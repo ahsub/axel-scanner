@@ -8,7 +8,7 @@ const TF_MAP = {
   '1d':  { yInterval: '1d',  lookbackDays: 130, minBars: 30 },
 };
  
-const HEADERS = {
+const YF_HEADERS = {
   'Accept': 'application/json',
   'Accept-Language': 'en-US,en;q=0.9',
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -27,6 +27,8 @@ export default async function handler(req) {
   return handleScan(searchParams);
 }
  
+// ─── SCAN ────────────────────────────────────────────────────────────────────
+ 
 async function handleScan(searchParams) {
   const symbol = (searchParams.get('symbol') || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
   const tfKey = searchParams.get('interval') || '1d';
@@ -35,20 +37,25 @@ async function handleScan(searchParams) {
  
   const to = Math.floor(Date.now() / 1000);
   const from = to - 60 * 60 * 24 * tf.lookbackDays;
- 
   const hosts = ['query2', 'query1'];
   let lastErr = '';
-  for (const host of hosts) {
+ 
+  for (var hi = 0; hi < hosts.length; hi++) {
+    var host = hosts[hi];
     try {
-      const url = 'https://' + host + '.finance.yahoo.com/v8/finance/chart/' + symbol + '?interval=' + tf.yInterval + '&period1=' + from + '&period2=' + to + '&includePrePost=false';
-      const r = await fetch(url, { headers: { ...HEADERS, 'Referer': 'https://finance.yahoo.com/quote/' + symbol } });
+      var url = 'https://' + host + '.finance.yahoo.com/v8/finance/chart/' + symbol
+        + '?interval=' + tf.yInterval
+        + '&period1=' + from
+        + '&period2=' + to
+        + '&includePrePost=false';
+      var r = await fetch(url, { headers: Object.assign({}, YF_HEADERS, { 'Referer': 'https://finance.yahoo.com/quote/' + symbol }) });
       if (!r.ok) { lastErr = host + ' HTTP ' + r.status; continue; }
-      const j = await r.json();
-      const res = j && j.chart && j.chart.result && j.chart.result[0];
+      var j = await r.json();
+      var res = j && j.chart && j.chart.result && j.chart.result[0];
       if (!res) { lastErr = host + ' no_data'; continue; }
-      const q = res.indicators.quote[0];
-      const closes = q.close.map(function(v) { return v || 0; });
-      const volumes = q.volume.map(function(v) { return v || 0; });
+      var q = res.indicators.quote[0];
+      var closes = q.close.map(function(v) { return v || 0; });
+      var volumes = q.volume.map(function(v) { return v || 0; });
       if (closes.length < tf.minBars) { lastErr = 'insufficient: ' + closes.length; continue; }
       return okRes(computeIndicators(symbol, tf, closes, volumes, res.timestamp));
     } catch(e) {
@@ -58,89 +65,139 @@ async function handleScan(searchParams) {
   return errRes('Scan fehlgeschlagen: ' + lastErr, 500);
 }
  
+// ─── MOST ACTIVE via Finnhub ─────────────────────────────────────────────────
+ 
 async function handleMovers() {
-  const hosts = ['query1', 'query2'];
-  let lastErr = '';
-  for (const host of hosts) {
-    try {
-      const url = 'https://' + host + '.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&scrIds=most_actives&count=12&start=0&region=US&lang=en-US';
-      const r = await fetch(url, { headers: { ...HEADERS, 'Referer': 'https://finance.yahoo.com/markets/stocks/most-active/' } });
-      if (!r.ok) { lastErr = 'HTTP ' + r.status; continue; }
-      const j = await r.json();
-      const quotes = j && j.finance && j.finance.result && j.finance.result[0] && j.finance.result[0].quotes;
-      if (!quotes || !quotes.length) { lastErr = 'empty'; continue; }
-      const items = quotes.slice(0, 10).map(function(q) {
-        return {
-          symbol: q.symbol,
-          name: (q.shortName || q.longName || q.symbol).substring(0, 22),
-          price: q.regularMarketPrice ? q.regularMarketPrice.toFixed(2) : '—',
-          change: q.regularMarketChange ? q.regularMarketChange.toFixed(2) : '0',
-          changePct: q.regularMarketChangePercent ? q.regularMarketChangePercent.toFixed(2) : '0',
-          volume: fmtVol(q.regularMarketVolume),
-          avgVol: fmtVol(q.averageDailyVolume3Month),
-          volRatio: q.averageDailyVolume3Month > 0 ? Math.round((q.regularMarketVolume / q.averageDailyVolume3Month) * 100) : null,
-          mktCap: fmtCap(q.marketCap),
-        };
+  var key = typeof process !== 'undefined' && process.env ? process.env.FINNHUB_KEY : null;
+  if (!key) return errRes('FINNHUB_KEY nicht konfiguriert', 500);
+ 
+  try {
+    // Get market status + top symbols by fetching a broad quote list
+    // Finnhub: use stock screener endpoint for most active
+    var url = 'https://finnhub.io/api/v1/stock/market-status?exchange=US&token=' + key;
+    var statusRes = await fetch(url);
+    var statusData = await statusRes.json();
+ 
+    // Fetch quotes for known high-volume symbols
+    var symbols = ['NVDA','AAPL','MSFT','TSLA','AMD','META','AMZN','GOOGL','PLTR','SPY',
+                   'SOXL','TQQQ','MRVL','AVGO','VRT','ARM','CRDO','LRCX','TSM','SMCI'];
+    var quotePromises = symbols.map(function(sym) {
+      return fetch('https://finnhub.io/api/v1/quote?symbol=' + sym + '&token=' + key)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { return { symbol: sym, data: d }; })
+        .catch(function() { return null; });
+    });
+ 
+    var results = await Promise.all(quotePromises);
+    var items = [];
+ 
+    for (var i = 0; i < results.length; i++) {
+      var item = results[i];
+      if (!item || !item.data || !item.data.c) continue;
+      var d = item.data;
+      var chgPct = d.dp ? d.dp.toFixed(2) : '0';
+      items.push({
+        symbol: item.symbol,
+        name: item.symbol,
+        price: d.c ? d.c.toFixed(2) : '—',
+        change: d.d ? d.d.toFixed(2) : '0',
+        changePct: chgPct,
+        volume: '—',
+        volRatio: null,
+        mktCap: '—',
+        high: d.h ? d.h.toFixed(2) : '—',
+        low: d.l ? d.l.toFixed(2) : '—',
       });
-      return okRes({ mode: 'movers', items: items, ts: new Date().toISOString() });
-    } catch(e) {
-      lastErr = e.message;
     }
+ 
+    // Sort by absolute % change (most active by movement)
+    items.sort(function(a, b) {
+      return Math.abs(parseFloat(b.changePct)) - Math.abs(parseFloat(a.changePct));
+    });
+ 
+    return okRes({ mode: 'movers', items: items.slice(0, 10), ts: new Date().toISOString() });
+  } catch(e) {
+    return errRes('Movers fehlgeschlagen: ' + e.message, 500);
   }
-  return errRes('Most active fehlgeschlagen: ' + lastErr, 500);
 }
+ 
+// ─── AFTER HOURS via Finnhub ─────────────────────────────────────────────────
  
 async function handleAfterHours() {
-  const watchlist = ['AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','AMD','AVGO','MRVL','VRT','LRCX','TSM','ARM','CRDO'];
-  const syms = watchlist.join(',');
-  const hosts = ['query1', 'query2'];
-  let lastErr = '';
-  for (const host of hosts) {
-    try {
-      const url = 'https://' + host + '.finance.yahoo.com/v8/finance/quote?symbols=' + syms + '&formatted=false&fields=symbol,shortName,regularMarketPrice,regularMarketChangePercent,preMarketPrice,preMarketChangePercent,postMarketPrice,postMarketChangePercent,regularMarketVolume';
-      const r = await fetch(url, { headers: { ...HEADERS, 'Referer': 'https://finance.yahoo.com/' } });
-      if (!r.ok) { lastErr = 'HTTP ' + r.status; continue; }
-      const j = await r.json();
-      const quotes = j && j.quoteResponse && j.quoteResponse.result;
-      if (!quotes || !quotes.length) { lastErr = 'empty'; continue; }
-      const now = new Date();
-      const hour = now.getUTCHours();
-      const isPreMarket = hour >= 9 && hour < 14;
-      const items = quotes.map(function(q) {
-        const ahPrice = isPreMarket ? q.preMarketPrice : q.postMarketPrice;
-        const ahChg = isPreMarket ? q.preMarketChangePercent : q.postMarketChangePercent;
-        return {
-          symbol: q.symbol,
-          name: (q.shortName || q.symbol).substring(0, 18),
-          regularPrice: q.regularMarketPrice ? q.regularMarketPrice.toFixed(2) : '—',
-          regularChgPct: q.regularMarketChangePercent ? q.regularMarketChangePercent.toFixed(2) : '0',
-          ahPrice: ahPrice ? ahPrice.toFixed(2) : null,
-          ahChgPct: ahChg ? ahChg.toFixed(2) : null,
-          volume: fmtVol(q.regularMarketVolume),
-        };
-      }).filter(function(q) { return q.ahPrice !== null; })
-        .sort(function(a, b) { return Math.abs(parseFloat(b.ahChgPct || 0)) - Math.abs(parseFloat(a.ahChgPct || 0)); });
-      return okRes({ mode: 'afterhours', items: items, isPreMarket: isPreMarket, ts: new Date().toISOString() });
-    } catch(e) {
-      lastErr = e.message;
+  var key = typeof process !== 'undefined' && process.env ? process.env.FINNHUB_KEY : null;
+  if (!key) return errRes('FINNHUB_KEY nicht konfiguriert', 500);
+ 
+  var watchlist = ['AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','AMD','AVGO','MRVL',
+                   'VRT','LRCX','TSM','ARM','CRDO','PLTR','SMCI','ORCL','CRM','SNOW'];
+  try {
+    var quotePromises = watchlist.map(function(sym) {
+      return fetch('https://finnhub.io/api/v1/quote?symbol=' + sym + '&token=' + key)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { return { symbol: sym, data: d }; })
+        .catch(function() { return null; });
+    });
+ 
+    var results = await Promise.all(quotePromises);
+    var now = new Date();
+    var hour = now.getUTCHours();
+    var isPreMarket = hour >= 9 && hour < 14;  // 09:00-14:00 UTC = 10:00-15:30 MEZ
+ 
+    var items = [];
+    for (var i = 0; i < results.length; i++) {
+      var item = results[i];
+      if (!item || !item.data || !item.data.c) continue;
+      var d = item.data;
+      var regularPrice = d.c ? d.c.toFixed(2) : null;
+      var regularChgPct = d.dp ? d.dp.toFixed(2) : '0';
+      if (!regularPrice) continue;
+ 
+      // Finnhub /quote returns current price which includes pre/post market
+      // Use 'pc' (prev close) vs 'c' (current) to detect after-hours movement
+      var ahPrice = null;
+      var ahChgPct = null;
+      if (d.c && d.pc && d.pc > 0) {
+        var chg = ((d.c - d.pc) / d.pc * 100);
+        // Only show if market is closed (significant after-hours signal)
+        ahPrice = d.c.toFixed(2);
+        ahChgPct = chg.toFixed(2);
+      }
+ 
+      if (!ahPrice) continue;
+      items.push({
+        symbol: item.symbol,
+        name: item.symbol,
+        regularPrice: regularPrice,
+        regularChgPct: regularChgPct,
+        ahPrice: ahPrice,
+        ahChgPct: ahChgPct,
+      });
     }
+ 
+    items.sort(function(a, b) {
+      return Math.abs(parseFloat(b.ahChgPct || 0)) - Math.abs(parseFloat(a.ahChgPct || 0));
+    });
+ 
+    return okRes({ mode: 'afterhours', items: items.slice(0, 12), isPreMarket: isPreMarket, ts: new Date().toISOString() });
+  } catch(e) {
+    return errRes('After-Hours fehlgeschlagen: ' + e.message, 500);
   }
-  return errRes('After-Hours fehlgeschlagen: ' + lastErr, 500);
 }
  
+// ─── INDICATORS ──────────────────────────────────────────────────────────────
+ 
 function computeIndicators(symbol, tf, closes, volumes, timestamps) {
-  const n = closes.length;
+  var n = closes.length;
  
   function ema(data, p) {
     if (data.length < p) return data.map(function() { return null; });
-    const k = 2 / (p + 1);
-    const result = [];
-    let e = 0;
-    for (let i = 0; i < p; i++) e += data[i];
+    var k = 2 / (p + 1);
+    var result = [];
+    var e = 0;
+    for (var i = 0; i < p; i++) e += data[i];
     e = e / p;
-    for (let i = 0; i < p - 1; i++) result.push(null);
+    for (var i = 0; i < p - 1; i++) result.push(null);
     result.push(e);
-    for (let i = p; i < data.length; i++) {
+    for (var i = p; i < data.length; i++) {
       e = data[i] * k + e * (1 - k);
       result.push(e);
     }
@@ -150,66 +207,66 @@ function computeIndicators(symbol, tf, closes, volumes, timestamps) {
   function sma(data, p) {
     return data.map(function(_, i) {
       if (i < p - 1) return null;
-      let sum = 0;
-      for (let j = i - p + 1; j <= i; j++) sum += data[j];
+      var sum = 0;
+      for (var j = i - p + 1; j <= i; j++) sum += data[j];
       return sum / p;
     });
   }
  
-  const e12 = ema(closes, 12);
-  const e26 = ema(closes, 26);
-  const macdLine = closes.map(function(_, i) {
+  var e12 = ema(closes, 12);
+  var e26 = ema(closes, 26);
+  var macdLine = closes.map(function(_, i) {
     return (e12[i] != null && e26[i] != null) ? e12[i] - e26[i] : null;
   });
-  const validMacd = macdLine.filter(function(v) { return v != null; });
-  const sigRaw = ema(validMacd, 9);
-  const signal = [];
-  let si = 0;
+  var validMacd = macdLine.filter(function(v) { return v != null; });
+  var sigRaw = ema(validMacd, 9);
+  var signal = [];
+  var si = 0;
   macdLine.forEach(function(v) { signal.push(v != null ? sigRaw[si++] : null); });
-  const hist = macdLine.map(function(v, i) {
+  var hist = macdLine.map(function(v, i) {
     return (v != null && signal[i] != null) ? v - signal[i] : null;
   });
  
-  const obv = [0];
-  for (let i = 1; i < n; i++) {
-    const prev = obv[obv.length - 1];
+  var obv = [0];
+  for (var i = 1; i < n; i++) {
+    var prev = obv[obv.length - 1];
     if (closes[i] > closes[i - 1]) obv.push(prev + volumes[i]);
     else if (closes[i] < closes[i - 1]) obv.push(prev - volumes[i]);
     else obv.push(prev);
   }
  
-  const maPeriod = Math.min(50, Math.floor(n * 0.6));
-  const ma50arr = sma(closes, maPeriod);
-  const ma50 = ma50arr[n - 1] != null ? ma50arr[n - 1] : closes[n - 1];
-  const price = closes[n - 1];
-  const histVal = hist[n - 1];
-  const histPrev = hist[n - 2];
-  const obvSlope = n >= 6 ? (obv[n - 1] - obv[n - 6]) / 1e6 : null;
-  const lastVol = volumes[n - 1];
-  const slice20 = volumes.slice(-21, -1);
-  let volSum = 0;
-  for (let i = 0; i < slice20.length; i++) volSum += slice20[i];
-  const volAvg20 = slice20.length > 0 ? volSum / slice20.length : 0;
-  const volRatio = volAvg20 > 0 ? Math.round((lastVol / volAvg20) * 100) : null;
+  var maPeriod = Math.min(50, Math.floor(n * 0.6));
+  var ma50arr = sma(closes, maPeriod);
+  var ma50 = ma50arr[n - 1] != null ? ma50arr[n - 1] : closes[n - 1];
+  var price = closes[n - 1];
+  var histVal = hist[n - 1];
+  var histPrev = hist[n - 2];
+  var obvSlope = n >= 6 ? (obv[n - 1] - obv[n - 6]) / 1e6 : null;
+  var lastVol = volumes[n - 1];
+  var slice20 = volumes.slice(-21, -1);
+  var volSum = 0;
+  for (var i = 0; i < slice20.length; i++) volSum += slice20[i];
+  var volAvg20 = slice20.length > 0 ? volSum / slice20.length : 0;
+  var volRatio = volAvg20 > 0 ? Math.round((lastVol / volAvg20) * 100) : null;
  
-  const dates = timestamps.map(function(t) {
-    const d = new Date(t * 1000);
-    const day = String(d.getDate()).padStart(2, '0');
-    const mon = String(d.getMonth() + 1).padStart(2, '0');
-    const hr = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
+  var dates = timestamps.map(function(t) {
+    var d = new Date(t * 1000);
+    var day = String(d.getDate()).padStart(2, '0');
+    var mon = String(d.getMonth() + 1).padStart(2, '0');
+    var hr = String(d.getHours()).padStart(2, '0');
+    var min = String(d.getMinutes()).padStart(2, '0');
     return tf.yInterval === '1d' ? day + '.' + mon : day + '.' + mon + ' ' + hr + ':' + min;
   });
  
-  const l20c = closes.slice(-20);
-  const l20h = hist.slice(-20);
-  const l20o = obv.slice(-20);
-  let oMin = l20o[0], oMax = l20o[0];
-  for (let i = 1; i < l20o.length; i++) {
+  var l20c = closes.slice(-20);
+  var l20h = hist.slice(-20);
+  var l20o = obv.slice(-20);
+  var oMin = l20o[0], oMax = l20o[0];
+  for (var i = 1; i < l20o.length; i++) {
     if (l20o[i] < oMin) oMin = l20o[i];
     if (l20o[i] > oMax) oMax = l20o[i];
   }
-  const obvNorm = l20o.map(function(v) {
+  var obvNorm = l20o.map(function(v) {
     return oMax === oMin ? 0.5 : (v - oMin) / (oMax - oMin);
   });
  
@@ -229,32 +286,19 @@ function computeIndicators(symbol, tf, closes, volumes, timestamps) {
   };
 }
  
-function fmtVol(v) {
-  if (!v) return '—';
-  if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
-  if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
-  if (v >= 1e3) return Math.round(v / 1e3) + 'K';
-  return String(v);
-}
- 
-function fmtCap(v) {
-  if (!v) return '—';
-  if (v >= 1e12) return (v / 1e12).toFixed(1) + 'T';
-  if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
-  return Math.round(v / 1e6) + 'M';
-}
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
  
 function okRes(data) {
   return new Response(JSON.stringify(data), {
     status: 200,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, s-maxage=120' },
   });
 }
  
 function errRes(msg, status) {
   return new Response(JSON.stringify({ error: msg }), {
     status: status || 500,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
   });
 }
  
@@ -263,6 +307,5 @@ function corsHeaders() {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Cache-Control': 'public, s-maxage=120',
   };
 }
