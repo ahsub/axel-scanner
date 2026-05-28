@@ -801,11 +801,18 @@ async function runScan(){
     document.getElementById('scan-bar').style.width=((i/tickers.length)*100)+'%';
     try{
       const tf=window.currentTF||'1d';
-      const r=await fetch(`${API_BASE}?symbol=${t.sym}&interval=${tf}`);
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      const data=await r.json();
-      if(data.error) throw new Error(data.error);
-      renderCard(t,processData(data));
+      const to=Math.floor(Date.now()/1000);
+      const days={'15m':60,'30m':60,'1h':90,'4h':120,'1d':130}[tf]||130;
+      const from=to-60*60*24*days;
+      const j=await finnhubCandles(t.sym,'D',from,to);
+      if(j.s==='no_data'||!j.c||j.c.length<20) throw new Error('Keine Daten (Finnhub: '+(j.s||'empty')+')');
+      const dates=j.t.map(function(ts){
+        const d=new Date(ts*1000);
+        return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');
+      });
+      const raw=computeFromRaw(j.c,j.v,j.t);
+      raw.dates_20d=dates.slice(-20);
+      renderCard(t,processData(raw));
     }catch(e){
       renderCard(t,{error:e.message});
     }
