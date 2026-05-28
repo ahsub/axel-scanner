@@ -255,7 +255,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
       <div id="scan-container"></div>
       <div style="font-size:11px;color:var(--text3);margin-top:.5rem">
-        <i class="ti ti-info-circle"></i> Daten via Yahoo Finance · Kaufsignal = alle 3 bullisch · Zeitrahmen wechseln = neuer Scan erforderlich
+        <i class="ti ti-info-circle"></i> Daten via Twelve Data · Kaufsignal = alle 3 bullisch · Key im Admin-Tab hinterlegen
       </div>
 
       <div style="height:0.5px;background:var(--border);margin:1.25rem 0"></div>
@@ -556,6 +556,19 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="fh-key-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Key gespeichert</div>
       </div>
 
+      <div class="sec">Twelve Data API-Key</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.65rem">Für Scanner MACD/OBV Analyse. Kostenlos bei twelvedata.com (800 Requests/Tag). Key wird lokal gespeichert.</div>
+        <div class="fg" style="margin-bottom:.65rem">
+          <label>Twelve Data API-Key</label>
+          <input type="password" id="td-key-input" placeholder="Twelve Data API-Key eingeben…" style="font-family:var(--mono)">
+        </div>
+        <button class="btn btn-primary" onclick="saveTwelveKey()" style="width:100%">
+          <i class="ti ti-key"></i> Key speichern
+        </button>
+        <div id="td-key-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Key gespeichert</div>
+      </div>
+
       <div class="sec">PIN ändern</div>
       <div class="card">
         <div class="grid-2" style="margin-bottom:.65rem">
@@ -658,6 +671,12 @@ function getFinnhubKey(){
 function setFinnhubKey(k){
   localStorage.setItem('ko_fh_key', k.trim());
 }
+function getTwelveKey(){
+  return localStorage.getItem('ko_twelve_key') || '';
+}
+function setTwelveKey(k){
+  localStorage.setItem('ko_twelve_key', k.trim());
+}
 
 async function finnhubQuote(sym){
   const key = getFinnhubKey();
@@ -721,6 +740,16 @@ function unlockApp(){
   updateClock(); setInterval(updateClock,1000);
   loadIBD(); loadMakro(); loadJournal();
 }
+function saveTwelveKey(){
+  const k=document.getElementById('td-key-input').value.trim();
+  if(!k){alert('Bitte Key eingeben');return;}
+  setTwelveKey(k);
+  document.getElementById('td-key-input').value='';
+  const msg=document.getElementById('td-key-msg');
+  msg.style.display='block';
+  setTimeout(()=>msg.style.display='none',3000);
+}
+
 function saveFinnhubKey(){
   const k=document.getElementById('fh-key-input').value.trim();
   if(!k){alert('Bitte Key eingeben');return;}
@@ -746,6 +775,8 @@ function showPanel(id){
   if(id==='admin'){
     const inp=document.getElementById('fh-key-input');
     if(inp&&getFinnhubKey()) inp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
+    const tdInp=document.getElementById('td-key-input');
+    if(tdInp&&getTwelveKey()) tdInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
   }
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -800,51 +831,36 @@ async function runScan(){
     const tfLabel=TF_CONFIG[window.currentTF||'1d']?.label||'';document.getElementById('scan-label').textContent=`${t.sym} · ${tfLabel.split('·')[0].trim()} (${i+1}/${tickers.length})`;
     document.getElementById('scan-bar').style.width=((i/tickers.length)*100)+'%';
     try{
-      const key=getFinnhubKey();
-      const to=Math.floor(Date.now()/1000);
-      const from=to-60*60*24*130;
-      // Try Finnhub candle with count parameter
-      let closes=[],volumes=[],timestamps=[];
-      let source='';
-      const fhUrl='https://finnhub.io/api/v1/stock/candle?symbol='+t.sym+'&resolution=D&from='+from+'&to='+to+(key?'&token='+key:'');
-      try{
-        const fhR=await fetch(fhUrl);
-        if(fhR.ok){
-          const fhJ=await fhR.json();
-          if(fhJ.s!=='no_data'&&fhJ.c&&fhJ.c.length>=20){
-            closes=fhJ.c;volumes=fhJ.v||[];timestamps=fhJ.t;source='Finnhub';
-          }
-        }
-      }catch(e2){}
-      // Fallback: stooq.com (CORS-friendly, no key needed)
-      if(closes.length<20){
-        const stooqUrl='https://stooq.com/q/d/l/?s='+t.sym.toLowerCase()+'.us&i=d&l=130';
-        try{
-          const stR=await fetch(stooqUrl);
-          if(stR.ok){
-            const csv=await stR.text();
-            const rows=csv.trim().split('\n').slice(1).filter(r=>r.length>0);
-            rows.forEach(function(row){
-              const cols=row.split(',');
-              if(cols.length>=5){
-                const ts=new Date(cols[0]).getTime()/1000;
-                const c=parseFloat(cols[4]);
-                const v=parseFloat(cols[5])||0;
-                if(!isNaN(ts)&&!isNaN(c)){timestamps.push(ts);closes.push(c);volumes.push(v);}
-              }
-            });
-            if(closes.length>=20) source='Stooq';
-          }
-        }catch(e3){}
-      }
-      if(closes.length<20) throw new Error('Keine Daten verfügbar (Finnhub & Stooq)');
+      const tdKey=getTwelveKey();
+      if(!tdKey) throw new Error('Twelve Data API-Key nicht gesetzt (Admin-Tab)');
+      const tf=window.currentTF||'1d';
+      const intervalMap={'15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'};
+      const outputMap={'15m':78,'30m':60,'1h':90,'4h':120,'1d':130};
+      const interval=intervalMap[tf]||'1day';
+      const outputsize=outputMap[tf]||130;
+      const url='https://api.twelvedata.com/time_series?symbol='+t.sym
+        +'&interval='+interval
+        +'&outputsize='+outputsize
+        +'&apikey='+tdKey;
+      const r=await fetch(url);
+      if(!r.ok) throw new Error('Twelve Data HTTP '+r.status);
+      const j=await r.json();
+      if(j.status==='error') throw new Error('Twelve Data: '+j.message);
+      const values=j.values;
+      if(!values||values.length<20) throw new Error('Zu wenig Datenpunkte: '+(values?values.length:0));
+      // Twelve Data returns newest first - reverse for MACD calculation
+      const reversed=[...values].reverse();
+      const closes=reversed.map(function(v){return parseFloat(v.close)||0;});
+      const volumes=reversed.map(function(v){return parseFloat(v.volume)||0;});
+      const timestamps=reversed.map(function(v){return new Date(v.datetime).getTime()/1000;});
       const raw=computeFromRaw(closes,volumes,timestamps);
-      const dates=timestamps.map(function(ts){
-        const d=new Date(ts*1000);
-        return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');
+      const dates=reversed.map(function(v){
+        const d=new Date(v.datetime);
+        const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
+        const hh=String(d.getHours()).padStart(2,'0'),mn=String(d.getMinutes()).padStart(2,'0');
+        return interval==='1day'?dd+'.'+mm:dd+'.'+mm+' '+hh+':'+mn;
       });
       raw.dates_20d=dates.slice(-20);
-      raw.source=source;
       renderCard(t,processData(raw));
     }catch(e){
       renderCard(t,{error:e.message});
