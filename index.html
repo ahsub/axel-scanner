@@ -168,6 +168,15 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .admin-warn{background:var(--amber-bg);border:0.5px solid rgba(240,169,58,0.3);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--amber);margin-bottom:1rem}
 .progress{height:3px;background:var(--bg3);border-radius:2px;margin:.5rem 0;overflow:hidden}
 .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+.j-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem;margin-bottom:.6rem}
+.j-card-open{border-left:3px solid var(--green)}
+.j-card-closed{border-left:3px solid var(--text3);opacity:.7}
+.j-card-warn{border-left:3px solid var(--amber)}
+.j-card-danger{border-left:3px solid var(--red)}
+.j-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid rgba(255,255,255,0.04)}
+.j-row:last-child{border-bottom:none}
+.j-label{font-size:11px;color:var(--text3)}
+.j-val{font-size:12px;font-weight:500;font-family:var(--mono)}
 .info-box{background:var(--blue-bg);border:0.5px solid rgba(79,142,247,0.25);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--accent);margin-bottom:1rem}
 .warn-box{background:var(--amber-bg);border:0.5px solid rgba(240,169,58,0.25);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--amber);margin-top:8px}
 .danger-box{background:var(--red-bg);border:0.5px solid rgba(240,86,86,0.25);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--red);margin-top:6px}
@@ -248,6 +257,23 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div style="font-size:11px;color:var(--text3);margin-top:.5rem">
         <i class="ti ti-info-circle"></i> Daten via Yahoo Finance · Kaufsignal = alle 3 bullisch · Zeitrahmen wechseln = neuer Scan erforderlich
       </div>
+
+      <div style="height:0.5px;background:var(--border);margin:1.25rem 0"></div>
+      <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">
+        <i class="ti ti-trending-up" style="font-size:12px"></i> Markt-Aktivität
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:.75rem;flex-wrap:wrap">
+        <button class="btn btn-sm" id="mkt-active-btn" onclick="loadMostActive()">
+          <i class="ti ti-flame"></i> Top 10 Aktivste
+        </button>
+        <button class="btn btn-sm" id="mkt-ah-btn" onclick="loadAfterHours()">
+          <i class="ti ti-moon"></i> After-Hours Movers
+        </button>
+        <button class="btn btn-sm" id="mkt-clear-btn" onclick="clearMarketIntel()" style="display:none">
+          <i class="ti ti-x"></i> Schließen
+        </button>
+      </div>
+      <div id="market-intel-container"></div>
     </div>
 
     <!-- RECHNER PANEL -->
@@ -531,6 +557,59 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
   </div>
 
+
+    <!-- JOURNAL PANEL -->
+    <div id="panel-journal" class="panel">
+      <div id="journal-summary" class="mc-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:.75rem">
+        <div class="mc"><div class="mcl">Positionen</div><div class="mcv" id="j-count">0</div></div>
+        <div class="mc"><div class="mcl">Einsatz (€)</div><div class="mcv" id="j-capital">—</div></div>
+        <div class="mc"><div class="mcl">P&amp;L (€)</div><div class="mcv" id="j-pnl">—</div></div>
+        <div class="mc"><div class="mcl">P&amp;L (%)</div><div class="mcv" id="j-pnl-pct">—</div></div>
+      </div>
+      <div class="sec">Neue Position erfassen</div>
+      <div class="card" id="j-add-card">
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="fg"><label>Ticker</label><input type="text" id="j-ticker" placeholder="VRT" oninput="this.value=this.value.toUpperCase()"></div>
+          <div class="fg"><label>ISIN</label><input type="text" id="j-isin" placeholder="DE000HM51L93"></div>
+        </div>
+        <div class="grid-3" style="margin-bottom:.65rem">
+          <div class="fg"><label>Einstieg Basis ($)</label><input type="number" id="j-entry" placeholder="318.19"></div>
+          <div class="fg"><label>KO-Schwelle ($)</label><input type="number" id="j-ko" placeholder="250.34"></div>
+          <div class="fg"><label>Ratio</label><input type="number" id="j-ratio" placeholder="0.01" step="0.001"></div>
+        </div>
+        <div class="grid-3" style="margin-bottom:.65rem">
+          <div class="fg"><label>Turbo-Einstieg (€)</label><input type="number" id="j-turbo-entry" placeholder="0.68" step="0.01"></div>
+          <div class="fg"><label>Anzahl Stück</label><input type="number" id="j-qty" placeholder="500"></div>
+          <div class="fg"><label>Stop-Kurs Basis ($)</label><input type="number" id="j-stop" placeholder="286.00"></div>
+        </div>
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="fg"><label>Status</label>
+            <select id="j-status"><option value="open">Offen</option><option value="closed">Geschlossen</option></select>
+          </div>
+          <div class="fg"><label>Emittent</label>
+            <select id="j-emittent">
+              <option value="">—</option><option value="HSBC">HSBC</option><option value="SocGen">SocGen</option>
+              <option value="Citi">Citi</option><option value="BNP">BNP</option><option value="DZ">DZ Bank</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg" style="margin-bottom:.65rem"><label>Notiz / Setup-Beschreibung</label>
+          <input type="text" id="j-note" placeholder="z.B. Post-Earnings Gap, VCP Breakout, 3/3 Scanner-Signal">
+        </div>
+        <button class="btn btn-primary" onclick="addPosition()" style="width:100%">
+          <i class="ti ti-plus"></i> Position speichern
+        </button>
+      </div>
+      <div class="sec" style="display:flex;justify-content:space-between;align-items:center;margin-top:1.25rem">
+        <span>Positionen</span>
+        <button class="btn btn-sm" id="j-show-closed" onclick="toggleClosed()">Geschlossene anzeigen</button>
+      </div>
+      <div id="journal-list"></div>
+      <div id="journal-empty" style="text-align:center;padding:2rem;color:var(--text3);font-size:13px;display:none">
+        <i class="ti ti-notebook" style="font-size:32px;display:block;margin-bottom:.5rem"></i>
+        Noch keine Positionen — erste Position oben erfassen
+      </div>
+    </div>
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <button class="nav-btn active" id="nav-scanner" onclick="showPanel('scanner')">
@@ -544,6 +623,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </button>
     <button class="nav-btn" id="nav-makro" onclick="showPanel('makro')">
       <i class="ti ti-world"></i>Makro
+    </button>
+    <button class="nav-btn" id="nav-journal" onclick="showPanel('journal')">
+      <i class="ti ti-notebook"></i>Journal
     </button>
     <button class="nav-btn" id="nav-admin" onclick="showPanel('admin')">
       <i class="ti ti-settings"></i>Admin
@@ -601,7 +683,7 @@ function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
-  loadIBD(); loadMakro();
+  loadIBD(); loadMakro(); loadJournal();
 }
 function changePin(){
   const p1=document.getElementById('new-pin').value;
@@ -1167,6 +1249,317 @@ function saveMakro(){
   const msg=document.getElementById('makro-save-msg');
   msg.style.display='block';
   setTimeout(()=>msg.style.display='none',3000);
+}
+
+function clearMarketIntel(){
+  document.getElementById('market-intel-container').innerHTML='';
+  document.getElementById('mkt-clear-btn').style.display='none';
+}
+
+async function loadMostActive(){
+  const container=document.getElementById('market-intel-container');
+  container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade aktivste Aktien…</div>';
+  document.getElementById('mkt-clear-btn').style.display='inline';
+  try{
+    const r=await fetch(`${API_BASE}?mode=movers`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(d.error) throw new Error(d.error);
+    renderMostActive(d);
+  }catch(e){
+    container.innerHTML=`<div style="font-size:12px;color:var(--red);padding:8px 0"><i class="ti ti-alert-circle"></i> ${e.message}</div>`;
+  }
+}
+
+function renderMostActive(d){
+  const container=document.getElementById('market-intel-container');
+  const rows=d.items.map(s=>{
+    const chg=parseFloat(s.changePct);
+    const chgCls=chg>0?'var(--green)':chg<0?'var(--red)':'var(--text2)';
+    const vRatio=s.volRatio;
+    const vCls=vRatio>150?'pill-green':vRatio>100?'pill-amber':'pill-gray';
+    return `<tr>
+      <td style="font-weight:600;font-family:var(--mono);color:var(--accent);font-size:12px">${s.symbol}</td>
+      <td style="font-size:11px;color:var(--text2);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</td>
+      <td style="font-family:var(--mono);font-size:12px;text-align:right">$${s.price}</td>
+      <td style="font-family:var(--mono);font-size:12px;text-align:right;color:${chgCls}">${chg>0?'+':''}${s.changePct}%</td>
+      <td style="text-align:right;font-size:11px;font-family:var(--mono)">${s.volume}</td>
+      <td style="text-align:right"><span class="pill ${vCls}" style="font-size:10px">${vRatio?vRatio+'%':'—'}</span></td>
+      <td style="text-align:right"><button class="btn btn-sm" onclick="addToScan('${s.symbol}')" style="padding:2px 6px;font-size:10px"><i class="ti ti-radar"></i></button></td>
+    </tr>`;
+  }).join('');
+  container.innerHTML=`
+  <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px">Top 10 Aktivste — ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr · Vol% = vs. 3M-Ø</div>
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr>
+      <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Ticker</th>
+      <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Name</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Kurs</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Chg%</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Vol</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Vol%</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)"></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  </div>
+  <div style="font-size:11px;color:var(--text3);margin-top:6px"><i class="ti ti-info-circle"></i> Radar-Icon = Ticker zum Scanner hinzufügen</div>`;
+}
+
+async function loadAfterHours(){
+  const container=document.getElementById('market-intel-container');
+  container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade After-Hours Daten…</div>';
+  document.getElementById('mkt-clear-btn').style.display='inline';
+  try{
+    const r=await fetch(`${API_BASE}?mode=afterhours`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(d.error) throw new Error(d.error);
+    renderAfterHours(d);
+  }catch(e){
+    container.innerHTML=`<div style="font-size:12px;color:var(--red);padding:8px 0"><i class="ti ti-alert-circle"></i> ${e.message}</div>`;
+  }
+}
+
+function renderAfterHours(d){
+  const container=document.getElementById('market-intel-container');
+  const label=d.isPreMarket?'Pre-Market':'After-Hours';
+  if(!d.items||d.items.length===0){
+    container.innerHTML=`<div style="font-size:12px;color:var(--text2);padding:8px 0">Keine ${label}-Aktivität verfügbar — Markt möglicherweise noch offen oder keine Daten.</div>`;
+    return;
+  }
+  const rows=d.items.slice(0,12).map(s=>{
+    const regChg=parseFloat(s.regularChgPct);
+    const ahChg=parseFloat(s.ahChgPct);
+    const regCls=regChg>0?'var(--green)':regChg<0?'var(--red)':'var(--text2)';
+    const ahCls=ahChg>0?'var(--green)':ahChg<0?'var(--red)':'var(--text2)';
+    const bigMove=Math.abs(ahChg)>=3;
+    return `<tr style="${bigMove?'background:rgba(240,169,58,0.06)':''}">
+      <td style="font-weight:600;font-family:var(--mono);color:var(--accent);font-size:12px">${s.symbol}</td>
+      <td style="font-size:11px;color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</td>
+      <td style="font-family:var(--mono);font-size:12px;text-align:right">$${s.regularPrice}</td>
+      <td style="font-family:var(--mono);font-size:11px;text-align:right;color:${regCls}">${regChg>0?'+':''}${s.regularChgPct}%</td>
+      <td style="font-family:var(--mono);font-size:12px;text-align:right;font-weight:500">$${s.ahPrice}</td>
+      <td style="font-family:var(--mono);font-size:12px;text-align:right;color:${ahCls};font-weight:600">${ahChg>0?'+':''}${s.ahChgPct}%${bigMove?' ⚡':''}</td>
+      <td style="text-align:right"><button class="btn btn-sm" onclick="addToScan('${s.symbol}')" style="padding:2px 6px;font-size:10px"><i class="ti ti-radar"></i></button></td>
+    </tr>`;
+  }).join('');
+  container.innerHTML=`
+  <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px">
+    ${label} — ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr · Sortiert nach Bewegungsgröße · ⚡ = Bewegung ≥3%
+  </div>
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr>
+      <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Ticker</th>
+      <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Name</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Schluss</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Tages%</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">${label}</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">${label}%</th>
+      <th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  </div>
+  <div style="font-size:11px;color:var(--text3);margin-top:6px"><i class="ti ti-info-circle"></i> Bewegung ≥3% = orange markiert · Radar = zum Scanner hinzufügen</div>`;
+}
+
+function addToScan(ticker){
+  document.getElementById('ticker-preset').value='custom';
+  document.getElementById('custom-wrap').style.display='block';
+  const current=document.getElementById('custom-input').value;
+  const tickers=current.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!tickers.includes(ticker)) tickers.push(ticker);
+  document.getElementById('custom-input').value=tickers.join(', ');
+  const info=document.createElement('div');
+  info.className='info-box';
+  info.style.cssText='margin-bottom:.5rem;font-size:12px';
+  info.innerHTML=`<i class="ti ti-check"></i> <strong>${ticker}</strong> zur Scan-Liste hinzugefügt`;
+  const container=document.getElementById('scan-container');
+  container.parentNode.insertBefore(info,container);
+  setTimeout(()=>info.remove(),3000);
+}
+
+// ─── POSITIONSJOURNAL ──────────────────────────────────────────────────────
+const J_KEY = 'ko_journal';
+let journalData = [];
+let showClosed = false;
+
+function loadJournal(){
+  const raw = localStorage.getItem(J_KEY);
+  if(raw){ try{ journalData = JSON.parse(raw); }catch(e){ journalData = []; } }
+  renderJournal();
+}
+
+function saveJournal(){
+  localStorage.setItem(J_KEY, JSON.stringify(journalData));
+}
+
+function gj(id){ return document.getElementById(id)?.value?.trim() || ''; }
+function gjn(id){ const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? null : v; }
+
+function addPosition(){
+  const ticker = gj('j-ticker');
+  if(!ticker){ alert('Bitte Ticker eingeben'); return; }
+  const entry = gjn('j-entry');
+  const ko = gjn('j-ko');
+  const ratio = gjn('j-ratio');
+  const turboEntry = gjn('j-turbo-entry');
+  const qty = gjn('j-qty');
+  const stop = gjn('j-stop');
+  if(!entry || !ko || !ratio || !turboEntry || !qty){
+    alert('Bitte mindestens: Einstieg Basiswert, KO, Ratio, Turbo-Preis und Anzahl ausfüllen');
+    return;
+  }
+  const pos = {
+    id: Date.now(),
+    ticker,
+    isin: gj('j-isin'),
+    emittent: gj('j-emittent'),
+    note: gj('j-note'),
+    status: gj('j-status') || 'open',
+    entry, ko, ratio, turboEntry, qty, stop,
+    einsatz: +(turboEntry * qty).toFixed(2),
+    date: new Date().toLocaleDateString('de-DE'),
+    closePrice: null,
+    closeDate: null,
+  };
+  journalData.unshift(pos);
+  saveJournal();
+  clearJournalForm();
+  renderJournal();
+}
+
+function clearJournalForm(){
+  ['j-ticker','j-isin','j-entry','j-ko','j-ratio','j-turbo-entry','j-qty','j-stop','j-note'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  const sel = document.getElementById('j-status');
+  if(sel) sel.value = 'open';
+  const em = document.getElementById('j-emittent');
+  if(em) em.value = '';
+}
+
+function closePosition(id){
+  const priceStr = prompt('Turbo-Verkaufspreis (€) eingeben:');
+  if(priceStr === null) return;
+  const price = parseFloat(priceStr.replace(',','.'));
+  if(isNaN(price)){ alert('Ungültiger Preis'); return; }
+  const pos = journalData.find(p => p.id === id);
+  if(!pos) return;
+  pos.status = 'closed';
+  pos.closePrice = price;
+  pos.closeDate = new Date().toLocaleDateString('de-DE');
+  saveJournal();
+  renderJournal();
+}
+
+function deletePosition(id){
+  if(!confirm('Position löschen?')) return;
+  journalData = journalData.filter(p => p.id !== id);
+  saveJournal();
+  renderJournal();
+}
+
+function toggleClosed(){
+  showClosed = !showClosed;
+  const btn = document.getElementById('j-show-closed');
+  if(btn) btn.textContent = showClosed ? 'Nur offene' : 'Geschlossene anzeigen';
+  renderJournal();
+}
+
+function renderJournal(){
+  const filtered = showClosed ? journalData : journalData.filter(p => p.status === 'open');
+  const openPos = journalData.filter(p => p.status === 'open');
+  const closedPos = journalData.filter(p => p.status === 'closed');
+
+  // Summary
+  const totalEinsatz = openPos.reduce((s,p) => s + (p.einsatz||0), 0);
+  let totalPnl = 0, pnlKnown = 0;
+  closedPos.forEach(p => {
+    if(p.closePrice != null && p.turboEntry && p.qty){
+      totalPnl += (p.closePrice - p.turboEntry) * p.qty;
+      pnlKnown++;
+    }
+  });
+
+  document.getElementById('j-count').textContent = openPos.length;
+  document.getElementById('j-capital').textContent = totalEinsatz > 0 ? totalEinsatz.toFixed(0) : '—';
+  const pnlEl = document.getElementById('j-pnl');
+  const pnlPctEl = document.getElementById('j-pnl-pct');
+  if(pnlKnown > 0){
+    pnlEl.textContent = (totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(0);
+    pnlEl.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const closedEinsatz = closedPos.reduce((s,p)=>s+(p.einsatz||0),0);
+    pnlPctEl.textContent = closedEinsatz > 0 ? (totalPnl/closedEinsatz*100).toFixed(1)+'%' : '—';
+    pnlPctEl.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+  } else {
+    pnlEl.textContent = '—';
+    pnlPctEl.textContent = '—';
+  }
+
+  const list = document.getElementById('journal-list');
+  const empty = document.getElementById('journal-empty');
+
+  if(filtered.length === 0){
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  list.innerHTML = filtered.map(p => {
+    const isClosed = p.status === 'closed';
+    const einsatz = p.einsatz || (p.turboEntry * p.qty) || 0;
+    const koAbstand = p.entry && p.ko ? ((p.entry - p.ko)/p.entry*100).toFixed(1) : null;
+    const stopAbstand = p.entry && p.stop ? ((p.entry - p.stop)/p.entry*100).toFixed(1) : null;
+
+    // P&L calculation
+    let pnlHtml = '';
+    if(isClosed && p.closePrice != null && p.turboEntry && p.qty){
+      const pnl = (p.closePrice - p.turboEntry) * p.qty;
+      const pct = einsatz > 0 ? (pnl/einsatz*100).toFixed(1) : '—';
+      const col = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      pnlHtml = `<div class="j-row">
+        <span class="j-label">Realisierter P&L</span>
+        <span class="j-val" style="color:${col}">${pnl>=0?'+':''}€${pnl.toFixed(2)} (${pnl>=0?'+':''}${pct}%)</span>
+      </div>`;
+    }
+
+    // Risk warning
+    let cardCls = isClosed ? 'j-card j-card-closed' : 'j-card j-card-open';
+    if(!isClosed && koAbstand && parseFloat(koAbstand) < 15) cardCls = 'j-card j-card-danger';
+    else if(!isClosed && koAbstand && parseFloat(koAbstand) < 20) cardCls = 'j-card j-card-warn';
+
+    const limitPrice = p.stop && p.ko && p.ratio
+      ? ((p.stop - p.ko) * p.ratio).toFixed(2)
+      : null;
+
+    return `<div class="${cardCls}" id="jpos-${p.id}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:16px;font-weight:600;font-family:var(--mono);color:var(--accent)">${p.ticker}</span>
+        ${p.emittent?`<span class="pill pill-gray" style="font-size:10px">${p.emittent}</span>`:''}
+        ${p.isin?`<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">${p.isin}</span>`:''}
+        <span class="pill ${isClosed?'pill-gray':'pill-green'}" style="font-size:10px;margin-left:auto">${isClosed?'Geschlossen':'Offen'}</span>
+      </div>
+      ${p.note?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-style:italic"><i class="ti ti-message" style="font-size:12px"></i> ${p.note}</div>`:''}
+      <div class="j-row"><span class="j-label">Einstieg Basiswert</span><span class="j-val">$${p.entry}</span></div>
+      <div class="j-row"><span class="j-label">KO-Schwelle</span><span class="j-val">$${p.ko} ${koAbstand?`<span style="color:${parseFloat(koAbstand)<15?'var(--red)':parseFloat(koAbstand)<20?'var(--amber)':'var(--text3)';};font-size:10px">(${koAbstand}% Abstand)</span>`:''}</span></div>
+      <div class="j-row"><span class="j-label">Turbo-Einstieg</span><span class="j-val">€${p.turboEntry} × ${p.qty} Stück = €${einsatz.toFixed(2)}</span></div>
+      ${p.stop?`<div class="j-row"><span class="j-label">Stop / Limit-Order</span><span class="j-val">$${p.stop} Basis ${limitPrice?`→ <span style="color:var(--accent)">€${limitPrice}</span> Limit`:''}</span></div>`:''}
+      ${isClosed && p.closeDate?`<div class="j-row"><span class="j-label">Geschlossen am</span><span class="j-val">${p.closeDate} · €${p.closePrice}</span></div>`:''}
+      ${pnlHtml}
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <div style="font-size:10px;color:var(--text3);flex:1;align-self:center">${p.date}</div>
+        ${!isClosed?`<button class="btn btn-sm" onclick="useInRechner('${p.ticker}')" style="font-size:10px;padding:3px 8px"><i class="ti ti-calculator"></i></button>`:''}
+        ${!isClosed?`<button class="btn btn-sm" onclick="closePosition(${p.id})" style="font-size:10px;padding:3px 8px"><i class="ti ti-check"></i> Schließen</button>`:''}
+        <button class="btn btn-sm" onclick="deletePosition(${p.id})" style="font-size:10px;padding:3px 8px;color:var(--red)"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
 }
 </script>
 </body>
