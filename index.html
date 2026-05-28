@@ -543,6 +543,19 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="makro-save-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Gespeichert</div>
       </div>
 
+      <div class="sec">Finnhub API-Key</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.65rem">Key wird lokal gespeichert — nie übertragen. Wird für Scanner, Movers und After-Hours benötigt.</div>
+        <div class="fg" style="margin-bottom:.65rem">
+          <label>Finnhub API-Key</label>
+          <input type="password" id="fh-key-input" placeholder="Finnhub API-Key eingeben…" style="font-family:var(--mono)">
+        </div>
+        <button class="btn btn-primary" onclick="saveFinnhubKey()" style="width:100%">
+          <i class="ti ti-key"></i> Key speichern
+        </button>
+        <div id="fh-key-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Key gespeichert</div>
+      </div>
+
       <div class="sec">PIN ändern</div>
       <div class="card">
         <div class="grid-2" style="margin-bottom:.65rem">
@@ -636,8 +649,31 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────
 const DEFAULT_PIN = '2409';
-const API_BASE = '/api/scan';
+const API_BASE = '/api/scan'; // legacy - not used
 window.currentTF = '1d';
+
+function getFinnhubKey(){
+  return localStorage.getItem('ko_fh_key') || '';
+}
+function setFinnhubKey(k){
+  localStorage.setItem('ko_fh_key', k.trim());
+}
+
+async function finnhubQuote(sym){
+  const key = getFinnhubKey();
+  if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
+  const r = await fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+key);
+  if(!r.ok) throw new Error('Finnhub HTTP '+r.status);
+  return r.json();
+}
+
+async function finnhubCandles(sym, resolution, from, to){
+  const key = getFinnhubKey();
+  if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
+  const r = await fetch('https://finnhub.io/api/v1/stock/candle?symbol='+sym+'&resolution='+resolution+'&from='+from+'&to='+to+'&token='+key);
+  if(!r.ok) throw new Error('Finnhub candle HTTP '+r.status);
+  return r.json();
+}
 
 const TF_CONFIG = {
   '15m': {label:'15min Intraday · MACD (12/26/9)', macdPeriods:[12,26,9], lookback:60*60*24*5},
@@ -685,6 +721,16 @@ function unlockApp(){
   updateClock(); setInterval(updateClock,1000);
   loadIBD(); loadMakro(); loadJournal();
 }
+function saveFinnhubKey(){
+  const k=document.getElementById('fh-key-input').value.trim();
+  if(!k){alert('Bitte Key eingeben');return;}
+  setFinnhubKey(k);
+  document.getElementById('fh-key-input').value='';
+  const msg=document.getElementById('fh-key-msg');
+  msg.style.display='block';
+  setTimeout(()=>msg.style.display='none',3000);
+}
+
 function changePin(){
   const p1=document.getElementById('new-pin').value;
   const p2=document.getElementById('new-pin2').value;
@@ -697,6 +743,10 @@ function changePin(){
 
 // ─── NAV ─────────────────────────────────────────────────────────────
 function showPanel(id){
+  if(id==='admin'){
+    const inp=document.getElementById('fh-key-input');
+    if(inp&&getFinnhubKey()) inp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
+  }
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('panel-'+id).classList.add('active');
@@ -764,6 +814,50 @@ async function runScan(){
   document.getElementById('scan-label').textContent='Scan abgeschlossen ✓';
   setTimeout(()=>document.getElementById('scan-progress').style.display='none',2000);
   btn.disabled=false;
+}
+
+function computeFromRaw(closes, volumes, timestamps){
+  const n=closes.length;
+  function ema(d,p){
+    if(d.length<p) return d.map(()=>null);
+    const k=2/(p+1);const r=[];
+    let e=d.slice(0,p).reduce((a,b)=>a+b,0)/p;
+    for(let i=0;i<p-1;i++) r.push(null);r.push(e);
+    for(let i=p;i<d.length;i++){e=d[i]*k+e*(1-k);r.push(e);}
+    return r;
+  }
+  function sma(d,p){return d.map((_,i)=>i<p-1?null:d.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p);}
+  const e12=ema(closes,12),e26=ema(closes,26);
+  const ml=closes.map((_,i)=>(e12[i]!=null&&e26[i]!=null)?e12[i]-e26[i]:null);
+  const sr=ema(ml.filter(v=>v!=null),9);
+  const sig=[];let si=0;
+  ml.forEach(v=>sig.push(v!=null?sr[si++]:null));
+  const hist=ml.map((v,i)=>(v!=null&&sig[i]!=null)?v-sig[i]:null);
+  const obv=[0];
+  for(let i=1;i<n;i++){
+    const p=obv[obv.length-1];
+    if(closes[i]>closes[i-1]) obv.push(p+(volumes[i]||0));
+    else if(closes[i]<closes[i-1]) obv.push(p-(volumes[i]||0));
+    else obv.push(p);
+  }
+  const maPer=Math.min(50,Math.floor(n*0.6));
+  const ma50=(sma(closes,maPer))[n-1]??closes[n-1];
+  const price=closes[n-1];
+  const obvSlope=n>=6?(obv[n-1]-obv[n-6])/1e6:null;
+  const volAvg20=(volumes||[]).slice(-21,-1).reduce((a,b)=>a+b,0)/20;
+  const volRatio=volAvg20>0?Math.round((volumes[n-1]/volAvg20)*100):null;
+  const l20o=obv.slice(-20);
+  const oMin=Math.min(...l20o),oMax=Math.max(...l20o);
+  return {
+    price:+price.toFixed(2),ma50:+ma50.toFixed(2),
+    macd_hist:hist[n-1]!=null?+hist[n-1].toFixed(4):null,
+    macd_hist_prev:hist[n-2]!=null?+hist[n-2].toFixed(4):null,
+    obv_slope_5d:obvSlope!=null?+obvSlope.toFixed(2):null,
+    volume_ratio:volRatio,
+    closes_20d:closes.slice(-20).map(v=>+v.toFixed(2)),
+    macd_hist_20d:hist.slice(-20).map(v=>v!=null?+v.toFixed(4):0),
+    obv_norm_20d:l20o.map(v=>oMax===oMin?0.5:+((v-oMin)/(oMax-oMin)).toFixed(3)),
+  };
 }
 
 function processData(raw){
@@ -1307,13 +1401,30 @@ async function loadMostActive(){
   container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade aktivste Aktien…</div>';
   document.getElementById('mkt-clear-btn').style.display='inline';
   try{
-    const r=await fetch(`${API_BASE}?mode=movers`);
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const d=await r.json();
-    if(d.error) throw new Error(d.error);
-    renderMostActive(d);
+    const syms=['NVDA','AAPL','MSFT','TSLA','AMD','META','AMZN','GOOGL','PLTR','MRVL',
+                'AVGO','VRT','ARM','CRDO','LRCX','TSM','SMCI','SOXL','TQQQ','SPY'];
+    const key=getFinnhubKey();
+    if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
+    const results=await Promise.all(syms.map(sym=>
+      fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+key)
+        .then(r=>r.json()).then(d=>({symbol:sym,data:d})).catch(()=>null)
+    ));
+    const items=results
+      .filter(r=>r&&r.data&&r.data.c)
+      .map(r=>({
+        symbol:r.symbol,name:r.symbol,
+        price:r.data.c.toFixed(2),
+        change:(r.data.d||0).toFixed(2),
+        changePct:(r.data.dp||0).toFixed(2),
+        high:(r.data.h||0).toFixed(2),
+        low:(r.data.l||0).toFixed(2),
+        volume:'—',volRatio:null,mktCap:'—',
+      }))
+      .sort((a,b)=>Math.abs(parseFloat(b.changePct))-Math.abs(parseFloat(a.changePct)))
+      .slice(0,10);
+    renderMostActive({mode:'movers',items,ts:new Date().toISOString()});
   }catch(e){
-    container.innerHTML=`<div style="font-size:12px;color:var(--red);padding:8px 0"><i class="ti ti-alert-circle"></i> ${e.message}</div>`;
+    container.innerHTML='<div style="font-size:12px;color:var(--red);padding:8px 0"><i class="ti ti-alert-circle"></i> '+e.message+'</div>';
   }
 }
 
@@ -1358,13 +1469,29 @@ async function loadAfterHours(){
   container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade After-Hours Daten…</div>';
   document.getElementById('mkt-clear-btn').style.display='inline';
   try{
-    const r=await fetch(`${API_BASE}?mode=afterhours`);
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const d=await r.json();
-    if(d.error) throw new Error(d.error);
-    renderAfterHours(d);
+    const watchlist=['AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','AMD','AVGO','MRVL',
+                     'VRT','LRCX','TSM','ARM','CRDO','PLTR','SMCI','ORCL','CRM','SNOW'];
+    const key=getFinnhubKey();
+    if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
+    const results=await Promise.all(watchlist.map(sym=>
+      fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+key)
+        .then(r=>r.json()).then(d=>({symbol:sym,data:d})).catch(()=>null)
+    ));
+    const isPreMarket=new Date().getUTCHours()>=9&&new Date().getUTCHours()<14;
+    const items=results
+      .filter(r=>r&&r.data&&r.data.c&&r.data.pc)
+      .map(r=>({
+        symbol:r.symbol,name:r.symbol,
+        regularPrice:r.data.c.toFixed(2),
+        regularChgPct:(r.data.dp||0).toFixed(2),
+        ahPrice:r.data.c.toFixed(2),
+        ahChgPct:((r.data.c-r.data.pc)/r.data.pc*100).toFixed(2),
+      }))
+      .sort((a,b)=>Math.abs(parseFloat(b.ahChgPct||0))-Math.abs(parseFloat(a.ahChgPct||0)))
+      .slice(0,12);
+    renderAfterHours({mode:'afterhours',items,isPreMarket,ts:new Date().toISOString()});
   }catch(e){
-    container.innerHTML=`<div style="font-size:12px;color:var(--red);padding:8px 0"><i class="ti ti-alert-circle"></i> ${e.message}</div>`;
+    container.innerHTML='<div style="font-size:12px;color:var(--red);padding:8px 0"><i class="ti ti-alert-circle"></i> '+e.message+'</div>';
   }
 }
 
