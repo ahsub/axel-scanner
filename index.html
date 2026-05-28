@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<title>KO-Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.5.0/tabler-icons.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #0d0f12;
+  --bg2: #141720;
+  --bg3: #1c2030;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #eef0f4;
+  --text2: #8b90a0;
+  --text3: #555a6a;
+  --accent: #4f8ef7;
+  --accent2: #2d5fd4;
+  --green: #34c26e;
+  --green-bg: rgba(52,194,110,0.12);
+  --amber: #f0a93a;
+  --amber-bg: rgba(240,169,58,0.12);
+  --red: #f05656;
+  --red-bg: rgba(240,86,86,0.12);
+  --blue-bg: rgba(79,142,247,0.12);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;overscroll-behavior:none}
+input,select,button,textarea{font-family:var(--font);font-size:14px}
+
+/* PIN SCREEN */
+#pin-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;padding:2rem}
+.pin-logo{font-size:48px;margin-bottom:1rem;color:var(--accent)}
+.pin-title{font-size:22px;font-weight:600;margin-bottom:.25rem}
+.pin-sub{font-size:13px;color:var(--text2);margin-bottom:2rem}
+.pin-dots{display:flex;gap:12px;margin-bottom:1.5rem}
+.pin-dot{width:14px;height:14px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2);transition:all .2s}
+.pin-dot.filled{background:var(--accent);border-color:var(--accent)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:240px}
+.pin-btn{background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:16px;font-size:20px;font-weight:500;color:var(--text);cursor:pointer;transition:all .15s;text-align:center}
+.pin-btn:active{background:var(--accent2);transform:scale(0.96)}
+.pin-error{color:var(--red);font-size:13px;margin-top:.75rem;opacity:0;transition:opacity .3s}
+.pin-error.show{opacity:1}
+
+/* LAYOUT */
+#app{display:none;flex-direction:column;min-height:100vh;padding-bottom:80px}
+.topbar{position:sticky;top:0;z-index:100;background:rgba(13,15,18,0.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:0.5px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between}
+.topbar-title{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.topbar-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+.topbar-time{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.content{padding:1rem;max-width:600px;margin:0 auto;width:100%}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(13,15,18,0.97);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:0.5px solid var(--border);display:flex;padding:.5rem .5rem calc(.5rem + env(safe-area-inset-bottom));z-index:100}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:.5rem;border:none;background:none;color:var(--text3);cursor:pointer;border-radius:var(--radius-sm);transition:all .15s;font-size:10px;font-family:var(--font)}
+.nav-btn.active{color:var(--accent)}
+.nav-btn i{font-size:20px}
+.nav-btn.active i{color:var(--accent)}
+
+/* PANELS */
+.panel{display:none}.panel.active{display:block}
+
+/* CARDS */
+.card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:.75rem}
+.card-accent{border-color:var(--accent);box-shadow:0 0 0 1px rgba(79,142,247,0.15)}
+
+/* SECTION TITLES */
+.sec{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:.6rem;margin-top:1.25rem}
+.sec:first-child{margin-top:0}
+
+/* PILLS */
+.pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.pill-green{background:var(--green-bg);color:var(--green)}
+.pill-amber{background:var(--amber-bg);color:var(--amber)}
+.pill-red{background:var(--red-bg);color:var(--red)}
+.pill-blue{background:var(--blue-bg);color:var(--accent)}
+.pill-gray{background:rgba(255,255,255,0.06);color:var(--text3)}
+
+/* SIGNAL GRID */
+.sig-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
+.sig-box{background:var(--bg3);border-radius:var(--radius-sm);padding:8px 10px}
+.sig-label{font-size:10px;color:var(--text3);margin-bottom:2px;font-family:var(--mono)}
+.sig-val{font-size:13px;font-weight:500;font-family:var(--mono)}
+.sig-sub{font-size:11px;margin-top:3px}
+
+/* VERDICT */
+.verdict{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;margin-bottom:8px}
+.v-bull{background:var(--green-bg);color:var(--green)}
+.v-neu{background:var(--amber-bg);color:var(--amber)}
+.v-bear{background:var(--red-bg);color:var(--red)}
+.v-load{background:rgba(255,255,255,0.04);color:var(--text3)}
+
+/* CHART */
+.chart-wrap{position:relative;width:100%;height:100px;margin-top:8px}
+
+/* TICKER HEADER */
+.ticker-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.ticker-sym{font-size:16px;font-weight:600;font-family:var(--mono)}
+.ticker-name{font-size:12px;color:var(--text2)}
+.ticker-price{margin-left:auto;font-size:14px;font-weight:500;font-family:var(--mono)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--radius-sm);border:0.5px solid var(--border2);background:var(--bg3);color:var(--text);cursor:pointer;font-size:13px;transition:all .15s;font-family:var(--font)}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+.btn-primary:active{background:var(--accent2)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.75rem}
+.btn-sel{border-color:var(--accent);color:var(--accent)}
+
+/* FORM */
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:.65rem}
+.field label{font-size:11px;color:var(--text3);font-family:var(--mono)}
+input[type=text],input[type=number],select,textarea{background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);padding:8px 10px;width:100%;outline:none;transition:border-color .15s;-webkit-appearance:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b90a0' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+
+/* RESULT ROWS */
+.rrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border)}
+.rrow:last-child{border-bottom:none}
+.rl{font-size:13px;color:var(--text2)}
+.rv{font-size:14px;font-weight:500;font-family:var(--mono)}
+
+/* METRIC CARDS */
+.mc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
+.mc{background:var(--bg3);border-radius:var(--radius-sm);padding:8px 10px;text-align:center}
+.mcl{font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px}
+.mcv{font-size:18px;font-weight:600;font-family:var(--mono)}
+
+/* MACRO */
+.macro-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border)}
+.macro-row:last-child{border-bottom:none}
+.macro-icon{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.mi-g{background:var(--green-bg);color:var(--green)}
+.mi-a{background:var(--amber-bg);color:var(--amber)}
+.mi-r{background:var(--red-bg);color:var(--red)}
+.macro-title{font-size:13px;font-weight:500;margin-bottom:2px}
+.macro-desc{font-size:12px;color:var(--text2);line-height:1.5}
+
+/* IBD TABLE */
+.ibd-table{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)}
+.ibd-table th{font-size:10px;color:var(--text3);text-align:right;padding:5px 6px;border-bottom:0.5px solid var(--border);white-space:nowrap;cursor:pointer}
+.ibd-table th:nth-child(1){text-align:center;width:28px}
+.ibd-table th:nth-child(2){text-align:left}
+.ibd-table td{padding:6px 6px;border-bottom:0.5px solid rgba(255,255,255,0.04);text-align:right;vertical-align:middle}
+.ibd-table td:nth-child(2){text-align:left;font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font)}
+.ibd-table tr:last-child td{border-bottom:none}
+.ibd-table tr:hover td{background:rgba(255,255,255,0.03)}
+.badge-c{display:inline-block;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:500}
+.bc-hi{background:rgba(52,194,110,0.15);color:var(--green)}
+.bc-mid{background:rgba(240,169,58,0.15);color:var(--amber)}
+.bc-lo{background:rgba(240,86,86,0.15);color:var(--red)}
+
+/* ADMIN */
+.admin-warn{background:var(--amber-bg);border:0.5px solid rgba(240,169,58,0.3);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--amber);margin-bottom:1rem}
+.progress{height:3px;background:var(--bg3);border-radius:2px;margin:.5rem 0;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+.info-box{background:var(--blue-bg);border:0.5px solid rgba(79,142,247,0.25);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--accent);margin-bottom:1rem}
+.warn-box{background:var(--amber-bg);border:0.5px solid rgba(240,169,58,0.25);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--amber);margin-top:8px}
+.danger-box{background:var(--red-bg);border:0.5px solid rgba(240,86,86,0.25);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--red);margin-top:6px}
+</style>
+</head>
+<body>
+
+<!-- PIN SCREEN -->
+<div id="pin-screen">
+  <div class="pin-logo"><i class="ti ti-chart-candle"></i></div>
+  <div class="pin-title">KO-Scanner</div>
+  <div class="pin-sub">Hebelprodukt-Analyse · Axel Hildebrand</div>
+  <div class="pin-dots" id="pin-dots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+  </div>
+  <div class="pin-pad">
+    <button class="pin-btn" onclick="pinPress(1)">1</button>
+    <button class="pin-btn" onclick="pinPress(2)">2</button>
+    <button class="pin-btn" onclick="pinPress(3)">3</button>
+    <button class="pin-btn" onclick="pinPress(4)">4</button>
+    <button class="pin-btn" onclick="pinPress(5)">5</button>
+    <button class="pin-btn" onclick="pinPress(6)">6</button>
+    <button class="pin-btn" onclick="pinPress(7)">7</button>
+    <button class="pin-btn" onclick="pinPress(8)">8</button>
+    <button class="pin-btn" onclick="pinPress(9)">9</button>
+    <button class="pin-btn" onclick="pinClear()" style="font-size:14px"><i class="ti ti-backspace"></i></button>
+    <button class="pin-btn" onclick="pinPress(0)">0</button>
+    <button class="pin-btn" onclick="pinSubmit()" style="background:var(--accent);color:#fff"><i class="ti ti-arrow-right"></i></button>
+  </div>
+  <div class="pin-error" id="pin-error">Falscher PIN — bitte erneut versuchen</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-title">
+      <span class="topbar-dot"></span>
+      KO-Scanner
+    </div>
+    <div class="topbar-time" id="topbar-time"></div>
+  </div>
+
+  <div class="content">
+    <!-- SCANNER PANEL -->
+    <div id="panel-scanner" class="panel active">
+      <div class="sec">Technischer Scanner</div>
+      <div class="btn-row">
+        <select id="ticker-preset" style="flex:1;font-size:12px" onchange="toggleCustom()">
+          <option value="default">Top-5 KO-Kandidaten (IBD 50)</option>
+          <option value="custom">Eigene Ticker</option>
+        </select>
+        <button class="btn btn-primary" onclick="runScan()" id="scan-btn">
+          <i class="ti ti-player-play"></i> Scan
+        </button>
+      </div>
+      <div id="custom-wrap" style="display:none;margin-bottom:.75rem">
+        <input type="text" id="custom-input" placeholder="AAPL, MSFT, NVDA (kommagetrennt)">
+      </div>
+      <div id="scan-progress" style="display:none;margin-bottom:.75rem">
+        <div style="font-size:12px;color:var(--text2)" id="scan-label">Analysiere…</div>
+        <div class="progress"><div class="progress-fill" id="scan-bar" style="width:0%"></div></div>
+      </div>
+      <div id="scan-container"></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:.5rem">
+        <i class="ti ti-info-circle"></i> Daten via Yahoo Finance · Kaufsignal = alle 3 bullisch
+      </div>
+    </div>
+
+    <!-- RECHNER PANEL -->
+    <div id="panel-rechner" class="panel">
+      <div id="rechner-info" class="info-box" style="display:none"></div>
+      <div class="sec">Basiswert</div>
+      <div class="card">
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="field" style="margin-bottom:0"><label>Ticker</label><input type="text" id="rt" placeholder="VRT" oninput="this.value=this.value.toUpperCase();cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Kurs ($)</label><input type="number" id="rk" placeholder="341.50" oninput="cr()"></div>
+        </div>
+        <div class="grid-3">
+          <div class="field" style="margin-bottom:0"><label>KO-Schwelle ($)</label><input type="number" id="rko" placeholder="273.20" oninput="cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Ratio</label><input type="number" id="rr" placeholder="0.1" step="0.01" oninput="cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Turbo (€)</label><input type="number" id="rtp" placeholder="6.80" step="0.01" oninput="cr()"></div>
+        </div>
+      </div>
+      <div class="sec">Stop-Loss</div>
+      <div class="card">
+        <div class="grid-2">
+          <div class="field" style="margin-bottom:0"><label>Stop-Kurs ($)</label><input type="number" id="rs" placeholder="307.35" oninput="cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Kapitaleinsatz (€)</label><input type="number" id="rc" placeholder="1000" oninput="cr()"></div>
+        </div>
+      </div>
+      <div class="sec">Ergebnis</div>
+      <div class="card">
+        <div class="mc-grid">
+          <div class="mc"><div class="mcl">Abstand KO</div><div class="mcv" id="r-ako">—</div></div>
+          <div class="mc"><div class="mcl">Hebel</div><div class="mcv" id="r-heb">—</div></div>
+          <div class="mc"><div class="mcl">Abstand Stop</div><div class="mcv" id="r-ast">—</div></div>
+        </div>
+        <div class="rrow"><span class="rl">Limit-Verkauf bei Stop</span><span class="rv" id="r-lim" style="color:var(--accent)">—</span></div>
+        <div class="rrow"><span class="rl">Verlust bei Stop (€)</span><span class="rv" id="r-veur">—</span></div>
+        <div class="rrow"><span class="rl">Verlust in % des Einsatzes</span><span class="rv" id="r-vpct">—</span></div>
+        <div class="rrow"><span class="rl">Anzahl Turbos</span><span class="rv" id="r-anz">—</span></div>
+        <div id="r-warn" style="display:none" class="warn-box"></div>
+        <div id="r-danger" style="display:none" class="danger-box"></div>
+        <div style="margin-top:1rem;font-size:11px;color:var(--text3)">
+          <i class="ti ti-info-circle"></i> Limit gilt 08:00–22:00 Uhr (TR). Gap-Down über Nacht nicht abgesichert.
+        </div>
+      </div>
+    </div>
+
+    <!-- IBD50 PANEL -->
+    <div id="panel-ibd" class="panel">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.75rem">
+        <input type="text" id="ibd-search" placeholder="Suche…" style="flex:1;font-size:13px" oninput="renderIBD()">
+        <select id="ibd-comp" style="font-size:12px;width:auto" onchange="renderIBD()">
+          <option value="">Comp: alle</option>
+          <option value="99">= 99</option>
+          <option value="97">≥ 97</option>
+          <option value="95">≥ 95</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="ibd-table" id="ibd-table">
+          <thead>
+            <tr>
+              <th onclick="sortIBD('rank')">#</th>
+              <th onclick="sortIBD('name')" style="text-align:left">Unternehmen</th>
+              <th onclick="sortIBD('comp')">Comp</th>
+              <th onclick="sortIBD('eps')">EPS</th>
+              <th onclick="sortIBD('rs')">RS</th>
+              <th onclick="sortIBD('lastEps')">LQ%</th>
+              <th onclick="sortIBD('sales')">Sales%</th>
+            </tr>
+          </thead>
+          <tbody id="ibd-body"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:.75rem;font-size:11px;color:var(--text3)">
+        <i class="ti ti-info-circle"></i> Daten wöchentlich via Admin-Tab aktualisieren · Stand: <span id="ibd-date">—</span>
+      </div>
+    </div>
+
+    <!-- MAKRO PANEL -->
+    <div id="panel-makro" class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div>
+          <div style="font-size:13px;font-weight:500">Makro-Tageseinschätzung</div>
+          <div style="font-size:11px;color:var(--text2)" id="makro-date">—</div>
+        </div>
+        <span class="pill" id="makro-verdict-pill">—</span>
+      </div>
+      <div class="mc-grid" style="grid-template-columns:repeat(2,1fr)">
+        <div class="mc"><div class="mcl">S&P 500</div><div class="mcv" id="m-sp">—</div></div>
+        <div class="mc"><div class="mcl">VIX</div><div class="mcv" id="m-vix">—</div></div>
+        <div class="mc"><div class="mcl">Nasdaq</div><div class="mcv" id="m-nq">—</div></div>
+        <div class="mc"><div class="mcl">WTI Öl</div><div class="mcv" id="m-oil">—</div></div>
+      </div>
+      <div class="card" id="makro-factors"></div>
+      <div class="card" id="makro-verdict-box" style="margin-top:.5rem"></div>
+      <div style="margin-top:.5rem;font-size:11px;color:var(--text3)">
+        <i class="ti ti-info-circle"></i> Admin-Tab → Makro täglich aktualisieren · Keine Anlageberatung
+      </div>
+    </div>
+
+    <!-- ADMIN PANEL -->
+    <div id="panel-admin" class="panel">
+      <div class="admin-warn">
+        <i class="ti ti-lock"></i> Admin-Bereich — nur für Datenaktualisierung
+      </div>
+
+      <div class="sec">IBD-50 Daten aktualisieren</div>
+      <div class="card">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.75rem">JSON aus Claude-Analyse hier einfügen. Format: Array mit rank, name, comp, eps, rs, annEps, lastEps, nextEps, sales, roe, margin, sector.</div>
+        <textarea id="ibd-json" rows="6" placeholder='[{"rank":1,"name":"Micron Tech","comp":99,"eps":82,"rs":99,"annEps":605,"lastEps":682,"nextEps":916,"sales":196,"roe":17,"margin":25,"sector":"tech"},...]' style="font-family:var(--mono);font-size:11px;margin-bottom:.75rem"></textarea>
+        <button class="btn btn-primary" onclick="saveIBD()" style="width:100%">
+          <i class="ti ti-device-floppy"></i> IBD-Daten speichern
+        </button>
+        <div id="ibd-save-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Gespeichert — alle Nutzer sehen die neuen Daten</div>
+      </div>
+
+      <div class="sec">Makro-Einschätzung aktualisieren</div>
+      <div class="card">
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="field" style="margin-bottom:0"><label>S&P 500</label><input type="text" id="m-sp-in" placeholder="7.538"></div>
+          <div class="field" style="margin-bottom:0"><label>Nasdaq</label><input type="text" id="m-nq-in" placeholder="26.674"></div>
+          <div class="field" style="margin-bottom:0"><label>VIX</label><input type="text" id="m-vix-in" placeholder="16.3"></div>
+          <div class="field" style="margin-bottom:0"><label>WTI Öl ($)</label><input type="text" id="m-oil-in" placeholder="92.9"></div>
+        </div>
+        <div class="field">
+          <label>Marktlage</label>
+          <select id="m-verdict-in">
+            <option value="bull">Confirmed Uptrend</option>
+            <option value="neu" selected>Uptrend Under Pressure</option>
+            <option value="bear">Market In Correction</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Tagesfazit (kurzer Text)</label>
+          <textarea id="m-text-in" rows="3" placeholder="Grundsätzlich günstiges Umfeld für AI-Tech Long-Turbos…"></textarea>
+        </div>
+        <div class="field">
+          <label>Faktoren (JSON-Array)</label>
+          <textarea id="m-factors-in" rows="4" style="font-family:var(--mono);font-size:11px" placeholder='[{"icon":"bull","title":"MRVL Beat & Raise","desc":"Starkes Q1..."},...]'></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="saveMakro()" style="width:100%">
+          <i class="ti ti-device-floppy"></i> Makro speichern
+        </button>
+        <div id="makro-save-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Gespeichert</div>
+      </div>
+
+      <div class="sec">PIN ändern</div>
+      <div class="card">
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="field" style="margin-bottom:0"><label>Neuer PIN (4-stellig)</label><input type="password" id="new-pin" placeholder="••••" maxlength="4"></div>
+          <div class="field" style="margin-bottom:0"><label>PIN bestätigen</label><input type="password" id="new-pin2" placeholder="••••" maxlength="4"></div>
+        </div>
+        <button class="btn" onclick="changePin()" style="width:100%">
+          <i class="ti ti-key"></i> PIN ändern
+        </button>
+        <div id="pin-change-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-scanner" onclick="showPanel('scanner')">
+      <i class="ti ti-radar"></i>Scanner
+    </button>
+    <button class="nav-btn" id="nav-rechner" onclick="showPanel('rechner')">
+      <i class="ti ti-calculator"></i>Rechner
+    </button>
+    <button class="nav-btn" id="nav-ibd" onclick="showPanel('ibd')">
+      <i class="ti ti-list-numbers"></i>IBD 50
+    </button>
+    <button class="nav-btn" id="nav-makro" onclick="showPanel('makro')">
+      <i class="ti ti-world"></i>Makro
+    </button>
+    <button class="nav-btn" id="nav-admin" onclick="showPanel('admin')">
+      <i class="ti ti-settings"></i>Admin
+    </button>
+  </nav>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────
+const DEFAULT_PIN = '2409';
+const API_BASE = '/api/scan';
+const DEFAULT_TICKERS = [
+  {sym:'VRT',name:'Vertiv Holdings'},
+  {sym:'MRVL',name:'Marvell Technology'},
+  {sym:'GOOGL',name:'Alphabet'},
+  {sym:'LRCX',name:'LAM Research'},
+  {sym:'AMD',name:'Advanced Micro Devices'}
+];
+
+// ─── PIN ─────────────────────────────────────────────────────────────
+let pinEntry = '';
+function getPin(){ return localStorage.getItem('ko_pin') || DEFAULT_PIN; }
+function pinPress(d){
+  if(pinEntry.length >= 4) return;
+  pinEntry += d;
+  for(let i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<pinEntry.length?' filled':'');
+  if(pinEntry.length === 4) setTimeout(pinSubmit, 100);
+}
+function pinClear(){ pinEntry=pinEntry.slice(0,-1); for(let i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<pinEntry.length?' filled':''); }
+function pinSubmit(){
+  if(pinEntry === getPin()){ unlockApp(); }
+  else { document.getElementById('pin-error').classList.add('show'); pinEntry=''; for(let i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'; setTimeout(()=>document.getElementById('pin-error').classList.remove('show'),2000); }
+}
+function unlockApp(){
+  document.getElementById('pin-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  updateClock(); setInterval(updateClock,1000);
+  loadIBD(); loadMakro();
+}
+function changePin(){
+  const p1=document.getElementById('new-pin').value;
+  const p2=document.getElementById('new-pin2').value;
+  const msg=document.getElementById('pin-change-msg');
+  if(p1.length!==4||!/^\d{4}$/.test(p1)){msg.style.display='block';msg.style.color='var(--amber)';msg.textContent='PIN muss 4 Ziffern haben';return;}
+  if(p1!==p2){msg.style.display='block';msg.style.color='var(--red)';msg.textContent='PINs stimmen nicht überein';return;}
+  localStorage.setItem('ko_pin',p1);
+  msg.style.display='block';msg.style.color='var(--green)';msg.textContent='✓ PIN geändert';
+}
+
+// ─── NAV ─────────────────────────────────────────────────────────────
+function showPanel(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+}
+
+// ─── CLOCK ───────────────────────────────────────────────────────────
+function updateClock(){
+  const now=new Date();
+  document.getElementById('topbar-time').textContent=
+    now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' · '+
+    now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ─── SCANNER ─────────────────────────────────────────────────────────
+const charts={};
+let tickerData={};
+let activeTickers=[...DEFAULT_TICKERS];
+
+function toggleCustom(){
+  document.getElementById('custom-wrap').style.display=
+    document.getElementById('ticker-preset').value==='custom'?'block':'none';
+}
+
+function getTickers(){
+  if(document.getElementById('ticker-preset').value==='custom'){
+    const raw=document.getElementById('custom-input').value;
+    return raw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean).map(s=>({sym:s,name:s}));
+  }
+  return DEFAULT_TICKERS;
+}
+
+async function runScan(){
+  const tickers=getTickers();
+  if(!tickers.length) return;
+  activeTickers=tickers;
+  const btn=document.getElementById('scan-btn');
+  btn.disabled=true;
+  document.getElementById('scan-progress').style.display='block';
+  const container=document.getElementById('scan-container');
+  container.innerHTML=tickers.map(t=>`<div class="card" id="card-${t.sym}">
+    <div class="ticker-head">
+      <span class="ticker-sym">${t.sym}</span>
+      <span class="ticker-name">${t.name}</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--text3)"><i class="ti ti-loader"></i> Lade…</span>
+    </div>
+  </div>`).join('');
+
+  for(let i=0;i<tickers.length;i++){
+    const t=tickers[i];
+    document.getElementById('scan-label').textContent=`${t.sym} analysiere… (${i+1}/${tickers.length})`;
+    document.getElementById('scan-bar').style.width=((i/tickers.length)*100)+'%';
+    try{
+      const r=await fetch(`${API_BASE}?symbol=${t.sym}`);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const data=await r.json();
+      if(data.error) throw new Error(data.error);
+      renderCard(t,processData(data));
+    }catch(e){
+      renderCard(t,{error:e.message});
+    }
+  }
+  document.getElementById('scan-bar').style.width='100%';
+  document.getElementById('scan-label').textContent='Scan abgeschlossen ✓';
+  setTimeout(()=>document.getElementById('scan-progress').style.display='none',2000);
+  btn.disabled=false;
+}
+
+function processData(raw){
+  const{price,ma50,macd_hist,macd_hist_prev,obv_slope_5d,volume_ratio,closes_20d,macd_hist_20d,obv_norm_20d,dates_20d}=raw;
+  const above50=price>ma50;
+  const macdBull=macd_hist!=null&&macd_hist_prev!=null?(macd_hist>macd_hist_prev&&macd_hist>0):null;
+  const obvBull=obv_slope_5d!=null?obv_slope_5d>0:null;
+  const bullCount=[above50,macdBull,obvBull].filter(v=>v===true).length;
+  return{price,ma50,above50,macdBull,obvBull,histVal:macd_hist,obvSlope:obv_slope_5d,volRatio:volume_ratio,bullCount,closes:closes_20d||[],hist:macd_hist_20d||[],obvNorm:obv_norm_20d||[],dates:dates_20d||[]};
+}
+
+function renderCard(t,state){
+  const el=document.getElementById('card-'+t.sym);
+  if(!el) return;
+  if(state.error){
+    el.innerHTML=`<div class="ticker-head"><span class="ticker-sym">${t.sym}</span></div><div style="font-size:12px;color:var(--red)"><i class="ti ti-alert-circle"></i> ${state.error}</div>`;
+    return;
+  }
+  tickerData[t.sym]=state;
+  const{price,ma50,above50,macdBull,obvBull,histVal,obvSlope,volRatio,bullCount,closes,hist,obvNorm,dates}=state;
+  let vC='v-bull',vT='Kaufsignal — alle 3 bullisch',vI='ti-trending-up';
+  if(bullCount===2){vC='v-neu';vT='Vorsicht — 2 von 3 bullisch';vI='ti-minus';}
+  else if(bullCount<=1){vC='v-bear';vT=bullCount===1?'Kein Einstieg — 1/3':'Kein Einstieg';vI='ti-trending-down';}
+  const vRatioTxt=volRatio?`${Math.round(volRatio)}% Ø`:'-';
+  const vRatioCls=volRatio>120?'pill-green':volRatio<80?'pill-red':'pill-amber';
+  const isSel=false;
+  el.className='card'+(bullCount===3?' card-accent':'');
+  el.innerHTML=`
+  <div class="ticker-head">
+    <span class="ticker-sym">${t.sym}</span>
+    <span class="ticker-name" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.name}</span>
+    <span class="ticker-price">$${price.toFixed(2)}</span>
+  </div>
+  <div class="sig-grid">
+    <div class="sig-box"><div class="sig-label">50d MA $${ma50.toFixed(0)}</div><div class="sig-val">${above50?'> MA':'< MA'}</div><div class="sig-sub"><span class="pill ${above50?'pill-green':'pill-red'}">${above50?'bullisch':'bärisch'}</span></div></div>
+    <div class="sig-box"><div class="sig-label">MACD Hist.</div><div class="sig-val">${histVal!=null?histVal.toFixed(3):'n/a'}</div><div class="sig-sub"><span class="pill ${macdBull?'pill-green':macdBull===false?'pill-red':'pill-gray'}">${macdBull?'bullisch':macdBull===false?'bärisch':'n/a'}</span></div></div>
+    <div class="sig-box"><div class="sig-label">OBV-Trend 5d</div><div class="sig-val">${obvSlope!=null?(obvSlope>0?'+':'')+obvSlope.toFixed(1)+'M':'n/a'}</div><div class="sig-sub"><span class="pill ${obvBull?'pill-green':obvBull===false?'pill-red':'pill-gray'}">${obvBull?'bullisch':obvBull===false?'bärisch':'n/a'}</span></div></div>
+    <div class="sig-box"><div class="sig-label">Volumen</div><div class="sig-val"><span class="pill ${vRatioCls}">${vRatioTxt}</span></div></div>
+  </div>
+  <div class="verdict ${vC}"><span><i class="ti ${vI}" style="margin-right:4px"></i>${vT}</span><span style="font-size:11px;opacity:.7">${bullCount}/3</span></div>
+  <div style="display:flex;gap:12px;font-size:11px;color:var(--text3);margin-bottom:5px">
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#4f8ef7;display:inline-block;border-radius:1px"></span>Kurs</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#34c26e;display:inline-block;border-radius:1px"></span>MACD</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#f0a93a;display:inline-block;border-radius:1px;border-top:2px dashed #f0a93a;background:none"></span>OBV</span>
+    <button class="btn btn-sm" onclick="useInRechner('${t.sym}')" style="margin-left:auto;padding:3px 8px;font-size:11px"><i class="ti ti-calculator"></i> Rechner</button>
+  </div>
+  <div class="chart-wrap"><canvas id="ch-${t.sym}" role="img" aria-label="Chart ${t.sym}"></canvas></div>`;
+
+  if(charts[t.sym]) charts[t.sym].destroy();
+  if(closes.length>0){
+    const pMin=Math.min(...closes)*0.985,pMax=Math.max(...closes)*1.015;
+    const hMax=Math.max(...hist.map(v=>Math.abs(v??0)))*1.6||1;
+    charts[t.sym]=new Chart(document.getElementById('ch-'+t.sym),{
+      type:'bar',
+      data:{labels:dates,datasets:[
+        {type:'line',label:'Kurs',data:closes,borderColor:'#4f8ef7',borderWidth:1.5,pointRadius:0,yAxisID:'yP',tension:0.2},
+        {type:'bar',label:'MACD',data:hist,backgroundColor:hist.map(v=>(v??0)>=0?'rgba(52,194,110,0.6)':'rgba(240,86,86,0.6)'),yAxisID:'yM'},
+        {type:'line',label:'OBV',data:obvNorm,borderColor:'#f0a93a',borderDash:[3,3],borderWidth:1.2,pointRadius:0,yAxisID:'yO',tension:0.3}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>{
+          if(ctx.dataset.label==='Kurs') return 'Kurs: $'+ctx.parsed.y.toFixed(2);
+          if(ctx.dataset.label==='MACD') return 'MACD: '+(ctx.parsed.y??0).toFixed(3);
+          return 'OBV: '+(ctx.parsed.y??0).toFixed(2);
+        }}}},
+        scales:{
+          x:{ticks:{color:'#555a6a',font:{size:9},maxTicksLimit:5,maxRotation:0},grid:{display:false}},
+          yP:{position:'left',ticks:{color:'#555a6a',font:{size:9},callback:v=>'$'+v.toFixed(0)},min:pMin,max:pMax,grid:{color:'rgba(255,255,255,0.04)'}},
+          yM:{position:'right',ticks:{display:false},min:-hMax,max:hMax,grid:{display:false}},
+          yO:{display:false,min:0,max:1}
+        },animation:{duration:300}}
+    });
+  }
+}
+
+// ─── HEBELRECHNER ────────────────────────────────────────────────────
+function useInRechner(sym){
+  const d=tickerData[sym];if(!d) return;
+  document.getElementById('rt').value=sym;
+  document.getElementById('rk').value=d.price.toFixed(2);
+  document.getElementById('rko').value=(d.price*0.80).toFixed(2);
+  document.getElementById('rs').value=(d.price*0.90).toFixed(2);
+  document.getElementById('rr').value='0.1';
+  const info=document.getElementById('rechner-info');
+  const sig=d.bullCount===3?'Kaufsignal':d.bullCount===2?'Vorsicht':'Kein Einstieg';
+  info.innerHTML=`<i class="ti ti-transfer"></i> <strong>${sym}</strong> — $${d.price.toFixed(2)} · ${sig} (${d.bullCount}/3) · KO −20%, Stop −10%`;
+  info.style.display='block';
+  cr();showPanel('rechner');
+}
+
+function cr(){
+  const k=parseFloat(document.getElementById('rk').value);
+  const ko=parseFloat(document.getElementById('rko').value);
+  const r=parseFloat(document.getElementById('rr').value);
+  const tp=parseFloat(document.getElementById('rtp').value);
+  const s=parseFloat(document.getElementById('rs').value);
+  const cap=parseFloat(document.getElementById('rc').value);
+  const w=document.getElementById('r-warn'),d=document.getElementById('r-danger');
+  w.style.display='none';d.style.display='none';
+  if(isNaN(k)||isNaN(ko)||isNaN(r)) return;
+  const abko=((k-ko)/k*100);
+  document.getElementById('r-ako').textContent=abko.toFixed(1)+'%';
+  if(!isNaN(tp)&&tp>0) document.getElementById('r-heb').textContent=((k*r)/tp).toFixed(1)+'×';
+  if(abko<10){d.style.display='block';d.textContent='⚠ KO-Abstand unter 10% — sehr hohes Totalverlustrisiko.';}
+  else if(abko<20){w.style.display='block';w.textContent='→ KO-Abstand unter 20% — Positionsgröße reduzieren.';}
+  if(!isNaN(s)&&!isNaN(tp)&&tp>0){
+    document.getElementById('r-ast').textContent=((k-s)/k*100).toFixed(1)+'%';
+    const tbs=(s-ko)*r;
+    if(tbs>0){
+      document.getElementById('r-lim').textContent='€ '+tbs.toFixed(2);
+      if(!isNaN(cap)&&cap>0){
+        const n=Math.floor(cap/tp);
+        document.getElementById('r-anz').textContent=n+' Stück';
+        const v=(tp-tbs)*n;
+        document.getElementById('r-veur').textContent='− € '+v.toFixed(2);
+        document.getElementById('r-vpct').textContent=((v/cap)*100).toFixed(1)+'%';
+      }
+    } else document.getElementById('r-lim').textContent='Stop unter KO';
+  }
+}
+
+// ─── IBD 50 ─────────────────────────────────────────────────────────
+const IBD_STORE_KEY='ko_ibd50';
+const IBD_DATE_KEY='ko_ibd50_date';
+let ibdData=[];
+let ibdSort={col:'rank',dir:1};
+
+function loadIBD(){
+  const raw=localStorage.getItem(IBD_STORE_KEY);
+  if(raw){try{ibdData=JSON.parse(raw);}catch(e){ibdData=getDefaultIBD();}}
+  else ibdData=getDefaultIBD();
+  document.getElementById('ibd-date').textContent=localStorage.getItem(IBD_DATE_KEY)||'—';
+  renderIBD();
+}
+
+function getDefaultIBD(){
+  return [
+    {rank:1,name:'Micron Tech',comp:99,eps:82,rs:99,annEps:605,lastEps:682,nextEps:916,sales:196,roe:17,margin:25,sector:'tech'},
+    {rank:2,name:'Rocket Lab',comp:87,eps:48,rs:98,annEps:null,lastEps:null,nextEps:null,sales:63,roe:null,margin:null,sector:'tech'},
+    {rank:3,name:'SiTime',comp:98,eps:99,rs:98,annEps:145,lastEps:454,nextEps:317,sales:88,roe:null,margin:null,sector:'tech'},
+    {rank:4,name:'Hut 8',comp:96,eps:67,rs:99,annEps:null,lastEps:null,nextEps:null,sales:226,roe:null,margin:null,sector:'tech'},
+    {rank:5,name:'Astera Labs',comp:99,eps:71,rs:96,annEps:61,lastEps:85,nextEps:57,sales:93,roe:19,margin:25,sector:'tech'},
+    {rank:6,name:'Comfort Systems',comp:97,eps:99,rs:95,annEps:45,lastEps:121,nextEps:56,sales:56,roe:49,margin:14,sector:'other'},
+    {rank:7,name:'Argan',comp:97,eps:97,rs:97,annEps:47,lastEps:56,nextEps:68,sales:13,roe:34,margin:16,sector:'other'},
+    {rank:8,name:'Liquidia',comp:96,eps:69,rs:97,annEps:null,lastEps:216,nextEps:null,sales:999,roe:null,margin:null,sector:'health'},
+    {rank:9,name:'Vertiv',comp:99,eps:99,rs:95,annEps:53,lastEps:83,nextEps:49,sales:30,roe:42,margin:17,sector:'tech'},
+    {rank:10,name:'Credo Tech',comp:99,eps:84,rs:95,annEps:645,lastEps:328,nextEps:363,sales:201,roe:9,margin:12,sector:'tech'},
+    {rank:11,name:'Advanced Micro Dvcs',comp:99,eps:95,rs:98,annEps:78,lastEps:43,nextEps:233,sales:38,roe:7,margin:11,sector:'tech'},
+    {rank:12,name:'Travere Therapeutics',comp:73,eps:35,rs:94,annEps:null,lastEps:null,nextEps:null,sales:68,roe:null,margin:null,sector:'health'},
+    {rank:13,name:'Axsome Therapeutics',comp:78,eps:37,rs:93,annEps:null,lastEps:null,nextEps:null,sales:56,roe:null,margin:null,sector:'health'},
+    {rank:14,name:'Solaris Energy Infra',comp:95,eps:71,rs:95,annEps:115,lastEps:114,nextEps:23,sales:55,roe:6,margin:11,sector:'energy'},
+    {rank:15,name:'Bloom Energy',comp:95,eps:65,rs:99,annEps:181,lastEps:999,nextEps:290,sales:130,roe:null,margin:null,sector:'energy'},
+    {rank:16,name:'Vita Coco',comp:99,eps:97,rs:95,annEps:45,lastEps:61,nextEps:45,sales:37,roe:24,margin:15,sector:'other'},
+    {rank:17,name:'Innodata',comp:81,eps:36,rs:96,annEps:17,lastEps:91,nextEps:5,sales:54,roe:38,margin:16,sector:'tech'},
+    {rank:18,name:'Marvell Technology',comp:99,eps:93,rs:98,annEps:93,lastEps:33,nextEps:89,sales:22,roe:19,margin:37,sector:'tech'},
+    {rank:19,name:'Lumentum',comp:95,eps:91,rs:98,annEps:299,lastEps:316,nextEps:235,sales:90,roe:2,margin:null,sector:'tech'},
+    {rank:20,name:'Alphabet',comp:99,eps:99,rs:91,annEps:31,lastEps:82,nextEps:25,sales:22,roe:36,margin:39,sector:'tech'},
+    {rank:24,name:'LAM Research',comp:99,eps:94,rs:95,annEps:37,lastEps:41,nextEps:25,sales:24,roe:58,margin:32,sector:'tech'},
+    {rank:36,name:'Arm Holdings',comp:99,eps:88,rs:97,annEps:259,lastEps:9,nextEps:63,sales:20,roe:12,margin:23,sector:'tech'},
+    {rank:41,name:'Taiwan Semiconductor',comp:99,eps:97,rs:86,annEps:49,lastEps:63,nextEps:45,sales:39,roe:36,margin:54,sector:'tech'},
+    {rank:47,name:'Broadcom',comp:99,eps:96,rs:85,annEps:65,lastEps:28,nextEps:51,sales:29,roe:31,margin:35,sector:'tech'}
+  ];
+}
+
+function renderIBD(){
+  const q=(document.getElementById('ibd-search').value||'').toLowerCase();
+  const fc=document.getElementById('ibd-comp').value;
+  let filtered=ibdData.filter(r=>{
+    if(q&&!r.name.toLowerCase().includes(q)&&!String(r.rank).includes(q)) return false;
+    if(fc&&(!r.comp||r.comp<parseInt(fc))) return false;
+    return true;
+  });
+  filtered.sort((a,b)=>{
+    const av=a[ibdSort.col]??-9999,bv=b[ibdSort.col]??-9999;
+    return typeof av==='string'?av.localeCompare(bv)*ibdSort.dir:(av-bv)*ibdSort.dir;
+  });
+  const fmt=v=>v===null||v===undefined?'<span style="color:var(--text3)">—</span>':(v===999?'+999':(v>0?'+':'')+v+'%');
+  const cBadge=v=>{if(!v)return'—';const c=v>=97?'bc-hi':v>=90?'bc-mid':'bc-lo';return`<span class="badge-c ${c}">${v}</span>`;};
+  document.getElementById('ibd-body').innerHTML=filtered.map(r=>`<tr>
+    <td style="color:var(--text3);text-align:center;font-size:11px">${r.rank}</td>
+    <td>${r.name}</td>
+    <td>${cBadge(r.comp)}</td>
+    <td>${cBadge(r.eps)}</td>
+    <td>${cBadge(r.rs)}</td>
+    <td style="color:${(r.lastEps??0)>25?'var(--green)':(r.lastEps??0)<0?'var(--red)':'var(--text2)'}">${fmt(r.lastEps)}</td>
+    <td style="color:${(r.sales??0)>20?'var(--green)':'var(--text2)'}">${fmt(r.sales)}</td>
+  </tr>`).join('');
+}
+
+function sortIBD(col){
+  if(ibdSort.col===col) ibdSort.dir*=-1; else{ibdSort.col=col;ibdSort.dir=-1;}
+  renderIBD();
+}
+
+function saveIBD(){
+  const raw=document.getElementById('ibd-json').value.trim();
+  if(!raw){alert('Bitte JSON einfügen.');return;}
+  try{
+    const data=JSON.parse(raw);
+    if(!Array.isArray(data)) throw new Error('Kein Array');
+    localStorage.setItem(IBD_STORE_KEY,JSON.stringify(data));
+    const now=new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    localStorage.setItem(IBD_DATE_KEY,now);
+    ibdData=data;
+    renderIBD();
+    document.getElementById('ibd-date').textContent=now;
+    const msg=document.getElementById('ibd-save-msg');
+    msg.style.display='block';
+    setTimeout(()=>msg.style.display='none',3000);
+    document.getElementById('ibd-json').value='';
+  }catch(e){alert('Ungültiges JSON: '+e.message);}
+}
+
+// ─── MAKRO ─────────────────────────────────────────────────────────
+const MAKRO_KEY='ko_makro';
+
+function loadMakro(){
+  const raw=localStorage.getItem(MAKRO_KEY);
+  if(raw){try{renderMakro(JSON.parse(raw));}catch(e){renderMakroDefault();}}
+  else renderMakroDefault();
+}
+
+function renderMakroDefault(){
+  renderMakro({
+    date:'28.05.2026',
+    sp:'7.538',nq:'26.674',vix:'16.3',oil:'$92.9',
+    verdict:'neu',
+    verdictText:'Vorsichtig bullisch — mit einem Auge auf AVGO-Earnings heute Abend (22:00 MEZ). KO-Abstand ≥20% einhalten wegen Iran-Overnight-Risiko.',
+    factors:[
+      {icon:'bull',title:'MRVL Beat & Raise gestern',desc:'EPS $0.80 (+6.7% über Konsens), Revenue +28%, Q2-Guidance +35%. Positiver Übertrag auf VRT, AMD, LRCX.'},
+      {icon:'bull',title:'Nasdaq nahe Allzeithoch',desc:'26.675 Punkte, VIX 16.3 — entspannte Marktlage. Confirmed Uptrend IBD Market Pulse.'},
+      {icon:'neu',title:'AVGO-Earnings heute 22:00 MEZ',desc:'Konsens $22 Mrd Revenue, $2.40 EPS. Bei Miss: Chip-Sektor unter Druck. Neue Positionen vor Earnings mit Vorsicht.'},
+      {icon:'neu',title:'Neuer Iran-Angriff heute Morgen',desc:'WTI $92.9/Barrel. Asiatische Märkte vorsichtig. Overnight-Gap-Risiko erhöht — KO-Abstand ≥20%.'},
+      {icon:'bear',title:'Consumer Sentiment 44.8',desc:'3-Jahres-Tief. Kein direkter Impact auf AI-Infrastruktur, aber geopolitischer Hintergrund belastet.'}
+    ]
+  });
+}
+
+function renderMakro(d){
+  document.getElementById('makro-date').textContent=d.date||'—';
+  document.getElementById('m-sp').textContent=d.sp||'—';
+  document.getElementById('m-nq').textContent=d.nq||'—';
+  document.getElementById('m-vix').textContent=d.vix||'—';
+  document.getElementById('m-oil').textContent=d.oil||'—';
+  const vPill=document.getElementById('makro-verdict-pill');
+  if(d.verdict==='bull'){vPill.className='pill pill-green';vPill.textContent='Confirmed Uptrend';}
+  else if(d.verdict==='neu'){vPill.className='pill pill-amber';vPill.textContent='Uptrend Under Pressure';}
+  else{vPill.className='pill pill-red';vPill.textContent='Market In Correction';}
+  if(d.factors){
+    document.getElementById('makro-factors').innerHTML=d.factors.map(f=>`
+    <div class="macro-row">
+      <div class="macro-icon ${f.icon==='bull'?'mi-g':f.icon==='neu'?'mi-a':'mi-r'}">
+        <i class="ti ${f.icon==='bull'?'ti-trending-up':f.icon==='neu'?'ti-minus':'ti-trending-down'}"></i>
+      </div>
+      <div class="macro-content">
+        <div class="macro-title">${f.title}</div>
+        <div class="macro-desc">${f.desc}</div>
+      </div>
+    </div>`).join('');
+  }
+  if(d.verdictText){
+    const vb=document.getElementById('makro-verdict-box');
+    vb.className='card '+(d.verdict==='bull'?'':'');
+    vb.style.background=d.verdict==='bull'?'rgba(52,194,110,0.08)':d.verdict==='neu'?'rgba(240,169,58,0.08)':'rgba(240,86,86,0.08)';
+    vb.style.borderColor=d.verdict==='bull'?'rgba(52,194,110,0.25)':d.verdict==='neu'?'rgba(240,169,58,0.25)':'rgba(240,86,86,0.25)';
+    vb.innerHTML=`<div style="font-size:13px;font-weight:500;margin-bottom:4px;color:${d.verdict==='bull'?'var(--green)':d.verdict==='neu'?'var(--amber)':'var(--red)'}">Tagesfazit</div><div style="font-size:13px;color:var(--text2);line-height:1.5">${d.verdictText}</div>`;
+  }
+}
+
+function saveMakro(){
+  const d={
+    date:new Date().toLocaleDateString('de-DE'),
+    sp:document.getElementById('m-sp-in').value,
+    nq:document.getElementById('m-nq-in').value,
+    vix:document.getElementById('m-vix-in').value,
+    oil:document.getElementById('m-oil-in').value,
+    verdict:document.getElementById('m-verdict-in').value,
+    verdictText:document.getElementById('m-text-in').value,
+    factors:[]
+  };
+  const factorsRaw=document.getElementById('m-factors-in').value.trim();
+  if(factorsRaw){try{d.factors=JSON.parse(factorsRaw);}catch(e){alert('Faktoren-JSON ungültig: '+e.message);return;}}
+  localStorage.setItem(MAKRO_KEY,JSON.stringify(d));
+  renderMakro(d);
+  const msg=document.getElementById('makro-save-msg');
+  msg.style.display='block';
+  setTimeout(()=>msg.style.display='none',3000);
+}
+</script>
+</body>
+</html>
