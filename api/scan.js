@@ -1,3 +1,4 @@
+
 export const config = { runtime: 'edge' };
  
 // Yahoo Finance interval → lookback in seconds and data points needed
