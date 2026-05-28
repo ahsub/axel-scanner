@@ -366,12 +366,69 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
         <span class="pill" id="makro-verdict-pill">—</span>
       </div>
-      <div class="mc-grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="mc-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:.5rem">
         <div class="mc"><div class="mcl">S&P 500</div><div class="mcv" id="m-sp">—</div></div>
         <div class="mc"><div class="mcl">VIX</div><div class="mcv" id="m-vix">—</div></div>
         <div class="mc"><div class="mcl">Nasdaq</div><div class="mcv" id="m-nq">—</div></div>
         <div class="mc"><div class="mcl">WTI Öl</div><div class="mcv" id="m-oil">—</div></div>
       </div>
+      <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px;margin-top:.25rem">
+        <i class="ti ti-currency-bitcoin" style="font-size:12px"></i> Krypto — Risikoindikator
+      </div>
+      <div class="mc-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:.75rem">
+        <div class="mc" style="padding:6px 8px">
+          <div class="mcl">BTC</div>
+          <div class="mcv" id="m-btc" style="font-size:14px">—</div>
+          <div style="font-size:10px;margin-top:2px" id="m-btc-chg">—</div>
+        </div>
+        <div class="mc" style="padding:6px 8px">
+          <div class="mcl">ETH</div>
+          <div class="mcv" id="m-eth" style="font-size:14px">—</div>
+          <div style="font-size:10px;margin-top:2px" id="m-eth-chg">—</div>
+        </div>
+        <div class="mc" style="padding:6px 8px">
+          <div class="mcl">SOL</div>
+          <div class="mcv" id="m-sol" style="font-size:14px">—</div>
+          <div style="font-size:10px;margin-top:2px" id="m-sol-chg">—</div>
+        </div>
+        <div class="mc" style="padding:6px 8px">
+          <div class="mcl">XRP</div>
+          <div class="mcv" id="m-xrp" style="font-size:14px">—</div>
+          <div style="font-size:10px;margin-top:2px" id="m-xrp-chg">—</div>
+        </div>
+      </div>
+      <div id="m-crypto-signal" style="display:none;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:500;margin-bottom:.75rem"></div>
+      <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">
+        <i class="ti ti-trending-up" style="font-size:12px"></i> Rohstoffe
+      </div>
+      <div class="mc-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:.75rem">
+        <div class="mc" style="padding:6px 6px">
+          <div class="mcl">Gold</div>
+          <div class="mcv" id="m-gold" style="font-size:12px">—</div>
+          <div style="font-size:10px;margin-top:2px" id="m-gold-chg">—</div>
+        </div>
+        <div class="mc" style="padding:6px 6px">
+          <div class="mcl">Silber</div>
+          <div class="mcv" id="m-silver" style="font-size:12px">—</div>
+          <div style="font-size:10px;margin-top:2px" id="m-silver-chg">—</div>
+        </div>
+        <div class="mc" style="padding:6px 6px">
+          <div class="mcl">Kupfer</div>
+          <div class="mcv" id="m-copper" style="font-size:12px">—</div>
+          <div style="font-size:10px;margin-top:2px" id="m-copper-chg">—</div>
+        </div>
+        <div class="mc" style="padding:6px 6px">
+          <div class="mcl">Lithium</div>
+          <div class="mcv" id="m-lithium" style="font-size:12px">—</div>
+          <div style="font-size:10px;margin-top:2px" id="m-lithium-chg">—</div>
+        </div>
+        <div class="mc" style="padding:6px 6px">
+          <div class="mcl">Öl WTI</div>
+          <div class="mcv" id="m-oil2" style="font-size:12px">—</div>
+          <div style="font-size:10px;margin-top:2px" id="m-oil2-chg">—</div>
+        </div>
+      </div>
+      <div id="m-commodities-signal" style="display:none;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:500;margin-bottom:.75rem"></div>
       <div class="card" id="makro-factors"></div>
       <div class="card" id="makro-verdict-box" style="margin-top:.5rem"></div>
       <div style="margin-top:.5rem;font-size:11px;color:var(--text3)">
@@ -402,6 +459,30 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <div class="field" style="margin-bottom:0"><label>Nasdaq</label><input type="text" id="m-nq-in" placeholder="26.674"></div>
           <div class="field" style="margin-bottom:0"><label>VIX</label><input type="text" id="m-vix-in" placeholder="16.3"></div>
           <div class="field" style="margin-bottom:0"><label>WTI Öl ($)</label><input type="text" id="m-oil-in" placeholder="92.9"></div>
+        </div>
+        <div style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:8px;margin-top:.25rem"><i class="ti ti-currency-bitcoin"></i> Krypto-Kurse</div>
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="field" style="margin-bottom:0"><label>Bitcoin (BTC $)</label><input type="text" id="m-btc-in" placeholder="107.500"></div>
+          <div class="field" style="margin-bottom:0"><label>BTC 24h % (z.B. +2.3)</label><input type="text" id="m-btc-chg-in" placeholder="+2.3"></div>
+          <div class="field" style="margin-bottom:0"><label>Ethereum (ETH $)</label><input type="text" id="m-eth-in" placeholder="2.580"></div>
+          <div class="field" style="margin-bottom:0"><label>ETH 24h %</label><input type="text" id="m-eth-chg-in" placeholder="+1.8"></div>
+          <div class="field" style="margin-bottom:0"><label>Solana (SOL $)</label><input type="text" id="m-sol-in" placeholder="168"></div>
+          <div class="field" style="margin-bottom:0"><label>SOL 24h %</label><input type="text" id="m-sol-chg-in" placeholder="+3.1"></div>
+          <div class="field" style="margin-bottom:0"><label>XRP ($)</label><input type="text" id="m-xrp-in" placeholder="2.28"></div>
+          <div class="field" style="margin-bottom:0"><label>XRP 24h %</label><input type="text" id="m-xrp-chg-in" placeholder="+0.8"></div>
+        </div>
+        <div style="font-size:11px;font-weight:500;color:var(--text3);margin-bottom:8px;margin-top:.5rem"><i class="ti ti-diamond"></i> Rohstoffe</div>
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="field" style="margin-bottom:0"><label>Gold ($/oz)</label><input type="text" id="m-gold-in" placeholder="3.310"></div>
+          <div class="field" style="margin-bottom:0"><label>Gold 24h %</label><input type="text" id="m-gold-chg-in" placeholder="+0.4"></div>
+          <div class="field" style="margin-bottom:0"><label>Silber ($/oz)</label><input type="text" id="m-silver-in" placeholder="32.80"></div>
+          <div class="field" style="margin-bottom:0"><label>Silber 24h %</label><input type="text" id="m-silver-chg-in" placeholder="+0.6"></div>
+          <div class="field" style="margin-bottom:0"><label>Kupfer ($/lb)</label><input type="text" id="m-copper-in" placeholder="4.65"></div>
+          <div class="field" style="margin-bottom:0"><label>Kupfer 24h %</label><input type="text" id="m-copper-chg-in" placeholder="+1.2"></div>
+          <div class="field" style="margin-bottom:0"><label>Lithium ($/t)</label><input type="text" id="m-lithium-in" placeholder="11.500"></div>
+          <div class="field" style="margin-bottom:0"><label>Lithium 24h %</label><input type="text" id="m-lithium-chg-in" placeholder="-0.3"></div>
+          <div class="field" style="margin-bottom:0"><label>Öl WTI ($/barrel)</label><input type="text" id="m-oil2-in" placeholder="92.9"></div>
+          <div class="field" style="margin-bottom:0"><label>Öl 24h %</label><input type="text" id="m-oil2-chg-in" placeholder="+1.5"></div>
         </div>
         <div class="field">
           <label>Marktlage</label>
@@ -882,6 +963,8 @@ function renderMakroDefault(){
   renderMakro({
     date:'28.05.2026',
     sp:'7.538',nq:'26.674',vix:'16.3',oil:'$92.9',
+    crypto_btc:'107.500',crypto_btc_chg:'+1.8',crypto_eth:'2.580',crypto_eth_chg:'+2.1',crypto_sol:'168',crypto_sol_chg:'+3.4',crypto_xrp:'2.28',crypto_xrp_chg:'+0.6',
+    comm_gold:'3.310',comm_gold_chg:'+0.4',comm_silver:'32.80',comm_silver_chg:'+0.6',comm_copper:'4.65',comm_copper_chg:'+1.2',comm_lithium:'11.500',comm_lithium_chg:'-0.3',comm_oil2:'92.9',comm_oil2_chg:'+1.5',
     verdict:'neu',
     verdictText:'Vorsichtig bullisch — mit einem Auge auf AVGO-Earnings heute Abend (22:00 MEZ). KO-Abstand ≥20% einhalten wegen Iran-Overnight-Risiko.',
     factors:[
@@ -900,6 +983,97 @@ function renderMakro(d){
   document.getElementById('m-nq').textContent=d.nq||'—';
   document.getElementById('m-vix').textContent=d.vix||'—';
   document.getElementById('m-oil').textContent=d.oil||'—';
+  // Crypto
+  const cryptos=[
+    {key:'btc',label:'BTC'},
+    {key:'eth',label:'ETH'},
+    {key:'sol',label:'SOL'},
+    {key:'xrp',label:'XRP'}
+  ];
+  let cryptoBullCount=0, cryptoFilledCount=0;
+  cryptos.forEach(c=>{
+    const val=d['crypto_'+c.key];
+    const chg=d['crypto_'+c.key+'_chg'];
+    const el=document.getElementById('m-'+c.key);
+    const chgEl=document.getElementById('m-'+c.key+'-chg');
+    if(el) el.textContent=val?'$'+val:'—';
+    if(chgEl && chg!==undefined && chg!==''){
+      const n=parseFloat(chg);
+      chgEl.textContent=(n>0?'+':'')+chg+'%';
+      chgEl.style.color=n>0?'var(--green)':n<0?'var(--red)':'var(--text3)';
+      cryptoFilledCount++;
+      if(n>0) cryptoBullCount++;
+    } else if(chgEl){
+      chgEl.textContent='—';
+      chgEl.style.color='var(--text3)';
+    }
+  });
+  const sigEl=document.getElementById('m-crypto-signal');
+  if(sigEl && cryptoFilledCount>=2){
+    sigEl.style.display='block';
+    const ratio=cryptoBullCount/cryptoFilledCount;
+    if(ratio>=0.75){
+      sigEl.style.background='rgba(52,194,110,0.1)';
+      sigEl.style.color='var(--green)';
+      sigEl.innerHTML='<i class="ti ti-trending-up"></i> Krypto-Sentiment bullisch — Risk-on Umfeld bestätigt';
+    } else if(ratio>=0.5){
+      sigEl.style.background='rgba(240,169,58,0.1)';
+      sigEl.style.color='var(--amber)';
+      sigEl.innerHTML='<i class="ti ti-minus"></i> Krypto-Sentiment gemischt — kein klares Signal';
+    } else {
+      sigEl.style.background='rgba(240,86,86,0.1)';
+      sigEl.style.color='var(--red)';
+      sigEl.innerHTML='<i class="ti ti-trending-down"></i> Krypto-Sentiment bärisch — Risk-off Warnung für Tech/AI';
+    }
+  } else if(sigEl){
+    sigEl.style.display='none';
+  }
+  // Commodities
+  const commodities=[
+    {key:'gold',label:'Gold'},
+    {key:'silver',label:'Silber'},
+    {key:'copper',label:'Kupfer'},
+    {key:'lithium',label:'Lithium'},
+    {key:'oil2',label:'Öl'}
+  ];
+  let commBullCount=0, commFilledCount=0;
+  commodities.forEach(c=>{
+    const val=d['comm_'+c.key];
+    const chg=d['comm_'+c.key+'_chg'];
+    const el=document.getElementById('m-'+c.key);
+    const chgEl=document.getElementById('m-'+c.key+'-chg');
+    if(el) el.textContent=val?'$'+val:'—';
+    if(chgEl && chg!==undefined && chg!==''){
+      const n=parseFloat(chg);
+      chgEl.textContent=(n>0?'+':'')+chg+'%';
+      chgEl.style.color=n>0?'var(--green)':n<0?'var(--red)':'var(--text3)';
+      commFilledCount++;
+      if(n>0) commBullCount++;
+    } else if(chgEl){
+      chgEl.textContent='—';
+      chgEl.style.color='var(--text3)';
+    }
+  });
+  const commSigEl=document.getElementById('m-commodities-signal');
+  if(commSigEl && commFilledCount>=2){
+    commSigEl.style.display='block';
+    const ratio=commBullCount/commFilledCount;
+    if(ratio>=0.6){
+      commSigEl.style.background='rgba(52,194,110,0.1)';
+      commSigEl.style.color='var(--green)';
+      commSigEl.innerHTML='<i class="ti ti-trending-up"></i> Rohstoffe fest — Inflationsdruck / Risk-on';
+    } else if(ratio>=0.4){
+      commSigEl.style.background='rgba(240,169,58,0.1)';
+      commSigEl.style.color='var(--amber)';
+      commSigEl.innerHTML='<i class="ti ti-minus"></i> Rohstoffe gemischt — kein eindeutiges Signal';
+    } else {
+      commSigEl.style.background='rgba(240,86,86,0.1)';
+      commSigEl.style.color='var(--red)';
+      commSigEl.innerHTML='<i class="ti ti-trending-down"></i> Rohstoffe schwach — Deflationsdruck / Risk-off';
+    }
+  } else if(commSigEl){
+    commSigEl.style.display='none';
+  }
   const vPill=document.getElementById('makro-verdict-pill');
   if(d.verdict==='bull'){vPill.className='pill pill-green';vPill.textContent='Confirmed Uptrend';}
   else if(d.verdict==='neu'){vPill.className='pill pill-amber';vPill.textContent='Uptrend Under Pressure';}
@@ -932,6 +1106,24 @@ function saveMakro(){
     nq:document.getElementById('m-nq-in').value,
     vix:document.getElementById('m-vix-in').value,
     oil:document.getElementById('m-oil-in').value,
+    crypto_btc:document.getElementById('m-btc-in').value,
+    crypto_btc_chg:document.getElementById('m-btc-chg-in').value,
+    crypto_eth:document.getElementById('m-eth-in').value,
+    crypto_eth_chg:document.getElementById('m-eth-chg-in').value,
+    crypto_sol:document.getElementById('m-sol-in').value,
+    crypto_sol_chg:document.getElementById('m-sol-chg-in').value,
+    crypto_xrp:document.getElementById('m-xrp-in').value,
+    crypto_xrp_chg:document.getElementById('m-xrp-chg-in').value,
+    comm_gold:document.getElementById('m-gold-in').value,
+    comm_gold_chg:document.getElementById('m-gold-chg-in').value,
+    comm_silver:document.getElementById('m-silver-in').value,
+    comm_silver_chg:document.getElementById('m-silver-chg-in').value,
+    comm_copper:document.getElementById('m-copper-in').value,
+    comm_copper_chg:document.getElementById('m-copper-chg-in').value,
+    comm_lithium:document.getElementById('m-lithium-in').value,
+    comm_lithium_chg:document.getElementById('m-lithium-chg-in').value,
+    comm_oil2:document.getElementById('m-oil2-in').value,
+    comm_oil2_chg:document.getElementById('m-oil2-chg-in').value,
     verdict:document.getElementById('m-verdict-in').value,
     verdictText:document.getElementById('m-text-in').value,
     factors:[]
@@ -947,3 +1139,4 @@ function saveMakro(){
 </script>
 </body>
 </html>
+
