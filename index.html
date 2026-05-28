@@ -150,7 +150,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .macro-title{font-size:13px;font-weight:500;margin-bottom:2px}
 .macro-desc{font-size:12px;color:var(--text2);line-height:1.5}
 
-/* IBD TABLE */
+/* MOMENTUM TABLE */
 .ibd-table{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)}
 .ibd-table th{font-size:10px;color:var(--text3);text-align:right;padding:5px 6px;border-bottom:0.5px solid var(--border);white-space:nowrap;cursor:pointer}
 .ibd-table th:nth-child(1){text-align:center;width:28px}
@@ -219,7 +219,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="sec">Technischer Scanner</div>
       <div class="btn-row">
         <select id="ticker-preset" style="flex:1;font-size:12px" onchange="toggleCustom()">
-          <option value="default">Top-5 KO-Kandidaten (IBD 50)</option>
+          <option value="default">Top-5 KO-Kandidaten</option>
           <option value="custom">Eigene Ticker</option>
         </select>
         <button class="btn btn-primary" onclick="runScan()" id="scan-btn">
@@ -242,50 +242,93 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <!-- RECHNER PANEL -->
     <div id="panel-rechner" class="panel">
       <div id="rechner-info" class="info-box" style="display:none"></div>
-      <div class="sec">Basiswert</div>
+
+      <div class="sec">TR Produktdaten <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px">direkt aus Trade Republic ablesen</span></div>
       <div class="card">
         <div class="grid-2" style="margin-bottom:.65rem">
-          <div class="field" style="margin-bottom:0"><label>Ticker</label><input type="text" id="rt" placeholder="VRT" oninput="this.value=this.value.toUpperCase();cr()"></div>
-          <div class="field" style="margin-bottom:0"><label>Kurs ($)</label><input type="number" id="rk" placeholder="341.50" oninput="cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Ticker / Name</label><input type="text" id="rt" placeholder="VRT" oninput="this.value=this.value.toUpperCase();cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>ISIN (optional)</label><input type="text" id="r-isin" placeholder="DE000HM51L93" oninput="cr()"></div>
+        </div>
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="field" style="margin-bottom:0"><label>Kurs Basiswert ($)</label><input type="number" id="rk" placeholder="318.19" oninput="cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Knock-out ($)</label><input type="number" id="rko" placeholder="250.34" oninput="cr()"></div>
         </div>
         <div class="grid-3">
-          <div class="field" style="margin-bottom:0"><label>KO-Schwelle ($)</label><input type="number" id="rko" placeholder="273.20" oninput="cr()"></div>
-          <div class="field" style="margin-bottom:0"><label>Ratio</label><input type="number" id="rr" placeholder="0.1" step="0.01" oninput="cr()"></div>
-          <div class="field" style="margin-bottom:0"><label>Turbo (€)</label><input type="number" id="rtp" placeholder="6.80" step="0.01" oninput="cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Verhältnis</label><input type="number" id="rr" placeholder="0.01" step="0.001" oninput="cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Turbo-Preis (€)</label><input type="number" id="rtp" placeholder="0.68" step="0.01" oninput="cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Emittent</label>
+            <select id="r-emittent" onchange="cr()">
+              <option value="">—</option>
+              <option value="HSBC">HSBC</option>
+              <option value="SocGen">SocGen</option>
+              <option value="Citi">Citi</option>
+              <option value="BNP">BNP</option>
+              <option value="DZ">DZ Bank</option>
+            </select>
+          </div>
         </div>
       </div>
-      <div class="sec">Stop-Loss</div>
+
+      <div class="sec">Stop-Loss definieren</div>
       <div class="card">
-        <div class="grid-2">
-          <div class="field" style="margin-bottom:0"><label>Stop-Kurs ($)</label><input type="number" id="rs" placeholder="307.35" oninput="cr()"></div>
-          <div class="field" style="margin-bottom:0"><label>Kapitaleinsatz (€)</label><input type="number" id="rc" placeholder="1000" oninput="cr()"></div>
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="field" style="margin-bottom:0"><label>Mentaler Stop — Basiswert ($)</label><input type="number" id="rs" placeholder="286.00" oninput="cr()"></div>
+          <div class="field" style="margin-bottom:0"><label>Kapitaleinsatz (€)</label><input type="number" id="rc" placeholder="500" oninput="cr()"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">
+          <i class="ti ti-info-circle"></i> Stop-Kurs sollte mind. 5% über KO-Schwelle liegen
         </div>
       </div>
-      <div class="sec">Ergebnis</div>
+
+      <div class="sec">Berechnungsergebnis</div>
       <div class="card">
         <div class="mc-grid">
           <div class="mc"><div class="mcl">Abstand KO</div><div class="mcv" id="r-ako">—</div></div>
           <div class="mc"><div class="mcl">Hebel</div><div class="mcv" id="r-heb">—</div></div>
           <div class="mc"><div class="mcl">Abstand Stop</div><div class="mcv" id="r-ast">—</div></div>
         </div>
-        <div class="rrow"><span class="rl">Limit-Verkauf bei Stop</span><span class="rv" id="r-lim" style="color:var(--accent)">—</span></div>
+
+        <div class="rrow">
+          <span class="rl">Turbo-Preis bei Stop</span>
+          <span class="rv" id="r-tbs" style="color:var(--text2)">—</span>
+        </div>
+        <div class="rrow" style="background:rgba(79,142,247,0.06);margin:0 -1rem;padding:8px 1rem;border-radius:0">
+          <span class="rl" style="font-weight:500;color:var(--text)">Limit-Order in TR setzen</span>
+          <span class="rv" id="r-lim" style="color:var(--accent);font-size:18px">—</span>
+        </div>
+        <div class="rrow"><span class="rl">Anzahl Turbos (Einsatz)</span><span class="rv" id="r-anz">—</span></div>
         <div class="rrow"><span class="rl">Verlust bei Stop (€)</span><span class="rv" id="r-veur">—</span></div>
         <div class="rrow"><span class="rl">Verlust in % des Einsatzes</span><span class="rv" id="r-vpct">—</span></div>
-        <div class="rrow"><span class="rl">Anzahl Turbos</span><span class="rv" id="r-anz">—</span></div>
+        <div class="rrow"><span class="rl">Gewinn bei +10% Basiswert (€)</span><span class="rv" id="r-gewinn" style="color:var(--green)">—</span></div>
+        <div class="rrow"><span class="rl">Chance/Risiko Verhältnis</span><span class="rv" id="r-crv">—</span></div>
+
         <div id="r-warn" style="display:none" class="warn-box"></div>
         <div id="r-danger" style="display:none" class="danger-box"></div>
-        <div style="margin-top:1rem;font-size:11px;color:var(--text3)">
-          <i class="ti ti-info-circle"></i> Limit gilt 08:00–22:00 Uhr (TR). Gap-Down über Nacht nicht abgesichert.
+
+        <div style="margin-top:1rem;padding:10px 12px;background:var(--bg3);border-radius:var(--radius-sm)">
+          <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px"><i class="ti ti-device-mobile"></i> So in Trade Republic eingeben:</div>
+          <div style="font-size:12px;color:var(--text3);line-height:1.7">
+            1. Turbo öffnen → <strong style="color:var(--text)">"Handeln"</strong><br>
+            2. <strong style="color:var(--text)">"Verkaufen"</strong> wählen<br>
+            3. Order-Typ: <strong style="color:var(--text)">"Limit"</strong><br>
+            4. Limit-Preis: <strong style="color:var(--accent)" id="r-lim-hint">—</strong> eingeben<br>
+            5. Gültigkeit: mind. 3 Monate wählen<br>
+            6. Order bestätigen
+          </div>
+        </div>
+
+        <div style="margin-top:.75rem;font-size:11px;color:var(--text3)">
+          <i class="ti ti-alert-triangle" style="color:var(--amber)"></i> Limit gilt nur 08:00–22:00 Uhr. Gap-Down über Nacht nicht abgesichert — KO-Abstand ≥20% empfohlen.
         </div>
       </div>
     </div>
 
-    <!-- IBD50 PANEL -->
+    <!-- TOP50 PANEL -->
     <div id="panel-ibd" class="panel">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:.75rem">
-        <input type="text" id="ibd-search" placeholder="Suche…" style="flex:1;font-size:13px" oninput="renderIBD()">
+        <input type="text" id="ibd-search" placeholder="Ticker oder Name suchen…" style="flex:1;font-size:13px" oninput="renderIBD()">
         <select id="ibd-comp" style="font-size:12px;width:auto" onchange="renderIBD()">
-          <option value="">Comp: alle</option>
+          <option value="">Score: alle</option>
           <option value="99">= 99</option>
           <option value="97">≥ 97</option>
           <option value="95">≥ 95</option>
@@ -297,18 +340,20 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <tr>
               <th onclick="sortIBD('rank')">#</th>
               <th onclick="sortIBD('name')" style="text-align:left">Unternehmen</th>
-              <th onclick="sortIBD('comp')">Comp</th>
-              <th onclick="sortIBD('eps')">EPS</th>
-              <th onclick="sortIBD('rs')">RS</th>
+              <th onclick="sortIBD('ticker')" style="text-align:left">Ticker</th>
+              <th onclick="sortIBD('comp')">Score</th>
+              <th onclick="sortIBD('eps')">EPS Rtg</th>
+              <th onclick="sortIBD('rs')">RS Rtg</th>
               <th onclick="sortIBD('lastEps')">LQ%</th>
               <th onclick="sortIBD('sales')">Sales%</th>
+              <th style="cursor:default;width:32px"></th>
             </tr>
           </thead>
           <tbody id="ibd-body"></tbody>
         </table>
       </div>
       <div style="margin-top:.75rem;font-size:11px;color:var(--text3)">
-        <i class="ti ti-info-circle"></i> Daten wöchentlich via Admin-Tab aktualisieren · Stand: <span id="ibd-date">—</span>
+        <i class="ti ti-info-circle"></i> Wöchentlich via Admin aktualisieren · Stand: <span id="ibd-date">—</span>
       </div>
     </div>
 
@@ -340,14 +385,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <i class="ti ti-lock"></i> Admin-Bereich — nur für Datenaktualisierung
       </div>
 
-      <div class="sec">IBD-50 Daten aktualisieren</div>
+      <div class="sec">Top-50 Daten aktualisieren</div>
       <div class="card">
         <div style="font-size:13px;color:var(--text2);margin-bottom:.75rem">JSON aus Claude-Analyse hier einfügen. Format: Array mit rank, name, comp, eps, rs, annEps, lastEps, nextEps, sales, roe, margin, sector.</div>
         <textarea id="ibd-json" rows="6" placeholder='[{"rank":1,"name":"Micron Tech","comp":99,"eps":82,"rs":99,"annEps":605,"lastEps":682,"nextEps":916,"sales":196,"roe":17,"margin":25,"sector":"tech"},...]' style="font-family:var(--mono);font-size:11px;margin-bottom:.75rem"></textarea>
         <button class="btn btn-primary" onclick="saveIBD()" style="width:100%">
-          <i class="ti ti-device-floppy"></i> IBD-Daten speichern
+          <i class="ti ti-device-floppy"></i> Top-50-Daten speichern
         </button>
-        <div id="ibd-save-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Gespeichert — alle Nutzer sehen die neuen Daten</div>
+        <div id="top50-save-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Gespeichert — Top-50 Liste aktualisiert</div>
       </div>
 
       <div class="sec">Makro-Einschätzung aktualisieren</div>
@@ -403,7 +448,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <i class="ti ti-calculator"></i>Rechner
     </button>
     <button class="nav-btn" id="nav-ibd" onclick="showPanel('ibd')">
-      <i class="ti ti-list-numbers"></i>IBD 50
+      <i class="ti ti-list-numbers"></i>Top 50
     </button>
     <button class="nav-btn" id="nav-makro" onclick="showPanel('makro')">
       <i class="ti ti-world"></i>Makro
@@ -606,10 +651,12 @@ function useInRechner(sym){
   document.getElementById('rk').value=d.price.toFixed(2);
   document.getElementById('rko').value=(d.price*0.80).toFixed(2);
   document.getElementById('rs').value=(d.price*0.90).toFixed(2);
-  document.getElementById('rr').value='0.1';
+  document.getElementById('rr').value='0.01';
+  document.getElementById('r-isin').value='';
+  document.getElementById('r-emittent').value='';
   const info=document.getElementById('rechner-info');
   const sig=d.bullCount===3?'Kaufsignal':d.bullCount===2?'Vorsicht':'Kein Einstieg';
-  info.innerHTML=`<i class="ti ti-transfer"></i> <strong>${sym}</strong> — $${d.price.toFixed(2)} · ${sig} (${d.bullCount}/3) · KO −20%, Stop −10%`;
+  info.innerHTML=`<i class="ti ti-transfer"></i> <strong>${sym}</strong> — $${d.price.toFixed(2)} · ${sig} (${d.bullCount}/3) · KO −20%, Stop −10% vorausgefüllt`;
   info.style.display='block';
   cr();showPanel('rechner');
 }
@@ -621,33 +668,75 @@ function cr(){
   const tp=parseFloat(document.getElementById('rtp').value);
   const s=parseFloat(document.getElementById('rs').value);
   const cap=parseFloat(document.getElementById('rc').value);
-  const w=document.getElementById('r-warn'),d=document.getElementById('r-danger');
-  w.style.display='none';d.style.display='none';
+  const w=document.getElementById('r-warn'),danger=document.getElementById('r-danger');
+  w.style.display='none';danger.style.display='none';
+
   if(isNaN(k)||isNaN(ko)||isNaN(r)) return;
+
   const abko=((k-ko)/k*100);
   document.getElementById('r-ako').textContent=abko.toFixed(1)+'%';
-  if(!isNaN(tp)&&tp>0) document.getElementById('r-heb').textContent=((k*r)/tp).toFixed(1)+'×';
-  if(abko<10){d.style.display='block';d.textContent='⚠ KO-Abstand unter 10% — sehr hohes Totalverlustrisiko.';}
-  else if(abko<20){w.style.display='block';w.textContent='→ KO-Abstand unter 20% — Positionsgröße reduzieren.';}
-  if(!isNaN(s)&&!isNaN(tp)&&tp>0){
-    document.getElementById('r-ast').textContent=((k-s)/k*100).toFixed(1)+'%';
+
+  let hebel='—';
+  if(!isNaN(tp)&&tp>0){
+    hebel=((k*r)/tp).toFixed(1)+'×';
+    document.getElementById('r-heb').textContent=hebel;
+  }
+
+  if(abko<10){
+    danger.style.display='block';
+    danger.textContent='⚠ KO-Abstand unter 10% — Totalverlustrisiko bei normaler Intraday-Volatilität.';
+  } else if(abko<20){
+    w.style.display='block';
+    w.textContent='→ KO-Abstand unter 20% — Positionsgröße reduzieren. Overnight-Gap-Risiko beachten.';
+  }
+
+  if(!isNaN(s)){
+    const abStop=((k-s)/k*100);
+    document.getElementById('r-ast').textContent=abStop.toFixed(1)+'%';
+
+    if(s<=ko){
+      document.getElementById('r-tbs').textContent='Stop liegt unter KO-Schwelle!';
+      document.getElementById('r-lim').textContent='Ungültig';
+      document.getElementById('r-lim-hint').textContent='—';
+      return;
+    }
+
     const tbs=(s-ko)*r;
-    if(tbs>0){
-      document.getElementById('r-lim').textContent='€ '+tbs.toFixed(2);
-      if(!isNaN(cap)&&cap>0){
-        const n=Math.floor(cap/tp);
-        document.getElementById('r-anz').textContent=n+' Stück';
-        const v=(tp-tbs)*n;
-        document.getElementById('r-veur').textContent='− € '+v.toFixed(2);
-        document.getElementById('r-vpct').textContent=((v/cap)*100).toFixed(1)+'%';
+    document.getElementById('r-tbs').textContent='€ '+tbs.toFixed(3);
+
+    const limRounded=Math.round(tbs*100)/100;
+    const limText='€ '+limRounded.toFixed(2);
+    document.getElementById('r-lim').textContent=limText;
+    document.getElementById('r-lim-hint').textContent=limRounded.toFixed(2);
+
+    if(!isNaN(tp)&&tp>0&&!isNaN(cap)&&cap>0){
+      const n=Math.floor(cap/tp);
+      document.getElementById('r-anz').textContent=n+' Stück (à € '+tp.toFixed(2)+')';
+
+      const verlustProStueck=tp-tbs;
+      const verlustGesamt=verlustProStueck*n;
+      document.getElementById('r-veur').textContent='− € '+verlustGesamt.toFixed(2);
+      document.getElementById('r-vpct').textContent=((verlustGesamt/cap)*100).toFixed(1)+'%';
+
+      const kZiel=k*1.10;
+      const turboBeiZiel=(kZiel-ko)*r;
+      const gewinnProStueck=turboBeiZiel-tp;
+      const gewinnGesamt=gewinnProStueck*n;
+      document.getElementById('r-gewinn').textContent=(gewinnGesamt>0?'+ ':'')+'€ '+gewinnGesamt.toFixed(2)+' (+'+((turboBeiZiel/tp-1)*100).toFixed(0)+'%)';
+
+      if(verlustGesamt>0&&gewinnGesamt>0){
+        const crv=gewinnGesamt/verlustGesamt;
+        const crvEl=document.getElementById('r-crv');
+        crvEl.textContent=crv.toFixed(1)+':1';
+        crvEl.style.color=crv>=2?'var(--green)':crv>=1?'var(--amber)':'var(--red)';
       }
-    } else document.getElementById('r-lim').textContent='Stop unter KO';
+    }
   }
 }
 
-// ─── IBD 50 ─────────────────────────────────────────────────────────
-const IBD_STORE_KEY='ko_ibd50';
-const IBD_DATE_KEY='ko_ibd50_date';
+// ─── Momentum Aktien Top 50 ─────────────────────────────────────────────────────────
+const IBD_STORE_KEY='ko_top50';
+const IBD_DATE_KEY='ko_top50_date';
 let ibdData=[];
 let ibdSort={col:'rank',dir:1};
 
@@ -661,30 +750,30 @@ function loadIBD(){
 
 function getDefaultIBD(){
   return [
-    {rank:1,name:'Micron Tech',comp:99,eps:82,rs:99,annEps:605,lastEps:682,nextEps:916,sales:196,roe:17,margin:25,sector:'tech'},
-    {rank:2,name:'Rocket Lab',comp:87,eps:48,rs:98,annEps:null,lastEps:null,nextEps:null,sales:63,roe:null,margin:null,sector:'tech'},
-    {rank:3,name:'SiTime',comp:98,eps:99,rs:98,annEps:145,lastEps:454,nextEps:317,sales:88,roe:null,margin:null,sector:'tech'},
-    {rank:4,name:'Hut 8',comp:96,eps:67,rs:99,annEps:null,lastEps:null,nextEps:null,sales:226,roe:null,margin:null,sector:'tech'},
-    {rank:5,name:'Astera Labs',comp:99,eps:71,rs:96,annEps:61,lastEps:85,nextEps:57,sales:93,roe:19,margin:25,sector:'tech'},
-    {rank:6,name:'Comfort Systems',comp:97,eps:99,rs:95,annEps:45,lastEps:121,nextEps:56,sales:56,roe:49,margin:14,sector:'other'},
-    {rank:7,name:'Argan',comp:97,eps:97,rs:97,annEps:47,lastEps:56,nextEps:68,sales:13,roe:34,margin:16,sector:'other'},
-    {rank:8,name:'Liquidia',comp:96,eps:69,rs:97,annEps:null,lastEps:216,nextEps:null,sales:999,roe:null,margin:null,sector:'health'},
-    {rank:9,name:'Vertiv',comp:99,eps:99,rs:95,annEps:53,lastEps:83,nextEps:49,sales:30,roe:42,margin:17,sector:'tech'},
-    {rank:10,name:'Credo Tech',comp:99,eps:84,rs:95,annEps:645,lastEps:328,nextEps:363,sales:201,roe:9,margin:12,sector:'tech'},
-    {rank:11,name:'Advanced Micro Dvcs',comp:99,eps:95,rs:98,annEps:78,lastEps:43,nextEps:233,sales:38,roe:7,margin:11,sector:'tech'},
-    {rank:12,name:'Travere Therapeutics',comp:73,eps:35,rs:94,annEps:null,lastEps:null,nextEps:null,sales:68,roe:null,margin:null,sector:'health'},
-    {rank:13,name:'Axsome Therapeutics',comp:78,eps:37,rs:93,annEps:null,lastEps:null,nextEps:null,sales:56,roe:null,margin:null,sector:'health'},
-    {rank:14,name:'Solaris Energy Infra',comp:95,eps:71,rs:95,annEps:115,lastEps:114,nextEps:23,sales:55,roe:6,margin:11,sector:'energy'},
-    {rank:15,name:'Bloom Energy',comp:95,eps:65,rs:99,annEps:181,lastEps:999,nextEps:290,sales:130,roe:null,margin:null,sector:'energy'},
-    {rank:16,name:'Vita Coco',comp:99,eps:97,rs:95,annEps:45,lastEps:61,nextEps:45,sales:37,roe:24,margin:15,sector:'other'},
-    {rank:17,name:'Innodata',comp:81,eps:36,rs:96,annEps:17,lastEps:91,nextEps:5,sales:54,roe:38,margin:16,sector:'tech'},
-    {rank:18,name:'Marvell Technology',comp:99,eps:93,rs:98,annEps:93,lastEps:33,nextEps:89,sales:22,roe:19,margin:37,sector:'tech'},
-    {rank:19,name:'Lumentum',comp:95,eps:91,rs:98,annEps:299,lastEps:316,nextEps:235,sales:90,roe:2,margin:null,sector:'tech'},
-    {rank:20,name:'Alphabet',comp:99,eps:99,rs:91,annEps:31,lastEps:82,nextEps:25,sales:22,roe:36,margin:39,sector:'tech'},
-    {rank:24,name:'LAM Research',comp:99,eps:94,rs:95,annEps:37,lastEps:41,nextEps:25,sales:24,roe:58,margin:32,sector:'tech'},
-    {rank:36,name:'Arm Holdings',comp:99,eps:88,rs:97,annEps:259,lastEps:9,nextEps:63,sales:20,roe:12,margin:23,sector:'tech'},
-    {rank:41,name:'Taiwan Semiconductor',comp:99,eps:97,rs:86,annEps:49,lastEps:63,nextEps:45,sales:39,roe:36,margin:54,sector:'tech'},
-    {rank:47,name:'Broadcom',comp:99,eps:96,rs:85,annEps:65,lastEps:28,nextEps:51,sales:29,roe:31,margin:35,sector:'tech'}
+    {rank:1,name:'Micron Tech',ticker:'MU',comp:99,eps:82,rs:99,annEps:605,lastEps:682,nextEps:916,sales:196,roe:17,margin:25,sector:'tech'},
+    {rank:2,name:'Rocket Lab',ticker:'RKLB',comp:87,eps:48,rs:98,annEps:null,lastEps:null,nextEps:null,sales:63,roe:null,margin:null,sector:'tech'},
+    {rank:3,name:'SiTime',ticker:'SITS',comp:98,eps:99,rs:98,annEps:145,lastEps:454,nextEps:317,sales:88,roe:null,margin:null,sector:'tech'},
+    {rank:4,name:'Hut 8',ticker:'HUT',comp:96,eps:67,rs:99,annEps:null,lastEps:null,nextEps:null,sales:226,roe:null,margin:null,sector:'tech'},
+    {rank:5,name:'Astera Labs',ticker:'ALAB',comp:99,eps:71,rs:96,annEps:61,lastEps:85,nextEps:57,sales:93,roe:19,margin:25,sector:'tech'},
+    {rank:6,name:'Comfort Systems',ticker:'FIX',comp:97,eps:99,rs:95,annEps:45,lastEps:121,nextEps:56,sales:56,roe:49,margin:14,sector:'other'},
+    {rank:7,name:'Argan',ticker:'AGX',comp:97,eps:97,rs:97,annEps:47,lastEps:56,nextEps:68,sales:13,roe:34,margin:16,sector:'other'},
+    {rank:8,name:'Liquidia',ticker:'LQDA',comp:96,eps:69,rs:97,annEps:null,lastEps:216,nextEps:null,sales:999,roe:null,margin:null,sector:'health'},
+    {rank:9,name:'Vertiv',ticker:'VRT',comp:99,eps:99,rs:95,annEps:53,lastEps:83,nextEps:49,sales:30,roe:42,margin:17,sector:'tech'},
+    {rank:10,name:'Credo Tech',ticker:'CRDO',comp:99,eps:84,rs:95,annEps:645,lastEps:328,nextEps:363,sales:201,roe:9,margin:12,sector:'tech'},
+    {rank:11,name:'Advanced Micro Dvcs',ticker:'AMD',comp:99,eps:95,rs:98,annEps:78,lastEps:43,nextEps:233,sales:38,roe:7,margin:11,sector:'tech'},
+    {rank:12,name:'Travere Therapeutics',ticker:'TVTX',comp:73,eps:35,rs:94,annEps:null,lastEps:null,nextEps:null,sales:68,roe:null,margin:null,sector:'health'},
+    {rank:13,name:'Axsome Therapeutics',ticker:'AXSM',comp:78,eps:37,rs:93,annEps:null,lastEps:null,nextEps:null,sales:56,roe:null,margin:null,sector:'health'},
+    {rank:14,name:'Solaris Energy Infra',ticker:'SEI',comp:95,eps:71,rs:95,annEps:115,lastEps:114,nextEps:23,sales:55,roe:6,margin:11,sector:'energy'},
+    {rank:15,name:'Bloom Energy',ticker:'BE',comp:95,eps:65,rs:99,annEps:181,lastEps:999,nextEps:290,sales:130,roe:null,margin:null,sector:'energy'},
+    {rank:16,name:'Vita Coco',ticker:'COCO',comp:99,eps:97,rs:95,annEps:45,lastEps:61,nextEps:45,sales:37,roe:24,margin:15,sector:'other'},
+    {rank:17,name:'Innodata',ticker:'INOD',comp:81,eps:36,rs:96,annEps:17,lastEps:91,nextEps:5,sales:54,roe:38,margin:16,sector:'tech'},
+    {rank:18,name:'Marvell Technology',ticker:'MRVL',comp:99,eps:93,rs:98,annEps:93,lastEps:33,nextEps:89,sales:22,roe:19,margin:37,sector:'tech'},
+    {rank:19,name:'Lumentum',ticker:'LITE',comp:95,eps:91,rs:98,annEps:299,lastEps:316,nextEps:235,sales:90,roe:2,margin:null,sector:'tech'},
+    {rank:20,name:'Alphabet',ticker:'GOOGL',comp:99,eps:99,rs:91,annEps:31,lastEps:82,nextEps:25,sales:22,roe:36,margin:39,sector:'tech'},
+    {rank:24,name:'LAM Research',ticker:'LRCX',comp:99,eps:94,rs:95,annEps:37,lastEps:41,nextEps:25,sales:24,roe:58,margin:32,sector:'tech'},
+    {rank:36,name:'Arm Holdings',ticker:'ARM',comp:99,eps:88,rs:97,annEps:259,lastEps:9,nextEps:63,sales:20,roe:12,margin:23,sector:'tech'},
+    {rank:41,name:'Taiwan Semiconductor',ticker:'TSM',comp:99,eps:97,rs:86,annEps:49,lastEps:63,nextEps:45,sales:39,roe:36,margin:54,sector:'tech'},
+    {rank:47,name:'Broadcom',ticker:'AVGO',comp:99,eps:96,rs:85,annEps:65,lastEps:28,nextEps:51,sales:29,roe:31,margin:35,sector:'tech'}
   ];
 }
 
@@ -692,7 +781,7 @@ function renderIBD(){
   const q=(document.getElementById('ibd-search').value||'').toLowerCase();
   const fc=document.getElementById('ibd-comp').value;
   let filtered=ibdData.filter(r=>{
-    if(q&&!r.name.toLowerCase().includes(q)&&!String(r.rank).includes(q)) return false;
+    if(q&&!r.name.toLowerCase().includes(q)&&!String(r.rank).includes(q)&&!(r.ticker||'').toLowerCase().includes(q)) return false;
     if(fc&&(!r.comp||r.comp<parseInt(fc))) return false;
     return true;
   });
@@ -702,15 +791,58 @@ function renderIBD(){
   });
   const fmt=v=>v===null||v===undefined?'<span style="color:var(--text3)">—</span>':(v===999?'+999':(v>0?'+':'')+v+'%');
   const cBadge=v=>{if(!v)return'—';const c=v>=97?'bc-hi':v>=90?'bc-mid':'bc-lo';return`<span class="badge-c ${c}">${v}</span>`;};
-  document.getElementById('ibd-body').innerHTML=filtered.map(r=>`<tr>
+  document.getElementById('ibd-body').innerHTML=filtered.map(r=>{
+    const ticker=r.ticker||'';
+    const hasT=ticker.length>0;
+    return`<tr>
     <td style="color:var(--text3);text-align:center;font-size:11px">${r.rank}</td>
     <td>${r.name}</td>
+    <td style="text-align:left;font-family:var(--mono);color:${hasT?'var(--accent)':'var(--text3)'};font-size:11px">${ticker||'—'}</td>
     <td>${cBadge(r.comp)}</td>
     <td>${cBadge(r.eps)}</td>
     <td>${cBadge(r.rs)}</td>
     <td style="color:${(r.lastEps??0)>25?'var(--green)':(r.lastEps??0)<0?'var(--red)':'var(--text2)'}">${fmt(r.lastEps)}</td>
     <td style="color:${(r.sales??0)>20?'var(--green)':'var(--text2)'}">${fmt(r.sales)}</td>
-  </tr>`).join('');
+    <td style="text-align:center;padding:4px 2px">${hasT?`<button class="btn btn-sm" onclick="ibdToRechner('${ticker}','${r.name.replace(/'/g,"\'")}',${r.comp||'null'},${r.rs||'null'})" style="padding:3px 6px;font-size:10px;white-space:nowrap"><i class="ti ti-calculator"></i></button>`:''}
+    ${hasT?`<button class="btn btn-sm" onclick="ibdToScanner('${ticker}')" style="padding:3px 6px;font-size:10px;margin-left:2px"><i class="ti ti-radar"></i></button>`:''}</td>
+  </tr>`;
+  }).join('');
+}
+
+function ibdToRechner(ticker, name, comp, rs){
+  document.getElementById('rt').value=ticker;
+  document.getElementById('rk').value='';
+  document.getElementById('rko').value='';
+  document.getElementById('rs').value='';
+  document.getElementById('rtp').value='';
+  document.getElementById('rr').value='0.01';
+  document.getElementById('r-isin').value='';
+  document.getElementById('r-emittent').value='';
+  const info=document.getElementById('rechner-info');
+  const compTxt=comp?` · Comp ${comp}`:'';
+  const rsTxt=rs?` · RS ${rs}`:'';
+  info.innerHTML=`<i class="ti ti-transfer"></i> <strong>${ticker}</strong> — ${name}${compTxt}${rsTxt} · Produktdaten aus TR eintragen`;
+  info.style.display='block';
+  showPanel('rechner');
+}
+
+function ibdToScanner(ticker){
+  document.getElementById('ticker-preset').value='custom';
+  document.getElementById('custom-wrap').style.display='block';
+  const current=document.getElementById('custom-input').value;
+  const tickers=current.split(',').map(s=>s.trim()).filter(Boolean);
+  if(!tickers.includes(ticker)) tickers.push(ticker);
+  document.getElementById('custom-input').value=tickers.join(', ');
+  showPanel('scanner');
+  setTimeout(()=>{
+    const info=document.createElement('div');
+    info.className='info-box';
+    info.style.marginBottom='.75rem';
+    info.innerHTML=`<i class="ti ti-radar"></i> <strong>${ticker}</strong> zur Scan-Liste hinzugefügt — "Scan" klicken`;
+    const container=document.getElementById('scan-container');
+    container.parentNode.insertBefore(info,container);
+    setTimeout(()=>info.remove(),4000);
+  },100);
 }
 
 function sortIBD(col){
@@ -730,7 +862,7 @@ function saveIBD(){
     ibdData=data;
     renderIBD();
     document.getElementById('ibd-date').textContent=now;
-    const msg=document.getElementById('ibd-save-msg');
+    const msg=document.getElementById('top50-save-msg');
     msg.style.display='block';
     setTimeout(()=>msg.style.display='none',3000);
     document.getElementById('ibd-json').value='';
@@ -754,7 +886,7 @@ function renderMakroDefault(){
     verdictText:'Vorsichtig bullisch — mit einem Auge auf AVGO-Earnings heute Abend (22:00 MEZ). KO-Abstand ≥20% einhalten wegen Iran-Overnight-Risiko.',
     factors:[
       {icon:'bull',title:'MRVL Beat & Raise gestern',desc:'EPS $0.80 (+6.7% über Konsens), Revenue +28%, Q2-Guidance +35%. Positiver Übertrag auf VRT, AMD, LRCX.'},
-      {icon:'bull',title:'Nasdaq nahe Allzeithoch',desc:'26.675 Punkte, VIX 16.3 — entspannte Marktlage. Confirmed Uptrend IBD Market Pulse.'},
+      {icon:'bull',title:'Nasdaq nahe Allzeithoch',desc:'26.675 Punkte, VIX 16.3 — entspannte Marktlage. Confirmed Uptrend — Marktlage positiv.'},
       {icon:'neu',title:'AVGO-Earnings heute 22:00 MEZ',desc:'Konsens $22 Mrd Revenue, $2.40 EPS. Bei Miss: Chip-Sektor unter Druck. Neue Positionen vor Earnings mit Vorsicht.'},
       {icon:'neu',title:'Neuer Iran-Angriff heute Morgen',desc:'WTI $92.9/Barrel. Asiatische Märkte vorsichtig. Overnight-Gap-Risiko erhöht — KO-Abstand ≥20%.'},
       {icon:'bear',title:'Consumer Sentiment 44.8',desc:'3-Jahres-Tief. Kein direkter Impact auf AI-Infrastruktur, aber geopolitischer Hintergrund belastet.'}
