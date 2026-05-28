@@ -801,16 +801,29 @@ async function runScan(){
     document.getElementById('scan-bar').style.width=((i/tickers.length)*100)+'%';
     try{
       const tf=window.currentTF||'1d';
+      const tfMap={'15m':'15m','30m':'30m','1h':'60m','4h':'1d','1d':'1d'};
+      const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':130};
+      const interval=tfMap[tf]||'1d';
+      const days=daysMap[tf]||130;
       const to=Math.floor(Date.now()/1000);
-      const days={'15m':60,'30m':60,'1h':90,'4h':120,'1d':130}[tf]||130;
       const from=to-60*60*24*days;
-      const j=await finnhubCandles(t.sym,'D',from,to);
-      if(j.s==='no_data'||!j.c||j.c.length<20) throw new Error('Keine Daten (Finnhub: '+(j.s||'empty')+')');
-      const dates=j.t.map(function(ts){
+      const url='https://query1.finance.yahoo.com/v8/finance/chart/'+t.sym+'?interval='+interval+'&period1='+from+'&period2='+to+'&includePrePost=false';
+      const r=await fetch(url,{headers:{'Accept':'application/json','User-Agent':'Mozilla/5.0'}});
+      if(!r.ok) throw new Error('Yahoo HTTP '+r.status);
+      const j=await r.json();
+      const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
+      if(!res) throw new Error('Keine Daten von Yahoo Finance');
+      const q=res.indicators.quote[0];
+      const closes=q.close.map(function(v){return v||0;});
+      const volumes=q.volume.map(function(v){return v||0;});
+      if(closes.length<20) throw new Error('Zu wenig Datenpunkte: '+closes.length);
+      const raw=computeFromRaw(closes,volumes,res.timestamp);
+      const dates=res.timestamp.map(function(ts){
         const d=new Date(ts*1000);
-        return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');
+        const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
+        const hh=String(d.getHours()).padStart(2,'0'),mn=String(d.getMinutes()).padStart(2,'0');
+        return interval==='1d'?dd+'.'+mm:dd+'.'+mm+' '+hh+':'+mn;
       });
-      const raw=computeFromRaw(j.c,j.v,j.t);
       raw.dates_20d=dates.slice(-20);
       renderCard(t,processData(raw));
     }catch(e){
