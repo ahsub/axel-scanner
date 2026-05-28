@@ -226,6 +226,17 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <i class="ti ti-player-play"></i> Scan
         </button>
       </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem">
+        <span style="font-size:11px;color:var(--text3);white-space:nowrap">Zeitrahmen:</span>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-sm tf-btn" id="tf-15m" onclick="setTF('15m')">15m</button>
+          <button class="btn btn-sm tf-btn" id="tf-30m" onclick="setTF('30m')">30m</button>
+          <button class="btn btn-sm tf-btn" id="tf-1h" onclick="setTF('1h')">1h</button>
+          <button class="btn btn-sm tf-btn" id="tf-4h" onclick="setTF('4h')">4h</button>
+          <button class="btn btn-sm tf-btn active-tf" id="tf-1d" onclick="setTF('1d')">1T</button>
+        </div>
+        <span style="font-size:11px;color:var(--text3)" id="tf-label">Tageschart · MACD (12/26/9)</span>
+      </div>
       <div id="custom-wrap" style="display:none;margin-bottom:.75rem">
         <input type="text" id="custom-input" placeholder="AAPL, MSFT, NVDA (kommagetrennt)">
       </div>
@@ -235,7 +246,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
       <div id="scan-container"></div>
       <div style="font-size:11px;color:var(--text3);margin-top:.5rem">
-        <i class="ti ti-info-circle"></i> Daten via Yahoo Finance · Kaufsignal = alle 3 bullisch
+        <i class="ti ti-info-circle"></i> Daten via Yahoo Finance · Kaufsignal = alle 3 bullisch · Zeitrahmen wechseln = neuer Scan erforderlich
       </div>
     </div>
 
@@ -544,6 +555,26 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 // ─── CONFIG ───────────────────────────────────────────────────────────
 const DEFAULT_PIN = '2409';
 const API_BASE = '/api/scan';
+window.currentTF = '1d';
+
+const TF_CONFIG = {
+  '15m': {label:'15min Intraday · MACD (12/26/9)', macdPeriods:[12,26,9], lookback:60*60*24*5},
+  '30m': {label:'30min Intraday · MACD (12/26/9)', macdPeriods:[12,26,9], lookback:60*60*24*8},
+  '1h':  {label:'1h Chart · MACD (12/26/9)',       macdPeriods:[12,26,9], lookback:60*60*24*14},
+  '4h':  {label:'4h Chart · MACD (12/26/9)',       macdPeriods:[12,26,9], lookback:60*60*24*30},
+  '1d':  {label:'Tageschart · MACD (12/26/9)',     macdPeriods:[12,26,9], lookback:60*60*24*130},
+};
+
+function setTF(tf){
+  window.currentTF=tf;
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active-tf'));
+  const btn=document.getElementById('tf-'+tf);
+  if(btn) btn.classList.add('active-tf');
+  const cfg=TF_CONFIG[tf]||TF_CONFIG['1d'];
+  document.getElementById('tf-label').textContent=cfg.label;
+  // Clear existing scan results when timeframe changes
+  document.getElementById('scan-container').innerHTML='';
+}
 const DEFAULT_TICKERS = [
   {sym:'VRT',name:'Vertiv Holdings'},
   {sym:'MRVL',name:'Marvell Technology'},
@@ -634,10 +665,11 @@ async function runScan(){
 
   for(let i=0;i<tickers.length;i++){
     const t=tickers[i];
-    document.getElementById('scan-label').textContent=`${t.sym} analysiere… (${i+1}/${tickers.length})`;
+    const tfLabel=TF_CONFIG[window.currentTF||'1d']?.label||'';document.getElementById('scan-label').textContent=`${t.sym} · ${tfLabel.split('·')[0].trim()} (${i+1}/${tickers.length})`;
     document.getElementById('scan-bar').style.width=((i/tickers.length)*100)+'%';
     try{
-      const r=await fetch(`${API_BASE}?symbol=${t.sym}`);
+      const tf=window.currentTF||'1d';
+      const r=await fetch(`${API_BASE}?symbol=${t.sym}&interval=${tf}`);
       if(!r.ok) throw new Error('HTTP '+r.status);
       const data=await r.json();
       if(data.error) throw new Error(data.error);
@@ -1139,4 +1171,3 @@ function saveMakro(){
 </script>
 </body>
 </html>
-
