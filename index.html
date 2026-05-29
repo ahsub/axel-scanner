@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0a">
@@ -401,8 +401,17 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <div style="font-size:13px;font-weight:500">Makro-Tageseinschätzung</div>
           <div style="font-size:11px;color:var(--text2)" id="makro-date">—</div>
         </div>
-        <span class="pill" id="makro-verdict-pill">—</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="pill" id="makro-verdict-pill">—</span>
+          <button class="btn btn-sm" onclick="refreshLivePrices()" id="makro-refresh-btn" style="padding:4px 10px;font-size:11px">
+            <i class="ti ti-refresh"></i> Live-Preise
+          </button>
+          <button class="btn btn-sm" onclick="requestMakroUpdate()" style="padding:4px 10px;font-size:11px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">
+            <i class="ti ti-news"></i> Makro heute
+          </button>
+        </div>
       </div>
+      <div id="live-prices-status" style="font-size:11px;color:var(--text3);margin-bottom:.5rem;display:none"></div>
       <div class="mc-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:.5rem">
         <div class="mc"><div class="mcl">S&P 500</div><div class="mcv" id="m-sp">—</div></div>
         <div class="mc"><div class="mcl">VIX</div><div class="mcv" id="m-vix">—</div></div>
@@ -738,7 +747,7 @@ function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
-  loadIBD(); loadMakro(); loadJournal();
+  loadIBD(); loadMakro(); loadJournal(); startLiveRefresh();
 }
 function saveTwelveKey(){
   const k=document.getElementById('td-key-input').value.trim();
@@ -777,6 +786,9 @@ function showPanel(id){
     if(inp&&getFinnhubKey()) inp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
     const tdInp=document.getElementById('td-key-input');
     if(tdInp&&getTwelveKey()) tdInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
+  }
+  if(id==='makro'){
+    refreshLivePrices();
   }
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -904,15 +916,33 @@ function computeFromRaw(closes, volumes, timestamps){
   const volRatio=volAvg20>0?Math.round((volumes[n-1]/volAvg20)*100):null;
   const l20o=obv.slice(-20);
   const oMin=Math.min(...l20o),oMax=Math.max(...l20o);
+  // Buy-Point Analyse
+  var high52w=Math.max.apply(null,closes);
+  var low52w=Math.min.apply(null,closes);
+  var dist52wHigh=ma50>0?+((price-high52w)/high52w*100).toFixed(1):null;
+  var dist10wMA=ma50>0?+((price-ma50)/ma50*100).toFixed(1):null;
+  var last10=closes.slice(-10);
+  var prev10=closes.slice(-20,-10);
+  var rangeL10=last10.length>0?(Math.max.apply(null,last10)-Math.min.apply(null,last10))/Math.min.apply(null,last10)*100:null;
+  var rangePrev10=prev10.length>0?(Math.max.apply(null,prev10)-Math.min.apply(null,prev10))/Math.min.apply(null,prev10)*100:null;
+  var isConsolidating=rangeL10!==null&&rangePrev10!==null&&rangeL10<rangePrev10*0.7;
+  var buyPointScore=0;
+  var buyPointSignals=[];
+  if(dist10wMA!==null&&dist10wMA>=0&&dist10wMA<=8){buyPointScore++;buyPointSignals.push('Nahe 10W-MA (+'+dist10wMA+'%)');}
+  if(dist52wHigh!==null&&dist52wHigh>=-8&&dist52wHigh<=-1){buyPointScore++;buyPointSignals.push('Nahe 52W-Hoch ('+dist52wHigh+'%)');}
+  if(isConsolidating){buyPointScore++;buyPointSignals.push('Konsolidierung (enge Range)');}
   return {
     price:+price.toFixed(2),ma50:+ma50.toFixed(2),
     macd_hist:hist[n-1]!=null?+hist[n-1].toFixed(4):null,
     macd_hist_prev:hist[n-2]!=null?+hist[n-2].toFixed(4):null,
     obv_slope_5d:obvSlope!=null?+obvSlope.toFixed(2):null,
     volume_ratio:volRatio,
-    closes_20d:closes.slice(-20).map(v=>+v.toFixed(2)),
-    macd_hist_20d:hist.slice(-20).map(v=>v!=null?+v.toFixed(4):0),
-    obv_norm_20d:l20o.map(v=>oMax===oMin?0.5:+((v-oMin)/(oMax-oMin)).toFixed(3)),
+    closes_20d:closes.slice(-20).map(function(v){return +v.toFixed(2);}),
+    macd_hist_20d:hist.slice(-20).map(function(v){return v!=null?+v.toFixed(4):0;}),
+    obv_norm_20d:l20o.map(function(v){return oMax===oMin?0.5:+((v-oMin)/(oMax-oMin)).toFixed(3);}),
+    dist10wMA:dist10wMA, dist52wHigh:dist52wHigh,
+    buyPointScore:buyPointScore, buyPointSignals:buyPointSignals,
+    high52w:+high52w.toFixed(2), low52w:+low52w.toFixed(2),
   };
 }
 
@@ -958,6 +988,15 @@ function renderCard(t,state){
   var motxt=obvBull?'bullisch':obvBull===false?'bärisch':'n/a';
 
   el.className='card'+(bullCount===3?' card-accent':'');
+  // Buy-Point section
+  var bpScore = state.buyPointScore || 0;
+  var bpSignals = state.buyPointSignals || [];
+  var dist10w = state.dist10wMA;
+  var dist52h = state.dist52wHigh;
+  var bpColor = bpScore >= 2 ? 'var(--green)' : bpScore === 1 ? 'var(--amber)' : 'var(--text3)';
+  var bpBg = bpScore >= 2 ? 'rgba(52,194,110,0.08)' : bpScore === 1 ? 'rgba(240,169,58,0.08)' : 'rgba(255,255,255,0.03)';
+  var bpLabel = bpScore >= 2 ? 'Buy-Point Nähe ✓' : bpScore === 1 ? 'Potenz. Buy-Point' : 'Kein Buy-Point';
+
   var s='<div class="ticker-head">'+
     '<span class="ticker-sym">'+t.sym+'</span>'+
     '<span class="ticker-name" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.name+'</span>'+
@@ -979,6 +1018,13 @@ function renderCard(t,state){
     '<div class="verdict '+vC+'">'+
     '<span><i class="ti '+vI+'" style="margin-right:4px"></i>'+vT+'</span>'+
     '<span style="font-size:11px;opacity:.7">'+bullCount+'/3</span></div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:8px;background:'+bpBg+';margin-bottom:8px">'+
+    '<span style="font-size:12px;font-weight:500;color:'+bpColor+'">'+bpLabel+'</span>'+
+    '<span style="font-size:11px;color:var(--text3)">'+
+    (dist10w!==null?'10W-MA: '+(dist10w>0?'+':'')+dist10w+'%':'')+(dist10w!==null&&dist52h!==undefined?' · ':'')+(dist52h!==undefined?'52W-H: '+(dist52h>0?'+':'')+dist52h+'%':'')+
+    '</span>'+
+    '</div>'+
+    (bpSignals.length>0?'<div style="font-size:11px;color:var(--text3);margin-bottom:6px">'+bpSignals.join(' · ')+'</div>':'')+
     '<div style="display:flex;gap:12px;font-size:11px;color:var(--text3);margin-bottom:5px">'+
     '<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#4f8ef7;display:inline-block;border-radius:1px"></span>Kurs</span>'+
     '<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#34c26e;display:inline-block;border-radius:1px"></span>MACD</span>'+
@@ -1270,24 +1316,21 @@ function loadMakro(){
 
 function renderMakroDefault(){
   renderMakro({
-    date:'28.05.2026',
-    sp:'7.538',nq:'26.674',vix:'16.3',oil:'$92.9',
-    crypto_btc:'107.500',crypto_btc_chg:'+1.8',crypto_eth:'2.580',crypto_eth_chg:'+2.1',crypto_sol:'168',crypto_sol_chg:'+3.4',crypto_xrp:'2.28',crypto_xrp_chg:'+0.6',
-    comm_gold:'3.310',comm_gold_chg:'+0.4',comm_silver:'32.80',comm_silver_chg:'+0.6',comm_copper:'4.65',comm_copper_chg:'+1.2',comm_lithium:'11.500',comm_lithium_chg:'-0.3',comm_oil2:'92.9',comm_oil2_chg:'+1.5',
+    date:'—',
+    sp:'—',nq:'—',vix:'—',oil:'—',
     verdict:'neu',
-    verdictText:'Vorsichtig bullisch — mit einem Auge auf AVGO-Earnings heute Abend (22:00 MEZ). KO-Abstand ≥20% einhalten wegen Iran-Overnight-Risiko.',
+    verdictText:'Bitte Makro-Daten im Admin-Tab aktualisieren oder "Makro heute" Button klicken.',
     factors:[
-      {icon:'bull',title:'MRVL Beat & Raise gestern',desc:'EPS $0.80 (+6.7% über Konsens), Revenue +28%, Q2-Guidance +35%. Positiver Übertrag auf VRT, AMD, LRCX.'},
-      {icon:'bull',title:'Nasdaq nahe Allzeithoch',desc:'26.675 Punkte, VIX 16.3 — entspannte Marktlage. Confirmed Uptrend — Marktlage positiv.'},
-      {icon:'neu',title:'AVGO-Earnings heute 22:00 MEZ',desc:'Konsens $22 Mrd Revenue, $2.40 EPS. Bei Miss: Chip-Sektor unter Druck. Neue Positionen vor Earnings mit Vorsicht.'},
-      {icon:'neu',title:'Neuer Iran-Angriff heute Morgen',desc:'WTI $92.9/Barrel. Asiatische Märkte vorsichtig. Overnight-Gap-Risiko erhöht — KO-Abstand ≥20%.'},
-      {icon:'bear',title:'Consumer Sentiment 44.8',desc:'3-Jahres-Tief. Kein direkter Impact auf AI-Infrastruktur, aber geopolitischer Hintergrund belastet.'}
+      {icon:'neu',title:'Keine aktuellen Marktdaten',desc:'Klicke "Live-Preise" für aktuelle Krypto/Rohstoff-Kurse. Klicke "Makro heute" für eine KI-gestützte Tageseinschätzung. Oder trage Daten manuell im Admin-Tab ein.'}
     ]
   });
 }
 
 function renderMakro(d){
-  document.getElementById('makro-date').textContent=d.date||'—';
+  var now=new Date();
+  document.getElementById('makro-date').textContent=
+    now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+
+    ' · Manuelle Daten: '+(d.date||'—');
   document.getElementById('m-sp').textContent=d.sp||'—';
   document.getElementById('m-nq').textContent=d.nq||'—';
   document.getElementById('m-vix').textContent=d.vix||'—';
@@ -1776,6 +1819,144 @@ function renderJournal(){
   if(filtered.length===0){list.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
   list.innerHTML=filtered.map(p=>jCard(p)).join('');
+}
+
+// ─── LIVE PREISE (CoinGecko + Metals API) ─────────────────────────────────
+let liveRefreshInterval = null;
+
+async function refreshLivePrices(){
+  const btn = document.getElementById('makro-refresh-btn');
+  const status = document.getElementById('live-prices-status');
+  if(btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Lädt…'; }
+  if(status) { status.style.display = 'block'; status.textContent = 'Live-Preise werden geladen…'; }
+
+  let updated = [];
+
+  // 1. Krypto via CoinGecko (kostenlos, CORS OK)
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple&vs_currencies=usd&include_24hr_change=true');
+    if(r.ok){
+      const j = await r.json();
+      const map = {
+        bitcoin: {el:'m-btc', chgEl:'m-btc-chg'},
+        ethereum: {el:'m-eth', chgEl:'m-eth-chg'},
+        solana: {el:'m-sol', chgEl:'m-sol-chg'},
+        ripple: {el:'m-xrp', chgEl:'m-xrp-chg'},
+      };
+      Object.keys(map).forEach(function(coin){
+        const d = j[coin];
+        if(!d) return;
+        const price = d.usd;
+        const chg = d.usd_24h_change;
+        const elPrice = document.getElementById(map[coin].el);
+        const elChg = document.getElementById(map[coin].chgEl);
+        if(elPrice) elPrice.textContent = price > 1000 ? '$' + Math.round(price).toLocaleString('de-DE') : '$' + price.toFixed(2);
+        if(elChg){
+          elChg.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+          elChg.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
+        }
+      });
+      updated.push('Krypto');
+      // Update crypto signal
+      updateCryptoSignalLive(j);
+    }
+  } catch(e) { console.log('CoinGecko error:', e.message); }
+
+  // 2. Commodities via Metals-API free tier / Frankfurter for FX reference
+  // Gold/Silver via metals-api.com free or fallback to stored values
+  try {
+    // Use a free metals price endpoint
+    const goldR = await fetch('https://api.metals.live/v1/spot/gold,silver,copper');
+    if(goldR.ok){
+      const metals = await goldR.json();
+      metals.forEach(function(m){
+        if(m.gold !== undefined){
+          const el = document.getElementById('m-gold');
+          if(el) el.textContent = '$' + Math.round(m.gold).toLocaleString('de-DE');
+          updated.push('Gold');
+        }
+        if(m.silver !== undefined){
+          const el = document.getElementById('m-silver');
+          if(el) el.textContent = '$' + m.silver.toFixed(2);
+        }
+        if(m.copper !== undefined){
+          const el = document.getElementById('m-copper');
+          if(el) el.textContent = '$' + m.copper.toFixed(2);
+        }
+      });
+    }
+  } catch(e) { console.log('Metals error:', e.message); }
+
+  // Update timestamp
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  // Update makro-date with live refresh timestamp
+  const makroDateEl = document.getElementById('makro-date');
+  if(makroDateEl){
+    const storedMakro = localStorage.getItem('ko_makro');
+    let manualDate = '—';
+    try { const m=JSON.parse(storedMakro); manualDate=m.date||'—'; } catch(e){}
+    makroDateEl.textContent = now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
+      + ' · Live: ' + timeStr + ' Uhr · Manuell: ' + manualDate;
+  }
+  if(status){
+    if(updated.length > 0){
+      status.textContent = '✓ Live-Preise aktualisiert (' + updated.join(', ') + ') · ' + timeStr + ' Uhr';
+      status.style.color = 'var(--green)';
+    } else {
+      status.textContent = 'Live-Preise nicht verfügbar · Gespeicherte Werte werden angezeigt · ' + timeStr + ' Uhr';
+      status.style.color = 'var(--text3)';
+    }
+    setTimeout(function(){ status.style.display = 'none'; }, 5000);
+  }
+  if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Live'; }
+}
+
+function updateCryptoSignalLive(j){
+  const changes = [
+    j.bitcoin && j.bitcoin.usd_24h_change,
+    j.ethereum && j.ethereum.usd_24h_change,
+    j.solana && j.solana.usd_24h_change,
+    j.ripple && j.ripple.usd_24h_change,
+  ].filter(v => v !== null && v !== undefined);
+
+  const bullCount = changes.filter(v => v > 0).length;
+  const sigEl = document.getElementById('m-crypto-signal');
+  if(!sigEl || changes.length < 2) return;
+  sigEl.style.display = 'block';
+  const ratio = bullCount / changes.length;
+  if(ratio >= 0.75){
+    sigEl.style.background = 'rgba(52,194,110,0.1)';
+    sigEl.style.color = 'var(--green)';
+    sigEl.innerHTML = '<i class="ti ti-trending-up"></i> Krypto-Sentiment bullisch — Risk-on Umfeld bestätigt';
+  } else if(ratio >= 0.5){
+    sigEl.style.background = 'rgba(240,169,58,0.1)';
+    sigEl.style.color = 'var(--amber)';
+    sigEl.innerHTML = '<i class="ti ti-minus"></i> Krypto-Sentiment gemischt';
+  } else {
+    sigEl.style.background = 'rgba(240,86,86,0.1)';
+    sigEl.style.color = 'var(--red)';
+    sigEl.innerHTML = '<i class="ti ti-trending-down"></i> Krypto-Sentiment bärisch — Risk-off Warnung';
+  }
+}
+
+function startLiveRefresh(){
+  // Auto-refresh every 60 minutes
+  if(liveRefreshInterval) clearInterval(liveRefreshInterval);
+  refreshLivePrices();
+  liveRefreshInterval = setInterval(refreshLivePrices, 60 * 60 * 1000);
+}
+
+function requestMakroUpdate(){
+  const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  sendPrompt('MAKRO_UPDATE_REQUEST:'+today+' Bitte aktuelle Makro-Einschätzung für heute als JSON für den KO-Scanner Admin-Tab.');
+  const status = document.getElementById('live-prices-status');
+  if(status){
+    status.style.display='block';
+    status.style.color='var(--accent)';
+    status.textContent='→ Claude wird befragt — Antwort im Chat erscheint mit JSON zum Einfügen im Admin-Tab';
+    setTimeout(function(){ status.style.display='none'; }, 8000);
+  }
 }
 </script>
 </body>
