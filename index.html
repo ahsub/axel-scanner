@@ -579,6 +579,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <button class="btn btn-sm" onclick="testTwelveKey()" style="margin-top:.5rem;font-size:12px;width:100%">
           <i class="ti ti-plug"></i> Twelve Data Key testen
         </button>
+        <button class="btn btn-sm" onclick="testProxy()" style="margin-top:.5rem;font-size:12px;width:100%;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">
+          <i class="ti ti-antenna"></i> Proxy-Verbindung testen
+        </button>
         <div id="td-test-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
       </div>
 
@@ -847,36 +850,77 @@ async function runScan(){
     const tfLabel=TF_CONFIG[window.currentTF||'1d']?.label||'';document.getElementById('scan-label').textContent=`${t.sym} · ${tfLabel.split('·')[0].trim()} (${i+1}/${tickers.length})`;
     document.getElementById('scan-bar').style.width=((i/tickers.length)*100)+'%';
     try{
-      const tdKey=getTwelveKey();
-      if(!tdKey) throw new Error('Twelve Data API-Key nicht gesetzt (Admin-Tab)');
       const tf=window.currentTF||'1d';
-      const intervalMap={'15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'};
+      const intervalMapTD={'15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'};
+      const intervalMapYF={'15m':'15m','30m':'30m','1h':'60m','4h':'1d','1d':'1d'};
       const outputMap={'15m':78,'30m':60,'1h':90,'4h':120,'1d':130};
-      const interval=intervalMap[tf]||'1day';
-      const outputsize=outputMap[tf]||130;
-      const url='https://api.twelvedata.com/time_series?symbol='+t.sym
-        +'&interval='+interval
-        +'&outputsize='+outputsize
-        +'&apikey='+tdKey;
-      const r=await fetch(url);
-      if(!r.ok) throw new Error('Twelve Data HTTP '+r.status);
-      const j=await r.json();
-      if(j.status==='error') throw new Error('Twelve Data: '+j.message);
-      const values=j.values;
-      if(!values||values.length<20) throw new Error('Zu wenig Datenpunkte: '+(values?values.length:0));
-      // Twelve Data returns newest first - reverse for MACD calculation
-      const reversed=[...values].reverse();
-      const closes=reversed.map(function(v){return parseFloat(v.close)||0;});
-      const volumes=reversed.map(function(v){return parseFloat(v.volume)||0;});
-      const timestamps=reversed.map(function(v){return new Date(v.datetime).getTime()/1000;});
+      const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':130};
+      let closes=[],volumes=[],timestamps=[],dates=[];
+      let dataSource='';
+
+      // Source 1: Twelve Data via CORS Proxy
+      const tdKey=getTwelveKey();
+      if(tdKey){
+        try{
+          const interval=intervalMapTD[tf]||'1day';
+          const outputsize=outputMap[tf]||130;
+          const tdUrl='https://api.twelvedata.com/time_series?symbol='+t.sym
+            +'&interval='+interval+'&outputsize='+outputsize+'&apikey='+tdKey;
+          const url='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(tdUrl);
+          const r=await fetch(url);
+          if(r.ok){
+            const j=await r.json();
+            if(j.status!=='error'&&j.values&&j.values.length>=20){
+              const rev=[...j.values].reverse();
+              closes=rev.map(function(v){return parseFloat(v.close)||0;});
+              volumes=rev.map(function(v){return parseFloat(v.volume)||0;});
+              timestamps=rev.map(function(v){return new Date(v.datetime).getTime()/1000;});
+              dates=rev.map(function(v){
+                const d=new Date(v.datetime);
+                const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
+                const hh=String(d.getHours()).padStart(2,'0'),mn=String(d.getMinutes()).padStart(2,'0');
+                return interval==='1day'?dd+'.'+mm:dd+'.'+mm+' '+hh+':'+mn;
+              });
+              dataSource='Twelve Data';
+            }
+          }
+        }catch(e2){ console.log('TD error:',e2.message); }
+      }
+
+      // Source 2: Yahoo Finance via CORS Proxy (fallback)
+      if(closes.length<20){
+        try{
+          const to=Math.floor(Date.now()/1000);
+          const from=to-60*60*24*(daysMap[tf]||130);
+          const yInterval=intervalMapYF[tf]||'1d';
+          const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+t.sym
+            +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
+          const url='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl);
+          const r=await fetch(url);
+          if(r.ok){
+            const j=await r.json();
+            const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
+            if(res){
+              const q=res.indicators.quote[0];
+              closes=q.close.map(function(v){return v||0;});
+              volumes=q.volume.map(function(v){return v||0;});
+              timestamps=res.timestamp;
+              dates=timestamps.map(function(ts){
+                const d=new Date(ts*1000);
+                const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
+                const hh=String(d.getHours()).padStart(2,'0'),mn=String(d.getMinutes()).padStart(2,'0');
+                return yInterval==='1d'?dd+'.'+mm:dd+'.'+mm+' '+hh+':'+mn;
+              });
+              dataSource='Yahoo Finance';
+            }
+          }
+        }catch(e3){ console.log('YF error:',e3.message); }
+      }
+
+      if(closes.length<20) throw new Error('Keine Daten verfügbar (TD & YF via Proxy)');
       const raw=computeFromRaw(closes,volumes,timestamps);
-      const dates=reversed.map(function(v){
-        const d=new Date(v.datetime);
-        const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
-        const hh=String(d.getHours()).padStart(2,'0'),mn=String(d.getMinutes()).padStart(2,'0');
-        return interval==='1day'?dd+'.'+mm:dd+'.'+mm+' '+hh+':'+mn;
-      });
       raw.dates_20d=dates.slice(-20);
+      raw.dataSource=dataSource;
       renderCard(t,processData(raw));
     }catch(e){
       var msg = e.message;
@@ -1980,7 +2024,8 @@ async function testTwelveKey(){
   msg.style.display='block'; msg.style.color='var(--text2)';
   msg.textContent='Teste Verbindung…';
   try{
-    const r = await fetch('https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&outputsize=2&apikey='+key);
+    const testTdUrl = 'https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&outputsize=2&apikey='+key;
+    const r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(testTdUrl));
     const j = await r.json();
     if(j.status === 'error'){
       msg.style.color='var(--red)';
@@ -1995,6 +2040,29 @@ async function testTwelveKey(){
   }catch(e){
     msg.style.color='var(--red)';
     msg.textContent='✗ Netzwerkfehler: '+e.message;
+  }
+}
+
+async function testProxy(){
+  const msg = document.getElementById('td-test-msg');
+  if(!msg) return;
+  msg.style.display='block';
+  msg.style.color='var(--text2)';
+  msg.textContent='Teste Proxy-Verbindung…';
+  try{
+    const proxyUrl='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent('https://httpbin.org/get');
+    const r = await fetch(proxyUrl);
+    if(r.ok){
+      const j = await r.json();
+      msg.style.color='var(--green)';
+      msg.textContent='✓ Proxy erreichbar — URL: '+j.url;
+    } else {
+      msg.style.color='var(--red)';
+      msg.textContent='✗ Proxy HTTP '+r.status;
+    }
+  }catch(e){
+    msg.style.color='var(--red)';
+    msg.textContent='✗ Proxy nicht erreichbar: '+e.message+' — Möglicherweise CSP/CORS Block durch Vercel';
   }
 }
 </script>
