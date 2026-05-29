@@ -576,6 +576,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <i class="ti ti-key"></i> Key speichern
         </button>
         <div id="td-key-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Key gespeichert</div>
+        <button class="btn btn-sm" onclick="testTwelveKey()" style="margin-top:.5rem;font-size:12px;width:100%">
+          <i class="ti ti-plug"></i> Twelve Data Key testen
+        </button>
+        <div id="td-test-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
       </div>
 
       <div class="sec">PIN ändern</div>
@@ -875,7 +879,11 @@ async function runScan(){
       raw.dates_20d=dates.slice(-20);
       renderCard(t,processData(raw));
     }catch(e){
-      renderCard(t,{error:e.message});
+      var msg = e.message;
+      if(msg.includes('Failed to fetch')){
+        msg = 'Netzwerkfehler — Twelve Data nicht erreichbar. Key prüfen: Admin-Tab → Twelve Data Key. Aktuell gesetzt: '+(getTwelveKey()?'Ja ('+getTwelveKey().substring(0,8)+'...)':'NEIN');
+      }
+      renderCard(t,{error:msg});
     }
   }
   document.getElementById('scan-bar').style.width='100%';
@@ -1957,6 +1965,36 @@ function requestMakroUpdate(){
     });
   } else {
     alert('Bitte diese Anfrage in Claude Chat eingeben:\n\n'+prompt);
+  }
+}
+
+async function testTwelveKey(){
+  const key = getTwelveKey();
+  const msg = document.getElementById('td-test-msg');
+  if(!msg) return;
+  if(!key){
+    msg.style.display='block'; msg.style.color='var(--red)';
+    msg.textContent='✗ Kein Key gesetzt — bitte zuerst Key eingeben und speichern';
+    return;
+  }
+  msg.style.display='block'; msg.style.color='var(--text2)';
+  msg.textContent='Teste Verbindung…';
+  try{
+    const r = await fetch('https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&outputsize=2&apikey='+key);
+    const j = await r.json();
+    if(j.status === 'error'){
+      msg.style.color='var(--red)';
+      msg.textContent='✗ Fehler: '+j.message;
+    } else if(j.values && j.values.length > 0){
+      msg.style.color='var(--green)';
+      msg.textContent='✓ Verbindung OK — Key funktioniert (AAPL: $'+parseFloat(j.values[0].close).toFixed(2)+')';
+    } else {
+      msg.style.color='var(--amber)';
+      msg.textContent='~ Unerwartete Antwort: '+JSON.stringify(j).substring(0,80);
+    }
+  }catch(e){
+    msg.style.color='var(--red)';
+    msg.textContent='✗ Netzwerkfehler: '+e.message;
   }
 }
 </script>
