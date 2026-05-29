@@ -1960,6 +1960,46 @@ async function refreshLivePrices(){
   }
 
   // Update timestamp
+  // Fallback: Yahoo Finance für Marktdaten (S&P, Nasdaq, VIX, Öl)
+  try {
+    const quotes = [
+      {sym:'^GSPC', el:'m-sp', label:'S&P 500'},
+      {sym:'^IXIC', el:'m-nq', label:'Nasdaq'},
+      {sym:'^VIX',  el:'m-vix', label:'VIX'},
+      {sym:'CL=F',  el:'m-oil', label:'Öl'},
+    ];
+    const yfResults = await Promise.all(quotes.map(function(q){
+      const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+q.sym+'?interval=1d&range=5d';
+      return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
+        .then(function(r){ return r.json(); })
+        .then(function(d){ return {q:q, d:d}; })
+        .catch(function(){ return null; });
+    }));
+    let mktUpdated = 0;
+    yfResults.forEach(function(item){
+      if(!item||!item.d) return;
+      const res=item.d.chart&&item.d.chart.result&&item.d.chart.result[0];
+      if(!res) return;
+      const closes=res.indicators.quote[0].close;
+      const price=closes[closes.length-1];
+      if(!price) return;
+      const prevClose=closes[closes.length-2]||price;
+      const chgPct=((price-prevClose)/prevClose*100);
+      const el=document.getElementById(item.q.el);
+      if(el){
+        if(item.q.sym==='^GSPC'||item.q.sym==='^IXIC'){
+          el.textContent=Math.round(price).toLocaleString('de-DE');
+        } else {
+          el.textContent=price.toFixed(2);
+        }
+        // Add change color
+        el.style.color=chgPct>0?'var(--green)':chgPct<0?'var(--red)':'var(--text)';
+      }
+      mktUpdated++;
+    });
+    if(mktUpdated>0) updated.push('Märkte (Yahoo)');
+  } catch(e) { console.log('YF markets error:', e.message); }
+
   const now = new Date();
   const timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
   // Update makro-date with live refresh timestamp
@@ -1995,20 +2035,38 @@ function startLiveRefresh(){
 
 function requestMakroUpdate(){
   const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-  const prompt = 'MAKRO_UPDATE_REQUEST:'+today+' Bitte aktuelle Makro-Einschätzung für heute als JSON für den KO-Scanner Admin-Tab.';
-  // Copy to clipboard
+  // Build context from live prices already loaded
+  const sp = document.getElementById('m-sp')?.textContent||'—';
+  const nq = document.getElementById('m-nq')?.textContent||'—';
+  const vix = document.getElementById('m-vix')?.textContent||'—';
+  const oil = document.getElementById('m-oil')?.textContent||'—';
+  const btc = document.getElementById('m-btc')?.textContent||'—';
+  const eth = document.getElementById('m-eth')?.textContent||'—';
+  const gold = document.getElementById('m-gold')?.textContent||'—';
+
+  const prompt = 'MAKRO_UPDATE_REQUEST '+today+': Bitte erstelle eine aktuelle Makro-Tageseinschätzung für den KO-Scanner als JSON.\n\n'+
+    'Aktuelle Live-Daten (gerade abgerufen):\n'+
+    '- S&P 500: '+sp+'\n'+
+    '- Nasdaq: '+nq+'\n'+
+    '- VIX: '+vix+'\n'+
+    '- WTI Öl: '+oil+'\n'+
+    '- Bitcoin: '+btc+'\n'+
+    '- Ethereum: '+eth+'\n'+
+    '- Gold: '+gold+'\n\n'+
+    'Bitte JSON im Admin-Tab Format mit: sp, nq, vix, oil, verdict (bull/neu/bear), verdictText, factors (Array mit icon/title/desc).';
+
   if(navigator.clipboard){
     navigator.clipboard.writeText(prompt).then(function(){
       const status = document.getElementById('live-prices-status');
       if(status){
         status.style.display='block';
         status.style.color='var(--accent)';
-        status.textContent='✓ Anfrage kopiert — in Claude Chat einfügen (Cmd+V / Strg+V)';
-        setTimeout(function(){ status.style.display='none'; }, 6000);
+        status.innerHTML='<i class="ti ti-copy"></i> Anfrage mit Live-Daten kopiert — in Claude Chat einfügen (Cmd+V).<br><span style="font-size:10px;opacity:.8">Tipp: Erst "Live-Preise" klicken damit aktuelle Kurse enthalten sind.</span>';
+        setTimeout(function(){ status.style.display='none'; }, 8000);
       }
     });
   } else {
-    alert('Bitte diese Anfrage in Claude Chat eingeben:\n\n'+prompt);
+    alert(prompt);
   }
 }
 
