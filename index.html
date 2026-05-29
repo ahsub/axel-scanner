@@ -621,6 +621,30 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="ant-key-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Key gespeichert</div>
       </div>
 
+      <div class="sec">Portfolio & Risiko-Einstellungen</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.75rem">Wird im Hebelrechner für automatische Positionsgrößen-Empfehlung verwendet.</div>
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="fg"><label>Portfoliogröße (€)</label>
+            <input type="number" id="port-size" placeholder="50000" oninput="savePortfolioSettings()">
+          </div>
+          <div class="fg"><label>Cashbestand (€)</label>
+            <input type="number" id="port-cash" placeholder="10000" oninput="savePortfolioSettings()">
+          </div>
+        </div>
+        <div class="grid-2" style="margin-bottom:.65rem">
+          <div class="fg"><label>Max. Risiko pro Trade (%)</label>
+            <input type="number" id="port-risk" placeholder="2" step="0.5" min="0.5" max="5" oninput="savePortfolioSettings()">
+          </div>
+          <div class="fg"><label>Max. gleichzeitige Positionen</label>
+            <input type="number" id="port-maxpos" placeholder="4" step="1" min="1" max="10" oninput="savePortfolioSettings()">
+          </div>
+        </div>
+        <div id="port-summary" style="padding:10px 12px;background:var(--bg3);border-radius:var(--radius-sm);font-size:12px;color:var(--text2)">
+          → Einstellungen eingeben um Empfehlung zu sehen
+        </div>
+      </div>
+
       <div class="sec">PIN ändern</div>
       <div class="card">
         <div class="grid-2" style="margin-bottom:.65rem">
@@ -803,7 +827,7 @@ function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
-  loadIBD(); loadMakro(); loadJournal(); startLiveRefresh();
+  loadIBD(); loadMakro(); loadJournal(); startLiveRefresh(); loadPortfolioSettings();
 }
 function saveTwelveKey(){
   const k=document.getElementById('td-key-input').value.trim();
@@ -844,6 +868,7 @@ function showPanel(id){
     if(tdInp&&getTwelveKey()) tdInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
     const antInp=document.getElementById('ant-key-input');
     if(antInp&&getAnthropicKey()) antInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
+    loadPortfolioSettings();
   }
   if(id==='ibd'){
     updateSessionBar();
@@ -1300,6 +1325,10 @@ function cr(){
         crvEl.style.color=crv>=2?'var(--green)':crv>=1?'var(--amber)':'var(--red)';
       }
     }
+  }
+  // Portfolio recommendation
+  if(!isNaN(tp)&&tp>0){
+    calcPortfolioRec(tp, abko, (!isNaN(s)&&!isNaN(k)&&k>0)?((k-s)/k*100):null);
   }
 }
 
@@ -2648,6 +2677,93 @@ function quickScan(ticker, name){
   const container=document.getElementById('scan-container');
   if(container) container.parentNode.insertBefore(info,container);
   setTimeout(function(){ if(info.parentNode) info.remove(); },4000);
+}
+
+// ─── PORTFOLIO & POSITIONSGRÖSSE ──────────────────────────────────────────
+const PORT_KEY = 'ko_portfolio';
+
+function getPortfolioSettings(){
+  try { return JSON.parse(localStorage.getItem(PORT_KEY)||'{}'); } catch(e){ return {}; }
+}
+
+function savePortfolioSettings(){
+  const s = {
+    size: parseFloat(document.getElementById('port-size')?.value)||0,
+    cash: parseFloat(document.getElementById('port-cash')?.value)||0,
+    risk: parseFloat(document.getElementById('port-risk')?.value)||2,
+    maxpos: parseInt(document.getElementById('port-maxpos')?.value)||4,
+  };
+  localStorage.setItem(PORT_KEY, JSON.stringify(s));
+  updatePortfolioSummary(s);
+  cr(); // Recalculate rechner
+}
+
+function updatePortfolioSummary(s){
+  const el = document.getElementById('port-summary');
+  if(!el) return;
+  if(!s.size || s.size <= 0){ el.textContent='→ Portfoliogröße eingeben'; return; }
+  const maxRiskEur = s.size * (s.risk/100);
+  const cashPct = s.cash>0 ? (s.cash/s.size*100).toFixed(1) : '—';
+  const perPos = maxRiskEur;
+  el.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
+    '<div><span style="color:var(--text3)">Max. Verlust/Trade:</span> <strong style="color:var(--amber)">€'+perPos.toFixed(0)+'</strong></div>'+
+    '<div><span style="color:var(--text3)">Cashquote:</span> <strong style="color:'+(parseFloat(cashPct)>20?'var(--green)':'var(--amber)')+'">'+cashPct+'%</strong></div>'+
+    '<div><span style="color:var(--text3)">Verfügbar:</span> <strong>€'+s.cash.toFixed(0)+'</strong></div>'+
+    '<div><span style="color:var(--text3)">Max. Positionen:</span> <strong>'+s.maxpos+'</strong></div>'+
+    '</div>';
+}
+
+function loadPortfolioSettings(){
+  const s = getPortfolioSettings();
+  if(s.size){ const el=document.getElementById('port-size'); if(el) el.value=s.size; }
+  if(s.cash){ const el=document.getElementById('port-cash'); if(el) el.value=s.cash; }
+  if(s.risk){ const el=document.getElementById('port-risk'); if(el) el.value=s.risk; }
+  if(s.maxpos){ const el=document.getElementById('port-maxpos'); if(el) el.value=s.maxpos; }
+  if(s.size) updatePortfolioSummary(s);
+}
+
+function calcPortfolioRec(turboPrice, koAbstandPct, stopAbstandPct){
+  const s = getPortfolioSettings();
+  const el = document.getElementById('r-portfolio-rec');
+  const details = document.getElementById('r-port-details');
+  if(!el || !details) return;
+  if(!s.size || s.size<=0 || !turboPrice || turboPrice<=0){ el.style.display='none'; return; }
+
+  el.style.display='block';
+  const maxRiskEur = s.size * (s.risk/100);
+  const riskPct = stopAbstandPct||koAbstandPct||20;
+
+  // Max position size: how many turbos can we buy such that loss at stop = maxRiskEur
+  // Loss per turbo at stop = turboPrice * (stopAbstand/100) * leverage_factor
+  // Simplified: max loss = turboPrice * riskPct/100 per turbo if stop = x% down
+  const lossPerTurbo = turboPrice * (riskPct/100);
+  const maxTurbos = lossPerTurbo > 0 ? Math.floor(maxRiskEur / lossPerTurbo) : 0;
+  const recEinsatz = maxTurbos * turboPrice;
+  const cashUsedPct = s.cash>0 ? (recEinsatz/s.cash*100) : 0;
+  const portUsedPct = (recEinsatz/s.size*100);
+
+  // Risk level
+  let riskColor, riskLabel;
+  if(koAbstandPct >= 20){ riskColor='var(--green)'; riskLabel='Konservativ ✓'; }
+  else if(koAbstandPct >= 15){ riskColor='var(--amber)'; riskLabel='Moderat ⚠'; }
+  else { riskColor='var(--red)'; riskLabel='Aggressiv ✗'; }
+
+  // Can we afford it?
+  const affordable = s.cash >= recEinsatz;
+  const posWarning = s.maxpos > 0 && recEinsatz > s.cash/s.maxpos;
+
+  details.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'+
+    '<div><span style="color:var(--text3)">Empf. Anzahl:</span> <strong style="color:var(--accent)">'+maxTurbos+' Stück</strong></div>'+
+    '<div><span style="color:var(--text3)">Empf. Einsatz:</span> <strong style="color:var(--accent)">€'+recEinsatz.toFixed(0)+'</strong></div>'+
+    '<div><span style="color:var(--text3)">Max. Verlust:</span> <strong style="color:var(--red)">€'+maxRiskEur.toFixed(0)+' ('+s.risk+'%)</strong></div>'+
+    '<div><span style="color:var(--text3)">Risikoklasse:</span> <strong style="color:'+riskColor+'">'+riskLabel+'</strong></div>'+
+    '<div><span style="color:var(--text3)">% des Cash:</span> <strong style="color:'+(cashUsedPct>50?'var(--red)':cashUsedPct>30?'var(--amber)':'var(--green)')+'">'+cashUsedPct.toFixed(1)+'%</strong></div>'+
+    '<div><span style="color:var(--text3)">% des Portfolio:</span> <strong>'+portUsedPct.toFixed(1)+'%</strong></div>'+
+    '</div>'+
+    (!affordable?'<div style="color:var(--red);font-size:11px">⚠ Cashbestand zu gering für empfohlene Position</div>':'')+
+    (posWarning?'<div style="color:var(--amber);font-size:11px">→ Beachte max. '+s.maxpos+' Positionen: max. €'+(s.cash/s.maxpos).toFixed(0)+' pro Position</div>':'');
 }
 </script>
 </body>
