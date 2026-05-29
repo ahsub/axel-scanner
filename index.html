@@ -477,6 +477,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div id="m-commodities-signal" style="display:none;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:500;margin-bottom:.75rem"></div>
       <div class="card" id="makro-factors"></div>
       <div class="card" id="makro-verdict-box" style="margin-top:.5rem"></div>
+      <div id="yahoo-news-section" style="display:none;margin-top:.75rem">
+        <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">
+          <i class="ti ti-news" style="font-size:12px"></i> Yahoo Finance Headlines
+          <span id="yahoo-news-time" style="margin-left:6px;font-weight:400"></span>
+        </div>
+        <div id="yahoo-news-list" style="font-size:12px;color:var(--text2);line-height:1.8"></div>
+      </div>
       <div style="margin-top:.5rem;font-size:11px;color:var(--text3)">
         <i class="ti ti-info-circle"></i> Admin-Tab → Makro täglich aktualisieren · Keine Anlageberatung
       </div>
@@ -810,6 +817,7 @@ function showPanel(id){
     if(antInp&&getAnthropicKey()) antInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
   }
   if(id==='makro'){
+    loadYahooNewsFromCache();
     refreshLivePrices();
   }
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -2015,6 +2023,31 @@ async function refreshLivePrices(){
     if(mktUpdated>0) updated.push('Märkte (Yahoo)');
   } catch(e) { console.log('YF markets error:', e.message); }
 
+  // Yahoo Finance News Headlines
+  try {
+    const yfNewsUrl = 'https://finance.yahoo.com/markets/';
+    const newsR = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(yfNewsUrl));
+    if(newsR.ok){
+      const html = await newsR.text();
+      // Extract headlines from Yahoo Finance HTML
+      const headlines = [];
+      const regex = /data-testid="card-title"[^>]*>([^<]+)</g;
+      let m;
+      while((m = regex.exec(html)) !== null && headlines.length < 8){
+        const title = m[1].trim();
+        if(title.length > 20 && title.length < 200) headlines.push(title);
+      }
+      if(headlines.length > 0){
+        localStorage.setItem('ko_yahoo_news', JSON.stringify({
+          headlines: headlines,
+          ts: new Date().toISOString()
+        }));
+        updated.push('News (Yahoo)');
+        renderYahooNews(headlines);
+      }
+    }
+  } catch(e){ console.log('Yahoo news error:', e.message); }
+
   const now = new Date();
   const timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
   // Update makro-date with live refresh timestamp
@@ -2186,11 +2219,23 @@ async function autoMakro(){
   if(status) status.textContent = 'Schritt 2/3: Claude analysiert Marktlage…';
 
   // Step 3: Call Claude API
+  // Include Yahoo Finance headlines if available
+  let newsContext = '';
+  const cachedNews = localStorage.getItem('ko_yahoo_news');
+  if(cachedNews){
+    try {
+      const nd = JSON.parse(cachedNews);
+      if(nd.headlines && nd.headlines.length > 0){
+        newsContext = '\n\nAktuelle Yahoo Finance Headlines:\n' + nd.headlines.slice(0,6).map(function(h,i){ return (i+1)+'. '+h; }).join('\n');
+      }
+    } catch(e){}
+  }
+
   const prompt = 'Du bist ein erfahrener Trendfolge-Trader und analysierst täglich die Makro-Marktlage für Knock-out Turbo-Zertifikate auf US-Tech-Aktien (Trade Republic).\n\n'+
     'Heute ist der '+today+'. Aktuelle Live-Marktdaten:\n'+
     '- S&P 500: '+sp+'\n- Nasdaq: '+nq+'\n- VIX: '+vix+'\n- WTI Öl: '+oil+'\n'+
     '- Bitcoin: '+btc+'\n- Ethereum: '+eth+'\n- Solana: '+sol+'\n- XRP: '+xrp+'\n'+
-    '- Gold: '+gold+'\n- Silber: '+silver+'\n- Kupfer: '+copper+'\n- Öl (Rohstoff): '+oil2+'\n\n'+
+    '- Gold: '+gold+'\n- Silber: '+silver+'\n- Kupfer: '+copper+'\n- Öl (Rohstoff): '+oil2+newsContext+'\n\n'+
     'Erstelle eine prägnante Tages-Makroeinschätzung als JSON-Objekt mit exakt dieser Struktur:\n'+
     '{\n'+
     '  "verdict": "bull" oder "neu" oder "bear",\n'+
@@ -2281,6 +2326,36 @@ async function autoMakro(){
   }
 
   if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-brain"></i> Auto-Makro'; }
+}
+
+function renderYahooNews(headlines){
+  const section = document.getElementById('yahoo-news-section');
+  const list = document.getElementById('yahoo-news-list');
+  const timeEl = document.getElementById('yahoo-news-time');
+  if(!section || !list) return;
+  section.style.display = 'block';
+  if(timeEl) timeEl.textContent = '· ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+  list.innerHTML = headlines.map(function(h){
+    return '<div style="padding:4px 0;border-bottom:0.5px solid var(--border)">' +
+      '<i class="ti ti-point" style="font-size:10px;margin-right:4px;color:var(--text3)"></i>' + h +
+      '</div>';
+  }).join('');
+}
+
+function loadYahooNewsFromCache(){
+  const raw = localStorage.getItem('ko_yahoo_news');
+  if(!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    if(d.headlines && d.headlines.length > 0){
+      renderYahooNews(d.headlines);
+      const timeEl = document.getElementById('yahoo-news-time');
+      if(timeEl){
+        const age = Math.round((Date.now() - new Date(d.ts).getTime()) / 60000);
+        timeEl.textContent = '· vor ' + age + ' Min.';
+      }
+    }
+  } catch(e){}
 }
 </script>
 </body>
