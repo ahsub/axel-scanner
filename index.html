@@ -645,6 +645,31 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
       </div>
 
+      <div class="sec">Datensicherung — Export & Import</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.75rem">
+          Alle Daten (Journal, Einstellungen, Top-50, Makro) als JSON-Datei sichern oder wiederherstellen. API-Keys werden aus Sicherheitsgründen nicht exportiert.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.5rem">
+          <button class="btn btn-primary" onclick="exportAllData()" style="flex:1">
+            <i class="ti ti-download"></i> Alles exportieren
+          </button>
+          <button class="btn" onclick="document.getElementById('import-file').click()" style="flex:1">
+            <i class="ti ti-upload"></i> Importieren
+          </button>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importAllData(this)">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="exportJournal()" style="flex:1;font-size:12px">
+            <i class="ti ti-notebook"></i> Nur Journal
+          </button>
+          <button class="btn btn-sm" onclick="exportTop50()" style="flex:1;font-size:12px">
+            <i class="ti ti-list-numbers"></i> Nur Top-50
+          </button>
+        </div>
+        <div id="backup-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
+      </div>
+
       <div class="sec">PIN ändern</div>
       <div class="card">
         <div class="grid-2" style="margin-bottom:.65rem">
@@ -2764,6 +2789,115 @@ function calcPortfolioRec(turboPrice, koAbstandPct, stopAbstandPct){
     '</div>'+
     (!affordable?'<div style="color:var(--red);font-size:11px">⚠ Cashbestand zu gering für empfohlene Position</div>':'')+
     (posWarning?'<div style="color:var(--amber);font-size:11px">→ Beachte max. '+s.maxpos+' Positionen: max. €'+(s.cash/s.maxpos).toFixed(0)+' pro Position</div>':'');
+}
+
+// ─── EXPORT & IMPORT ──────────────────────────────────────────────────────────
+function downloadJSON(data, filename){
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function showBackupMsg(text, color){
+  const el = document.getElementById('backup-msg');
+  if(!el) return;
+  el.style.display = 'block';
+  el.style.color = color || 'var(--green)';
+  el.textContent = text;
+  setTimeout(function(){ el.style.display='none'; }, 4000);
+}
+
+function exportAllData(){
+  const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\./g,'-');
+  const data = {
+    exportDate: new Date().toISOString(),
+    version: '2.0',
+    journal: JSON.parse(localStorage.getItem('ko_journal')||'[]'),
+    top50: JSON.parse(localStorage.getItem('ko_top50')||'[]'),
+    top50Date: localStorage.getItem('ko_top50_date')||'',
+    makro: JSON.parse(localStorage.getItem('ko_makro')||'{}'),
+    portfolio: JSON.parse(localStorage.getItem('ko_portfolio')||'{}'),
+    // Note: API keys not exported for security
+  };
+  downloadJSON(data, 'KO-Scanner-Backup-'+today+'.json');
+  showBackupMsg('✓ Export erfolgreich — Datei gespeichert', 'var(--green)');
+}
+
+function exportJournal(){
+  const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\./g,'-');
+  const data = {
+    exportDate: new Date().toISOString(),
+    type: 'journal',
+    journal: JSON.parse(localStorage.getItem('ko_journal')||'[]'),
+  };
+  downloadJSON(data, 'KO-Journal-'+today+'.json');
+  showBackupMsg('✓ Journal exportiert ('+data.journal.length+' Positionen)', 'var(--green)');
+}
+
+function exportTop50(){
+  const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\./g,'-');
+  const data = {
+    exportDate: new Date().toISOString(),
+    type: 'top50',
+    top50: JSON.parse(localStorage.getItem('ko_top50')||'[]'),
+    top50Date: localStorage.getItem('ko_top50_date')||'',
+  };
+  downloadJSON(data, 'KO-Top50-'+today+'.json');
+  showBackupMsg('✓ Top-50 exportiert ('+data.top50.length+' Titel)', 'var(--green)');
+}
+
+function importAllData(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const data = JSON.parse(e.target.result);
+      let imported = [];
+
+      // Detect type and import accordingly
+      if(data.journal !== undefined){
+        localStorage.setItem('ko_journal', JSON.stringify(data.journal));
+        journalData = data.journal;
+        renderJournal();
+        imported.push('Journal ('+data.journal.length+' Pos.)');
+      }
+      if(data.top50 !== undefined && data.top50.length > 0){
+        localStorage.setItem('ko_top50', JSON.stringify(data.top50));
+        if(data.top50Date) localStorage.setItem('ko_top50_date', data.top50Date);
+        ibdData = data.top50;
+        renderIBD();
+        imported.push('Top-50 ('+data.top50.length+' Titel)');
+      }
+      if(data.makro !== undefined && Object.keys(data.makro).length > 0){
+        localStorage.setItem('ko_makro', JSON.stringify(data.makro));
+        renderMakro(data.makro);
+        imported.push('Makro');
+      }
+      if(data.portfolio !== undefined && Object.keys(data.portfolio).length > 0){
+        localStorage.setItem('ko_portfolio', JSON.stringify(data.portfolio));
+        loadPortfolioSettings();
+        imported.push('Portfolio-Einstellungen');
+      }
+
+      if(imported.length > 0){
+        showBackupMsg('✓ Importiert: '+imported.join(', '), 'var(--green)');
+      } else {
+        showBackupMsg('⚠ Keine bekannten Daten gefunden', 'var(--amber)');
+      }
+    } catch(err) {
+      showBackupMsg('✗ Fehler beim Import: '+err.message, 'var(--red)');
+    }
+    // Reset file input
+    input.value = '';
+  };
+  reader.readAsText(file);
 }
 </script>
 </body>
