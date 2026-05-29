@@ -1664,28 +1664,48 @@ async function loadMostActive(){
   container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade aktivste Aktien…</div>';
   document.getElementById('mkt-clear-btn').style.display='inline';
   try{
-    const syms=['NVDA','AAPL','MSFT','TSLA','AMD','META','AMZN','GOOGL','PLTR','MRVL',
-                'AVGO','VRT','ARM','CRDO','LRCX','TSM','SMCI','SOXL','TQQQ','SPY'];
     const key=getFinnhubKey();
     if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
-    const results=await Promise.all(syms.map(sym=>
-      fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+key)
-        .then(r=>r.json()).then(d=>({symbol:sym,data:d})).catch(()=>null)
-    ));
+    const usOpen=isUSMarketOpen&&isUSMarketOpen();
+    let syms, marketLabel, isDE=false;
+    if(usOpen){
+      // US market open: show US stocks
+      syms=['NVDA','AAPL','MSFT','TSLA','AMD','META','AMZN','GOOGL','PLTR','MRVL',
+            'AVGO','VRT','ARM','CRDO','LRCX','TSM','SMCI','SOXL','TQQQ','SPY'];
+      marketLabel='🔔 US-Markt — Top 10 nach Bewegung';
+    } else {
+      // Pre-market: show German stocks via Xetra
+      syms=['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE',
+            'MRK.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','HEN3.DE','EOAN.DE','LIN.DE'];
+      marketLabel='🌙 Xetra Pre-Market — Top 15 DE';
+      isDE=true;
+    }
+    const results=await Promise.all(syms.map(function(sym){
+      return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+key)
+        .then(function(r){return r.json();})
+        .then(function(d){return {symbol:sym,data:d};})
+        .catch(function(){return null;});
+    }));
     const items=results
-      .filter(r=>r&&r.data&&r.data.c)
-      .map(r=>({
-        symbol:r.symbol,name:r.symbol,
-        price:r.data.c.toFixed(2),
-        change:(r.data.d||0).toFixed(2),
-        changePct:(r.data.dp||0).toFixed(2),
-        high:(r.data.h||0).toFixed(2),
-        low:(r.data.l||0).toFixed(2),
-        volume:'—',volRatio:null,mktCap:'—',
-      }))
-      .sort((a,b)=>Math.abs(parseFloat(b.changePct))-Math.abs(parseFloat(a.changePct)))
+      .filter(function(r){return r&&r.data&&r.data.c;})
+      .map(function(r){
+        const displaySym=isDE?r.symbol.replace('.DE',''):r.symbol;
+        return {
+          symbol:displaySym,
+          scanSym:isDE?displaySym:r.symbol, // US ticker for scanner
+          name:displaySym,
+          price:r.data.c.toFixed(2),
+          change:(r.data.d||0).toFixed(2),
+          changePct:(r.data.dp||0).toFixed(2),
+          high:(r.data.h||0).toFixed(2),
+          low:(r.data.l||0).toFixed(2),
+          volume:'—',volRatio:null,mktCap:'—',
+          currency:isDE?'€':'$',
+        };
+      })
+      .sort(function(a,b){return Math.abs(parseFloat(b.changePct))-Math.abs(parseFloat(a.changePct));})
       .slice(0,10);
-    renderMostActive({mode:'movers',items,ts:new Date().toISOString()});
+    renderMostActive({mode:'movers',items:items,ts:new Date().toISOString(),label:marketLabel});
   }catch(e){
     container.innerHTML='<div style="font-size:12px;color:var(--red);padding:8px 0"><i class="ti ti-alert-circle"></i> '+e.message+'</div>';
   }
@@ -1699,7 +1719,7 @@ function renderMostActive(d){
     const vRatio=s.volRatio;
     const vCls=vRatio>150?'pill-green':vRatio>100?'pill-amber':'pill-gray';
     return `<tr>
-      <td style="font-weight:600;font-family:var(--mono);color:var(--accent);font-size:12px">${s.symbol}</td>
+      <td style="font-weight:600;font-family:var(--mono);font-size:12px"><button class="btn btn-sm" data-sym="${s.scanSym||s.symbol}" onclick="quickScanBtn(this)" style="padding:0;font-size:12px;font-family:var(--mono);color:var(--accent);background:none;border:none;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-weight:600">${s.symbol}</button></td>
       <td style="font-size:11px;color:var(--text2);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</td>
       <td style="font-family:var(--mono);font-size:12px;text-align:right">$${s.price}</td>
       <td style="font-family:var(--mono);font-size:12px;text-align:right;color:${chgCls}">${chg>0?'+':''}${s.changePct}%</td>
@@ -1708,8 +1728,9 @@ function renderMostActive(d){
       <td style="text-align:right"><button class="btn btn-sm" onclick="addToScan('${s.symbol}')" style="padding:2px 6px;font-size:10px"><i class="ti ti-radar"></i></button></td>
     </tr>`;
   }).join('');
+  const sessionLabel = d.label || 'Top 10 Aktivste';
   container.innerHTML=`
-  <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px">Top 10 Aktivste — ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr · Vol% = vs. 3M-Ø</div>
+  <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px">${sessionLabel} — ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr · Klick auf Ticker = Scanner</div>
   <div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead><tr>
@@ -1729,30 +1750,64 @@ function renderMostActive(d){
 
 async function loadAfterHours(){
   const container=document.getElementById('market-intel-container');
-  container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade After-Hours Daten…</div>';
+  container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade Markt-Bewegungen…</div>';
   document.getElementById('mkt-clear-btn').style.display='inline';
   try{
-    const watchlist=['AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','AMD','AVGO','MRVL',
-                     'VRT','LRCX','TSM','ARM','CRDO','PLTR','SMCI','ORCL','CRM','SNOW'];
     const key=getFinnhubKey();
     if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
-    const results=await Promise.all(watchlist.map(sym=>
-      fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+key)
-        .then(r=>r.json()).then(d=>({symbol:sym,data:d})).catch(()=>null)
-    ));
-    const isPreMarket=new Date().getUTCHours()>=9&&new Date().getUTCHours()<14;
+    const usOpen=isUSMarketOpen&&isUSMarketOpen();
+    const isDE=!usOpen;
+    let watchlist, sessionLabel, isPreMarket;
+
+    if(isDE){
+      // Pre-US: Deutsche Xetra Titel
+      watchlist=['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE',
+                 'MRK.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','HEN3.DE','EOAN.DE',
+                 'LIN.DE','VOW3.DE','MUV2.DE','IFX.DE','MTX.DE','ZAL.DE'];
+      sessionLabel='🌙 Xetra Pre-Market Mover DE';
+      isPreMarket=true;
+    } else {
+      // US market open or after-hours: US watchlist
+      watchlist=['AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','AMD','AVGO','MRVL',
+                 'VRT','LRCX','TSM','ARM','CRDO','PLTR','SMCI','ORCL','CRM','SNOW'];
+      const utcH=new Date().getUTCHours();
+      isPreMarket=utcH>=9&&utcH<14;
+      sessionLabel=isPreMarket?'🔔 US Pre-Market Mover':'🌆 US After-Hours Mover';
+    }
+
+    const results=await Promise.all(watchlist.map(function(sym){
+      return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+key)
+        .then(function(r){return r.json();})
+        .then(function(d){return {symbol:sym,data:d};})
+        .catch(function(){return null;});
+    }));
+
     const items=results
-      .filter(r=>r&&r.data&&r.data.c&&r.data.pc)
-      .map(r=>({
-        symbol:r.symbol,name:r.symbol,
-        regularPrice:r.data.c.toFixed(2),
-        regularChgPct:(r.data.dp||0).toFixed(2),
-        ahPrice:r.data.c.toFixed(2),
-        ahChgPct:((r.data.c-r.data.pc)/r.data.pc*100).toFixed(2),
-      }))
-      .sort((a,b)=>Math.abs(parseFloat(b.ahChgPct||0))-Math.abs(parseFloat(a.ahChgPct||0)))
+      .filter(function(r){return r&&r.data&&r.data.c&&r.data.pc;})
+      .map(function(r){
+        const displaySym=isDE?r.symbol.replace('.DE',''):r.symbol;
+        const chg=((r.data.c-r.data.pc)/r.data.pc*100);
+        return {
+          symbol:displaySym,
+          scanSym:displaySym,
+          name:displaySym,
+          regularPrice:r.data.c.toFixed(2),
+          regularChgPct:(r.data.dp||0).toFixed(2),
+          ahPrice:r.data.c.toFixed(2),
+          ahChgPct:chg.toFixed(2),
+          currency:isDE?'€':'$',
+        };
+      })
+      .filter(function(r){return Math.abs(parseFloat(r.ahChgPct))>0.1;})
+      .sort(function(a,b){return Math.abs(parseFloat(b.ahChgPct||0))-Math.abs(parseFloat(a.ahChgPct||0));})
       .slice(0,12);
-    renderAfterHours({mode:'afterhours',items,isPreMarket,ts:new Date().toISOString()});
+
+    renderAfterHours({
+      mode:'afterhours',items:items,
+      isPreMarket:isPreMarket,isDE:isDE,
+      label:sessionLabel,
+      ts:new Date().toISOString()
+    });
   }catch(e){
     container.innerHTML='<div style="font-size:12px;color:var(--red);padding:8px 0"><i class="ti ti-alert-circle"></i> '+e.message+'</div>';
   }
@@ -1760,7 +1815,8 @@ async function loadAfterHours(){
 
 function renderAfterHours(d){
   const container=document.getElementById('market-intel-container');
-  const label=d.isPreMarket?'Pre-Market':'After-Hours';
+  const label=d.label||(d.isPreMarket?'Pre-Market':'After-Hours');
+  const currency=d.isDE?'€':'$';
   if(!d.items||d.items.length===0){
     container.innerHTML=`<div style="font-size:12px;color:var(--text2);padding:8px 0">Keine ${label}-Aktivität verfügbar — Markt möglicherweise noch offen oder keine Daten.</div>`;
     return;
@@ -1772,7 +1828,7 @@ function renderAfterHours(d){
     const ahCls=ahChg>0?'var(--green)':ahChg<0?'var(--red)':'var(--text2)';
     const bigMove=Math.abs(ahChg)>=3;
     return `<tr style="${bigMove?'background:rgba(240,169,58,0.06)':''}">
-      <td style="font-weight:600;font-family:var(--mono);color:var(--accent);font-size:12px">${s.symbol}</td>
+      <td style="font-weight:600;font-family:var(--mono);font-size:12px"><button class="btn btn-sm" data-sym="${s.scanSym||s.symbol}" onclick="quickScanBtn(this)" style="padding:0;font-size:12px;font-family:var(--mono);color:var(--accent);background:none;border:none;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-weight:600">${s.symbol}</button></td>
       <td style="font-size:11px;color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</td>
       <td style="font-family:var(--mono);font-size:12px;text-align:right">$${s.regularPrice}</td>
       <td style="font-family:var(--mono);font-size:11px;text-align:right;color:${regCls}">${regChg>0?'+':''}${s.regularChgPct}%</td>
@@ -1783,17 +1839,17 @@ function renderAfterHours(d){
   }).join('');
   container.innerHTML=`
   <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px">
-    ${label} — ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr · Sortiert nach Bewegungsgröße · ⚡ = Bewegung ≥3%
+    ${label} — ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr · ⚡ ≥3% · Klick auf Ticker = Scanner
   </div>
   <div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead><tr>
       <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Ticker</th>
       <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Name</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Schluss</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Kurs ${currency}</th>
       <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Tages%</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">${label}</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">${label}%</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Bewegung</th>
+      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">%</th>
       <th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
