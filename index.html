@@ -1832,60 +1832,80 @@ async function refreshLivePrices(){
 
   let updated = [];
 
-  // 1. Krypto via CoinGecko (kostenlos, CORS OK)
+  // 1. Krypto via Binance API (CORS OK, kein Key nötig)
   try {
-    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple&vs_currencies=usd&include_24hr_change=true');
-    if(r.ok){
-      const j = await r.json();
-      const map = {
-        bitcoin: {el:'m-btc', chgEl:'m-btc-chg'},
-        ethereum: {el:'m-eth', chgEl:'m-eth-chg'},
-        solana: {el:'m-sol', chgEl:'m-sol-chg'},
-        ripple: {el:'m-xrp', chgEl:'m-xrp-chg'},
-      };
-      Object.keys(map).forEach(function(coin){
-        const d = j[coin];
-        if(!d) return;
-        const price = d.usd;
-        const chg = d.usd_24h_change;
-        const elPrice = document.getElementById(map[coin].el);
-        const elChg = document.getElementById(map[coin].chgEl);
-        if(elPrice) elPrice.textContent = price > 1000 ? '$' + Math.round(price).toLocaleString('de-DE') : '$' + price.toFixed(2);
-        if(elChg){
-          elChg.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
-          elChg.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
-        }
-      });
-      updated.push('Krypto');
-      // Update crypto signal
-      updateCryptoSignalLive(j);
+    const symbols = [
+      {binance:'BTCUSDT', el:'m-btc', chgEl:'m-btc-chg'},
+      {binance:'ETHUSDT', el:'m-eth', chgEl:'m-eth-chg'},
+      {binance:'SOLUSDT', el:'m-sol', chgEl:'m-sol-chg'},
+      {binance:'XRPUSDT', el:'m-xrp', chgEl:'m-xrp-chg'},
+    ];
+    const cryptoResults = await Promise.all(symbols.map(function(s){
+      return fetch('https://api.binance.com/api/v3/ticker/24hr?symbol='+s.binance)
+        .then(function(r){ return r.json(); })
+        .then(function(d){ return {s:s, d:d}; })
+        .catch(function(){ return null; });
+    }));
+    let cryptoUpdated = 0;
+    const cryptoChanges = [];
+    cryptoResults.forEach(function(item){
+      if(!item || !item.d || !item.d.lastPrice) return;
+      const price = parseFloat(item.d.lastPrice);
+      const chg = parseFloat(item.d.priceChangePercent);
+      const elPrice = document.getElementById(item.s.el);
+      const elChg = document.getElementById(item.s.chgEl);
+      if(elPrice) elPrice.textContent = price > 1000 ? '$'+Math.round(price).toLocaleString('de-DE') : '$'+price.toFixed(2);
+      if(elChg){
+        elChg.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+        elChg.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
+      }
+      cryptoChanges.push(chg);
+      cryptoUpdated++;
+    });
+    if(cryptoUpdated > 0){
+      updated.push('Krypto (Binance)');
+      // Update signal
+      var bullCount = cryptoChanges.filter(function(v){ return v > 0; }).length;
+      var sigEl = document.getElementById('m-crypto-signal');
+      if(sigEl && cryptoChanges.length >= 2){
+        sigEl.style.display = 'block';
+        var ratio = bullCount / cryptoChanges.length;
+        if(ratio >= 0.75){ sigEl.style.background='rgba(52,194,110,0.1)'; sigEl.style.color='var(--green)'; sigEl.innerHTML='<i class="ti ti-trending-up"></i> Krypto-Sentiment bullisch — Risk-on bestätigt';}
+        else if(ratio >= 0.5){ sigEl.style.background='rgba(240,169,58,0.1)'; sigEl.style.color='var(--amber)'; sigEl.innerHTML='<i class="ti ti-minus"></i> Krypto-Sentiment gemischt';}
+        else { sigEl.style.background='rgba(240,86,86,0.1)'; sigEl.style.color='var(--red)'; sigEl.innerHTML='<i class="ti ti-trending-down"></i> Krypto-Sentiment bärisch — Risk-off Warnung';}
+      }
     }
-  } catch(e) { console.log('CoinGecko error:', e.message); }
+  } catch(e) { console.log('Binance crypto error:', e.message); }
 
-  // 2. Commodities via Metals-API free tier / Frankfurter for FX reference
-  // Gold/Silver via metals-api.com free or fallback to stored values
-  try {
-    // Use a free metals price endpoint
-    const goldR = await fetch('https://api.metals.live/v1/spot/gold,silver,copper');
-    if(goldR.ok){
-      const metals = await goldR.json();
-      metals.forEach(function(m){
-        if(m.gold !== undefined){
-          const el = document.getElementById('m-gold');
-          if(el) el.textContent = '$' + Math.round(m.gold).toLocaleString('de-DE');
-          updated.push('Gold');
-        }
-        if(m.silver !== undefined){
-          const el = document.getElementById('m-silver');
-          if(el) el.textContent = '$' + m.silver.toFixed(2);
-        }
-        if(m.copper !== undefined){
-          const el = document.getElementById('m-copper');
-          if(el) el.textContent = '$' + m.copper.toFixed(2);
-        }
+  // 2. Rohstoffe via Finnhub (Key bereits vorhanden)
+  const fhKey = getFinnhubKey();
+  if(fhKey){
+    try {
+      const commodMap = [
+        {sym:'OANDA:XAU_USD', el:'m-gold', label:'Gold'},
+        {sym:'OANDA:XAG_USD', el:'m-silver', label:'Silber'},
+        {sym:'OANDA:BCO_USD', el:'m-oil2', label:'Öl'},
+      ];
+      const commResults = await Promise.all(commodMap.map(function(c){
+        return fetch('https://finnhub.io/api/v1/quote?symbol='+c.sym+'&token='+fhKey)
+          .then(function(r){ return r.json(); })
+          .then(function(d){ return {c:c, d:d}; })
+          .catch(function(){ return null; });
+      }));
+      let commUpdated = 0;
+      commResults.forEach(function(item){
+        if(!item || !item.d || !item.d.c) return;
+        const price = item.d.c;
+        const chg = item.d.dp || 0;
+        const el = document.getElementById(item.c.el);
+        const chgEl = document.getElementById(item.c.el+'-chg');
+        if(el) el.textContent = '$'+price.toFixed(2);
+        if(chgEl){ chgEl.textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%'; chgEl.style.color=chg>=0?'var(--green)':'var(--red)';}
+        commUpdated++;
       });
-    }
-  } catch(e) { console.log('Metals error:', e.message); }
+      if(commUpdated > 0) updated.push('Rohstoffe (Finnhub)');
+    } catch(e) { console.log('Finnhub commodities error:', e.message); }
+  }
 
   // Update timestamp
   const now = new Date();
@@ -1912,33 +1932,7 @@ async function refreshLivePrices(){
   if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Live'; }
 }
 
-function updateCryptoSignalLive(j){
-  const changes = [
-    j.bitcoin && j.bitcoin.usd_24h_change,
-    j.ethereum && j.ethereum.usd_24h_change,
-    j.solana && j.solana.usd_24h_change,
-    j.ripple && j.ripple.usd_24h_change,
-  ].filter(v => v !== null && v !== undefined);
-
-  const bullCount = changes.filter(v => v > 0).length;
-  const sigEl = document.getElementById('m-crypto-signal');
-  if(!sigEl || changes.length < 2) return;
-  sigEl.style.display = 'block';
-  const ratio = bullCount / changes.length;
-  if(ratio >= 0.75){
-    sigEl.style.background = 'rgba(52,194,110,0.1)';
-    sigEl.style.color = 'var(--green)';
-    sigEl.innerHTML = '<i class="ti ti-trending-up"></i> Krypto-Sentiment bullisch — Risk-on Umfeld bestätigt';
-  } else if(ratio >= 0.5){
-    sigEl.style.background = 'rgba(240,169,58,0.1)';
-    sigEl.style.color = 'var(--amber)';
-    sigEl.innerHTML = '<i class="ti ti-minus"></i> Krypto-Sentiment gemischt';
-  } else {
-    sigEl.style.background = 'rgba(240,86,86,0.1)';
-    sigEl.style.color = 'var(--red)';
-    sigEl.innerHTML = '<i class="ti ti-trending-down"></i> Krypto-Sentiment bärisch — Risk-off Warnung';
-  }
-}
+// updateCryptoSignalLive now integrated in refreshLivePrices
 
 function startLiveRefresh(){
   // Auto-refresh every 60 minutes
@@ -1949,13 +1943,20 @@ function startLiveRefresh(){
 
 function requestMakroUpdate(){
   const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-  sendPrompt('MAKRO_UPDATE_REQUEST:'+today+' Bitte aktuelle Makro-Einschätzung für heute als JSON für den KO-Scanner Admin-Tab.');
-  const status = document.getElementById('live-prices-status');
-  if(status){
-    status.style.display='block';
-    status.style.color='var(--accent)';
-    status.textContent='→ Claude wird befragt — Antwort im Chat erscheint mit JSON zum Einfügen im Admin-Tab';
-    setTimeout(function(){ status.style.display='none'; }, 8000);
+  const prompt = 'MAKRO_UPDATE_REQUEST:'+today+' Bitte aktuelle Makro-Einschätzung für heute als JSON für den KO-Scanner Admin-Tab.';
+  // Copy to clipboard
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(prompt).then(function(){
+      const status = document.getElementById('live-prices-status');
+      if(status){
+        status.style.display='block';
+        status.style.color='var(--accent)';
+        status.textContent='✓ Anfrage kopiert — in Claude Chat einfügen (Cmd+V / Strg+V)';
+        setTimeout(function(){ status.style.display='none'; }, 6000);
+      }
+    });
+  } else {
+    alert('Bitte diese Anfrage in Claude Chat eingeben:\n\n'+prompt);
   }
 }
 </script>
