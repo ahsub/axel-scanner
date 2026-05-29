@@ -1093,12 +1093,11 @@ function computeFromRaw(closes, volumes, timestamps){
 }
 
 function processData(raw){
-  const{price,ma50,macd_hist,macd_hist_prev,obv_slope_5d,volume_ratio,closes_20d,macd_hist_20d,obv_norm_20d,dates_20d}=raw;
-  const above50=price>ma50;
-  const macdBull=macd_hist!=null&&macd_hist_prev!=null?(macd_hist>macd_hist_prev&&macd_hist>0):null;
-  const obvBull=obv_slope_5d!=null?obv_slope_5d>0:null;
-  const bullCount=[above50,macdBull,obvBull].filter(v=>v===true).length;
-  return{price,ma50,above50,macdBull,obvBull,histVal:macd_hist,obvSlope:obv_slope_5d,volRatio:volume_ratio,bullCount,closes:closes_20d||[],hist:macd_hist_20d||[],obvNorm:obv_norm_20d||[],dates:dates_20d||[]};
+  const above50=raw.price>raw.ma50;
+  const macdBull=raw.macd_hist!=null&&raw.macd_hist_prev!=null?(raw.macd_hist>raw.macd_hist_prev&&raw.macd_hist>0):null;
+  const obvBull=raw.obv_slope_5d!=null?raw.obv_slope_5d>0:null;
+  const bullCount=[above50,macdBull,obvBull].filter(function(v){return v===true;}).length;
+  return Object.assign({},raw,{above50:above50,macdBull:macdBull,obvBull:obvBull,bullCount:bullCount});
 }
 
 function renderCard(t,state){
