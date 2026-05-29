@@ -1097,7 +1097,13 @@ function processData(raw){
   const macdBull=raw.macd_hist!=null&&raw.macd_hist_prev!=null?(raw.macd_hist>raw.macd_hist_prev&&raw.macd_hist>0):null;
   const obvBull=raw.obv_slope_5d!=null?raw.obv_slope_5d>0:null;
   const bullCount=[above50,macdBull,obvBull].filter(function(v){return v===true;}).length;
-  return Object.assign({},raw,{above50:above50,macdBull:macdBull,obvBull:obvBull,bullCount:bullCount});
+  // Aliases: renderCard uses short names
+  return Object.assign({},raw,{
+    above50:above50,macdBull:macdBull,obvBull:obvBull,bullCount:bullCount,
+    histVal:raw.macd_hist,obvSlope:raw.obv_slope_5d,volRatio:raw.volume_ratio,
+    closes:raw.closes_20d||[],hist:raw.macd_hist_20d||[],
+    obvNorm:raw.obv_norm_20d||[],dates:raw.dates_20d||[]
+  });
 }
 
 function renderCard(t,state){
