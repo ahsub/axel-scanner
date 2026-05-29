@@ -362,6 +362,20 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
     <!-- TOP50 PANEL -->
     <div id="panel-ibd" class="panel">
+      <!-- Market Session Indicator -->
+      <div id="top50-session-bar" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;margin-bottom:.75rem;background:var(--bg3);border:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="top50-session-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);display:inline-block"></span>
+          <span id="top50-session-label" style="font-size:12px;font-weight:500;color:var(--text2)">Markt geschlossen</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="top50-session-time" style="font-size:11px;color:var(--text3)"></span>
+          <button class="btn btn-sm" onclick="loadTop50Prices()" id="top50-price-btn" style="font-size:11px;padding:3px 8px">
+            <i class="ti ti-refresh"></i> Kurse laden
+          </button>
+        </div>
+      </div>
+
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:.75rem">
         <input type="text" id="ibd-search" placeholder="Ticker oder Name suchen…" style="flex:1;font-size:13px" oninput="renderIBD()">
         <select id="ibd-comp" style="font-size:12px;width:auto" onchange="renderIBD()">
@@ -378,6 +392,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
               <th onclick="sortIBD('rank')">#</th>
               <th onclick="sortIBD('name')" style="text-align:left">Unternehmen</th>
               <th onclick="sortIBD('ticker')" style="text-align:left">Ticker</th>
+              <th onclick="sortIBD('livePrice')" style="text-align:right">Kurs</th>
+              <th onclick="sortIBD('liveChg')" style="text-align:right">%</th>
               <th onclick="sortIBD('comp')">Score</th>
               <th onclick="sortIBD('eps')">EPS Rtg</th>
               <th onclick="sortIBD('rs')">RS Rtg</th>
@@ -738,13 +754,26 @@ const TF_CONFIG = {
   '1d':  {label:'Tageschart · MACD (12/26/9)',     macdPeriods:[12,26,9], lookback:60*60*24*130},
 };
 
+function getEffectiveTF(tf){
+  // Returns the effective TF used for scanning
+  if(tf==='1d'){
+    const now=new Date();
+    const utcMins=now.getUTCHours()*60+now.getUTCMinutes();
+    const dow=now.getUTCDay();
+    if(dow>0&&dow<6&&utcMins>=13*60+30&&utcMins<20*60+15) return '1h'; // US open → auto 1h
+  }
+  return tf;
+}
+
 function setTF(tf){
   window.currentTF=tf;
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active-tf'));
   const btn=document.getElementById('tf-'+tf);
   if(btn) btn.classList.add('active-tf');
-  const cfg=TF_CONFIG[tf]||TF_CONFIG['1d'];
-  document.getElementById('tf-label').textContent=cfg.label;
+  const eff=getEffectiveTF(tf);
+  const cfg=TF_CONFIG[eff]||TF_CONFIG['1d'];
+  const autoNote = eff!==tf?' (Auto: '+eff+')':'';
+  document.getElementById('tf-label').textContent=cfg.label+autoNote;
   // Clear existing scan results when timeframe changes
   document.getElementById('scan-container').innerHTML='';
 }
@@ -816,6 +845,9 @@ function showPanel(id){
     const antInp=document.getElementById('ant-key-input');
     if(antInp&&getAnthropicKey()) antInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
   }
+  if(id==='ibd'){
+    updateSessionBar();
+  }
   if(id==='makro'){
     loadYahooNewsFromCache();
     refreshLivePrices();
@@ -874,19 +906,56 @@ async function runScan(){
     document.getElementById('scan-bar').style.width=((i/tickers.length)*100)+'%';
     try{
       const tf=window.currentTF||'1d';
+
+      // ─── Session-aware interval selection ───────────────────────────────
+      // DST: MESZ (summer) = UTC+2, MEZ (winter) = UTC+1
+      // NYSE/Nasdaq: opens 09:30 ET = 15:30 MESZ / 14:30 MEZ
+      //              closes 16:00 ET = 22:00 MESZ / 21:00 MEZ
+      function isUSMarketOpen(){
+        const now = new Date();
+        const utcH = now.getUTCHours(), utcM = now.getUTCMinutes();
+        const utcMins = utcH*60+utcM;
+        const dayOfWeek = now.getUTCDay(); // 0=Sun, 6=Sat
+        if(dayOfWeek===0||dayOfWeek===6) return false;
+        // NYSE: 13:30-20:00 UTC (summer) / 14:30-21:00 UTC (winter)
+        // Use simple check: 13:30-20:00 UTC covers both with margin
+        return utcMins >= 13*60+30 && utcMins < 20*60+15;
+      }
+      function isGermanPreMarket(){
+        const now = new Date();
+        const utcH = now.getUTCHours(), utcM = now.getUTCMinutes();
+        const utcMins = utcH*60+utcM;
+        const dayOfWeek = now.getUTCDay();
+        if(dayOfWeek===0||dayOfWeek===6) return false;
+        // German pre-market: 06:00-13:30 UTC (roughly 08:00-15:30 MESZ)
+        return utcMins >= 6*60 && utcMins < 13*60+30;
+      }
+
+      const usOpen = isUSMarketOpen();
+      const dePreMarket = isGermanPreMarket();
+
+      // Auto-select optimal interval based on session
+      // US market open → prefer intraday (15m/30m/1h) for live signal
+      // Pre-market DE → use 1h or 4h for directional context
+      // Manual override always wins
+      let effectiveTF = tf;
+      if(tf==='1d' && usOpen) {
+        effectiveTF='1h'; // Auto: switch to 1h intraday when US open
+      }
+
       const intervalMapTD={'15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'};
-      const intervalMapYF={'15m':'15m','30m':'30m','1h':'60m','4h':'1d','1d':'1d'};
       const outputMap={'15m':78,'30m':60,'1h':90,'4h':120,'1d':130};
       const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':130};
       let closes=[],volumes=[],timestamps=[],dates=[];
       let dataSource='';
+      let sessionNote = usOpen?'🔔 US Live':dePreMarket?'🌙 Pre-Market':'📊 Tageschart';
 
       // Source 1: Twelve Data via CORS Proxy
       const tdKey=getTwelveKey();
       if(tdKey){
         try{
-          const interval=intervalMapTD[tf]||'1day';
-          const outputsize=outputMap[tf]||130;
+          const interval=intervalMapTD[effectiveTF]||'1day';
+          const outputsize=outputMap[effectiveTF]||130;
           const tdUrl='https://api.twelvedata.com/time_series?symbol='+t.sym
             +'&interval='+interval+'&outputsize='+outputsize+'&apikey='+tdKey;
           const url='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(tdUrl);
@@ -914,8 +983,8 @@ async function runScan(){
       if(closes.length<20){
         try{
           const to=Math.floor(Date.now()/1000);
-          const from=to-60*60*24*(daysMap[tf]||130);
-          const yInterval=intervalMapYF[tf]||'1d';
+          const from=to-60*60*24*(daysMap[effectiveTF]||130);
+          const yInterval={'15m':'15m','30m':'30m','1h':'60m','4h':'1d','1d':'1d'}[effectiveTF]||'1d';
           const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+t.sym
             +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
           const url='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl);
@@ -944,6 +1013,8 @@ async function runScan(){
       const raw=computeFromRaw(closes,volumes,timestamps);
       raw.dates_20d=dates.slice(-20);
       raw.dataSource=dataSource;
+      raw.sessionNote=sessionNote;
+      raw.effectiveTF=effectiveTF;
       renderCard(t,processData(raw));
     }catch(e){
       var msg = e.message;
@@ -1076,6 +1147,7 @@ function renderCard(t,state){
     '<span class="ticker-sym">'+t.sym+'</span>'+
     '<span class="ticker-name" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.name+'</span>'+
     '<span class="ticker-price">$'+price.toFixed(2)+'</span>'+
+    (state.sessionNote?'<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,0.08);color:var(--text3);margin-left:4px">'+state.sessionNote+'</span>':'')+
     '</div>'+
     '<div class="sig-grid">'+
     '<div class="sig-box"><div class="sig-label">50d MA $'+ma50.toFixed(0)+'</div>'+
@@ -1290,10 +1362,22 @@ function renderIBD(){
     var cBadge=function(v){ if(!v) return '—'; var c=v>=97?'bc-hi':v>=90?'bc-mid':'bc-lo'; return '<span class="badge-c '+c+'">'+v+'</span>'; };
     var lqColor=(r.lastEps||0)>25?'var(--green)':(r.lastEps||0)<0?'var(--red)':'var(--text2)';
     var sColor=(r.sales||0)>20?'var(--green)':'var(--text2)';
+    // Live price data
+    var lp = ticker ? top50LivePrices[ticker] : null;
+    var priceCell = lp ? '$'+lp.price.toFixed(2) : '—';
+    var chgCell = lp ? (lp.chg>=0?'+':'')+lp.chg.toFixed(2)+'%' : '—';
+    var chgColor = lp ? (lp.chg>0?'var(--green)':lp.chg<0?'var(--red)':'var(--text2)') : 'var(--text3)';
+    // Session-based styling
+    var session = getMarketSession();
+    var priceStyle = session.session==='premarket' ? 'color:#4f8ef7;font-weight:500' : 
+                     session.session==='us' ? 'color:var(--green);font-weight:500' : 'color:var(--text2)';
+
     var row='<tr>'+
       '<td style="color:var(--text3);text-align:center;font-size:11px">'+r.rank+'</td>'+
       '<td>'+r.name+'</td>'+
       '<td style="text-align:left;font-family:var(--mono);color:'+(hasT?'var(--accent)':'var(--text3)')+';font-size:11px">'+(ticker||'—')+'</td>'+
+      '<td style="text-align:right;font-family:var(--mono);font-size:12px;'+priceStyle+'">'+priceCell+'</td>'+
+      '<td style="text-align:right;font-family:var(--mono);font-size:12px;color:'+chgColor+'">'+chgCell+'</td>'+
       '<td>'+cBadge(r.comp)+'</td>'+
       '<td>'+cBadge(r.eps)+'</td>'+
       '<td>'+cBadge(r.rs)+'</td>'+
@@ -2386,6 +2470,102 @@ function generateRuleBasedSummary(){
     renderMakro(newMakro);
   }
 }
+
+// ─── TOP50 LIVE PREISE ──────────────────────────────────────────────────────
+const top50LivePrices = {};
+
+function getMarketSession(){
+  const now = new Date();
+  // MEZ = UTC+1 (Winter) / UTC+2 (Summer)
+  // Use UTC+2 for summer (May-Oct)
+  const utcH = now.getUTCHours();
+  const utcM = now.getUTCMinutes();
+  const mezH = utcH + 2; // MESZ
+  const mezMinutes = mezH * 60 + utcM;
+  
+  // Pre-Market DE: 08:00 - 15:30 MESZ
+  // US Market: 15:30 - 22:00 MESZ
+  // After-Hours: 22:00 - 23:00 MESZ
+  
+  if(mezMinutes >= 8*60 && mezMinutes < 15*60+30){
+    return {session:'premarket', label:'Pre-Market (TR/L&S)', color:'#4f8ef7', bg:'rgba(79,142,247,0.12)', icon:'🌙'};
+  } else if(mezMinutes >= 15*60+30 && mezMinutes < 22*60){
+    return {session:'us', label:'US-Markt offen', color:'var(--green)', bg:'rgba(52,194,110,0.12)', icon:'🔔'};
+  } else if(mezMinutes >= 22*60 && mezMinutes < 23*60){
+    return {session:'afterhours', label:'After-Hours', color:'var(--amber)', bg:'rgba(240,169,58,0.12)', icon:'🌆'};
+  } else {
+    return {session:'closed', label:'Markt geschlossen', color:'var(--text3)', bg:'var(--bg3)', icon:'🌙'};
+  }
+}
+
+function updateSessionBar(){
+  const s = getMarketSession();
+  const bar = document.getElementById('top50-session-bar');
+  const dot = document.getElementById('top50-session-dot');
+  const label = document.getElementById('top50-session-label');
+  const timeEl = document.getElementById('top50-session-time');
+  if(!bar) return;
+  bar.style.background = s.bg;
+  bar.style.borderColor = s.color.includes('var') ? 'rgba(255,255,255,0.1)' : s.color+'40';
+  if(dot) dot.style.background = s.color;
+  if(dot && s.session === 'us') dot.style.boxShadow = '0 0 6px '+s.color;
+  if(label){ label.textContent = s.icon + ' ' + s.label; label.style.color = s.color; }
+  const now = new Date();
+  if(timeEl) timeEl.textContent = now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' MESZ';
+}
+
+async function loadTop50Prices(){
+  const btn = document.getElementById('top50-price-btn');
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader"></i> Lädt…'; }
+  
+  const session = getMarketSession();
+  const tickers = ibdData.filter(function(r){ return r.ticker; }).map(function(r){ return r.ticker; });
+  
+  if(tickers.length === 0){
+    if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-refresh"></i> Kurse laden'; }
+    return;
+  }
+
+  let loaded = 0;
+  // Load in batches of 5 to avoid rate limits
+  const batchSize = 5;
+  for(let i=0; i<tickers.length; i+=batchSize){
+    const batch = tickers.slice(i, i+batchSize);
+    await Promise.all(batch.map(function(sym){
+      const yfUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/'+sym+'?interval=1d&range=2d';
+      return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          const res = j&&j.chart&&j.chart.result&&j.chart.result[0];
+          if(!res) return;
+          const closes = res.indicators.quote[0].close.filter(function(v){return v!=null;});
+          if(closes.length < 1) return;
+          const price = closes[closes.length-1];
+          const prev = closes.length>=2 ? closes[closes.length-2] : price;
+          const chg = prev>0 ? ((price-prev)/prev*100) : 0;
+          top50LivePrices[sym] = {price: price, chg: chg};
+          loaded++;
+        })
+        .catch(function(){});
+    }));
+    // Small delay between batches
+    await new Promise(function(r){ setTimeout(r, 200); });
+  }
+
+  renderIBD();
+  if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-refresh"></i> Aktualisieren'; }
+  
+  // Update button with count
+  const bar = document.getElementById('top50-session-bar');
+  if(bar){
+    const info = document.createElement('span');
+    info.style.cssText = 'font-size:11px;color:var(--text3)';
+    info.textContent = loaded+' Kurse geladen';
+  }
+}
+
+// Auto-update session bar every minute
+setInterval(updateSessionBar, 60000);
 </script>
 </body>
 </html>
