@@ -1114,25 +1114,7 @@ async function runScan(){
       // DST: MESZ (summer) = UTC+2, MEZ (winter) = UTC+1
       // NYSE/Nasdaq: opens 09:30 ET = 15:30 MESZ / 14:30 MEZ
       //              closes 16:00 ET = 22:00 MESZ / 21:00 MEZ
-      function isUSMarketOpen(){
-        const now = new Date();
-        const utcH = now.getUTCHours(), utcM = now.getUTCMinutes();
-        const utcMins = utcH*60+utcM;
-        const dayOfWeek = now.getUTCDay(); // 0=Sun, 6=Sat
-        if(dayOfWeek===0||dayOfWeek===6) return false;
-        // NYSE: 13:30-20:00 UTC (summer) / 14:30-21:00 UTC (winter)
-        // Use simple check: 13:30-20:00 UTC covers both with margin
-        return utcMins >= 13*60+30 && utcMins < 20*60+15;
-      }
-      function isGermanPreMarket(){
-        const now = new Date();
-        const utcH = now.getUTCHours(), utcM = now.getUTCMinutes();
-        const utcMins = utcH*60+utcM;
-        const dayOfWeek = now.getUTCDay();
-        if(dayOfWeek===0||dayOfWeek===6) return false;
-        // German pre-market: 06:00-13:30 UTC (roughly 08:00-15:30 MESZ)
-        return utcMins >= 6*60 && utcMins < 13*60+30;
-      }
+      // isUSMarketOpen and isGermanPreMarket defined globally below
 
       const usOpen = isUSMarketOpen();
       const dePreMarket = isGermanPreMarket();
@@ -3162,6 +3144,21 @@ function importAllData(input){
     input.value = '';
   };
   reader.readAsText(file);
+}
+
+function isUSMarketOpen(){
+  const now = new Date();
+  const utcMins = now.getUTCHours()*60 + now.getUTCMinutes();
+  const dow = now.getUTCDay();
+  if(dow===0||dow===6) return false;
+  return utcMins >= 13*60+30 && utcMins < 20*60+15;
+}
+function isGermanPreMarket(){
+  const now = new Date();
+  const utcMins = now.getUTCHours()*60 + now.getUTCMinutes();
+  const dow = now.getUTCDay();
+  if(dow===0||dow===6) return false;
+  return utcMins >= 6*60 && utcMins < 13*60+30;
 }
 
 function getLastTradingDayLabel(){
