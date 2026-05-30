@@ -1936,17 +1936,16 @@ async function loadMostActive(){
     const weekend=isWeekend();
     const lastDayLabel=getLastTradingDayLabel();
     let syms, marketLabel, isDE=false;
-    if(usOpen){
-      // US market open: show US stocks
-      syms=['NVDA','AAPL','MSFT','TSLA','AMD','META','AMZN','GOOGL','PLTR','MRVL',
-            'AVGO','VRT','ARM','CRDO','LRCX','TSM','SMCI','SOXL','TQQQ','SPY'];
-      marketLabel=(lastDayLabel?'📊 '+lastDayLabel+' — US Top 10':'🔔 US-Markt — Top 10 nach Bewegung');
-    } else {
-      // Pre-market: show German stocks via Xetra
-      syms=['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE',
-            'MRK.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','HEN3.DE','EOAN.DE','LIN.DE'];
-      marketLabel=(lastDayLabel?'📊 '+lastDayLabel+' — Xetra Top 15':'🌙 Xetra Pre-Market — Top 15 DE');
+    if(window.currentMarket==='de'){
       isDE=true;
+      syms=['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE',
+            'MRK.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','HEN3.DE','EOAN.DE',
+            'LIN.DE','VOW3.DE','IFX.DE','MTX.DE','ENR.DE','ZAL.DE'];
+      marketLabel=(lastDayLabel?'📊 '+lastDayLabel+' — Xetra Top 20':'🌙 Xetra — Top 20 DE');
+    } else {
+      syms=['NVDA','AAPL','MSFT','TSLA','AMD','META','AMZN','GOOGL','PLTR','MRVL',
+            'AVGO','VRT','ARM','CRDO','LRCX','TSM','SMCI','APP','COIN','HOOD'];
+      marketLabel=(lastDayLabel?'📊 '+lastDayLabel+' — US Top 20':'🔔 US-Markt — Top 20');
     }
     // Fetch via Yahoo Finance (reliable on weekends too)
     const yfSyms2 = syms.map(function(sym){ return isDE ? sym+'.DE' : sym; });
@@ -2041,23 +2040,20 @@ async function loadAfterHours(){
     const key=getFinnhubKey();
     if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
     const usOpen=isUSMarketOpen&&isUSMarketOpen();
-    const isDE=!usOpen;
+    const isDE=window.currentMarket==='de';
     let watchlist, sessionLabel, isPreMarket;
-
     if(isDE){
-      // Pre-US: Deutsche Xetra Titel
       watchlist=['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE',
                  'MRK.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','HEN3.DE','EOAN.DE',
                  'LIN.DE','VOW3.DE','MUV2.DE','IFX.DE','MTX.DE','ZAL.DE'];
-      sessionLabel=(lastDayLabel?'📊 '+lastDayLabel+' — DE Schlusskurse':'🌙 Xetra Pre-Market Mover DE');
+      sessionLabel=(lastDayLabel?'📊 '+lastDayLabel+' — DE Mover':'🌙 Xetra Mover DE');
       isPreMarket=true;
     } else {
-      // US market open or after-hours: US watchlist
       watchlist=['AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','AMD','AVGO','MRVL',
                  'VRT','LRCX','TSM','ARM','CRDO','PLTR','SMCI','ORCL','CRM','SNOW'];
       const utcH=new Date().getUTCHours();
       isPreMarket=utcH>=9&&utcH<14;
-      sessionLabel=(lastDayLabel?'📊 '+lastDayLabel+' — US Schlusskurse':isPreMarket?'🔔 US Pre-Market Mover':'🌆 US After-Hours Mover');
+      sessionLabel=(lastDayLabel?'📊 '+lastDayLabel+' — US Mover':isPreMarket?'🔔 US Pre-Market':'🌆 US After-Hours');
     }
 
     const weekend=isWeekend();
