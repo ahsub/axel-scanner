@@ -2417,6 +2417,7 @@ async function refreshLivePrices(){
 
 // updateCryptoSignalLive now integrated in refreshLivePrices
 
+var liveRefreshInterval = null;
 function startLiveRefresh(){
   // Auto-refresh every 60 minutes
   if(liveRefreshInterval) clearInterval(liveRefreshInterval);
