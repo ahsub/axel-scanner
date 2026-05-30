@@ -3026,19 +3026,25 @@ async function scanTickerList(syms, label){
 async function debugDEFetch(){
   const tdKey=getTwelveKey();
   if(!tdKey){ alert('Kein Twelve Data Key!'); return; }
+  const proxy='https://my-cors-proxy.ahildebrand.workers.dev/';
   const results=[];
   const testSyms=['SAP:XETR','SAP','SAP.DE','SAP:XETRA'];
-  for(const sym of testSyms){
+  for(var i=0;i<testSyms.length;i++){
+    var sym=testSyms[i];
     try{
-      const url='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(sym)+'&interval=1day&outputsize=2&apikey='+tdKey;
-      const r=await fetch(PROXY+'?url='+encodeURIComponent(url));
-      const j=await r.json();
-      results.push(sym+': '+(j.status==='ok'?'OK price='+j.values[0].close:j.status+' msg='+j.message));
+      var url='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(sym)+'&interval=1day&outputsize=2&apikey='+tdKey;
+      var r=await fetch(proxy+'?url='+encodeURIComponent(url));
+      var j=await r.json();
+      if(j.status==='ok'&&j.values&&j.values.length>0){
+        results.push(sym+': ✓ OK price='+j.values[0].close);
+      } else {
+        results.push(sym+': ✗ '+JSON.stringify(j).substring(0,80));
+      }
     }catch(e){
       results.push(sym+': ERROR '+e.message);
     }
   }
-  alert(results.join('\n'));
+  alert('Twelve Data DE Symbol Test:\n\n'+results.join('\n'));
 }
 </script>
 </body>
