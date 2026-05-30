@@ -239,7 +239,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="btn-row">
         <select id="ticker-preset" style="flex:1;font-size:12px" onchange="toggleCustom()">
           <option value="default">Top-5 KO-Kandidaten (US)</option>
-          <option value="default-de">Top-5 Kandidaten (DE)</option>
+          <option value="default-de">Top-5 aus 50 DE-Aktien (dynamisch)</option>
           <option value="custom">Eigene Ticker</option>
         </select>
         <button class="btn btn-primary" onclick="runScan()" id="scan-btn">
@@ -845,11 +845,58 @@ const DEFAULT_TICKERS = [
   {sym:'AMD',name:'Advanced Micro Devices'}
 ];
 const DEFAULT_TICKERS_DE = [
+  // DAX Schwergewichte
   {sym:'SAP',name:'SAP SE'},
   {sym:'SIE',name:'Siemens AG'},
   {sym:'ALV',name:'Allianz SE'},
+  {sym:'MBG',name:'Mercedes-Benz'},
+  {sym:'BMW',name:'BMW AG'},
+  {sym:'BAS',name:'BASF SE'},
+  {sym:'DTE',name:'Deutsche Telekom'},
+  {sym:'MRK',name:'Merck KGaA'},
+  {sym:'BAYN',name:'Bayer AG'},
+  {sym:'ADS',name:'Adidas AG'},
+  {sym:'DBK',name:'Deutsche Bank'},
+  {sym:'MUV2',name:'Munich Re'},
+  {sym:'HEN3',name:'Henkel AG'},
+  {sym:'EOAN',name:'E.ON SE'},
+  {sym:'LIN',name:'Linde plc'},
+  {sym:'VOW3',name:'Volkswagen AG'},
+  {sym:'IFX',name:'Infineon Tech.'},
+  {sym:'DHL',name:'DHL Group'},
+  {sym:'DHER',name:'Delivery Hero'},
+  {sym:'ZAL',name:'Zalando SE'},
+  // MDax / Momentum
   {sym:'RHM',name:'Rheinmetall AG'},
-  {sym:'MBG',name:'Mercedes-Benz'}
+  {sym:'MTX',name:'MTU Aero Engines'},
+  {sym:'HNR1',name:'Hannover Rück'},
+  {sym:'VNA',name:'Vonovia SE'},
+  {sym:'SRT',name:'Sartorius AG'},
+  {sym:'SHL',name:'Siemens Healthin.'},
+  {sym:'ENR',name:'Siemens Energy'},
+  {sym:'HAG',name:'Hensoldt AG'},
+  {sym:'COP',name:'Covestro AG'},
+  {sym:'AIXA',name:'Aixtron SE'},
+  {sym:'MDNT',name:'Medios AG'},
+  {sym:'LEG',name:'LEG Immobilien'},
+  {sym:'TAG',name:'TAG Immobilien'},
+  {sym:'EVT',name:'Evotec SE'},
+  {sym:'FNTN',name:'freenet AG'},
+  {sym:'NDA',name:'Nemetschek SE'},
+  {sym:'PUM',name:'Puma SE'},
+  {sym:'SY1',name:'Symrise AG'},
+  {sym:'GXI',name:'Gerresheimer AG'},
+  {sym:'KGX',name:'Kion Group AG'},
+  {sym:'TLX',name:'Talanx AG'},
+  {sym:'TPVG',name:'TP ICAP Group'},
+  {sym:'AT1',name:'CureVac NV'},
+  {sym:'BOSS',name:'Hugo Boss AG'},
+  {sym:'DEQ',name:'Deutsche EuroShop'},
+  {sym:'UTDI',name:'United Internet'},
+  {sym:'GBF',name:'Bilfinger SE'},
+  {sym:'PSM',name:'ProSiebenSat.1'},
+  {sym:'WAF',name:'Siltronic AG'},
+  {sym:'NDX1',name:'Nordex SE'},
 ];
 window.currentMarket = 'us'; // 'us' or 'de'
 
@@ -971,7 +1018,7 @@ function setMarket(mkt){
     if(deBtn){ deBtn.style.background='var(--accent)'; deBtn.style.color='#fff'; }
     if(usBtn){ usBtn.style.background='var(--bg3)'; usBtn.style.color='var(--text2)'; }
     if(preset && preset.value==='default') preset.value='default-de';
-    if(preset) preset.options[0].text='Top-5 KO-Kandidaten (DE)';
+    if(preset) preset.options[0].text='50 DE-Aktien (dynamisch)';
   }
   // Clear previous results
   document.getElementById('scan-container').innerHTML='';
@@ -1770,17 +1817,19 @@ async function loadMostActive(){
     const key=getFinnhubKey();
     if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
     const usOpen=isUSMarketOpen&&isUSMarketOpen();
+    const weekend=isWeekend();
+    const lastDayLabel=getLastTradingDayLabel();
     let syms, marketLabel, isDE=false;
     if(usOpen){
       // US market open: show US stocks
       syms=['NVDA','AAPL','MSFT','TSLA','AMD','META','AMZN','GOOGL','PLTR','MRVL',
             'AVGO','VRT','ARM','CRDO','LRCX','TSM','SMCI','SOXL','TQQQ','SPY'];
-      marketLabel='🔔 US-Markt — Top 10 nach Bewegung';
+      marketLabel=(lastDayLabel?'📊 '+lastDayLabel+' — US Top 10':'🔔 US-Markt — Top 10 nach Bewegung');
     } else {
       // Pre-market: show German stocks via Xetra
       syms=['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE',
             'MRK.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','HEN3.DE','EOAN.DE','LIN.DE'];
-      marketLabel='🌙 Xetra Pre-Market — Top 15 DE';
+      marketLabel=(lastDayLabel?'📊 '+lastDayLabel+' — Xetra Top 15':'🌙 Xetra Pre-Market — Top 15 DE');
       isDE=true;
     }
     const results=await Promise.all(syms.map(function(sym){
@@ -1806,7 +1855,12 @@ async function loadMostActive(){
           currency:isDE?'€':'$',
         };
       })
-      .sort(function(a,b){return Math.abs(parseFloat(b.changePct))-Math.abs(parseFloat(a.changePct));})
+      .sort(function(a,b){
+        // On weekends show by last known movement, fallback to price
+        const ac=Math.abs(parseFloat(a.changePct)), bc=Math.abs(parseFloat(b.changePct));
+        if(ac===0&&bc===0) return parseFloat(b.price)-parseFloat(a.price);
+        return bc-ac;
+      })
       .slice(0,10);
     renderMostActive({mode:'movers',items:items,ts:new Date().toISOString(),label:marketLabel});
   }catch(e){
@@ -1867,7 +1921,7 @@ async function loadAfterHours(){
       watchlist=['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE',
                  'MRK.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','HEN3.DE','EOAN.DE',
                  'LIN.DE','VOW3.DE','MUV2.DE','IFX.DE','MTX.DE','ZAL.DE'];
-      sessionLabel='🌙 Xetra Pre-Market Mover DE';
+      sessionLabel=(lastDayLabel?'📊 '+lastDayLabel+' — DE Schlusskurse':'🌙 Xetra Pre-Market Mover DE');
       isPreMarket=true;
     } else {
       // US market open or after-hours: US watchlist
@@ -1875,9 +1929,11 @@ async function loadAfterHours(){
                  'VRT','LRCX','TSM','ARM','CRDO','PLTR','SMCI','ORCL','CRM','SNOW'];
       const utcH=new Date().getUTCHours();
       isPreMarket=utcH>=9&&utcH<14;
-      sessionLabel=isPreMarket?'🔔 US Pre-Market Mover':'🌆 US After-Hours Mover';
+      sessionLabel=(lastDayLabel?'📊 '+lastDayLabel+' — US Schlusskurse':isPreMarket?'🔔 US Pre-Market Mover':'🌆 US After-Hours Mover');
     }
 
+    const weekend=isWeekend();
+    const lastDayLabel=getLastTradingDayLabel();
     const results=await Promise.all(watchlist.map(function(sym){
       return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+key)
         .then(function(r){return r.json();})
@@ -1901,8 +1957,15 @@ async function loadAfterHours(){
           currency:isDE?'€':'$',
         };
       })
-      .filter(function(r){return Math.abs(parseFloat(r.ahChgPct))>0.1;})
-      .sort(function(a,b){return Math.abs(parseFloat(b.ahChgPct||0))-Math.abs(parseFloat(a.ahChgPct||0));})
+      .filter(function(r){
+        // On weekends show all, on trading days filter small moves
+        return weekend ? true : Math.abs(parseFloat(r.ahChgPct))>0.01;
+      })
+      .sort(function(a,b){
+        const ac=Math.abs(parseFloat(a.ahChgPct||0)), bc=Math.abs(parseFloat(b.ahChgPct||0));
+        if(ac===0&&bc===0) return parseFloat(b.regularPrice)-parseFloat(a.regularPrice);
+        return bc-ac;
+      })
       .slice(0,12);
 
     renderAfterHours({
@@ -2947,6 +3010,33 @@ function importAllData(input){
     input.value = '';
   };
   reader.readAsText(file);
+}
+
+function getLastTradingDayLabel(){
+  const now = new Date();
+  const dow = now.getUTCDay(); // 0=Sun, 6=Sat
+  const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  if(dow === 0) { // Sunday - last trading day was Friday
+    const fri = new Date(now); fri.setUTCDate(now.getUTCDate()-2);
+    return 'Letzter Handelstag: Fr. '+fri.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  } else if(dow === 6) { // Saturday
+    const fri = new Date(now); fri.setUTCDate(now.getUTCDate()-1);
+    return 'Letzter Handelstag: Fr. '+fri.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  }
+  const utcMins = now.getUTCHours()*60+now.getUTCMinutes();
+  if(utcMins < 6*60) { // Before 08:00 MEZ - show yesterday
+    const yest = new Date(now); yest.setUTCDate(now.getUTCDate()-1);
+    const yd = yest.getUTCDay();
+    if(yd===0) yest.setUTCDate(yest.getUTCDate()-2);
+    if(yd===6) yest.setUTCDate(yest.getUTCDate()-1);
+    return 'Letzter Handelstag: '+yest.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  }
+  return null; // Normal trading day/time
+}
+
+function isWeekend(){
+  const dow = new Date().getUTCDay();
+  return dow === 0 || dow === 6;
 }
 </script>
 </body>
