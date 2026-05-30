@@ -1991,6 +1991,8 @@ async function loadMostActive(){
 }
 
 function renderMostActive(d){
+  // Store tickers for scan-all
+  window.lastMovers = (d.items||[]).map(function(s){ return s.scanSym||s.symbol; }).filter(Boolean);
   const container=document.getElementById('market-intel-container');
   const rows=d.items.map(s=>{
     const chg=parseFloat(s.changePct);
@@ -2039,7 +2041,9 @@ async function loadAfterHours(){
   try{
     const key=getFinnhubKey();
     if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
-    const usOpen=isUSMarketOpen&&isUSMarketOpen();
+    const usOpen=isUSMarketOpen();
+    const weekend=isWeekend();
+    const lastDayLabel=getLastTradingDayLabel();
     const isDE=window.currentMarket==='de';
     let watchlist, sessionLabel, isPreMarket;
     if(isDE){
@@ -2056,8 +2060,6 @@ async function loadAfterHours(){
       sessionLabel=(lastDayLabel?'📊 '+lastDayLabel+' — US Mover':isPreMarket?'🔔 US Pre-Market':'🌆 US After-Hours');
     }
 
-    const weekend=isWeekend();
-    const lastDayLabel=getLastTradingDayLabel();
     // Use Yahoo Finance for reliable data including weekends
     const yfWatchlist = watchlist.map(function(sym){ return isDE ? sym+'.DE' : sym; });
     const results = await Promise.all(yfWatchlist.map(function(sym){
@@ -3184,18 +3186,28 @@ function isWeekend(){
   return dow === 0 || dow === 6;
 }
 
+// Store last loaded movers for scan-all
+window.lastMovers = [];
+window.lastAH = [];
+
 function scanAllMovers(){
-  // Get all tickers from current movers table
-  const btns = document.querySelectorAll('#market-intel-container button[data-sym]');
-  if(!btns.length){ alert('Bitte zuerst Top 10 Aktivste laden'); return; }
-  const tickers = Array.from(btns).map(function(b){ return b.dataset.sym; }).filter(Boolean);
+  // Use stored movers or fallback to buttons
+  let tickers = window.lastMovers.length > 0 ? window.lastMovers : [];
+  if(!tickers.length){
+    const btns = document.querySelectorAll('#market-intel-container button[data-sym]');
+    tickers = Array.from(btns).map(function(b){ return b.dataset.sym; }).filter(Boolean);
+  }
+  if(!tickers.length){ alert('Bitte zuerst Top 10 Aktivste laden'); return; }
   scanTickerList(tickers, 'Top 10 Aktivste');
 }
 
 function scanAllAH(){
-  const btns = document.querySelectorAll('#market-intel-container button[data-sym]');
-  if(!btns.length){ alert('Bitte zuerst After-Hours Movers laden'); return; }
-  const tickers = Array.from(btns).map(function(b){ return b.dataset.sym; }).filter(Boolean);
+  let tickers = window.lastAH.length > 0 ? window.lastAH : [];
+  if(!tickers.length){
+    const btns = document.querySelectorAll('#market-intel-container button[data-sym]');
+    tickers = Array.from(btns).map(function(b){ return b.dataset.sym; }).filter(Boolean);
+  }
+  if(!tickers.length){ alert('Bitte zuerst After-Hours Movers laden'); return; }
   scanTickerList(tickers, 'After-Hours Movers');
 }
 
