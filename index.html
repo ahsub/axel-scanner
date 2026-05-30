@@ -1208,6 +1208,7 @@ async function runScan(){
       raw.dataSource=dataSource;
       raw.sessionNote=sessionNote;
       raw.effectiveTF=effectiveTF;
+      tickerData[t.sym]=raw;
       renderCard(t,processData(raw));
     }catch(e){
       var msg = e.message;
@@ -1287,12 +1288,21 @@ function sortAndRenderCards(tickers){
   const bull2 = results.filter(function(r){ return r.data.bullCount===2; }).length;
   if(results.length > 0){
     const summary = document.createElement('div');
-    summary.style.cssText = 'font-size:11px;color:var(--text3);margin-top:.5rem;text-align:center;padding:6px;background:var(--bg2);border-radius:8px';
+    summary.style.cssText = 'font-size:11px;color:var(--text3);margin-top:.5rem;padding:8px 10px;background:var(--bg2);border-radius:8px';
     summary.innerHTML =
-      '<i class="ti ti-sort-descending"></i> '+results.length+' Titel gescannt · '+
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">'+
+      '<span><i class="ti ti-sort-descending"></i> '+results.length+' Titel · '+
       '<span style="color:var(--green)">'+bull3+' Kaufsignal</span> · '+
       '<span style="color:var(--amber)">'+bull2+' Vorsicht</span> · '+
-      '<span style="color:var(--text3)">'+(results.length-bull3-bull2)+' Bärisch</span>';
+      '<span style="color:var(--text3)">'+(results.length-bull3-bull2)+' Bärisch</span></span>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button onclick="saveFromScan(3)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:rgba(52,194,110,0.12);border-color:var(--green);color:var(--green)">'+
+        '<i class="ti ti-star"></i> 3/3 speichern ('+bull3+')</button>'+
+      '<button onclick="saveFromScan(2)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:rgba(240,169,58,0.1);border-color:var(--amber);color:var(--amber)">'+
+        '<i class="ti ti-star"></i> ≥2/3 speichern ('+(bull3+bull2)+')</button>'+
+      '<button onclick="saveFromScan(0)" class="btn btn-sm" style="font-size:10px;padding:2px 7px">'+
+        '<i class="ti ti-star"></i> Alle ('+results.length+')</button>'+
+      '</div></div>';
     container.appendChild(summary);
   }
 }
@@ -1466,6 +1476,7 @@ function renderCard(t,state){
     '<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#34c26e;display:inline-block;border-radius:1px"></span>MACD</span>'+
     '<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#f0a93a;border-top:2px dashed #f0a93a"></span>OBV</span>'+
     '<button class="btn btn-sm" data-sym="'+t.sym+'" onclick="useInRechner(this.dataset.sym)" style="margin-left:auto;padding:3px 8px;font-size:11px"><i class="ti ti-calculator"></i> Rechner</button>'+
+    '<button class="btn btn-sm" data-sym="'+t.sym+'" onclick="openWatchlistModal(this.dataset.sym)" style="padding:3px 8px;font-size:11px" title="Zu Watchlist hinzufügen"><i class="ti ti-star"></i></button>'+
     '</div>'+
     '<div class="chart-wrap"><canvas id="ch-'+t.sym+'" role="img" aria-label="Chart '+t.sym+'"></canvas></div>';
   el.innerHTML=s;
@@ -3185,6 +3196,65 @@ renderCard = function(t, state){
 
 // Initialize watchlist dropdown on load
 document.addEventListener('DOMContentLoaded', function(){ updateWatchlistDropdown(); });
+
+function saveFromScan(minScore){
+  // Collect tickers from current scan results based on minScore
+  const container = document.getElementById('scan-container');
+  if(!container){ alert('Kein Scan-Ergebnis vorhanden'); return; }
+  const tickers = [];
+  // Get from tickerData
+  Object.keys(tickerData).forEach(function(sym){
+    const d = tickerData[sym];
+    if(!d) return;
+    const processed = processData(d);
+    if(processed.bullCount >= minScore) tickers.push(sym);
+  });
+  if(!tickers.length){ alert('Keine Titel mit diesem Signal'); return; }
+  const label = minScore===3?'Kaufsignal 3/3':minScore===2?'≥2/3 bullisch':'Alle gescannt';
+  const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  const defaultName = label+' · '+today;
+  const name = prompt('Watchlist-Name:', defaultName);
+  if(!name) return;
+  const wls = getWatchlists();
+  wls[name] = tickers.join(', ');
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  updateWatchlistDropdown();
+  alert('✓ "'+name+'" gespeichert ('+tickers.length+' Titel):\n'+tickers.join(', '));
+}
 </script>
+
+<!-- WATCHLIST MODAL -->
+<div id="wl-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px)" onclick="if(event.target===this)closeWatchlistModal()">
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(92vw,420px);background:var(--bg1);border-radius:16px;border:0.5px solid var(--border2);padding:1.25rem;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div>
+        <div style="font-size:15px;font-weight:600" id="wl-modal-title">Zu Watchlist hinzufügen</div>
+        <div style="font-size:12px;color:var(--text3)" id="wl-modal-sym"></div>
+      </div>
+      <button onclick="closeWatchlistModal()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px">✕</button>
+    </div>
+
+    <!-- Bestehende Watchlisten -->
+    <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Bestehende Watchlisten</div>
+    <div id="wl-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:1rem"></div>
+
+    <!-- Neue Watchlist -->
+    <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Neue Watchlist erstellen</div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="wl-new-name" placeholder="Name der neuen Watchlist…" style="flex:1;font-size:13px">
+      <button class="btn btn-primary" onclick="createAndAddToWatchlist()" style="white-space:nowrap;font-size:13px">
+        <i class="ti ti-plus"></i> Erstellen
+      </button>
+    </div>
+
+    <div id="wl-modal-msg" style="display:none;margin-top:.75rem;font-size:12px;color:var(--green)"></div>
+
+    <!-- Watchlisten verwalten -->
+    <div style="margin-top:1.25rem;padding-top:1rem;border-top:0.5px solid var(--border)">
+      <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Watchlisten verwalten</div>
+      <div id="wl-manage-list" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
