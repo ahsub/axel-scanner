@@ -1952,35 +1952,49 @@ async function loadMostActive(){
     const results = await Promise.all(syms.map(function(sym){
       if(isDE && fhKey){
         // Finnhub for DE stocks - use full sym with .DE suffix
-        // Use Yahoo Finance via proxy for both DE and US
-        const yfSym = isDE ? sym : sym; // sym already has .DE for DE
-        const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(yfSym)+'?interval=1d&range=5d';
-        return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
-          .then(function(r){ return r.json(); })
-          .then(function(j){
-            const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
-            if(!res) return null;
-            const q=res.indicators.quote[0];
-            const closes=q.close.filter(function(v){return v!=null;});
-            const vols=(q.volume||[]).filter(function(v){return v!=null;});
-            if(closes.length<1) return null;
-            const price=closes[closes.length-1];
-            const prev=closes.length>1?closes[closes.length-2]:price;
-            const chg=prev>0?((price-prev)/prev*100):0;
-            const vol=vols.length>0?vols[vols.length-1]:0;
-            const avgVol=vols.length>1?vols.slice(0,-1).reduce(function(a,b){return a+b;},0)/(vols.length-1):0;
-            const displaySym=isDE?sym.replace('.DE',''):sym;
-            return {
-              symbol:displaySym, scanSym:displaySym, name:displaySym,
-              price:price.toFixed(2),
-              change:(price-prev).toFixed(2),
-              changePct:chg.toFixed(2),
-              volume:vol>1e6?(vol/1e6).toFixed(1)+'M':vol>1e3?Math.round(vol/1e3)+'K':'—',
-              volRatio:avgVol>0?Math.round((vol/avgVol)*100):null,
-              mktCap:'—', currency:isDE?'€':'$',
-            };
-          })
-          .catch(function(){ return null; });
+        if(isDE){
+          // Twelve Data for DE stocks via proxy
+          const tdKey=getTwelveKey();
+          if(!tdKey) return Promise.resolve(null);
+          const tdSym=sym+':XETRA';
+          const tdUrl='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(tdSym)+'&interval=1day&outputsize=3&apikey='+tdKey;
+          return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(tdUrl))
+            .then(function(r){ return r.json(); })
+            .then(function(j){
+              if(j.status==='error'||!j.values||j.values.length<1) return null;
+              const v=j.values;
+              const price=parseFloat(v[0].close);
+              const prev=v.length>1?parseFloat(v[1].close):price;
+              const chg=prev>0?((price-prev)/prev*100):0;
+              const displaySym=sym.replace('.DE','');
+              return {
+                symbol:displaySym, scanSym:displaySym, name:displaySym,
+                price:price.toFixed(2), change:(price-prev).toFixed(2),
+                changePct:chg.toFixed(2), volume:'—', volRatio:null,
+                mktCap:'—', currency:'€',
+              };
+            })
+            .catch(function(){ return null; });
+        } else {
+          // Finnhub for US stocks
+          const fhKey=getFinnhubKey();
+          if(!fhKey) return Promise.resolve(null);
+          return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+fhKey)
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              if(!d||(!d.c&&!d.pc)) return null;
+              const price=(d.c&&d.c>0)?d.c:(d.pc||0);
+              const prev=(d.pc&&d.pc>0)?d.pc:price;
+              const chg=prev>0?((price-prev)/prev*100):(d.dp||0);
+              return {
+                symbol:sym, scanSym:sym, name:sym,
+                price:price.toFixed(2), change:(price-prev).toFixed(2),
+                changePct:chg.toFixed(2), volume:'—', volRatio:null,
+                mktCap:'—', currency:'$',
+              };
+            })
+            .catch(function(){ return null; });
+        }
       }
     }));
     const items=results
@@ -2068,29 +2082,45 @@ async function loadAfterHours(){
     // Fetch: Finnhub for DE (works on weekends), YF for US
     const results = await Promise.all(watchlist.map(function(sym){
       if(isDE && fhKey2){
-        const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'?interval=1d&range=5d';
-        return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
-          .then(function(r){ return r.json(); })
-          .then(function(j){
-            const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
-            if(!res) return null;
-            const q=res.indicators.quote[0];
-            const closes=q.close.filter(function(v){return v!=null;});
-            if(closes.length<1) return null;
-            const price=closes[closes.length-1];
-            const prev=closes.length>1?closes[closes.length-2]:price;
-            const chg=prev>0?((price-prev)/prev*100):0;
-            const displaySym=isDE?sym.replace('.DE',''):sym;
-            return {
-              symbol:displaySym, scanSym:displaySym, name:displaySym,
-              regularPrice:price.toFixed(2),
-              regularChgPct:chg.toFixed(2),
-              ahPrice:price.toFixed(2),
-              ahChgPct:chg.toFixed(2),
-              currency:isDE?'€':'$',
-            };
-          })
-          .catch(function(){ return null; });
+        if(isDE){
+          const tdKey=getTwelveKey();
+          if(!tdKey) return Promise.resolve(null);
+          const tdSym=sym+':XETRA';
+          const tdUrl='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(tdSym)+'&interval=1day&outputsize=3&apikey='+tdKey;
+          return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(tdUrl))
+            .then(function(r){ return r.json(); })
+            .then(function(j){
+              if(j.status==='error'||!j.values||j.values.length<1) return null;
+              const v=j.values;
+              const price=parseFloat(v[0].close);
+              const prev=v.length>1?parseFloat(v[1].close):price;
+              const chg=prev>0?((price-prev)/prev*100):0;
+              const displaySym=sym.replace('.DE','');
+              return {
+                symbol:displaySym, scanSym:displaySym, name:displaySym,
+                regularPrice:price.toFixed(2), regularChgPct:chg.toFixed(2),
+                ahPrice:price.toFixed(2), ahChgPct:chg.toFixed(2), currency:'€',
+              };
+            })
+            .catch(function(){ return null; });
+        } else {
+          const fhKey=getFinnhubKey();
+          if(!fhKey) return Promise.resolve(null);
+          return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+fhKey)
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              if(!d||(!d.c&&!d.pc)) return null;
+              const price=(d.c&&d.c>0)?d.c:(d.pc||0);
+              const prev=(d.pc&&d.pc>0)?d.pc:price;
+              const chg=prev>0?((price-prev)/prev*100):(d.dp||0);
+              return {
+                symbol:sym, scanSym:sym, name:sym,
+                regularPrice:price.toFixed(2), regularChgPct:chg.toFixed(2),
+                ahPrice:price.toFixed(2), ahChgPct:chg.toFixed(2), currency:'$',
+              };
+            })
+            .catch(function(){ return null; });
+        }
       }
     }));
 
