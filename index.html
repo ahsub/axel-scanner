@@ -616,6 +616,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <button class="btn btn-sm" onclick="testProxy()" style="margin-top:.5rem;font-size:12px;width:100%;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">
           <i class="ti ti-antenna"></i> Proxy-Verbindung testen
         </button>
+        <button class="btn btn-sm" onclick="debugDEFetch()" style="margin-top:.5rem;font-size:12px;width:100%;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">
+          <i class="ti ti-bug"></i> DE Symbol-Format testen
+        </button>
         <div id="td-test-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
       </div>
 
@@ -3018,6 +3021,24 @@ async function scanTickerList(syms, label){
   document.getElementById('custom-input').value=syms.join(', ');
   // Small delay then run scan
   setTimeout(function(){ runScan(); }, 150);
+}
+
+async function debugDEFetch(){
+  const tdKey=getTwelveKey();
+  if(!tdKey){ alert('Kein Twelve Data Key!'); return; }
+  const results=[];
+  const testSyms=['SAP:XETR','SAP','SAP.DE','SAP:XETRA'];
+  for(const sym of testSyms){
+    try{
+      const url='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(sym)+'&interval=1day&outputsize=2&apikey='+tdKey;
+      const r=await fetch(PROXY+'?url='+encodeURIComponent(url));
+      const j=await r.json();
+      results.push(sym+': '+(j.status==='ok'?'OK price='+j.values[0].close:j.status+' msg='+j.message));
+    }catch(e){
+      results.push(sym+': ERROR '+e.message);
+    }
+  }
+  alert(results.join('\n'));
 }
 </script>
 </body>
