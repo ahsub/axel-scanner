@@ -237,10 +237,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
 
       <div class="btn-row">
-        <select id="ticker-preset" style="flex:1;font-size:12px" onchange="toggleCustom()">
+        <select id="ticker-preset" style="flex:1;font-size:12px" onchange="onPresetChange()">
           <option value="default">50 US-Aktien (alle scannen)</option>
           <option value="top50-us">Top-50 Liste (IBD Momentum)</option>
           <option value="custom">Eigene Ticker</option>
+          <optgroup label="── Meine Watchlisten ──" id="watchlist-options"></optgroup>
         </select>
         <button class="btn btn-primary" onclick="runScan()" id="scan-btn">
           <i class="ti ti-player-play"></i> Scan
@@ -973,7 +974,7 @@ function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
-  loadIBD(); loadMakro(); loadJournal(); startLiveRefresh(); loadPortfolioSettings();
+  loadIBD(); loadMakro(); loadJournal(); startLiveRefresh(); loadPortfolioSettings(); updateWatchlistDropdown();
 }
 function saveTwelveKey(){
   const k=document.getElementById('td-key-input').value.trim();
@@ -1436,13 +1437,30 @@ function renderCard(t,state){
     '<div class="verdict '+vC+'">'+
     '<span><i class="ti '+vI+'" style="margin-right:4px"></i>'+vT+'</span>'+
     '<span style="font-size:11px;opacity:.7">'+bullCount+'/3</span></div>'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:8px;background:'+bpBg+';margin-bottom:8px">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-radius:8px;background:'+bpBg+';margin-bottom:6px">'+
     '<span style="font-size:12px;font-weight:500;color:'+bpColor+'">'+bpLabel+'</span>'+
     '<span style="font-size:11px;color:var(--text3)">'+
     (dist10w!==null?'10W-MA: '+(dist10w>0?'+':'')+dist10w+'%':'')+(dist10w!==null&&dist52h!==undefined?' · ':'')+(dist52h!==undefined?'52W-H: '+(dist52h>0?'+':'')+dist52h+'%':'')+
     '</span>'+
     '</div>'+
+    (state.high52w&&state.low52w&&state.price?function(){
+      var range=state.high52w-state.low52w;
+      var pos=range>0?Math.max(0,Math.min(100,((state.price-state.low52w)/range*100))):50;
+      var col=pos>=80?'var(--green)':pos>=50?'var(--accent)':pos>=30?'var(--amber)':'var(--red)';
+      return '<div style="margin-bottom:8px;padding:0 2px">'+
+        '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px">'+
+        '<span>52W-T: $'+state.low52w+'</span>'+
+        '<span style="color:'+col+';font-weight:500">$'+state.price+' ('+pos.toFixed(0)+'%)</span>'+
+        '<span>52W-H: $'+state.high52w+'</span>'+
+        '</div>'+
+        '<div style="height:5px;background:var(--bg3);border-radius:3px;position:relative">'+
+        '<div style="position:absolute;left:0;top:0;height:100%;width:'+pos+'%;background:'+col+';border-radius:3px;transition:width .3s"></div>'+
+        '<div style="position:absolute;top:-2px;left:'+pos+'%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:'+col+';border:2px solid var(--bg1)"></div>'+
+        '</div>'+
+        '</div>';
+    }():'<div style="margin-bottom:8px"></div>')+
     (bpSignals.length>0?'<div style="font-size:11px;color:var(--text3);margin-bottom:6px">'+bpSignals.join(' · ')+'</div>':'')+
+    (state.earningsDate?'<div style="font-size:11px;padding:4px 8px;border-radius:6px;margin-bottom:6px;background:'+(state.earningsDaysAway<=14?'rgba(240,169,58,0.12)':'rgba(255,255,255,0.04)')+';color:'+(state.earningsDaysAway<=14?'var(--amber)':'var(--text3)')+'"><i class="ti ti-calendar-event"></i> Earnings: '+state.earningsDate+(state.earningsDaysAway<=30?' (in '+state.earningsDaysAway+' Tagen)':'')+' '+(state.earningsDaysAway<=7?'⚠️':state.earningsDaysAway<=14?'📅':'')+'</div>':'')+
     '<div style="display:flex;gap:12px;font-size:11px;color:var(--text3);margin-bottom:5px">'+
     '<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#4f8ef7;display:inline-block;border-radius:1px"></span>Kurs</span>'+
     '<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#34c26e;display:inline-block;border-radius:1px"></span>MACD</span>'+
@@ -2856,6 +2874,7 @@ function exportAllData(){
     version: '2.0',
     journal: JSON.parse(localStorage.getItem('ko_journal')||'[]'),
     top50: JSON.parse(localStorage.getItem('ko_top50')||'[]'),
+    watchlists: JSON.parse(localStorage.getItem('ko_watchlists')||'{}'),
     top50Date: localStorage.getItem('ko_top50_date')||'',
     makro: JSON.parse(localStorage.getItem('ko_makro')||'{}'),
     portfolio: JSON.parse(localStorage.getItem('ko_portfolio')||'{}'),
@@ -2915,6 +2934,11 @@ function importAllData(input){
         localStorage.setItem('ko_makro', JSON.stringify(data.makro));
         renderMakro(data.makro);
         imported.push('Makro');
+      }
+      if(data.watchlists !== undefined && Object.keys(data.watchlists).length > 0){
+        localStorage.setItem('ko_watchlists', JSON.stringify(data.watchlists));
+        updateWatchlistDropdown();
+        imported.push('Watchlisten ('+Object.keys(data.watchlists).length+')');
       }
       if(data.portfolio !== undefined && Object.keys(data.portfolio).length > 0){
         localStorage.setItem('ko_portfolio', JSON.stringify(data.portfolio));
@@ -3035,6 +3059,132 @@ async function debugDEFetch(){
   }
   alert('Twelve Data DE Symbol Test:\n\n'+results.join('\n'));
 }
+
+// ─── EARNINGS KALENDER ────────────────────────────────────────────────────────
+const earningsCache = {};
+
+async function fetchEarningsDate(sym){
+  if(earningsCache[sym]) return earningsCache[sym];
+  const fhKey = getFinnhubKey();
+  if(!fhKey) return null;
+  try{
+    const today = new Date();
+    const from = today.toISOString().split('T')[0];
+    const to = new Date(today.getTime()+90*24*60*60*1000).toISOString().split('T')[0];
+    const url = 'https://finnhub.io/api/v1/calendar/earnings?symbol='+sym+'&from='+from+'&to='+to+'&token='+fhKey;
+    const r = await fetch(url);
+    const j = await r.json();
+    if(j.earningsCalendar && j.earningsCalendar.length > 0){
+      const next = j.earningsCalendar[0];
+      const date = next.date;
+      const daysAway = Math.round((new Date(date)-today)/(24*60*60*1000));
+      const result = {date: date, daysAway: daysAway};
+      earningsCache[sym] = result;
+      return result;
+    }
+  } catch(e){}
+  return null;
+}
+
+// ─── WATCHLIST MANAGEMENT ─────────────────────────────────────────────────────
+const WL_KEY = 'ko_watchlists';
+
+function getWatchlists(){
+  try { return JSON.parse(localStorage.getItem(WL_KEY)||'{}'); } catch(e){ return {}; }
+}
+
+function saveWatchlist(){
+  const input = document.getElementById('custom-input').value.trim();
+  if(!input){ alert('Bitte zuerst Ticker eingeben'); return; }
+  const name = prompt('Watchlist-Name:', 'Meine Watchlist');
+  if(!name) return;
+  const wls = getWatchlists();
+  wls[name] = input;
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  updateWatchlistDropdown();
+  alert('✓ Watchlist "'+name+'" gespeichert');
+}
+
+function updateWatchlistDropdown(){
+  const optgroup = document.getElementById('watchlist-options');
+  if(!optgroup) return;
+  const wls = getWatchlists();
+  optgroup.innerHTML = '';
+  Object.keys(wls).forEach(function(name){
+    const opt = document.createElement('option');
+    opt.value = 'wl:'+name;
+    opt.textContent = '⭐ '+name;
+    optgroup.appendChild(opt);
+  });
+}
+
+function deleteWatchlist(name){
+  const wls = getWatchlists();
+  delete wls[name];
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  updateWatchlistDropdown();
+}
+
+function onPresetChange(){
+  const val = document.getElementById('ticker-preset').value;
+  if(val.startsWith('wl:')){
+    const name = val.substring(3);
+    const wls = getWatchlists();
+    if(wls[name]){
+      document.getElementById('custom-wrap').style.display='block';
+      document.getElementById('custom-input').value = wls[name];
+    }
+  } else {
+    toggleCustom();
+  }
+}
+
+// ─── PATCH getTickers FOR WATCHLISTS ──────────────────────────────────────────
+const _origGetTickers = getTickers;
+getTickers = function(){
+  const preset = document.getElementById('ticker-preset').value;
+  if(preset && preset.startsWith('wl:')){
+    const name = preset.substring(3);
+    const wls = getWatchlists();
+    if(wls[name]){
+      return wls[name].split(',').map(function(s){ return s.trim().toUpperCase(); })
+        .filter(Boolean).map(function(s){ return {sym:s,name:s}; });
+    }
+  }
+  return _origGetTickers();
+};
+
+// ─── PATCH runScan TO FETCH EARNINGS ──────────────────────────────────────────
+const _origRenderCard = renderCard;
+renderCard = function(t, state){
+  _origRenderCard(t, state);
+  // Async fetch earnings after card renders
+  if(window.currentMarket !== 'de' && getFinnhubKey()){
+    fetchEarningsDate(t.sym).then(function(e){
+      if(!e) return;
+      const cardEl = document.getElementById('card-'+t.sym);
+      if(!cardEl) return;
+      // Find or create earnings element
+      let earningsEl = cardEl.querySelector('.earnings-badge');
+      if(!earningsEl){
+        earningsEl = document.createElement('div');
+        earningsEl.className = 'earnings-badge';
+        const chartEl = cardEl.querySelector('canvas');
+        if(chartEl) chartEl.parentNode.insertBefore(earningsEl, chartEl);
+        else cardEl.appendChild(earningsEl);
+      }
+      const daysAway = e.daysAway;
+      const bg = daysAway<=7?'rgba(240,86,86,0.12)':daysAway<=14?'rgba(240,169,58,0.12)':'rgba(255,255,255,0.04)';
+      const color = daysAway<=7?'var(--red)':daysAway<=14?'var(--amber)':'var(--text3)';
+      const icon = daysAway<=7?'⚠️':daysAway<=14?'📅':'📊';
+      earningsEl.style.cssText = 'font-size:11px;padding:4px 8px;border-radius:6px;margin:4px 0;background:'+bg+';color:'+color;
+      earningsEl.innerHTML = '<i class="ti ti-calendar-event"></i> Earnings: '+e.date+' (in '+daysAway+' Tagen) '+icon;
+    });
+  }
+};
+
+// Initialize watchlist dropdown on load
+document.addEventListener('DOMContentLoaded', function(){ updateWatchlistDropdown(); });
 </script>
 </body>
 </html>
