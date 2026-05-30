@@ -774,7 +774,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────
 const DEFAULT_PIN = '2409';
-const API_BASE = '/api/scan'; // legacy - not used
+const API_BASE = '/api/scan';
+const PROXY = 'https://my-cors-proxy.ahildebrand.workers.dev/'; // legacy - not used
 window.currentTF = '1d';
 
 function getFinnhubKey(){
@@ -1930,78 +1931,56 @@ async function loadMostActive(){
   container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade aktivste Aktien…</div>';
   document.getElementById('mkt-clear-btn').style.display='inline';
   try{
-    const key=getFinnhubKey();
-    if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
-    const usOpen=isUSMarketOpen&&isUSMarketOpen();
-    const weekend=isWeekend();
-    const lastDayLabel=getLastTradingDayLabel();
-    let syms, marketLabel, isDE=false;
-    if(window.currentMarket==='de'){
-      isDE=true;
-      syms=['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE',
-            'MRK.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','HEN3.DE','EOAN.DE',
-            'LIN.DE','VOW3.DE','IFX.DE','MTX.DE','ENR.DE','ZAL.DE'];
+    const isDE = window.currentMarket==='de';
+    const lastDayLabel = getLastTradingDayLabel();
+    let syms, marketLabel;
+    if(isDE){
+      syms=['SAP','SIE','ALV','MBG','BMW','BAS','DTE','MRK','BAYN','ADS',
+            'DBK','RHM','HEN3','EOAN','LIN','VOW3','IFX','MTX','ENR','ZAL'];
       marketLabel=(lastDayLabel?'📊 '+lastDayLabel+' — Xetra Top 20':'🌙 Xetra — Top 20 DE');
     } else {
       syms=['NVDA','AAPL','MSFT','TSLA','AMD','META','AMZN','GOOGL','PLTR','MRVL',
             'AVGO','VRT','ARM','CRDO','LRCX','TSM','SMCI','APP','COIN','HOOD'];
       marketLabel=(lastDayLabel?'📊 '+lastDayLabel+' — US Top 20':'🔔 US-Markt — Top 20');
     }
-    // Fetch: Finnhub for DE (works on weekends), YF for US
-    const fhKey = getFinnhubKey();
-    const results = await Promise.all(syms.map(function(sym){
-      if(isDE && fhKey){
-        // Finnhub for DE stocks - use full sym with .DE suffix
-        if(isDE){
-          // Twelve Data for DE stocks via proxy
-          const tdKey=getTwelveKey();
-          if(!tdKey) return Promise.resolve(null);
-          const tdSym=sym+':XETRA';
-          const tdUrl='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(tdSym)+'&interval=1day&outputsize=3&apikey='+tdKey;
-          return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(tdUrl))
-            .then(function(r){ return r.json(); })
-            .then(function(j){
-              if(j.status==='error'||!j.values||j.values.length<1) return null;
-              const v=j.values;
-              const price=parseFloat(v[0].close);
-              const prev=v.length>1?parseFloat(v[1].close):price;
-              const chg=prev>0?((price-prev)/prev*100):0;
-              const displaySym=sym.replace('.DE','');
-              return {
-                symbol:displaySym, scanSym:displaySym, name:displaySym,
-                price:price.toFixed(2), change:(price-prev).toFixed(2),
-                changePct:chg.toFixed(2), volume:'—', volRatio:null,
-                mktCap:'—', currency:'€',
-              };
-            })
-            .catch(function(){ return null; });
-        } else {
-          // Finnhub for US stocks
-          const fhKey=getFinnhubKey();
-          if(!fhKey) return Promise.resolve(null);
-          return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+fhKey)
-            .then(function(r){ return r.json(); })
-            .then(function(d){
-              if(!d||(!d.c&&!d.pc)) return null;
-              const price=(d.c&&d.c>0)?d.c:(d.pc||0);
-              const prev=(d.pc&&d.pc>0)?d.pc:price;
-              const chg=prev>0?((price-prev)/prev*100):(d.dp||0);
-              return {
-                symbol:sym, scanSym:sym, name:sym,
-                price:price.toFixed(2), change:(price-prev).toFixed(2),
-                changePct:chg.toFixed(2), volume:'—', volRatio:null,
-                mktCap:'—', currency:'$',
-              };
-            })
-            .catch(function(){ return null; });
-        }
+    const fhKey=getFinnhubKey();
+    const tdKey=getTwelveKey();
+    const results=await Promise.all(syms.map(function(sym){
+      if(isDE && tdKey){
+        // Twelve Data for DE via proxy
+        const tdSym=sym+':XETRA';
+        const tdUrl='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(tdSym)+'&interval=1day&outputsize=3&apikey='+tdKey;
+        return fetch(PROXY+'?url='+encodeURIComponent(tdUrl))
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            if(j.status==='error'||!j.values||!j.values.length) return null;
+            const price=parseFloat(j.values[0].close);
+            const prev=j.values.length>1?parseFloat(j.values[1].close):price;
+            const chg=prev>0?((price-prev)/prev*100):0;
+            return {symbol:sym,scanSym:sym,name:sym,price:price.toFixed(2),
+              change:(price-prev).toFixed(2),changePct:chg.toFixed(2),
+              volume:'—',volRatio:null,mktCap:'—',currency:'€'};
+          }).catch(function(){ return null; });
+      } else if(!isDE && fhKey){
+        // Finnhub for US
+        return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+fhKey)
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if(!d) return null;
+            const price=(d.c&&d.c>0)?d.c:(d.pc>0?d.pc:0);
+            if(!price) return null;
+            const prev=d.pc>0?d.pc:price;
+            const chg=prev>0?((price-prev)/prev*100):(d.dp||0);
+            return {symbol:sym,scanSym:sym,name:sym,price:price.toFixed(2),
+              change:(price-prev).toFixed(2),changePct:chg.toFixed(2),
+              volume:'—',volRatio:null,mktCap:'—',currency:'$'};
+          }).catch(function(){ return null; });
       }
+      return Promise.resolve(null);
     }));
     const items=results
       .filter(function(r){ return r&&r.price; })
-      .sort(function(a,b){
-        return Math.abs(parseFloat(b.changePct))-Math.abs(parseFloat(a.changePct));
-      })
+      .sort(function(a,b){ return Math.abs(parseFloat(b.changePct))-Math.abs(parseFloat(a.changePct)); })
       .slice(0,10);
     renderMostActive({mode:'movers',items:items,ts:new Date().toISOString(),label:marketLabel});
   }catch(e){
@@ -2009,374 +1988,69 @@ async function loadMostActive(){
   }
 }
 
-function renderMostActive(d){
-  // Store tickers for scan-all
-  window.lastMovers = (d.items||[]).map(function(s){ return s.scanSym||s.symbol; }).filter(Boolean);
-  const container=document.getElementById('market-intel-container');
-  const rows=d.items.map(s=>{
-    const chg=parseFloat(s.changePct);
-    const chgCls=chg>0?'var(--green)':chg<0?'var(--red)':'var(--text2)';
-    const vRatio=s.volRatio;
-    const vCls=vRatio>150?'pill-green':vRatio>100?'pill-amber':'pill-gray';
-    return `<tr>
-      <td style="font-weight:600;font-family:var(--mono);font-size:12px"><button class="btn btn-sm" data-sym="${s.scanSym||s.symbol}" onclick="quickScanBtn(this)" style="padding:0;font-size:12px;font-family:var(--mono);color:var(--accent);background:none;border:none;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-weight:600">${s.symbol}</button></td>
-      <td style="font-size:11px;color:var(--text2);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</td>
-      <td style="font-family:var(--mono);font-size:12px;text-align:right">$${s.price}</td>
-      <td style="font-family:var(--mono);font-size:12px;text-align:right;color:${chgCls}">${chg>0?'+':''}${s.changePct}%</td>
-      <td style="text-align:right;font-size:11px;font-family:var(--mono)">${s.volume}</td>
-      <td style="text-align:right"><span class="pill ${vCls}" style="font-size:10px">${vRatio?vRatio+'%':'—'}</span></td>
-      <td style="text-align:right"><button class="btn btn-sm" onclick="addToScan('${s.symbol}')" style="padding:2px 6px;font-size:10px"><i class="ti ti-radar"></i></button></td>
-    </tr>`;
-  }).join('');
-  const sessionLabel = d.label || 'Top 10 Aktivste';
-  container.innerHTML=`
-  <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px">${sessionLabel} — ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr · Klick auf Ticker = Scanner</div>
-  <div style="overflow-x:auto">
-  <table style="width:100%;border-collapse:collapse;font-size:12px">
-    <thead><tr>
-      <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Ticker</th>
-      <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Name</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Kurs</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Chg%</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Vol</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Vol%</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)"></th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-    <div style="font-size:11px;color:var(--text3);flex:1;align-self:center"><i class="ti ti-info-circle"></i> Klick auf Ticker = Scanner · Alle 10 scannen:</div>
-    <button class="btn btn-sm" onclick="scanAllMovers()" style="font-size:11px;padding:3px 8px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">
-      <i class="ti ti-radar"></i> Alle 10 scannen + sortieren
-    </button>
-  </div>`;
-}
-
 async function loadAfterHours(){
   const container=document.getElementById('market-intel-container');
-  container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade Markt-Bewegungen…</div>';
+  container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade Mover-Daten…</div>';
   document.getElementById('mkt-clear-btn').style.display='inline';
   try{
-    const key=getFinnhubKey();
-    if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
-    const usOpen=isUSMarketOpen();
-    const weekend=isWeekend();
-    const lastDayLabel=getLastTradingDayLabel();
-    const isDE=window.currentMarket==='de';
-    let watchlist, sessionLabel, isPreMarket;
+    const isDE = window.currentMarket==='de';
+    const lastDayLabel = getLastTradingDayLabel();
+    const utcH=new Date().getUTCHours();
+    const isPreMarket=utcH>=9&&utcH<14;
+    let watchlist, sessionLabel;
     if(isDE){
-      watchlist=['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE',
-                 'MRK.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','HEN3.DE','EOAN.DE',
-                 'LIN.DE','VOW3.DE','MUV2.DE','IFX.DE','MTX.DE','ZAL.DE'];
+      watchlist=['SAP','SIE','ALV','MBG','BMW','BAS','DTE','MRK','BAYN','ADS',
+                 'DBK','RHM','HEN3','EOAN','LIN','VOW3','MUV2','IFX','MTX','ZAL'];
       sessionLabel=(lastDayLabel?'📊 '+lastDayLabel+' — DE Mover':'🌙 Xetra Mover DE');
-      isPreMarket=true;
     } else {
       watchlist=['AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','AMD','AVGO','MRVL',
                  'VRT','LRCX','TSM','ARM','CRDO','PLTR','SMCI','ORCL','CRM','SNOW'];
-      const utcH=new Date().getUTCHours();
-      isPreMarket=utcH>=9&&utcH<14;
       sessionLabel=(lastDayLabel?'📊 '+lastDayLabel+' — US Mover':isPreMarket?'🔔 US Pre-Market':'🌆 US After-Hours');
     }
-
-    // Fetch: Finnhub for DE (works on weekends), YF for US
-    const results = await Promise.all(watchlist.map(function(sym){
-      if(isDE && getFinnhubKey()){
-        if(isDE){
-          const tdKey=getTwelveKey();
-          if(!tdKey) return Promise.resolve(null);
-          const tdSym=sym+':XETRA';
-          const tdUrl='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(tdSym)+'&interval=1day&outputsize=3&apikey='+tdKey;
-          return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(tdUrl))
-            .then(function(r){ return r.json(); })
-            .then(function(j){
-              if(j.status==='error'||!j.values||j.values.length<1) return null;
-              const v=j.values;
-              const price=parseFloat(v[0].close);
-              const prev=v.length>1?parseFloat(v[1].close):price;
-              const chg=prev>0?((price-prev)/prev*100):0;
-              const displaySym=sym.replace('.DE','');
-              return {
-                symbol:displaySym, scanSym:displaySym, name:displaySym,
-                regularPrice:price.toFixed(2), regularChgPct:chg.toFixed(2),
-                ahPrice:price.toFixed(2), ahChgPct:chg.toFixed(2), currency:'€',
-              };
-            })
-            .catch(function(){ return null; });
-        } else {
-          const fhKey=getFinnhubKey();
-          if(!fhKey) return Promise.resolve(null);
-          return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+fhKey)
-            .then(function(r){ return r.json(); })
-            .then(function(d){
-              if(!d||(!d.c&&!d.pc)) return null;
-              const price=(d.c&&d.c>0)?d.c:(d.pc||0);
-              const prev=(d.pc&&d.pc>0)?d.pc:price;
-              const chg=prev>0?((price-prev)/prev*100):(d.dp||0);
-              return {
-                symbol:sym, scanSym:sym, name:sym,
-                regularPrice:price.toFixed(2), regularChgPct:chg.toFixed(2),
-                ahPrice:price.toFixed(2), ahChgPct:chg.toFixed(2), currency:'$',
-              };
-            })
-            .catch(function(){ return null; });
-        }
+    const fhKey=getFinnhubKey();
+    const tdKey=getTwelveKey();
+    const results=await Promise.all(watchlist.map(function(sym){
+      if(isDE && tdKey){
+        const tdSym=sym+':XETRA';
+        const tdUrl='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(tdSym)+'&interval=1day&outputsize=3&apikey='+tdKey;
+        return fetch(PROXY+'?url='+encodeURIComponent(tdUrl))
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            if(j.status==='error'||!j.values||!j.values.length) return null;
+            const price=parseFloat(j.values[0].close);
+            const prev=j.values.length>1?parseFloat(j.values[1].close):price;
+            const chg=prev>0?((price-prev)/prev*100):0;
+            return {symbol:sym,scanSym:sym,name:sym,
+              regularPrice:price.toFixed(2),regularChgPct:chg.toFixed(2),
+              ahPrice:price.toFixed(2),ahChgPct:chg.toFixed(2),currency:'€'};
+          }).catch(function(){ return null; });
+      } else if(!isDE && fhKey){
+        return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+fhKey)
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if(!d) return null;
+            const price=(d.c&&d.c>0)?d.c:(d.pc>0?d.pc:0);
+            if(!price) return null;
+            const prev=d.pc>0?d.pc:price;
+            const chg=prev>0?((price-prev)/prev*100):(d.dp||0);
+            return {symbol:sym,scanSym:sym,name:sym,
+              regularPrice:price.toFixed(2),regularChgPct:chg.toFixed(2),
+              ahPrice:price.toFixed(2),ahChgPct:chg.toFixed(2),currency:'$'};
+          }).catch(function(){ return null; });
       }
+      return Promise.resolve(null);
     }));
-
     const items=results
       .filter(function(r){ return r&&r.regularPrice; })
-      .sort(function(a,b){
-        return Math.abs(parseFloat(b.ahChgPct||0))-Math.abs(parseFloat(a.ahChgPct||0));
-      })
+      .sort(function(a,b){ return Math.abs(parseFloat(b.ahChgPct||0))-Math.abs(parseFloat(a.ahChgPct||0)); })
       .slice(0,12);
-
-    renderAfterHours({
-      mode:'afterhours',items:items,
-      isPreMarket:isPreMarket,isDE:isDE,
-      label:sessionLabel,
-      ts:new Date().toISOString()
-    });
+    renderAfterHours({mode:'afterhours',items:items,isPreMarket:isPreMarket,isDE:isDE,
+      label:sessionLabel,ts:new Date().toISOString()});
   }catch(e){
     container.innerHTML='<div style="font-size:12px;color:var(--red);padding:8px 0"><i class="ti ti-alert-circle"></i> '+e.message+'</div>';
   }
 }
 
-function renderAfterHours(d){
-  const container=document.getElementById('market-intel-container');
-  const label=d.label||(d.isPreMarket?'Pre-Market':'After-Hours');
-  const currency=d.isDE?'€':'$';
-  if(!d.items||d.items.length===0){
-    container.innerHTML=`<div style="font-size:12px;color:var(--text2);padding:8px 0">Keine ${label}-Aktivität verfügbar — Markt möglicherweise noch offen oder keine Daten.</div>`;
-    return;
-  }
-  const rows=d.items.slice(0,12).map(s=>{
-    const regChg=parseFloat(s.regularChgPct);
-    const ahChg=parseFloat(s.ahChgPct);
-    const regCls=regChg>0?'var(--green)':regChg<0?'var(--red)':'var(--text2)';
-    const ahCls=ahChg>0?'var(--green)':ahChg<0?'var(--red)':'var(--text2)';
-    const bigMove=Math.abs(ahChg)>=3;
-    return `<tr style="${bigMove?'background:rgba(240,169,58,0.06)':''}">
-      <td style="font-weight:600;font-family:var(--mono);font-size:12px"><button class="btn btn-sm" data-sym="${s.scanSym||s.symbol}" onclick="quickScanBtn(this)" style="padding:0;font-size:12px;font-family:var(--mono);color:var(--accent);background:none;border:none;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-weight:600">${s.symbol}</button></td>
-      <td style="font-size:11px;color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</td>
-      <td style="font-family:var(--mono);font-size:12px;text-align:right">$${s.regularPrice}</td>
-      <td style="font-family:var(--mono);font-size:11px;text-align:right;color:${regCls}">${regChg>0?'+':''}${s.regularChgPct}%</td>
-      <td style="font-family:var(--mono);font-size:12px;text-align:right;font-weight:500">$${s.ahPrice}</td>
-      <td style="font-family:var(--mono);font-size:12px;text-align:right;color:${ahCls};font-weight:600">${ahChg>0?'+':''}${s.ahChgPct}%${bigMove?' ⚡':''}</td>
-      <td style="text-align:right"><button class="btn btn-sm" onclick="addToScan('${s.symbol}')" style="padding:2px 6px;font-size:10px"><i class="ti ti-radar"></i></button></td>
-    </tr>`;
-  }).join('');
-  container.innerHTML=`
-  <div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:6px">
-    ${label} — ${new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr · ⚡ ≥3% · Klick auf Ticker = Scanner
-  </div>
-  <div style="overflow-x:auto">
-  <table style="width:100%;border-collapse:collapse;font-size:12px">
-    <thead><tr>
-      <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Ticker</th>
-      <th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Name</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Kurs ${currency}</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Tages%</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Bewegung</th>
-      <th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">%</th>
-      <th></th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-    <div style="font-size:11px;color:var(--text3);flex:1;align-self:center"><i class="ti ti-info-circle"></i> ⚡ ≥3% orange · Klick = Scanner</div>
-    <button class="btn btn-sm" onclick="scanAllAH()" style="font-size:11px;padding:3px 8px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">
-      <i class="ti ti-radar"></i> Alle scannen + sortieren
-    </button>
-  </div>`;
-}
-
-function addToScan(ticker){
-  document.getElementById('ticker-preset').value='custom';
-  document.getElementById('custom-wrap').style.display='block';
-  const current=document.getElementById('custom-input').value;
-  const tickers=current.split(',').map(s=>s.trim()).filter(Boolean);
-  if(!tickers.includes(ticker)) tickers.push(ticker);
-  document.getElementById('custom-input').value=tickers.join(', ');
-  const info=document.createElement('div');
-  info.className='info-box';
-  info.style.cssText='margin-bottom:.5rem;font-size:12px';
-  info.innerHTML=`<i class="ti ti-check"></i> <strong>${ticker}</strong> zur Scan-Liste hinzugefügt`;
-  const container=document.getElementById('scan-container');
-  container.parentNode.insertBefore(info,container);
-  setTimeout(()=>info.remove(),3000);
-}
-
-// ─── POSITIONSJOURNAL ──────────────────────────────────────────────────────
-const J_KEY = 'ko_journal';
-let journalData = [];
-let showClosed = false;
-
-function loadJournal(){
-  const raw = localStorage.getItem(J_KEY);
-  if(raw){ try{ journalData = JSON.parse(raw); }catch(e){ journalData = []; } }
-  renderJournal();
-}
-
-function saveJournal(){
-  localStorage.setItem(J_KEY, JSON.stringify(journalData));
-}
-
-function gj(id){ return document.getElementById(id)?.value?.trim() || ''; }
-function gjn(id){ const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? null : v; }
-
-function addPosition(){
-  const ticker = gj('j-ticker');
-  if(!ticker){ alert('Bitte Ticker eingeben'); return; }
-  const entry = gjn('j-entry');
-  const ko = gjn('j-ko');
-  const ratio = gjn('j-ratio');
-  const turboEntry = gjn('j-turbo-entry');
-  const qty = gjn('j-qty');
-  const stop = gjn('j-stop');
-  if(!entry || !ko || !ratio || !turboEntry || !qty){
-    alert('Bitte mindestens: Einstieg Basiswert, KO, Ratio, Turbo-Preis und Anzahl ausfüllen');
-    return;
-  }
-  const pos = {
-    id: Date.now(),
-    ticker,
-    isin: gj('j-isin'),
-    emittent: gj('j-emittent'),
-    note: gj('j-note'),
-    status: gj('j-status') || 'open',
-    entry, ko, ratio, turboEntry, qty, stop,
-    einsatz: +(turboEntry * qty).toFixed(2),
-    date: new Date().toLocaleDateString('de-DE'),
-    closePrice: null,
-    closeDate: null,
-  };
-  journalData.unshift(pos);
-  saveJournal();
-  clearJournalForm();
-  renderJournal();
-}
-
-function clearJournalForm(){
-  ['j-ticker','j-isin','j-entry','j-ko','j-ratio','j-turbo-entry','j-qty','j-stop','j-note'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(el) el.value = '';
-  });
-  const sel = document.getElementById('j-status');
-  if(sel) sel.value = 'open';
-  const em = document.getElementById('j-emittent');
-  if(em) em.value = '';
-}
-
-function closePosition(id){
-  const priceStr = prompt('Turbo-Verkaufspreis (€) eingeben:');
-  if(priceStr === null) return;
-  const price = parseFloat(priceStr.replace(',','.'));
-  if(isNaN(price)){ alert('Ungültiger Preis'); return; }
-  const pos = journalData.find(p => p.id === id);
-  if(!pos) return;
-  pos.status = 'closed';
-  pos.closePrice = price;
-  pos.closeDate = new Date().toLocaleDateString('de-DE');
-  saveJournal();
-  renderJournal();
-}
-
-function deletePosition(id){
-  if(!confirm('Position löschen?')) return;
-  journalData = journalData.filter(p => p.id !== id);
-  saveJournal();
-  renderJournal();
-}
-
-function toggleClosed(){
-  showClosed = !showClosed;
-  const btn = document.getElementById('j-show-closed');
-  if(btn) btn.textContent = showClosed ? 'Nur offene' : 'Geschlossene anzeigen';
-  renderJournal();
-}
-
-function koAbstandBadge(pct){
-  const n=parseFloat(pct);
-  const col=n<15?'var(--red)':n<20?'var(--amber)':'var(--text3)';
-  return '<span style="color:'+col+';font-size:10px">('+pct+'% Abstand)</span>';
-}
-
-function jCard(p){
-  const isClosed=p.status==='closed';
-  const einsatz=+(p.einsatz||(p.turboEntry&&p.qty?p.turboEntry*p.qty:0)).toFixed(2);
-  const koAbstand=p.entry&&p.ko?((p.entry-p.ko)/p.entry*100).toFixed(1):null;
-  const limitPrice=p.stop&&p.ko&&p.ratio?((p.stop-p.ko)*p.ratio).toFixed(2):null;
-  let cardCls='j-card '+(isClosed?'j-card-closed':'j-card-open');
-  if(!isClosed&&koAbstand&&parseFloat(koAbstand)<15) cardCls='j-card j-card-danger';
-  else if(!isClosed&&koAbstand&&parseFloat(koAbstand)<20) cardCls='j-card j-card-warn';
-  let pnlHtml='';
-  if(isClosed&&p.closePrice!=null&&p.turboEntry&&p.qty){
-    const pnl=(p.closePrice-p.turboEntry)*p.qty;
-    const pct2=einsatz>0?(pnl/einsatz*100).toFixed(1):'--';
-    const col=pnl>=0?'var(--green)':'var(--red)';
-    pnlHtml='<div class="j-row"><span class="j-label">Realisierter P&L</span><span class="j-val" style="color:'+col+'">'+(pnl>=0?'+':'')+'€'+pnl.toFixed(2)+' ('+(pnl>=0?'+':'')+pct2+'%)</span></div>';
-  }
-  let s='<div class="'+cardCls+'" id="jpos-'+p.id+'">';
-  s+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-  s+='<span style="font-size:16px;font-weight:600;font-family:var(--mono);color:var(--accent)">'+p.ticker+'</span>';
-  if(p.emittent) s+='<span class="pill pill-gray" style="font-size:10px">'+p.emittent+'</span>';
-  if(p.isin) s+='<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+p.isin+'</span>';
-  s+='<span class="pill '+(isClosed?'pill-gray':'pill-green')+'" style="font-size:10px;margin-left:auto">'+(isClosed?'Geschlossen':'Offen')+'</span>';
-  s+='</div>';
-  if(p.note) s+='<div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-style:italic">'+p.note+'</div>';
-  s+='<div class="j-row"><span class="j-label">Einstieg Basiswert</span><span class="j-val">$'+p.entry+'</span></div>';
-  s+='<div class="j-row"><span class="j-label">KO-Schwelle</span><span class="j-val">$'+p.ko+(koAbstand?' '+koAbstandBadge(koAbstand):'')+'</span></div>';
-  s+='<div class="j-row"><span class="j-label">Turbo-Einstieg</span><span class="j-val">€'+p.turboEntry+' x '+p.qty+' Stk = €'+einsatz+'</span></div>';
-  if(p.stop){
-    s+='<div class="j-row"><span class="j-label">Stop / Limit-Order</span><span class="j-val">$'+p.stop+(limitPrice?' → €'+limitPrice+' Limit':'')+'</span></div>';
-  }
-  if(isClosed&&p.closeDate) s+='<div class="j-row"><span class="j-label">Geschlossen</span><span class="j-val">'+p.closeDate+' · €'+p.closePrice+'</span></div>';
-  s+=pnlHtml;
-  s+='<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">';
-  s+='<div style="font-size:10px;color:var(--text3);flex:1;align-self:center">'+p.date+'</div>';
-  if(!isClosed){
-    s+='<button class="btn btn-sm" data-sym="'+p.ticker+'" onclick="useInRechner(this.dataset.sym)" style="font-size:10px;padding:3px 8px"><i class="ti ti-calculator"></i></button>';
-    s+='<button class="btn btn-sm" data-id="'+p.id+'" onclick="closePosition(parseInt(this.dataset.id))" style="font-size:10px;padding:3px 8px"><i class="ti ti-check"></i> Schließen</button>';
-  }
-  s+='<button class="btn btn-sm" data-id="'+p.id+'" onclick="deletePosition(parseInt(this.dataset.id))" style="font-size:10px;padding:3px 8px;color:var(--red)"><i class="ti ti-trash"></i></button>';
-  s+='</div></div>';
-  return s;
-}
-
-function renderJournal(){
-  const filtered=showClosed?journalData:journalData.filter(p=>p.status==='open');
-  const openPos=journalData.filter(p=>p.status==='open');
-  const closedPos=journalData.filter(p=>p.status==='closed');
-  const totalEinsatz=openPos.reduce((s,p)=>s+(p.einsatz||0),0);
-  let totalPnl=0,pnlKnown=0;
-  closedPos.forEach(p=>{
-    if(p.closePrice!=null&&p.turboEntry&&p.qty){totalPnl+=(p.closePrice-p.turboEntry)*p.qty;pnlKnown++;}
-  });
-  document.getElementById('j-count').textContent=openPos.length;
-  document.getElementById('j-capital').textContent=totalEinsatz>0?totalEinsatz.toFixed(0):'—';
-  const pnlEl=document.getElementById('j-pnl');
-  const pnlPctEl=document.getElementById('j-pnl-pct');
-  if(pnlKnown>0){
-    pnlEl.textContent=(totalPnl>=0?'+':'')+totalPnl.toFixed(0);
-    pnlEl.style.color=totalPnl>=0?'var(--green)':'var(--red)';
-    const ce=closedPos.reduce((s,p)=>s+(p.einsatz||0),0);
-    pnlPctEl.textContent=ce>0?(totalPnl/ce*100).toFixed(1)+'%':'—';
-    pnlPctEl.style.color=totalPnl>=0?'var(--green)':'var(--red)';
-  } else {
-    pnlEl.textContent='—';pnlEl.style.color='';
-    pnlPctEl.textContent='—';pnlPctEl.style.color='';
-  }
-  const list=document.getElementById('journal-list');
-  const empty=document.getElementById('journal-empty');
-  if(filtered.length===0){list.innerHTML='';empty.style.display='block';return;}
-  empty.style.display='none';
-  list.innerHTML=filtered.map(p=>jCard(p)).join('');
-}
-
-// ─── LIVE PREISE (CoinGecko + Metals API) ─────────────────────────────────
-let liveRefreshInterval = null;
 
 async function refreshLivePrices(){
   const btn = document.getElementById('makro-refresh-btn');
