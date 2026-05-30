@@ -1952,24 +1952,9 @@ async function loadMostActive(){
     const results = await Promise.all(syms.map(function(sym){
       if(isDE && fhKey){
         // Finnhub for DE stocks - use full sym with .DE suffix
-        return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+fhKey)
-          .then(function(r){ return r.json(); })
-          .then(function(d){
-            if(!d||!d.c||d.c===0) return null;
-            const displaySym=sym.replace('.DE','');
-            const chg=d.dp||0;
-            return {
-              symbol:displaySym, scanSym:displaySym, name:displaySym,
-              price:d.c.toFixed(2),
-              change:(d.d||0).toFixed(2),
-              changePct:chg.toFixed(2),
-              volume:'—', volRatio:null, mktCap:'—', currency:'€',
-            };
-          })
-          .catch(function(){ return null; });
-      } else {
-        // Yahoo Finance via proxy for US
-        const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'?interval=1d&range=5d';
+        // Use Yahoo Finance via proxy for both DE and US
+        const yfSym = isDE ? sym : sym; // sym already has .DE for DE
+        const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(yfSym)+'?interval=1d&range=5d';
         return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
           .then(function(r){ return r.json(); })
           .then(function(j){
@@ -1978,20 +1963,21 @@ async function loadMostActive(){
             const q=res.indicators.quote[0];
             const closes=q.close.filter(function(v){return v!=null;});
             const vols=(q.volume||[]).filter(function(v){return v!=null;});
-            if(closes.length<2) return null;
+            if(closes.length<1) return null;
             const price=closes[closes.length-1];
-            const prev=closes[closes.length-2];
-            const chg=((price-prev)/prev*100);
+            const prev=closes.length>1?closes[closes.length-2]:price;
+            const chg=prev>0?((price-prev)/prev*100):0;
             const vol=vols.length>0?vols[vols.length-1]:0;
             const avgVol=vols.length>1?vols.slice(0,-1).reduce(function(a,b){return a+b;},0)/(vols.length-1):0;
+            const displaySym=isDE?sym.replace('.DE',''):sym;
             return {
-              symbol:sym, scanSym:sym, name:sym,
+              symbol:displaySym, scanSym:displaySym, name:displaySym,
               price:price.toFixed(2),
               change:(price-prev).toFixed(2),
               changePct:chg.toFixed(2),
               volume:vol>1e6?(vol/1e6).toFixed(1)+'M':vol>1e3?Math.round(vol/1e3)+'K':'—',
               volRatio:avgVol>0?Math.round((vol/avgVol)*100):null,
-              mktCap:'—', currency:'$',
+              mktCap:'—', currency:isDE?'€':'$',
             };
           })
           .catch(function(){ return null; });
@@ -2080,26 +2066,8 @@ async function loadAfterHours(){
     }
 
     // Fetch: Finnhub for DE (works on weekends), YF for US
-    const fhKey2 = getFinnhubKey();
     const results = await Promise.all(watchlist.map(function(sym){
       if(isDE && fhKey2){
-        return fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+fhKey2)
-          .then(function(r){ return r.json(); })
-          .then(function(d){
-            if(!d||!d.c||d.c===0) return null;
-            const displaySym=sym.replace('.DE','');
-            const chg=d.dp||0;
-            return {
-              symbol:displaySym, scanSym:displaySym, name:displaySym,
-              regularPrice:d.c.toFixed(2),
-              regularChgPct:chg.toFixed(2),
-              ahPrice:d.c.toFixed(2),
-              ahChgPct:chg.toFixed(2),
-              currency:'€',
-            };
-          })
-          .catch(function(){ return null; });
-      } else {
         const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'?interval=1d&range=5d';
         return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
           .then(function(r){ return r.json(); })
@@ -2108,17 +2076,18 @@ async function loadAfterHours(){
             if(!res) return null;
             const q=res.indicators.quote[0];
             const closes=q.close.filter(function(v){return v!=null;});
-            if(closes.length<2) return null;
+            if(closes.length<1) return null;
             const price=closes[closes.length-1];
-            const prev=closes[closes.length-2];
-            const chg=((price-prev)/prev*100);
+            const prev=closes.length>1?closes[closes.length-2]:price;
+            const chg=prev>0?((price-prev)/prev*100):0;
+            const displaySym=isDE?sym.replace('.DE',''):sym;
             return {
-              symbol:sym, scanSym:sym, name:sym,
+              symbol:displaySym, scanSym:displaySym, name:displaySym,
               regularPrice:price.toFixed(2),
               regularChgPct:chg.toFixed(2),
               ahPrice:price.toFixed(2),
               ahChgPct:chg.toFixed(2),
-              currency:'$',
+              currency:isDE?'€':'$',
             };
           })
           .catch(function(){ return null; });
