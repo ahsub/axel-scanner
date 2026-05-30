@@ -2081,7 +2081,7 @@ async function loadAfterHours(){
 
     // Fetch: Finnhub for DE (works on weekends), YF for US
     const results = await Promise.all(watchlist.map(function(sym){
-      if(isDE && fhKey2){
+      if(isDE && getFinnhubKey()){
         if(isDE){
           const tdKey=getTwelveKey();
           if(!tdKey) return Promise.resolve(null);
