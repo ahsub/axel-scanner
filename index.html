@@ -591,7 +591,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
       <div class="sec">Finnhub API-Key</div>
       <div class="card" style="margin-bottom:1rem">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:.65rem">Key wird lokal gespeichert — nie übertragen. Wird für Scanner, Movers und After-Hours benötigt.</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.5rem">Für Markt-Aktivität, After-Hours, Earnings. Key wird lokal gespeichert — nie übertragen.</div>
+        <a href="https://finnhub.io/dashboard" target="_blank" rel="noopener"
+           style="display:inline-flex;align-items:center;gap:5px;margin-bottom:.65rem;font-size:12px;color:var(--accent);text-decoration:none;padding:5px 10px;border-radius:6px;background:var(--blue-bg);border:0.5px solid var(--accent)">
+          <i class="ti ti-external-link"></i> Finnhub → Dashboard & API Key
+        </a>
         <div class="fg" style="margin-bottom:.65rem">
           <label>Finnhub API-Key</label>
           <input type="password" id="fh-key-input" placeholder="Finnhub API-Key eingeben…" style="font-family:var(--mono)">
@@ -627,7 +631,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
       <div class="sec">Anthropic API-Key (Auto-Makro)</div>
       <div class="card" style="margin-bottom:1rem">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:.65rem">Für automatische KI-Makro-Einschätzung. Kostenlos testen: anthropic.com → Console → API Keys.</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.5rem">Für automatische KI-Makro-Einschätzung (Auto-Makro Button). Pay-per-use, ~$0.01/Aufruf.</div>
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener"
+           style="display:inline-flex;align-items:center;gap:5px;margin-bottom:.65rem;font-size:12px;color:var(--accent);text-decoration:none;padding:5px 10px;border-radius:6px;background:var(--blue-bg);border:0.5px solid var(--accent)">
+          <i class="ti ti-external-link"></i> Anthropic Console → API Keys
+        </a>
         <div class="fg" style="margin-bottom:.65rem">
           <label>Anthropic API-Key</label>
           <input type="password" id="ant-key-input" placeholder="sk-ant-..." style="font-family:var(--mono)">
@@ -698,9 +706,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <option value="rally_attempt">🔄 Rally Attempt — Score ×0.70</option>
           <option value="downtrend">🔴 Market in Correction — Score ×0.50</option>
         </select>
-        <div id="mkt-phase-hint" style="font-size:11px;color:var(--text3)">
+        <div id="mkt-phase-hint" style="font-size:11px;color:var(--text3);margin-top:4px">
           Bei Correction: nur Scores ≥70 handeln (entspricht Score ≥85 im Uptrend)
         </div>
+        <a href="https://www.investors.com/market-trend/the-big-picture/" target="_blank" rel="noopener" 
+           style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:12px;color:var(--accent);text-decoration:none;padding:5px 10px;border-radius:6px;background:var(--blue-bg);border:0.5px solid var(--accent)">
+          <i class="ti ti-external-link"></i> IBD Market Pulse → investors.com
+        </a>
       </div>
 
       <div class="sec">Score-Gewichtung (Gesamt 100 Punkte)</div>
