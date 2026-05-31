@@ -608,7 +608,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
       <div class="sec">Twelve Data API-Key</div>
       <div class="card" style="margin-bottom:1rem">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:.65rem">Für Scanner MACD/OBV Analyse. Kostenlos bei twelvedata.com (800 Requests/Tag). Key wird lokal gespeichert.</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.5rem">Für Scanner MACD/OBV/MA. 800 Requests/Tag kostenlos. Key wird lokal gespeichert.</div>
+        <a href="https://twelvedata.com/account/api-keys" target="_blank" rel="noopener"
+           style="display:inline-flex;align-items:center;gap:5px;margin-bottom:.65rem;font-size:12px;color:var(--accent);text-decoration:none;padding:5px 10px;border-radius:6px;background:var(--blue-bg);border:0.5px solid var(--accent)">
+          <i class="ti ti-external-link"></i> Twelve Data → API Keys
+        </a>
         <div class="fg" style="margin-bottom:.65rem">
           <label>Twelve Data API-Key</label>
           <input type="password" id="td-key-input" placeholder="Twelve Data API-Key eingeben…" style="font-family:var(--mono)">
@@ -709,10 +713,23 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="mkt-phase-hint" style="font-size:11px;color:var(--text3);margin-top:4px">
           Bei Correction: nur Scores ≥70 handeln (entspricht Score ≥85 im Uptrend)
         </div>
-        <a href="https://www.investors.com/market-trend/the-big-picture/" target="_blank" rel="noopener" 
-           style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:12px;color:var(--accent);text-decoration:none;padding:5px 10px;border-radius:6px;background:var(--blue-bg);border:0.5px solid var(--accent)">
-          <i class="ti ti-external-link"></i> IBD Market Pulse → investors.com
-        </a>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+          <a href="https://www.investors.com/market-trend/the-big-picture/" target="_blank" rel="noopener"
+             style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--accent);text-decoration:none;padding:5px 10px;border-radius:6px;background:var(--blue-bg);border:0.5px solid var(--accent)">
+            <i class="ti ti-external-link"></i> IBD Market Pulse (kostenpflichtig)
+          </a>
+          <a href="https://stockcharts.com/h-sc/ui?s=%24SPXA50R&p=D&yr=1&mn=0&dy=0&id=p50777416253" target="_blank" rel="noopener"
+             style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--green);text-decoration:none;padding:5px 10px;border-radius:6px;background:rgba(52,194,110,0.08);border:0.5px solid var(--green)">
+            <i class="ti ti-external-link"></i> StockCharts — Marktbreite (kostenlos)
+          </a>
+          <a href="https://finviz.com/map.ashx?t=sec" target="_blank" rel="noopener"
+             style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--green);text-decoration:none;padding:5px 10px;border-radius:6px;background:rgba(52,194,110,0.08);border:0.5px solid var(--green)">
+            <i class="ti ti-external-link"></i> Finviz Sektor-Heatmap (kostenlos)
+          </a>
+          <div style="font-size:11px;color:var(--text3);padding:4px 0">
+            <i class="ti ti-info-circle"></i> Faustregel: S&P über 50d MA = Uptrend · unter 50d MA = Under Pressure · unter 200d MA = Correction
+          </div>
+        </div>
       </div>
 
       <div class="sec">Score-Gewichtung (Gesamt 100 Punkte)</div>
