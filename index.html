@@ -1373,7 +1373,7 @@ function computeFromRaw(closes, volumes, timestamps){
   const sepa5 = ma150 > ma200 ? 1 : 0;       // SMA150 > SMA200
   const sepa6 = ma200Rising ? 1 : 0;         // SMA200 rising
   const sepa7 = dist52wHigh >= -25 ? 1 : 0;  // Within 25% of 52W high
-  const sepa8 = dist52wLow >= 25 ? 1 : 0;    // At least 25% above 52W low (corrected: price vs low52w)
+  const sepa8 = low52w>0 ? ((price-low52w)/low52w*100)>=25 ? 1 : 0 : 0;  // At least 25% above 52W low
   const sepa8b = low52w > 0 ? ((price - low52w) / low52w * 100) >= 25 ? 1 : 0 : 0;
   const sepaScore = sepa1+sepa2+sepa3+sepa4+sepa5+sepa6+sepa7+sepa8b;
 
