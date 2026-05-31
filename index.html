@@ -686,6 +686,54 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="backup-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
       </div>
 
+      <div class="sec">Score-Gewichtung (Gesamt 100 Punkte)</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.75rem">
+          Zeithorizont-Preset oder manuelle Anpassung. Summe muss 100 ergeben.
+        </div>
+        <div class="fg" style="margin-bottom:.75rem">
+          <label>Zeithorizont-Preset</label>
+          <select id="score-preset" onchange="applyScorePreset(this.value)" style="font-size:13px">
+            <option value="">— Manuell —</option>
+            <option value="daily">Daily (Intraday-Momentum)</option>
+            <option value="short">Kurzfristig 7-14 Tage</option>
+            <option value="mid">Mittelfristig 28-63 Tage</option>
+            <option value="long">Langfristig &lt;3 Monate</option>
+          </select>
+        </div>
+        <div class="grid-2" style="gap:.5rem;margin-bottom:.5rem">
+          <div class="fg">
+            <label>Tech MACD/OBV/MA (max 40)</label>
+            <input type="number" id="w-tech" min="0" max="40" value="30" oninput="updateScoreWeights()">
+          </div>
+          <div class="fg">
+            <label>SEPA Minervini (max 40)</label>
+            <input type="number" id="w-sepa" min="0" max="40" value="30" oninput="updateScoreWeights()">
+          </div>
+          <div class="fg">
+            <label>Buy-Point Nähe (max 20)</label>
+            <input type="number" id="w-bp" min="0" max="20" value="15" oninput="updateScoreWeights()">
+          </div>
+          <div class="fg">
+            <label>Trend Stickyness (max 20)</label>
+            <input type="number" id="w-sticky" min="0" max="20" value="15" oninput="updateScoreWeights()">
+          </div>
+          <div class="fg">
+            <label>Volumen (max 15)</label>
+            <input type="number" id="w-vol" min="0" max="15" value="10" oninput="updateScoreWeights()">
+          </div>
+          <div class="fg" style="display:flex;align-items:flex-end;padding-bottom:2px">
+            <div style="font-size:13px">
+              Summe: <strong id="w-sum" style="color:var(--green)">100</strong>/100
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveScoreWeights()" style="width:100%">
+          <i class="ti ti-check"></i> Gewichtung speichern
+        </button>
+        <div id="w-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)"></div>
+      </div>
+
       <div class="sec">PIN ändern</div>
       <div class="card">
         <div class="grid-2" style="margin-bottom:.65rem">
@@ -1010,6 +1058,7 @@ function changePin(){
 // ─── NAV ─────────────────────────────────────────────────────────────
 function showPanel(id){
   if(id==='admin'){
+    loadScoreWeights();
     const inp=document.getElementById('fh-key-input');
     if(inp&&getFinnhubKey()) inp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
     const tdInp=document.getElementById('td-key-input');
@@ -1443,23 +1492,14 @@ function processData(raw){
   const obvBull=raw.obv_slope_5d!=null?raw.obv_slope_5d>0:null;
   const bullCount=[above50,macdBull,obvBull].filter(function(v){return v===true;}).length;
 
-  // ─── Composite Score 0-100 ────────────────────────────────────────────────
-  // 1. Technical Signals (30 pts): MACD + OBV + MA
-  const techPts = Math.round((bullCount/3)*30);
-
-  // 2. SEPA Minervini (30 pts): 8 conditions
-  const sepaPts = Math.round(((raw.sepaScore||0)/8)*30);
-
-  // 3. Buy-Point Nähe (15 pts): 3 conditions
-  const bpPts = Math.round(((raw.buyPointScore||0)/3)*15);
-
-  // 4. Trend Stickyness (15 pts): 0-100% → 0-15 pts
-  const stkPts = Math.round(((raw.stickyness||50)/100)*15);
-
-  // 5. Volumen (10 pts): >150% Ø = 10, >100% = 6, >80% = 3, else 0
+  // ─── Composite Score 0-100 (dynamic weights) ─────────────────────────────
+  const _w = typeof getScoreWeights === 'function' ? getScoreWeights() : {tech:30,sepa:30,bp:15,sticky:15,vol:10};
+  const techPts  = Math.round((bullCount/3)*_w.tech);
+  const sepaPts  = Math.round(((raw.sepaScore||0)/8)*_w.sepa);
+  const bpPts    = Math.round(((raw.buyPointScore||0)/3)*_w.bp);
+  const stkPts   = Math.round(((raw.stickyness||50)/100)*_w.sticky);
   const vr = raw.volume_ratio||0;
-  const volPts = vr>=150?10:vr>=100?6:vr>=80?3:0;
-
+  const volPts   = Math.round((vr>=150?1:vr>=100?0.6:vr>=80?0.3:0)*_w.vol);
   const compositeScore = techPts + sepaPts + bpPts + stkPts + volPts;
   const scoreLabel = compositeScore>=80?'A+':compositeScore>=70?'A':compositeScore>=60?'B+':
                      compositeScore>=50?'B':compositeScore>=40?'C':compositeScore>=30?'D':'F';
@@ -3010,6 +3050,7 @@ function exportAllData(){
     journal: JSON.parse(localStorage.getItem('ko_journal')||'[]'),
     top50: JSON.parse(localStorage.getItem('ko_top50')||'[]'),
     watchlists: JSON.parse(localStorage.getItem('ko_watchlists')||'{}'),
+    scoreWeights: JSON.parse(localStorage.getItem('ko_score_weights')||'{}'),
     top50Date: localStorage.getItem('ko_top50_date')||'',
     makro: JSON.parse(localStorage.getItem('ko_makro')||'{}'),
     portfolio: JSON.parse(localStorage.getItem('ko_portfolio')||'{}'),
@@ -3555,6 +3596,83 @@ function deletePosition(idx){
   if(!confirm('Position löschen?')) return;
   journalData.splice(idx, 1);
   saveJournal();
+}
+
+
+// ─── SCORE WEIGHTS ────────────────────────────────────────────────────────────
+const WEIGHTS_KEY = 'ko_score_weights';
+const SCORE_PRESETS = {
+  daily:  {tech:40, sepa:15, bp:25, sticky:10, vol:10, label:'Daily'},
+  short:  {tech:35, sepa:20, bp:20, sticky:15, vol:10, label:'Kurzfristig 7-14d'},
+  mid:    {tech:25, sepa:30, bp:15, sticky:20, vol:10, label:'Mittelfristig 28-63d'},
+  long:   {tech:20, sepa:35, bp:10, sticky:20, vol:15, label:'Langfristig <3M'},
+};
+const DEFAULT_WEIGHTS = {tech:30, sepa:30, bp:15, sticky:15, vol:10};
+
+function getScoreWeights(){
+  try { 
+    const w = JSON.parse(localStorage.getItem(WEIGHTS_KEY)||'{}');
+    return Object.keys(w).length ? w : DEFAULT_WEIGHTS;
+  } catch(e){ return DEFAULT_WEIGHTS; }
+}
+
+function applyScorePreset(preset){
+  if(!preset) return;
+  const p = SCORE_PRESETS[preset];
+  if(!p) return;
+  document.getElementById('w-tech').value = p.tech;
+  document.getElementById('w-sepa').value = p.sepa;
+  document.getElementById('w-bp').value = p.bp;
+  document.getElementById('w-sticky').value = p.sticky;
+  document.getElementById('w-vol').value = p.vol;
+  updateScoreWeights();
+}
+
+function updateScoreWeights(){
+  const t=parseInt(document.getElementById('w-tech')?.value)||0;
+  const s=parseInt(document.getElementById('w-sepa')?.value)||0;
+  const b=parseInt(document.getElementById('w-bp')?.value)||0;
+  const st=parseInt(document.getElementById('w-sticky')?.value)||0;
+  const v=parseInt(document.getElementById('w-vol')?.value)||0;
+  const sum=t+s+b+st+v;
+  const sumEl=document.getElementById('w-sum');
+  if(sumEl){
+    sumEl.textContent=sum;
+    sumEl.style.color=sum===100?'var(--green)':sum>100?'var(--red)':'var(--amber)';
+  }
+}
+
+function saveScoreWeights(){
+  const t=parseInt(document.getElementById('w-tech')?.value)||0;
+  const s=parseInt(document.getElementById('w-sepa')?.value)||0;
+  const b=parseInt(document.getElementById('w-bp')?.value)||0;
+  const st=parseInt(document.getElementById('w-sticky')?.value)||0;
+  const v=parseInt(document.getElementById('w-vol')?.value)||0;
+  const sum=t+s+b+st+v;
+  if(sum!==100){ alert('Summe muss 100 ergeben (aktuell: '+sum+')'); return; }
+  const weights={tech:t,sepa:s,bp:b,sticky:st,vol:v};
+  localStorage.setItem(WEIGHTS_KEY,JSON.stringify(weights));
+  const msg=document.getElementById('w-msg');
+  if(msg){msg.style.display='block';msg.textContent='✓ Gewichtung gespeichert — nächster Scan verwendet neue Gewichte';setTimeout(function(){msg.style.display='none';},4000);}
+}
+
+function loadScoreWeights(){
+  const w=getScoreWeights();
+  if(document.getElementById('w-tech')) document.getElementById('w-tech').value=w.tech||30;
+  if(document.getElementById('w-sepa')) document.getElementById('w-sepa').value=w.sepa||30;
+  if(document.getElementById('w-bp'))   document.getElementById('w-bp').value=w.bp||15;
+  if(document.getElementById('w-sticky')) document.getElementById('w-sticky').value=w.sticky||15;
+  if(document.getElementById('w-vol'))  document.getElementById('w-vol').value=w.vol||10;
+  updateScoreWeights();
+  // Show active preset label if matches
+  const preset=document.getElementById('score-preset');
+  if(preset){
+    const match=Object.keys(SCORE_PRESETS).find(function(k){
+      const p=SCORE_PRESETS[k];
+      return p.tech===w.tech&&p.sepa===w.sepa&&p.bp===w.bp&&p.sticky===w.sticky&&p.vol===w.vol;
+    });
+    preset.value=match||'';
+  }
 }
 
 </script>
