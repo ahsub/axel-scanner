@@ -1074,18 +1074,30 @@ function setMarket(mkt){
     if(usBtn){ usBtn.style.background='var(--accent)'; usBtn.style.color='#fff'; }
     if(deBtn){ deBtn.style.background='var(--bg3)'; deBtn.style.color='var(--text2)'; }
     if(preset){
+      const wls=getWatchlists();
+      const wlOpts=Object.keys(wls).map(function(n){
+        return '<option value="wl:'+n+'">⭐ '+n+' ('+wls[n].split(',').filter(Boolean).length+')</option>';
+      }).join('');
       preset.innerHTML=
         '<option value="default">50 US-Aktien (alle scannen)</option>'+
         '<option value="top50-us">Top-50 Liste (IBD Momentum)</option>'+
-        '<option value="custom">Eigene Ticker</option>';
+        '<option value="custom">Eigene Ticker</option>'+
+        (wlOpts?'<optgroup label="── Meine Watchlisten ──" id="watchlist-options">'+wlOpts+'</optgroup>':
+          '<optgroup label="── Meine Watchlisten ──" id="watchlist-options"></optgroup>');
     }
   } else {
     if(deBtn){ deBtn.style.background='var(--accent)'; deBtn.style.color='#fff'; }
     if(usBtn){ usBtn.style.background='var(--bg3)'; usBtn.style.color='var(--text2)'; }
     if(preset){
+      const wls2=getWatchlists();
+      const wlOpts2=Object.keys(wls2).map(function(n){
+        return '<option value="wl:'+n+'">⭐ '+n+' ('+wls2[n].split(',').filter(Boolean).length+')</option>';
+      }).join('');
       preset.innerHTML=
         '<option value="default-de">50 DE-Aktien (alle scannen)</option>'+
-        '<option value="custom">Eigene Ticker</option>';
+        '<option value="custom">Eigene Ticker</option>'+
+        (wlOpts2?'<optgroup label="── Meine Watchlisten ──" id="watchlist-options">'+wlOpts2+'</optgroup>':
+          '<optgroup label="── Meine Watchlisten ──" id="watchlist-options"></optgroup>');
     }
   }
   document.getElementById('scan-container').innerHTML='';
@@ -3229,16 +3241,22 @@ function saveWatchlist(){
 }
 
 function updateWatchlistDropdown(){
-  const optgroup = document.getElementById('watchlist-options');
-  if(!optgroup) return;
   const wls = getWatchlists();
-  optgroup.innerHTML = '';
-  Object.keys(wls).forEach(function(name){
-    const opt = document.createElement('option');
-    opt.value = 'wl:'+name;
-    opt.textContent = '⭐ '+name;
-    optgroup.appendChild(opt);
-  });
+  const names = Object.keys(wls);
+  
+  // Update optgroup in preset dropdown
+  const optgroup = document.getElementById('watchlist-options');
+  if(optgroup){
+    optgroup.innerHTML = '';
+    names.forEach(function(name){
+      const opt = document.createElement('option');
+      opt.value = 'wl:'+name;
+      opt.textContent = '⭐ '+name+' ('+((wls[name]||'').split(',').filter(Boolean).length)+')';
+      optgroup.appendChild(opt);
+    });
+    // Show/hide optgroup label
+    optgroup.label = names.length ? '── Meine Watchlisten ──' : '';
+  }
 }
 
 function deleteWatchlist(name){
@@ -3250,15 +3268,22 @@ function deleteWatchlist(name){
 
 function onPresetChange(){
   const val = document.getElementById('ticker-preset').value;
-  if(val.startsWith('wl:')){
+  if(val && val.startsWith('wl:')){
     const name = val.substring(3);
     const wls = getWatchlists();
     if(wls[name]){
+      // Show custom wrap with watchlist tickers
       document.getElementById('custom-wrap').style.display='block';
       document.getElementById('custom-input').value = wls[name];
+      // Update label to show it's a watchlist
+      const label = document.querySelector('#custom-wrap div');
+      if(label) label.textContent = '⭐ Watchlist: "'+name+'" — '+wls[name].split(',').filter(Boolean).length+' Titel';
     }
   } else {
     toggleCustom();
+    // Reset label
+    const label = document.querySelector('#custom-wrap div');
+    if(label) label.textContent = 'Komma-getrennte Ticker';
   }
 }
 
