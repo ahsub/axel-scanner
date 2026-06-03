@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260604-1100">
+<meta name="app-version" content="20260604-1200">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0a">
@@ -647,7 +647,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           IBD-Liste von einem geteilten Gist-Link laden. URL einmalig speichern — danach reicht ein Klick.
         </div>
         <div style="display:flex;gap:6px;margin-bottom:.65rem">
-          <input type="text" id="ibd-gist-url" placeholder="https://gist.githubusercontent.com/..." style="flex:1;font-size:12px;font-family:var(--mono)">
+          <input type="text" id="ibd-gist-url" placeholder="https://gist.githubusercontent.com/..." value="https://gist.githubusercontent.com/ahsub/bbbfed945e4d8292fbb300cf4012cfa5/raw/4dc45670fb3e50dd1df3fc832413047961d78558/ibd50.json" style="flex:1;font-size:12px;font-family:var(--mono)">
           <button class="btn btn-sm" onclick="saveGistUrl()" style="font-size:11px;white-space:nowrap"><i class="ti ti-device-floppy"></i> Speichern</button>
         </div>
         <button class="btn btn-primary" onclick="loadIBDFromGist()" style="width:100%;font-size:13px">
@@ -5225,9 +5225,14 @@ async function loadIBDFromGist(){
 
 // Load saved gist URL into input field on admin tab open
 function loadGistUrlField(){
-  var saved = localStorage.getItem('ko_ibd_gist_url');
+  var DEFAULT_GIST = 'https://gist.githubusercontent.com/ahsub/bbbfed945e4d8292fbb300cf4012cfa5/raw/4dc45670fb3e50dd1df3fc832413047961d78558/ibd50.json';
+  var saved = localStorage.getItem('ko_ibd_gist_url') || DEFAULT_GIST;
   var el = document.getElementById('ibd-gist-url');
-  if(el && saved) el.value = saved;
+  if(el) el.value = saved;
+  // Auto-save default if nothing saved yet
+  if(!localStorage.getItem('ko_ibd_gist_url')){
+    localStorage.setItem('ko_ibd_gist_url', DEFAULT_GIST);
+  }
 }
 </script>
 
