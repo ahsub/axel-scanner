@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260604-1200">
+<meta name="app-version" content="20260604-1400">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0a">
@@ -432,8 +432,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <tbody id="ibd-body"></tbody>
         </table>
       </div>
-      <div style="margin-top:.75rem;font-size:11px;color:var(--text3)">
-        <i class="ti ti-info-circle"></i> Wöchentlich via Admin aktualisieren · Stand: <span id="ibd-date">—</span>
+      <div style="margin-top:.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <div style="font-size:11px;color:var(--text3)">
+          <i class="ti ti-info-circle"></i> Wöchentlich via Admin aktualisieren · Stand: <span id="ibd-date">—</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="scanFilteredIBD()" style="font-size:11px;padding:3px 9px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">
+            <i class="ti ti-radar"></i> Gefilterte Liste scannen
+          </button>
+          <button class="btn btn-sm" onclick="scanFilteredIBD(true)" style="font-size:11px;padding:3px 9px">
+            <i class="ti ti-radar"></i> Alle 50 scannen
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1365,7 +1375,7 @@ function setMarket(mkt){
   }
   document.getElementById('scan-container').innerHTML='';
   const hint = document.getElementById('scanner-market-hint');
-  if(hint) hint.innerHTML='<i class="ti ti-info-circle"></i> '+(mkt==='us'?'🔔 US-Markt · 50 Titel':'🇩🇪 DE-Markt · 50 Titel')+' · Kaufsignal = alle 3 bullisch · Sortierung nach Scan';
+  if(hint) hint.innerHTML='<i class="ti ti-info-circle"></i> '+(mkt==='us'?'🔔 US-Markt · 50 Titel':'🇩🇪 DE-Markt · 50 Titel · <button onclick="openDEListSelector()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;text-decoration:underline;padding:0">DAX/MDAX/TecDAX auswählen</button>')+' · Kaufsignal = alle 3 bullisch';
 }
 
 async function runScan(){
@@ -2712,10 +2722,11 @@ async function refreshLivePrices(){
   // 3. Rohstoffe via Yahoo Finance Futures
   try {
     const commMap = [
-      {sym:'GC=F',  el:'m-gold',   chgEl:'m-gold-chg',   label:'Gold'},
-      {sym:'SI=F',  el:'m-silver', chgEl:'m-silver-chg', label:'Silber'},
-      {sym:'HG=F',  el:'m-copper', chgEl:'m-copper-chg', label:'Kupfer'},
-      {sym:'CL=F',  el:'m-oil2',   chgEl:'m-oil2-chg',   label:'Öl WTI'},
+      {sym:'GC=F',  el:'m-gold',    chgEl:'m-gold-chg',    label:'Gold'},
+      {sym:'SI=F',  el:'m-silver',  chgEl:'m-silver-chg',  label:'Silber'},
+      {sym:'HG=F',  el:'m-copper',  chgEl:'m-copper-chg',  label:'Kupfer'},
+      {sym:'CL=F',  el:'m-oil2',    chgEl:'m-oil2-chg',    label:'Öl WTI'},
+      {sym:'LIT',   el:'m-lithium', chgEl:'m-lithium-chg', label:'Lithium ETF'},
     ];
     const commResults = await Promise.all(commMap.map(function(c){
       const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(c.sym)+'?interval=1d&range=5d';
@@ -3035,6 +3046,8 @@ async function autoMakro(){
 
     localStorage.setItem('ko_makro', JSON.stringify(newMakro));
     renderMakro(newMakro);
+    // Restore live DOM values after renderMakro reset
+    try { await refreshLivePrices(); } catch(e2) {}
 
     if(status){
       status.style.color='var(--green)';
@@ -4665,7 +4678,7 @@ function renderMoverModalCards(items, isDE){
 }
 
 function mmUpdateCount(){
-  var cbs=document.querySelectorAll('.mm-cb');
+  var container2=document.getElementById('mover-modal-cards'); var cbs=(container2?container2.querySelectorAll('.mm-cb'):document.querySelectorAll('.mm-cb'));
   var checked=Array.from(cbs).filter(function(c){return c.checked;});
   var countEl=document.getElementById('mm-select-count');
   if(countEl) countEl.textContent=checked.length+' ausgewählt';
@@ -4680,12 +4693,12 @@ function mmUpdateCount(){
 }
 
 function mmToggleAll(checked){
-  document.querySelectorAll('.mm-cb').forEach(function(cb){ cb.checked=checked; });
+  var cont=document.getElementById('mover-modal-cards'); (cont?cont.querySelectorAll('.mm-cb'):document.querySelectorAll('.mm-cb')).forEach(function(cb){ cb.checked=checked; });
   mmUpdateCount();
 }
 
 function mmSaveWatchlist(){
-  var cbs=document.querySelectorAll('.mm-cb:checked');
+  var container=document.getElementById('mover-modal-cards'); var cbs=(container?container.querySelectorAll('.mm-cb:checked'):document.querySelectorAll('.mm-cb:checked'));
   var tickers=Array.from(cbs).map(function(c){return c.dataset.sym;}).filter(Boolean);
   if(!tickers.length){ alert('Bitte mindestens einen Ticker auswählen.'); return; }
   var nameEl=document.getElementById('mm-wl-name');
@@ -4703,7 +4716,7 @@ function mmSaveWatchlist(){
 }
 
 function mmScanSelected(){
-  var cbs=document.querySelectorAll('.mm-cb:checked');
+  var container=document.getElementById('mover-modal-cards'); var cbs=(container?container.querySelectorAll('.mm-cb:checked'):document.querySelectorAll('.mm-cb:checked'));
   var tickers=Array.from(cbs).map(function(c){return c.dataset.sym;}).filter(Boolean);
   if(!tickers.length){ alert('Bitte mindestens einen Ticker auswählen.'); return; }
   closeMoverModal();
@@ -5234,6 +5247,105 @@ function loadGistUrlField(){
     localStorage.setItem('ko_ibd_gist_url', DEFAULT_GIST);
   }
 }
+
+// ─── IBD FILTERED SCAN ────────────────────────────────────────────────────────
+function scanFilteredIBD(scanAll){
+  var q = (document.getElementById('ibd-search')?.value||'').toLowerCase();
+  var fc = document.getElementById('ibd-comp')?.value;
+  var data = scanAll ? ibdData : ibdData.filter(function(r){
+    if(q && !r.name.toLowerCase().includes(q) && !(r.ticker||'').toLowerCase().includes(q)) return false;
+    if(fc && (!r.comp || r.comp < parseInt(fc))) return false;
+    return true;
+  });
+  if(!data.length){ alert('Keine Titel in der aktuellen Filteransicht.'); return; }
+  var tickers = data.filter(function(r){return r.ticker;}).map(function(r){return r.ticker;});
+  if(!tickers.length){ alert('Keine Ticker in der Liste.'); return; }
+  document.getElementById('ticker-preset').value = 'custom';
+  document.getElementById('custom-wrap').style.display = 'block';
+  document.getElementById('custom-input').value = tickers.join(', ');
+  showPanel('scanner');
+  setTimeout(function(){ runScan(); }, 150);
+}
+
+// ─── DE-50 ERWEITERTE LISTEN (DAX + MDAX + TecDAX) ───────────────────────────
+var DE_LIST_GROUPS = {
+  'DAX 40': [
+    {sym:'SAP',name:'SAP SE'},{sym:'SIE',name:'Siemens AG'},{sym:'ALV',name:'Allianz SE'},
+    {sym:'MBG',name:'Mercedes-Benz'},{sym:'BMW',name:'BMW AG'},{sym:'BAS',name:'BASF SE'},
+    {sym:'DTE',name:'Deutsche Telekom'},{sym:'MRK',name:'Merck KGaA'},{sym:'BAYN',name:'Bayer AG'},
+    {sym:'ADS',name:'Adidas AG'},{sym:'DBK',name:'Deutsche Bank'},{sym:'MUV2',name:'Munich Re'},
+    {sym:'HEN3',name:'Henkel AG'},{sym:'EOAN',name:'E.ON SE'},{sym:'LIN',name:'Linde plc'},
+    {sym:'VOW3',name:'Volkswagen AG'},{sym:'IFX',name:'Infineon Tech.'},{sym:'DHL',name:'DHL Group'},
+    {sym:'RHM',name:'Rheinmetall AG'},{sym:'MTX',name:'MTU Aero Engines'},
+    {sym:'SHL',name:'Siemens Healthineers'},{sym:'ENR',name:'Siemens Energy'},
+    {sym:'HNR1',name:'Hannover Rück'},{sym:'VNA',name:'Vonovia SE'},
+    {sym:'SY1',name:'Symrise AG'},{sym:'BEI',name:'Beiersdorf AG'},
+    {sym:'FRE',name:'Fresenius SE'},{sym:'SRT',name:'Sartorius AG'},
+    {sym:'HFG',name:'HelloFresh SE'},{sym:'ZAL',name:'Zalando SE'},
+    {sym:'CON',name:'Continental AG'},{sym:'DHER',name:'Delivery Hero'},
+    {sym:'QIA',name:'Qiagen NV'},{sym:'DTG',name:'Daimler Truck'},
+    {sym:'P911',name:'Porsche AG'},{sym:'PAH3',name:'Porsche Automobil'},
+    {sym:'1COV',name:'Covestro AG'},{sym:'DB1',name:'Deutsche Börse'},
+    {sym:'CBK',name:'Commerzbank'},{sym:'PUM',name:'Puma SE'},
+  ],
+  'MDAX Top 20': [
+    {sym:'HAG',name:'Hensoldt AG'},{sym:'AIXA',name:'Aixtron SE'},
+    {sym:'NDA',name:'Nemetschek SE'},{sym:'NDX1',name:'Nordex SE'},
+    {sym:'LEG',name:'LEG Immobilien'},{sym:'TAG',name:'TAG Immobilien'},
+    {sym:'EVT',name:'Evotec SE'},{sym:'FNTN',name:'freenet AG'},
+    {sym:'GXI',name:'Gerresheimer AG'},{sym:'KGX',name:'Kion Group AG'},
+    {sym:'TLX',name:'Talanx AG'},{sym:'BOSS',name:'Hugo Boss AG'},
+    {sym:'DEQ',name:'Deutsche EuroShop'},{sym:'UTDI',name:'United Internet'},
+    {sym:'GBF',name:'Bilfinger SE'},{sym:'PSM',name:'ProSiebenSat.1'},
+    {sym:'WAF',name:'Siltronic AG'},{sym:'MDG1',name:'Medigene AG'},
+    {sym:'SDAX',name:'SDAX ETF'},{sym:'COP',name:'Covestro AG'},
+  ],
+  'TecDAX Top 20': [
+    {sym:'SAP',name:'SAP SE'},{sym:'IFX',name:'Infineon Tech.'},
+    {sym:'SHL',name:'Siemens Healthineers'},{sym:'SRT',name:'Sartorius AG'},
+    {sym:'AIXA',name:'Aixtron SE'},{sym:'NDA',name:'Nemetschek SE'},
+    {sym:'QIA',name:'Qiagen NV'},{sym:'EVT',name:'Evotec SE'},
+    {sym:'WAF',name:'Siltronic AG'},{sym:'HAG',name:'Hensoldt AG'},
+    {sym:'NDX1',name:'Nordex SE'},{sym:'SMHN',name:'Ströer SE'},
+    {sym:'UTDI',name:'United Internet'},{sym:'FNTN',name:'freenet AG'},
+    {sym:'CAN',name:'CAN'},{sym:'SFQ',name:'SAF-Holland SE'},
+    {sym:'TLX',name:'Talanx AG'},{sym:'MOR',name:'MorphoSys AG'},
+    {sym:'DMP',name:'Dermapharm AG'},{sym:'MDNT',name:'Medios AG'},
+  ],
+};
+
+function openDEListSelector(){
+  var modal = document.getElementById('de-list-modal');
+  if(modal){ modal.style.display='block'; document.body.style.overflow='hidden'; }
+}
+function closeDEListSelector(){
+  var modal = document.getElementById('de-list-modal');
+  if(modal){ modal.style.display='none'; document.body.style.overflow=''; }
+}
+function selectDEGroup(groupName){
+  var tickers = DE_LIST_GROUPS[groupName];
+  if(!tickers) return;
+  // Merge into DE scan
+  setMarket('de');
+  document.getElementById('ticker-preset').value = 'custom';
+  document.getElementById('custom-wrap').style.display = 'block';
+  document.getElementById('custom-input').value = tickers.map(function(t){return t.sym;}).join(', ');
+  closeDEListSelector();
+  showPanel('scanner');
+  setTimeout(function(){ runScan(); }, 150);
+}
+function addDEGroupToWatchlist(groupName){
+  var tickers = DE_LIST_GROUPS[groupName];
+  if(!tickers) return;
+  var wls = getWatchlists();
+  var today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  var name = groupName + ' ' + today;
+  wls[name] = tickers.map(function(t){return t.sym;}).join(', ');
+  localStorage.setItem('ko_watchlists', JSON.stringify(wls));
+  updateWatchlistDropdown();
+  closeDEListSelector();
+  alert('✓ "' + name + '" als Watchlist gespeichert (' + tickers.length + ' Titel)');
+}
 </script>
 
 <!-- LIST EDITOR MODAL -->
@@ -5291,6 +5403,53 @@ function loadGistUrlField(){
     <!-- Footer hint -->
     <div style="padding:8px 12px;font-size:11px;color:var(--text3)">
       <i class="ti ti-info-circle"></i> Änderungen erst nach "Speichern" aktiv · TradingView Import: Watchlist → Import → Datei wählen
+    </div>
+  </div>
+</div>
+
+<!-- DE LIST SELECTOR MODAL -->
+<div id="de-list-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99995;background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closeDEListSelector()">
+  <div style="background:var(--bg2);border-radius:16px;border:0.5px solid var(--border2);padding:1.25rem;width:min(92vw,440px);max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div style="font-size:15px;font-weight:600">🇩🇪 DE-Index Auswahl</div>
+      <button onclick="closeDEListSelector()" style="background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:1rem">Index auswählen zum direkten Scan oder als Watchlist speichern.</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="card" style="margin-bottom:0;padding:.75rem 1rem">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">📊 DAX 40</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Alle 40 DAX-Unternehmen</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-primary" onclick="selectDEGroup('DAX 40')" style="font-size:11px;flex:1"><i class="ti ti-radar"></i> Scannen</button>
+          <button class="btn btn-sm" onclick="addDEGroupToWatchlist('DAX 40')" style="font-size:11px"><i class="ti ti-star"></i> Watchlist</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:0;padding:.75rem 1rem">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">📈 MDAX Top 20</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px">20 umsatzstärkste MDAX-Titel</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-primary" onclick="selectDEGroup('MDAX Top 20')" style="font-size:11px;flex:1"><i class="ti ti-radar"></i> Scannen</button>
+          <button class="btn btn-sm" onclick="addDEGroupToWatchlist('MDAX Top 20')" style="font-size:11px"><i class="ti ti-star"></i> Watchlist</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:0;padding:.75rem 1rem">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">💻 TecDAX Top 20</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px">20 führende TecDAX-Technologiewerte</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-primary" onclick="selectDEGroup('TecDAX Top 20')" style="font-size:11px;flex:1"><i class="ti ti-radar"></i> Scannen</button>
+          <button class="btn btn-sm" onclick="addDEGroupToWatchlist('TecDAX Top 20')" style="font-size:11px"><i class="ti ti-star"></i> Watchlist</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:0;padding:.75rem 1rem">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">🇩🇪 DE-50 Standard</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Bestehende 50 DE-Aktien Liste</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-primary" onclick="setMarket('de');closeDEListSelector();setTimeout(runScan,150)" style="font-size:11px;flex:1"><i class="ti ti-radar"></i> Scannen</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:.75rem;font-size:11px;color:var(--text3)">
+      <i class="ti ti-info-circle"></i> Listen können im Admin-Tab → Listen-Editor bearbeitet werden
     </div>
   </div>
 </div>
