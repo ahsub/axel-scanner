@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260603-1200">
+<meta name="app-version" content="20260604-1100">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0a">
@@ -497,6 +497,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="world-index-result" style="font-size:13px;font-weight:600;font-family:var(--mono);min-width:80px;text-align:right">—</div>
         <div id="world-index-chg" style="font-size:11px;min-width:55px;text-align:right">—</div>
         <button id="world-index-tv-btn" style="display:none;padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border:0.5px solid rgba(26,188,156,0.4);color:#1abc9c;border-radius:6px;cursor:pointer" title="TradingView Chart"><i class="ti ti-chart-candle"></i></button>
+        <a id="world-index-info-btn" href="#" target="_blank" rel="noopener" style="display:none;padding:3px 8px;font-size:11px;background:var(--blue-bg);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;text-decoration:none;align-items:center;gap:4px" title="Index-Zusammensetzung (Börsenwebsite)"><i class="ti ti-external-link"></i> Komponenten</a>
         <button id="world-index-mover-btn" onclick="loadIndexMovers()" style="display:none;padding:3px 8px;font-size:11px;background:var(--blue-bg);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer" title="Top Mover für diesen Index"><i class="ti ti-flame"></i> Mover</button>
       </div>
       <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px;margin-top:.25rem">
@@ -610,7 +611,80 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <!-- ADMIN PANEL -->
     <div id="panel-admin" class="panel">
       <div class="admin-warn">
-        <i class="ti ti-lock"></i> Admin-Bereich — nur für Datenaktualisierung
+        <i class="ti ti-lock"></i> Admin-Bereich — Konfiguration &amp; Datenverwaltung
+      </div>
+
+      <!-- ═══ LISTEN-EDITOR ═══════════════════════════════════════════════ -->
+      <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
+        <span><i class="ti ti-table"></i> Listen-Editor</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="openListEditor('us50')" style="font-size:11px;padding:3px 9px">🇺🇸 US-50</button>
+          <button class="btn btn-sm" onclick="openListEditor('de50')" style="font-size:11px;padding:3px 9px">🇩🇪 DE-50</button>
+          <button class="btn btn-sm" onclick="openListEditor('ibd')" style="font-size:11px;padding:3px 9px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">📊 IBD</button>
+          <button class="btn btn-sm" onclick="openListEditor('watchlist')" style="font-size:11px;padding:3px 9px">⭐ Watchlisten</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
+          Ticker-Listen anzeigen, bearbeiten, importieren und als CSV oder TradingView-Format exportieren.
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="openListEditor('us50')" style="font-size:12px"><i class="ti ti-pencil"></i> Liste bearbeiten</button>
+          <button class="btn btn-sm" onclick="exportListCSV()" style="font-size:12px"><i class="ti ti-download"></i> CSV Export</button>
+          <button class="btn btn-sm" onclick="exportListTV()" style="font-size:12px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c"><i class="ti ti-brand-tradingview"></i> TradingView Export</button>
+          <button class="btn btn-sm" onclick="document.getElementById('list-import-file').click()" style="font-size:12px"><i class="ti ti-upload"></i> CSV Import</button>
+          <input type="file" id="list-import-file" accept=".csv,.txt" style="display:none" onchange="importListCSV(this)">
+        </div>
+        <div id="list-editor-status" style="display:none;margin-top:.5rem;font-size:12px"></div>
+      </div>
+
+      <!-- IBD GIST UPDATE -->
+      <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
+        <span><i class="ti ti-cloud-download"></i> IBD Update-Hub</span>
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem">
+          IBD-Liste von einem geteilten Gist-Link laden. URL einmalig speichern — danach reicht ein Klick.
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:.65rem">
+          <input type="text" id="ibd-gist-url" placeholder="https://gist.githubusercontent.com/..." style="flex:1;font-size:12px;font-family:var(--mono)">
+          <button class="btn btn-sm" onclick="saveGistUrl()" style="font-size:11px;white-space:nowrap"><i class="ti ti-device-floppy"></i> Speichern</button>
+        </div>
+        <button class="btn btn-primary" onclick="loadIBDFromGist()" style="width:100%;font-size:13px">
+          <i class="ti ti-cloud-download"></i> IBD-Liste jetzt laden
+        </button>
+        <div id="gist-load-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
+      </div>
+
+      <!-- IBD WÖCHENTLICHES UPDATE -->
+      <div class="sec"><i class="ti ti-refresh"></i> IBD Wöchentliches Update</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem">
+          Neu hinzugekommene oder geänderte IBD-Titel eintragen. Bestehende Scores werden überschrieben.
+        </div>
+        <div class="grid-2" style="margin-bottom:.5rem">
+          <div class="field" style="margin-bottom:0"><label>Ticker</label><input type="text" id="ibd-up-ticker" placeholder="NVDA" oninput="this.value=this.value.toUpperCase()"></div>
+          <div class="field" style="margin-bottom:0"><label>Name</label><input type="text" id="ibd-up-name" placeholder="NVIDIA Corp"></div>
+          <div class="field" style="margin-bottom:0"><label>Comp Score</label><input type="number" id="ibd-up-comp" placeholder="99" min="1" max="99"></div>
+          <div class="field" style="margin-bottom:0"><label>EPS Rating</label><input type="number" id="ibd-up-eps" placeholder="97" min="1" max="99"></div>
+          <div class="field" style="margin-bottom:0"><label>RS Rating</label><input type="number" id="ibd-up-rs" placeholder="95" min="1" max="99"></div>
+          <div class="field" style="margin-bottom:0"><label>Sektor</label>
+            <select id="ibd-up-sector">
+              <option value="tech">Tech</option>
+              <option value="health">Health/Biotech</option>
+              <option value="energy">Energy</option>
+              <option value="finance">Finance</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0"><label>LQ Earnings %</label><input type="number" id="ibd-up-lasteps" placeholder="82"></div>
+          <div class="field" style="margin-bottom:0"><label>Sales %</label><input type="number" id="ibd-up-sales" placeholder="45"></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-primary" onclick="ibdUpdateAdd()" style="flex:1;font-size:12px"><i class="ti ti-plus"></i> Hinzufügen / Aktualisieren</button>
+          <button class="btn" onclick="ibdUpdateRemove()" style="font-size:12px;color:var(--red);border-color:var(--red)"><i class="ti ti-trash"></i> Entfernen</button>
+        </div>
+        <div id="ibd-update-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
       </div>
 
       <div class="sec">Top-50 Daten aktualisieren</div>
@@ -1163,6 +1237,7 @@ function unlockApp(){
   try{ startLiveRefresh(); }catch(e){ console.warn('startLiveRefresh:',e); }
   try{ loadPortfolioSettings(); }catch(e){ console.warn('loadPortfolioSettings:',e); }
   try{ updateWatchlistDropdown(); }catch(e){ console.warn('updateWatchlistDropdown:',e); }
+  try{ loadCustomLists(); }catch(e){ console.warn('loadCustomLists:',e); }
 }
 function saveTwelveKey(){
   const k=document.getElementById('td-key-input').value.trim();
@@ -1964,32 +2039,7 @@ function loadIBD(){
 }
 
 function getDefaultIBD(){
-  return [
-    {rank:1,name:'Micron Tech',ticker:'MU',comp:99,eps:82,rs:99,annEps:605,lastEps:682,nextEps:916,sales:196,roe:17,margin:25,sector:'tech'},
-    {rank:2,name:'Rocket Lab',ticker:'RKLB',comp:87,eps:48,rs:98,annEps:null,lastEps:null,nextEps:null,sales:63,roe:null,margin:null,sector:'tech'},
-    {rank:3,name:'SiTime',ticker:'SITS',comp:98,eps:99,rs:98,annEps:145,lastEps:454,nextEps:317,sales:88,roe:null,margin:null,sector:'tech'},
-    {rank:4,name:'Hut 8',ticker:'HUT',comp:96,eps:67,rs:99,annEps:null,lastEps:null,nextEps:null,sales:226,roe:null,margin:null,sector:'tech'},
-    {rank:5,name:'Astera Labs',ticker:'ALAB',comp:99,eps:71,rs:96,annEps:61,lastEps:85,nextEps:57,sales:93,roe:19,margin:25,sector:'tech'},
-    {rank:6,name:'Comfort Systems',ticker:'FIX',comp:97,eps:99,rs:95,annEps:45,lastEps:121,nextEps:56,sales:56,roe:49,margin:14,sector:'other'},
-    {rank:7,name:'Argan',ticker:'AGX',comp:97,eps:97,rs:97,annEps:47,lastEps:56,nextEps:68,sales:13,roe:34,margin:16,sector:'other'},
-    {rank:8,name:'Liquidia',ticker:'LQDA',comp:96,eps:69,rs:97,annEps:null,lastEps:216,nextEps:null,sales:999,roe:null,margin:null,sector:'health'},
-    {rank:9,name:'Vertiv',ticker:'VRT',comp:99,eps:99,rs:95,annEps:53,lastEps:83,nextEps:49,sales:30,roe:42,margin:17,sector:'tech'},
-    {rank:10,name:'Credo Tech',ticker:'CRDO',comp:99,eps:84,rs:95,annEps:645,lastEps:328,nextEps:363,sales:201,roe:9,margin:12,sector:'tech'},
-    {rank:11,name:'Advanced Micro Dvcs',ticker:'AMD',comp:99,eps:95,rs:98,annEps:78,lastEps:43,nextEps:233,sales:38,roe:7,margin:11,sector:'tech'},
-    {rank:12,name:'Travere Therapeutics',ticker:'TVTX',comp:73,eps:35,rs:94,annEps:null,lastEps:null,nextEps:null,sales:68,roe:null,margin:null,sector:'health'},
-    {rank:13,name:'Axsome Therapeutics',ticker:'AXSM',comp:78,eps:37,rs:93,annEps:null,lastEps:null,nextEps:null,sales:56,roe:null,margin:null,sector:'health'},
-    {rank:14,name:'Solaris Energy Infra',ticker:'SEI',comp:95,eps:71,rs:95,annEps:115,lastEps:114,nextEps:23,sales:55,roe:6,margin:11,sector:'energy'},
-    {rank:15,name:'Bloom Energy',ticker:'BE',comp:95,eps:65,rs:99,annEps:181,lastEps:999,nextEps:290,sales:130,roe:null,margin:null,sector:'energy'},
-    {rank:16,name:'Vita Coco',ticker:'COCO',comp:99,eps:97,rs:95,annEps:45,lastEps:61,nextEps:45,sales:37,roe:24,margin:15,sector:'other'},
-    {rank:17,name:'Innodata',ticker:'INOD',comp:81,eps:36,rs:96,annEps:17,lastEps:91,nextEps:5,sales:54,roe:38,margin:16,sector:'tech'},
-    {rank:18,name:'Marvell Technology',ticker:'MRVL',comp:99,eps:93,rs:98,annEps:93,lastEps:33,nextEps:89,sales:22,roe:19,margin:37,sector:'tech'},
-    {rank:19,name:'Lumentum',ticker:'LITE',comp:95,eps:91,rs:98,annEps:299,lastEps:316,nextEps:235,sales:90,roe:2,margin:null,sector:'tech'},
-    {rank:20,name:'Alphabet',ticker:'GOOGL',comp:99,eps:99,rs:91,annEps:31,lastEps:82,nextEps:25,sales:22,roe:36,margin:39,sector:'tech'},
-    {rank:24,name:'LAM Research',ticker:'LRCX',comp:99,eps:94,rs:95,annEps:37,lastEps:41,nextEps:25,sales:24,roe:58,margin:32,sector:'tech'},
-    {rank:36,name:'Arm Holdings',ticker:'ARM',comp:99,eps:88,rs:97,annEps:259,lastEps:9,nextEps:63,sales:20,roe:12,margin:23,sector:'tech'},
-    {rank:41,name:'Taiwan Semiconductor',ticker:'TSM',comp:99,eps:97,rs:86,annEps:49,lastEps:63,nextEps:45,sales:39,roe:36,margin:54,sector:'tech'},
-    {rank:47,name:'Broadcom',ticker:'AVGO',comp:99,eps:96,rs:85,annEps:65,lastEps:28,nextEps:51,sales:29,roe:31,margin:35,sector:'tech'}
-  ];
+  return [{"rank": 1, "name": "Micron Tech", "ticker": "MU", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 2, "name": "Rocket Lab", "ticker": "RKLB", "comp": 89, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 3, "name": "Astera Labs", "ticker": "ALAB", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 4, "name": "SiTime", "ticker": "SITM", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 5, "name": "Hut 8", "ticker": "HUT", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 6, "name": "Credo Tech", "ticker": "CRDO", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 7, "name": "Liquidia", "ticker": "LQDA", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 8, "name": "Comfort Systems", "ticker": "FIX", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 9, "name": "Argan", "ticker": "AGX", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 10, "name": "Ionq Inc Cl A", "ticker": "IONQ", "comp": 96, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 11, "name": "Advanced Micro Dvcs", "ticker": "AMD", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 12, "name": "Innodata", "ticker": "INOD", "comp": 90, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 13, "name": "Marvell Technology", "ticker": "MRVL", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 14, "name": "Travere Therapeutics", "ticker": "TVTX", "comp": 77, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 15, "name": "Axsome Therapeutics", "ticker": "AXSM", "comp": 77, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 16, "name": "Bloom Energy", "ticker": "BE", "comp": 89, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "energy"}, {"rank": 17, "name": "Vertiv", "ticker": "VRT", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 18, "name": "Ouster", "ticker": "OUST", "comp": 95, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 19, "name": "MDA Space", "ticker": "MDA", "comp": 93, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 20, "name": "Skywater Technology", "ticker": "SKYT", "comp": 89, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 21, "name": "Vita Coco", "ticker": "COCO", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 22, "name": "LAM Research", "ticker": "LRCX", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 23, "name": "Celestica", "ticker": "CLC", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 24, "name": "Solaris Energy Infra", "ticker": "SEI", "comp": 90, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "energy"}, {"rank": 25, "name": "Dycom Industries", "ticker": "DY", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 26, "name": "Guardant Health", "ticker": "GH", "comp": 75, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 27, "name": "Vista Energy", "ticker": "VIST", "comp": 82, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "energy"}, {"rank": 28, "name": "Redwire Corporation", "ticker": "RDWR", "comp": 76, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 29, "name": "Alphabet", "ticker": "GOOGL", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 30, "name": "Macom", "ticker": "MTSI", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 31, "name": "Dave", "ticker": "DAVE", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 32, "name": "Arm Holdings", "ticker": "ARM", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 33, "name": "Carpenter Technology", "ticker": "CRS", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 34, "name": "WisdomTree", "ticker": "WT", "comp": 95, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 35, "name": "StoneX", "ticker": "SNEX", "comp": 91, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 36, "name": "Ceco Environmental", "ticker": "CECO", "comp": 87, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 37, "name": "Broadcom", "ticker": "AVGO", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 38, "name": "Krystal Biotech", "ticker": "KRYS", "comp": 90, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 39, "name": "Teradyne", "ticker": "TER", "comp": 96, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 40, "name": "Monolithic Power", "ticker": "MPWR", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 41, "name": "CrowdStrike", "ticker": "CRWD", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 42, "name": "SSR Mining", "ticker": "SSRM", "comp": 89, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 43, "name": "Taiwan Semiconductor", "ticker": "TSM", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 44, "name": "Rush Street Interactive", "ticker": "RSI", "comp": 78, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 45, "name": "American Supercondtr", "ticker": "AMSC", "comp": 92, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 46, "name": "Zeta Global", "ticker": "ZETA", "comp": 75, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 47, "name": "Morgan Stanley", "ticker": "MS", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 48, "name": "NetApp", "ticker": "NTAP", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 49, "name": "Interactive Brokers", "ticker": "IBKR", "comp": 95, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 50, "name": "AppLovin", "ticker": "APP", "comp": 96, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}];
 }
 
 function renderIBD(){
@@ -4381,6 +4431,33 @@ async function loadWorldIndex(sym) {
       tvBtn.style.display='inline-flex';
       tvBtn.onclick=function(){ openTVChart(sym, label, false); };
     }
+    // Info link: Wikipedia/exchange page for index constituents
+    var infoBtn=document.getElementById('world-index-info-btn');
+    if(infoBtn){
+      var infoUrls={
+        '^GDAXI':'https://www.dax-indices.com/index-details?isin=DE0008469008',
+        '^STOXX50E':'https://www.stoxx.com/index-details?isin=EU0009658145',
+        '^FTSE':'https://www.ftserussell.com/products/indices/uk',
+        '^FCHI':'https://live.euronext.com/en/product/indices/FR0003500008-XPAR',
+        '^IBEX':'https://www.bolsasymercados.es/bme-exchange/en/Indices/IBEX',
+        '^FTMIB':'https://www.borsaitaliana.it/borsaitaliana/statistiche/indici/ftse-mib.htm',
+        '^AEX':'https://live.euronext.com/en/product/indices/NL0000000107-XAMS',
+        '^SMI':'https://www.six-group.com/en/market-data/indices/smi.html',
+        '^N225':'https://indexes.nikkei.co.jp/en/nkave/index/component?idx=nk225',
+        '^HSI':'https://www.hsi.com.hk/eng/indexes/all-indexes/hsi',
+        '000001.SS':'https://www.csindex.com.cn/en/indices/index-detail/000001',
+        '^KS11':'https://www.krx.co.kr/main/main.jsp',
+        '^AXJO':'https://www.asx.com.au/markets/market-statistics/indices',
+        '^BSESN':'https://www.bseindia.com/market-data/indices/sensex/',
+        '^TWII':'https://www.twse.com.tw/en/indices/taiex/overview.html',
+        '^GSPC':'https://www.spglobal.com/spdji/en/indices/equity/sp-500/',
+        '^IXIC':'https://indexes.nasdaqomx.com/index/overview/COMP',
+        '^DJI':'https://www.spglobal.com/spdji/en/indices/equity/dow-jones-industrial-average/',
+      };
+      var url=infoUrls[sym];
+      if(url){ infoBtn.style.display='inline-flex'; infoBtn.href=url; }
+      else { infoBtn.style.display='none'; }
+    }
     var moverBtn=document.getElementById('world-index-mover-btn');
     if(moverBtn){
       // Show mover button only for indices we have stock lists for
@@ -4746,6 +4823,471 @@ async function loadIndexMovers(){
   + '<div style="font-size:10px;color:var(--text3);margin-top:6px;text-align:right">'
   + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr · ⚡ = ≥2%</div>';
 }
+
+// ═══ LISTEN-EDITOR ═══════════════════════════════════════════════════════════
+
+// Current editor state
+var _listEditorMode = 'us50';
+var _listEditorData = [];  // [{sym, name, exchange, comp, eps, rs, lastEps, sales, sector, note}]
+
+var LIST_EXCHANGE_MAP = {
+  // US stocks
+  'NVDA':'NASDAQ','AAPL':'NASDAQ','MSFT':'NASDAQ','AMZN':'NASDAQ','META':'NASDAQ',
+  'GOOGL':'NASDAQ','TSLA':'NASDAQ','AVGO':'NASDAQ','PLTR':'NASDAQ','AMD':'NASDAQ',
+  'MRVL':'NASDAQ','ARM':'NASDAQ','CRDO':'NASDAQ','ALAB':'NASDAQ','SMCI':'NASDAQ',
+  'MU':'NASDAQ','DDOG':'NASDAQ','NET':'NASDAQ','SNOW':'NASDAQ','CELH':'NASDAQ',
+  'LRCX':'NASDAQ','ANET':'NASDAQ','FTNT':'NASDAQ','PANW':'NASDAQ','ISRG':'NASDAQ',
+  'REGN':'NASDAQ','VRTX':'NASDAQ','COIN':'NASDAQ','APP':'NASDAQ',
+  'VRT':'NYSE','TSM':'NYSE','ORCL':'NYSE','CRM':'NYSE','LLY':'NYSE',
+  'NVO':'NYSE','VST':'NYSE','CEG':'NYSE','GEV':'NYSE','PWR':'NYSE',
+  'FANG':'NYSE','GS':'NYSE','HOOD':'NYSE','CAVA':'NYSE','ELF':'NYSE',
+  'DECK':'NYSE','WELL':'NYSE','FIX':'NYSE','MLI':'NYSE','AXON':'NASDAQ',
+  'SHOP':'NYSE','AAPL':'NASDAQ',
+  // DE stocks - XETR
+  'SAP':'XETR','SIE':'XETR','ALV':'XETR','MBG':'XETR','BMW':'XETR',
+  'BAS':'XETR','DTE':'XETR','MRK':'XETR','BAYN':'XETR','ADS':'XETR',
+  'DBK':'XETR','MUV2':'XETR','HEN3':'XETR','EOAN':'XETR','LIN':'XETR',
+  'VOW3':'XETR','IFX':'XETR','DHL':'XETR','DHER':'XETR','ZAL':'XETR',
+  'RHM':'XETR','MTX':'XETR','HNR1':'XETR','VNA':'XETR','SRT':'XETR',
+  'SHL':'XETR','ENR':'XETR','HAG':'XETR','AIXA':'XETR','NDA':'XETR',
+  'PUM':'XETR','SY1':'XETR','GXI':'XETR','BOSS':'XETR','NDX1':'XETR',
+};
+
+function getExchange(sym){
+  return LIST_EXCHANGE_MAP[sym] || (sym.length <= 4 ? 'NASDAQ' : 'XETR');
+}
+
+function openListEditor(mode){
+  _listEditorMode = mode;
+  var modal = document.getElementById('list-editor-modal');
+  if(!modal) return;
+  modal.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  loadListEditorData();
+}
+
+function closeListEditor(){
+  var modal = document.getElementById('list-editor-modal');
+  if(modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function loadListEditorData(){
+  var titleEl = document.getElementById('le-title');
+  var hasScores = false;
+
+  if(_listEditorMode === 'us50'){
+    _listEditorData = DEFAULT_TICKERS.map(function(t){
+      return {sym:t.sym, name:t.name, exchange:getExchange(t.sym), comp:'', eps:'', rs:'', lastEps:'', sales:'', sector:'', note:''};
+    });
+    if(titleEl) titleEl.textContent = '🇺🇸 US-50 Standard Liste';
+  } else if(_listEditorMode === 'de50'){
+    _listEditorData = DEFAULT_TICKERS_DE.map(function(t){
+      return {sym:t.sym, name:t.name, exchange:'XETR', comp:'', eps:'', rs:'', lastEps:'', sales:'', sector:'', note:''};
+    });
+    if(titleEl) titleEl.textContent = '🇩🇪 DE-50 Standard Liste';
+  } else if(_listEditorMode === 'ibd'){
+    _listEditorData = ibdData.map(function(r){
+      return {sym:r.ticker||'', name:r.name||'', exchange:getExchange(r.ticker||''),
+              comp:r.comp||'', eps:r.eps||'', rs:r.rs||'',
+              lastEps:r.lastEps||'', sales:r.sales||'',
+              sector:r.sector||'', note:'', rank:r.rank||''};
+    });
+    hasScores = true;
+    if(titleEl) titleEl.textContent = '📊 IBD Top-50 + Quant-Scores';
+  } else if(_listEditorMode === 'watchlist'){
+    var wls = getWatchlists();
+    var names = Object.keys(wls);
+    if(!names.length){
+      _listEditorData = [];
+      if(titleEl) titleEl.textContent = '⭐ Watchlisten (keine vorhanden)';
+    } else {
+      // Show first watchlist, with selector
+      var firstKey = names[0];
+      _listEditorData = (wls[firstKey]||'').split(',').map(function(s){
+        s = s.trim();
+        return {sym:s, name:s, exchange:getExchange(s), comp:'', eps:'', rs:'', lastEps:'', sales:'', sector:'', note:''};
+      }).filter(function(r){return r.sym;});
+      if(titleEl) titleEl.textContent = '⭐ Watchlist: ' + firstKey;
+    }
+  }
+
+  // Show/hide score columns
+  var scoreCols = document.querySelectorAll('.le-score-col');
+  scoreCols.forEach(function(el){ el.style.display = hasScores ? '' : 'none'; });
+
+  renderListEditorTable();
+}
+
+function renderListEditorTable(){
+  var tbody = document.getElementById('le-tbody');
+  var countEl = document.getElementById('le-count');
+  if(!tbody) return;
+  if(countEl) countEl.textContent = _listEditorData.length + ' Titel';
+  var hasScores = _listEditorMode === 'ibd';
+
+  tbody.innerHTML = _listEditorData.map(function(row, i){
+    var scoreCells = hasScores
+      ? '<td style="text-align:center"><input type="number" value="'+(row.comp||'')+'" onchange="_listEditorData['+i+'].comp=this.value" style="width:44px;padding:2px 4px;font-size:11px;text-align:center;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:4px"></td>'
+        + '<td style="text-align:center"><input type="number" value="'+(row.eps||'')+'" onchange="_listEditorData['+i+'].eps=this.value" style="width:44px;padding:2px 4px;font-size:11px;text-align:center;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:4px"></td>'
+        + '<td style="text-align:center"><input type="number" value="'+(row.rs||'')+'" onchange="_listEditorData['+i+'].rs=this.value" style="width:44px;padding:2px 4px;font-size:11px;text-align:center;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:4px"></td>'
+      : '<td class="le-score-col" style="display:none"></td><td class="le-score-col" style="display:none"></td><td class="le-score-col" style="display:none"></td>';
+
+    return '<tr style="border-bottom:0.5px solid var(--border)">'
+      + '<td style="text-align:center;padding:4px 6px"><button onclick="leDeleteRow('+i+')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0;line-height:1">×</button></td>'
+      + '<td style="padding:4px 6px"><input type="text" value="'+row.sym+'" onchange="_listEditorData['+i+'].sym=this.value.toUpperCase()" style="width:60px;padding:2px 4px;font-size:11px;font-family:var(--mono);font-weight:600;background:var(--bg3);border:0.5px solid var(--border2);color:var(--accent);border-radius:4px"></td>'
+      + '<td style="padding:4px 6px"><input type="text" value="'+row.name+'" onchange="_listEditorData['+i+'].name=this.value" style="width:130px;padding:2px 4px;font-size:11px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:4px"></td>'
+      + '<td style="padding:4px 6px"><select onchange="_listEditorData['+i+'].exchange=this.value" style="font-size:11px;padding:2px 4px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:4px">'
+          + ['NASDAQ','NYSE','XETR','XLON','XTSE','TSE','XPAR','XAMS'].map(function(ex){
+              return '<option value="'+ex+'"'+(row.exchange===ex?' selected':'')+'>'+ex+'</option>';
+            }).join('')
+        + '</select></td>'
+      + scoreCells
+      + '<td style="padding:4px 6px"><input type="text" value="'+(row.sector||'')+'" onchange="_listEditorData['+i+'].sector=this.value" placeholder="tech" style="width:60px;padding:2px 4px;font-size:11px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:4px"></td>'
+      + '<td style="padding:4px 6px"><input type="text" value="'+(row.note||'')+'" onchange="_listEditorData['+i+'].note=this.value" placeholder="Notiz" style="width:90px;padding:2px 4px;font-size:11px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:4px"></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function leDeleteRow(i){
+  _listEditorData.splice(i, 1);
+  renderListEditorTable();
+}
+
+function leAddRow(){
+  var symEl = document.getElementById('le-new-sym');
+  var nameEl = document.getElementById('le-new-name');
+  var sym = symEl ? symEl.value.trim().toUpperCase() : '';
+  var name = nameEl ? nameEl.value.trim() : sym;
+  if(!sym){ alert('Bitte Ticker eingeben.'); return; }
+  _listEditorData.push({sym:sym, name:name||sym, exchange:getExchange(sym),
+                        comp:'', eps:'', rs:'', lastEps:'', sales:'', sector:'', note:''});
+  if(symEl) symEl.value = '';
+  if(nameEl) nameEl.value = '';
+  renderListEditorTable();
+  // Scroll to bottom
+  var tbody = document.getElementById('le-tbody');
+  if(tbody) tbody.lastElementChild && tbody.lastElementChild.scrollIntoView({behavior:'smooth'});
+}
+
+function leSaveList(){
+  if(!_listEditorData.length){ alert('Liste ist leer.'); return; }
+  var msg = '';
+  if(_listEditorMode === 'us50'){
+    // Update DEFAULT_TICKERS in memory
+    DEFAULT_TICKERS.splice(0, DEFAULT_TICKERS.length);
+    _listEditorData.forEach(function(r){ DEFAULT_TICKERS.push({sym:r.sym, name:r.name}); });
+    localStorage.setItem('ko_custom_us50', JSON.stringify(_listEditorData));
+    msg = '✓ US-50 gespeichert (' + _listEditorData.length + ' Titel)';
+  } else if(_listEditorMode === 'de50'){
+    DEFAULT_TICKERS_DE.splice(0, DEFAULT_TICKERS_DE.length);
+    _listEditorData.forEach(function(r){ DEFAULT_TICKERS_DE.push({sym:r.sym, name:r.name}); });
+    localStorage.setItem('ko_custom_de50', JSON.stringify(_listEditorData));
+    msg = '✓ DE-50 gespeichert (' + _listEditorData.length + ' Titel)';
+  } else if(_listEditorMode === 'ibd'){
+    var newIbd = _listEditorData.map(function(r, i){
+      return {rank:r.rank||i+1, name:r.name, ticker:r.sym,
+              comp:parseInt(r.comp)||null, eps:parseInt(r.eps)||null, rs:parseInt(r.rs)||null,
+              lastEps:parseInt(r.lastEps)||null, sales:parseInt(r.sales)||null,
+              sector:r.sector||'tech'};
+    });
+    localStorage.setItem('ko_top50', JSON.stringify(newIbd));
+    localStorage.setItem('ko_top50_date', new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}));
+    ibdData = newIbd;
+    renderIBD();
+    msg = '✓ IBD-Liste gespeichert (' + newIbd.length + ' Titel)';
+  } else if(_listEditorMode === 'watchlist'){
+    var titleEl = document.getElementById('le-title');
+    var wlName = (titleEl ? titleEl.textContent : '').replace(/^[\s\S]*?Watchlist: /, '');
+    var tickers = _listEditorData.map(function(r){return r.sym;}).filter(Boolean);
+    var wls = getWatchlists();
+    wls[wlName] = tickers.join(', ');
+    localStorage.setItem('ko_watchlists', JSON.stringify(wls));
+    updateWatchlistDropdown();
+    msg = '✓ Watchlist "' + wlName + '" gespeichert (' + tickers.length + ' Titel)';
+  }
+  leShowStatus(msg, 'var(--green)');
+}
+
+function leShowStatus(msg, color){
+  var el = document.getElementById('le-status');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = color || 'var(--green)';
+  el.style.display = 'block';
+  setTimeout(function(){ el.style.display = 'none'; }, 4000);
+}
+
+// ── CSV EXPORT ────────────────────────────────────────────────────────────────
+function exportListCSV(){
+  var data = _listEditorData.length ? _listEditorData : getCurrentListData();
+  var hasScores = data.some(function(r){ return r.comp; });
+  var header = 'Ticker,Name,Exchange' + (hasScores ? ',Comp,EPS_Rtg,RS_Rtg,LastEPS%,Sales%' : '') + ',Sector,Notiz';
+  var rows = data.map(function(r){
+    var base = '"'+r.sym+'","'+(r.name||r.sym)+'","'+(r.exchange||'')+ '"';
+    if(hasScores) base += ','+(r.comp||'')+','+(r.eps||'')+','+(r.rs||'')+','+(r.lastEps||'')+','+(r.sales||'');
+    base += ',"'+(r.sector||'')+'","'+(r.note||'')+'"';
+    return base;
+  });
+  var csv = header + '\n' + rows.join('\n');
+  var today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\./g,'-');
+  var fname = 'KO-Scanner-' + _listEditorMode.toUpperCase() + '-' + today + '.csv';
+  downloadTextFile(csv, fname, 'text/csv;charset=utf-8');
+  leShowStatus('✓ CSV exportiert: ' + fname, 'var(--green)');
+}
+
+// ── TRADINGVIEW EXPORT ────────────────────────────────────────────────────────
+function exportListTV(){
+  var data = _listEditorData.length ? _listEditorData : getCurrentListData();
+  // TradingView format: one ticker per line as EXCHANGE:TICKER
+  var lines = data.map(function(r){
+    var ex = r.exchange || getExchange(r.sym);
+    return ex + ':' + r.sym;
+  });
+  var content = lines.join('\n');
+  var today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\./g,'-');
+  var fname = 'TradingView-' + _listEditorMode.toUpperCase() + '-' + today + '.txt';
+  downloadTextFile(content, fname, 'text/plain');
+  leShowStatus('✓ TradingView Export: ' + fname + ' (' + lines.length + ' Ticker) — in TV: Watchlist → Import', 'var(--green)');
+}
+
+function getCurrentListData(){
+  if(_listEditorMode === 'us50') return DEFAULT_TICKERS.map(function(t){ return {sym:t.sym,name:t.name,exchange:getExchange(t.sym)}; });
+  if(_listEditorMode === 'de50') return DEFAULT_TICKERS_DE.map(function(t){ return {sym:t.sym,name:t.name,exchange:'XETR'}; });
+  if(_listEditorMode === 'ibd') return ibdData.map(function(r){ return {sym:r.ticker,name:r.name,exchange:getExchange(r.ticker||''),comp:r.comp,eps:r.eps,rs:r.rs,lastEps:r.lastEps,sales:r.sales,sector:r.sector}; });
+  return [];
+}
+
+function downloadTextFile(text, filename, mime){
+  var blob = new Blob(['\uFEFF'+text], {type: mime || 'text/plain;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ── CSV IMPORT ────────────────────────────────────────────────────────────────
+function importListCSV(input){
+  var file = input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var text = e.target.result.replace(/^\uFEFF/,''); // remove BOM
+      var lines = text.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+      if(!lines.length) throw new Error('Leere Datei');
+
+      // Detect format: TradingView (EXCHANGE:TICKER) or CSV
+      if(lines[0].match(/^[A-Z]+:[A-Z0-9.]+$/)){
+        // TradingView format
+        _listEditorData = lines.map(function(line){
+          var parts = line.split(':');
+          var exchange = parts[0]; var sym = parts[1];
+          return {sym:sym, name:sym, exchange:exchange, comp:'', eps:'', rs:'', sector:'', note:''};
+        });
+        leShowStatus('✓ TradingView-Format importiert: ' + _listEditorData.length + ' Ticker', 'var(--green)');
+      } else {
+        // CSV format — first line is header
+        var headers = lines[0].split(',').map(function(h){return h.replace(/"/g,'').trim().toLowerCase();});
+        var colIdx = {
+          sym: headers.indexOf('ticker'),
+          name: headers.indexOf('name'),
+          exchange: headers.indexOf('exchange'),
+          comp: headers.indexOf('comp'),
+          eps: headers.indexOf('eps_rtg'),
+          rs: headers.indexOf('rs_rtg'),
+          lastEps: headers.indexOf('lasteps%'),
+          sales: headers.indexOf('sales%'),
+          sector: headers.indexOf('sector'),
+          note: headers.indexOf('notiz'),
+        };
+        _listEditorData = lines.slice(1).map(function(line){
+          // Handle quoted CSV
+          var cols = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|(?<=,)$|^(?=,))/g) || line.split(',');
+          cols = cols.map(function(c){return (c||'').replace(/^"|"$/g,'').trim();});
+          function col(i){ return i>=0&&i<cols.length ? cols[i] : ''; }
+          return {
+            sym: col(colIdx.sym).toUpperCase(),
+            name: col(colIdx.name),
+            exchange: col(colIdx.exchange) || getExchange(col(colIdx.sym)),
+            comp: col(colIdx.comp), eps: col(colIdx.eps), rs: col(colIdx.rs),
+            lastEps: col(colIdx.lastEps), sales: col(colIdx.sales),
+            sector: col(colIdx.sector), note: col(colIdx.note),
+          };
+        }).filter(function(r){return r.sym;});
+        leShowStatus('✓ CSV importiert: ' + _listEditorData.length + ' Titel', 'var(--green)');
+      }
+      renderListEditorTable();
+    }catch(err){
+      leShowStatus('✗ Import-Fehler: ' + err.message, 'var(--red)');
+    }
+    input.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ── IBD WEEKLY UPDATE ─────────────────────────────────────────────────────────
+function ibdUpdateAdd(){
+  var ticker = (document.getElementById('ibd-up-ticker')?.value||'').trim().toUpperCase();
+  var name   = (document.getElementById('ibd-up-name')?.value||'').trim();
+  var comp   = parseInt(document.getElementById('ibd-up-comp')?.value)||null;
+  var eps    = parseInt(document.getElementById('ibd-up-eps')?.value)||null;
+  var rs     = parseInt(document.getElementById('ibd-up-rs')?.value)||null;
+  var sector = document.getElementById('ibd-up-sector')?.value||'tech';
+  var lastEps= parseInt(document.getElementById('ibd-up-lasteps')?.value)||null;
+  var sales  = parseInt(document.getElementById('ibd-up-sales')?.value)||null;
+  var msg    = document.getElementById('ibd-update-msg');
+
+  if(!ticker){ if(msg){msg.style.display='block';msg.style.color='var(--red)';msg.textContent='✗ Bitte Ticker eingeben.';} return; }
+
+  var existing = ibdData.findIndex(function(r){return r.ticker===ticker;});
+  var entry = {ticker:ticker, name:name||ticker, comp:comp, eps:eps, rs:rs,
+               lastEps:lastEps, sales:sales, sector:sector,
+               rank: existing>=0 ? ibdData[existing].rank : ibdData.length+1};
+
+  if(existing >= 0){
+    ibdData[existing] = entry;
+    if(msg){msg.style.display='block';msg.style.color='var(--green)';msg.textContent='✓ '+ticker+' aktualisiert';}
+  } else {
+    ibdData.unshift(entry);
+    if(msg){msg.style.display='block';msg.style.color='var(--green)';msg.textContent='✓ '+ticker+' hinzugefügt (Rang 1)';}
+  }
+
+  localStorage.setItem('ko_top50', JSON.stringify(ibdData));
+  renderIBD();
+  // Clear fields
+  ['ibd-up-ticker','ibd-up-name','ibd-up-comp','ibd-up-eps','ibd-up-rs','ibd-up-lasteps','ibd-up-sales'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  setTimeout(function(){if(msg) msg.style.display='none';}, 3000);
+}
+
+function ibdUpdateRemove(){
+  var ticker = (document.getElementById('ibd-up-ticker')?.value||'').trim().toUpperCase();
+  var msg = document.getElementById('ibd-update-msg');
+  if(!ticker){ if(msg){msg.style.display='block';msg.style.color='var(--red)';msg.textContent='✗ Bitte Ticker eingeben.';} return; }
+  var idx = ibdData.findIndex(function(r){return r.ticker===ticker;});
+  if(idx < 0){ if(msg){msg.style.display='block';msg.style.color='var(--amber)';msg.textContent='⚠ '+ticker+' nicht in IBD-Liste gefunden.';} return; }
+  ibdData.splice(idx, 1);
+  localStorage.setItem('ko_top50', JSON.stringify(ibdData));
+  renderIBD();
+  if(msg){msg.style.display='block';msg.style.color='var(--green)';msg.textContent='✓ '+ticker+' entfernt.';}
+  setTimeout(function(){if(msg) msg.style.display='none';}, 3000);
+}
+
+// Load custom lists from localStorage on startup
+function loadCustomLists(){
+  var us = localStorage.getItem('ko_custom_us50');
+  if(us){ try{ var d=JSON.parse(us); if(d.length){ DEFAULT_TICKERS.splice(0,DEFAULT_TICKERS.length); d.forEach(function(r){DEFAULT_TICKERS.push({sym:r.sym,name:r.name});}); } }catch(e){} }
+  var de = localStorage.getItem('ko_custom_de50');
+  if(de){ try{ var d2=JSON.parse(de); if(d2.length){ DEFAULT_TICKERS_DE.splice(0,DEFAULT_TICKERS_DE.length); d2.forEach(function(r){DEFAULT_TICKERS_DE.push({sym:r.sym,name:r.name});}); } }catch(e){} }
+}
+
+// ─── IBD GIST UPDATE ─────────────────────────────────────────────────────────
+function saveGistUrl(){
+  var url = (document.getElementById('ibd-gist-url')?.value||'').trim();
+  if(!url){ alert('Bitte URL eingeben.'); return; }
+  localStorage.setItem('ko_ibd_gist_url', url);
+  var msg = document.getElementById('gist-load-msg');
+  if(msg){ msg.style.display='block'; msg.style.color='var(--green)'; msg.textContent='✓ URL gespeichert'; setTimeout(function(){msg.style.display='none';},2000); }
+}
+
+async function loadIBDFromGist(){
+  var url = localStorage.getItem('ko_ibd_gist_url') || (document.getElementById('ibd-gist-url')?.value||'').trim();
+  var msg = document.getElementById('gist-load-msg');
+  if(!url){
+    if(msg){ msg.style.display='block'; msg.style.color='var(--red)'; msg.textContent='✗ Bitte zuerst Gist-URL eingeben und speichern.'; }
+    return;
+  }
+  if(msg){ msg.style.display='block'; msg.style.color='var(--text2)'; msg.textContent='⏳ Lade IBD-Daten…'; }
+  try {
+    // Add cache-busting
+    var fetchUrl = url + (url.includes('?')?'&':'?') + '_t=' + Date.now();
+    var r = await fetch(fetchUrl);
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    if(!Array.isArray(data) || !data.length) throw new Error('Keine gültigen Daten');
+    // Validate: each entry needs at least ticker or name
+    var valid = data.filter(function(d){ return d.ticker || d.name; });
+    if(!valid.length) throw new Error('Keine gültigen Einträge');
+    // Save
+    localStorage.setItem('ko_top50', JSON.stringify(valid));
+    localStorage.setItem('ko_top50_date', new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}));
+    ibdData = valid;
+    renderIBD();
+    if(msg){ msg.style.display='block'; msg.style.color='var(--green)'; msg.textContent='✓ ' + valid.length + ' Titel geladen · Stand: ' + new Date().toLocaleDateString('de-DE'); }
+  } catch(e) {
+    if(msg){ msg.style.display='block'; msg.style.color='var(--red)'; msg.textContent='✗ Fehler: ' + e.message; }
+    console.error('Gist load error:', e);
+  }
+}
+
+// Load saved gist URL into input field on admin tab open
+function loadGistUrlField(){
+  var saved = localStorage.getItem('ko_ibd_gist_url');
+  var el = document.getElementById('ibd-gist-url');
+  if(el && saved) el.value = saved;
+}
 </script>
+
+<!-- LIST EDITOR MODAL -->
+<div id="list-editor-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99996;background:rgba(0,0,0,0.9);backdrop-filter:blur(4px);overflow-y:auto" onclick="if(event.target===this)closeListEditor()">
+  <div style="max-width:780px;margin:16px auto;padding:12px">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg2);border-radius:var(--radius) var(--radius) 0 0;border:0.5px solid var(--border2);border-bottom:none;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:15px;font-weight:600" id="le-title">Listen-Editor</span>
+        <span style="font-size:11px;color:var(--text3)" id="le-count"></span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <!-- List selector -->
+        <button onclick="openListEditor('us50')" id="le-btn-us50" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🇺🇸 US-50</button>
+        <button onclick="openListEditor('de50')" id="le-btn-de50" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🇩🇪 DE-50</button>
+        <button onclick="openListEditor('ibd')" id="le-btn-ibd" class="btn btn-sm" style="font-size:11px;padding:3px 8px">📊 IBD</button>
+        <button onclick="openListEditor('watchlist')" id="le-btn-watchlist" class="btn btn-sm" style="font-size:11px;padding:3px 8px">⭐ WL</button>
+        <button onclick="closeListEditor()" style="background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer;padding:4px;line-height:1">✕</button>
+      </div>
+    </div>
+    <!-- Toolbar -->
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg3);border-left:0.5px solid var(--border2);border-right:0.5px solid var(--border2);flex-wrap:wrap">
+      <button onclick="leSaveList()" class="btn btn-sm btn-primary" style="font-size:11px"><i class="ti ti-device-floppy"></i> Speichern</button>
+      <button onclick="exportListCSV()" class="btn btn-sm" style="font-size:11px"><i class="ti ti-download"></i> CSV</button>
+      <button onclick="exportListTV()" class="btn btn-sm" style="font-size:11px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c"><i class="ti ti-chart-candle"></i> TradingView</button>
+      <label class="btn btn-sm" style="font-size:11px;cursor:pointer"><i class="ti ti-upload"></i> Import <input type="file" accept=".csv,.txt" style="display:none" onchange="importListCSV(this)"></label>
+      <span style="flex:1"></span>
+      <span id="le-status" style="display:none;font-size:11px"></span>
+    </div>
+    <!-- Add row -->
+    <div style="display:flex;gap:6px;padding:7px 12px;background:var(--bg2);border-left:0.5px solid var(--border2);border-right:0.5px solid var(--border2);align-items:center;flex-wrap:wrap">
+      <input type="text" id="le-new-sym" placeholder="Ticker" oninput="this.value=this.value.toUpperCase()" style="width:70px;padding:4px 7px;font-size:12px;font-family:var(--mono);background:var(--bg3);border:0.5px solid var(--border2);color:var(--accent);border-radius:6px">
+      <input type="text" id="le-new-name" placeholder="Unternehmensname" style="flex:1;min-width:120px;padding:4px 7px;font-size:12px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px">
+      <button onclick="leAddRow()" class="btn btn-sm" style="font-size:12px;background:var(--green-bg);border-color:var(--green);color:var(--green)"><i class="ti ti-plus"></i> Hinzufügen</button>
+    </div>
+    <!-- Table -->
+    <div style="background:var(--bg);border:0.5px solid var(--border2);border-top:none;border-radius:0 0 var(--radius) var(--radius);overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--bg2);border-bottom:0.5px solid var(--border2)">
+            <th style="padding:6px 8px;width:28px;color:var(--text3);font-size:10px"></th>
+            <th style="padding:6px 8px;text-align:left;color:var(--text3);font-size:10px;white-space:nowrap">TICKER</th>
+            <th style="padding:6px 8px;text-align:left;color:var(--text3);font-size:10px">NAME</th>
+            <th style="padding:6px 8px;text-align:left;color:var(--text3);font-size:10px">EXCHANGE</th>
+            <th class="le-score-col" style="padding:6px 8px;text-align:center;color:var(--text3);font-size:10px;white-space:nowrap">COMP</th>
+            <th class="le-score-col" style="padding:6px 8px;text-align:center;color:var(--text3);font-size:10px">EPS</th>
+            <th class="le-score-col" style="padding:6px 8px;text-align:center;color:var(--text3);font-size:10px">RS</th>
+            <th style="padding:6px 8px;text-align:left;color:var(--text3);font-size:10px">SEKTOR</th>
+            <th style="padding:6px 8px;text-align:left;color:var(--text3);font-size:10px">NOTIZ</th>
+          </tr>
+        </thead>
+        <tbody id="le-tbody"></tbody>
+      </table>
+    </div>
+    <!-- Footer hint -->
+    <div style="padding:8px 12px;font-size:11px;color:var(--text3)">
+      <i class="ti ti-info-circle"></i> Änderungen erst nach "Speichern" aktiv · TradingView Import: Watchlist → Import → Datei wählen
+    </div>
+  </div>
+</div>
 </body>
 </html>
