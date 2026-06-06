@@ -983,6 +983,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="w-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)"></div>
       </div>
 
+      <div class="sec">Twelve Data Cache</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">Kursdaten 4h lokal gecacht. Cache leeren erzwingt frische API-Daten.</div>
+        <button class="btn btn-sm" onclick="clearTdCache();this.textContent='✓ Geleert';setTimeout(()=>this.textContent='Cache leeren',2000)" style="font-size:12px"><i class="ti ti-trash"></i> Cache leeren</button>
+      </div>
       <div class="sec">PIN ändern</div>
       <div class="card">
         <div class="grid-2" style="margin-bottom:.65rem">
@@ -1421,6 +1426,30 @@ const charts={};
 let tickerData={};
 let activeTickers=[...DEFAULT_TICKERS];
 
+// TD THROTTLE + CACHE (8 req/min Free Plan)
+const TD_CACHE_KEY='ko_td_cache';
+const TD_CACHE_TTL=4*60*60*1000;
+const TD_MIN_DELAY=8000;
+let _tdLastCall=0;
+function getTdCache(){try{const r=localStorage.getItem(TD_CACHE_KEY);return r?JSON.parse(r):{};}catch(e){return{};}}
+function setTdCache(c){try{localStorage.setItem(TD_CACHE_KEY,JSON.stringify(c));}catch(e){}}
+function getTdCacheEntry(key){const c=getTdCache();const e=c[key];if(!e)return null;if(Date.now()-e.ts>TD_CACHE_TTL)return null;return e.data;}
+function setTdCacheEntry(key,data){const c=getTdCache();const keys=Object.keys(c);if(keys.length>200){keys.sort((a,b)=>(c[a].ts||0)-(c[b].ts||0));keys.slice(0,50).forEach(k=>delete c[k]);}c[key]={ts:Date.now(),data:data};setTdCache(c);}
+async function tdThrottledFetch(url,cacheKey){
+  const cached=getTdCacheEntry(cacheKey);
+  if(cached)return{data:cached,fromCache:true};
+  const elapsed=Date.now()-_tdLastCall;
+  if(_tdLastCall>0&&elapsed<TD_MIN_DELAY) await new Promise(r=>setTimeout(r,TD_MIN_DELAY-elapsed));
+  _tdLastCall=Date.now();
+  const r=await fetch(url);
+  if(!r.ok){if(r.status===429)throw new Error('TD_RATE_LIMIT');throw new Error('TD HTTP '+r.status);}
+  const j=await r.json();
+  if(j.status==='error')throw new Error('TD: '+(j.message||'API error'));
+  setTdCacheEntry(cacheKey,j);
+  return{data:j,fromCache:false};
+}
+function clearTdCache(){try{localStorage.removeItem(TD_CACHE_KEY);}catch(e){}}
+
 function toggleCustom(){
   document.getElementById('custom-wrap').style.display=
     document.getElementById('ticker-preset').value==='custom'?'block':'none';
@@ -1575,11 +1604,12 @@ async function runScan(){
           const outputsize=outputMap[effectiveTF]||130;
           const tdUrl='https://api.twelvedata.com/time_series?symbol='+tdSym
             +'&interval='+interval+'&outputsize='+outputsize+'&apikey='+tdKey;
-          const url='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(tdUrl);
-          const r=await fetch(url);
-          if(r.ok){
-            const j=await r.json();
-            if(j.status!=='error'&&j.values&&j.values.length>=20){
+          const proxyUrl='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(tdUrl);
+          const cacheKey=tdSym+'_'+interval+'_'+outputsize;
+          const tdResult=await tdThrottledFetch(proxyUrl,cacheKey);
+          const j=tdResult.data;
+          if(true){
+            if(j.values&&j.values.length>=20){
               const rev=[...j.values].reverse();
               closes=rev.map(function(v){return parseFloat(v.close)||0;});
               volumes=rev.map(function(v){return parseFloat(v.volume)||0;});
@@ -1593,7 +1623,11 @@ async function runScan(){
               dataSource='Twelve Data';
             }
           }
-        }catch(e2){ console.log('TD error:',e2.message); }
+        }catch(e2){
+          if(e2.message==='TD_RATE_LIMIT'){
+            console.warn('TD Rate-Limit bei '+tdSym+' - warte...');
+          } else { console.log('TD error:',e2.message); }
+        }
       }
 
       // Source 2: Yahoo Finance via CORS Proxy (fallback)
@@ -1648,7 +1682,9 @@ async function runScan(){
       renderCard(t,processData(raw));
     }catch(e){
       var msg = e.message;
-      if(msg.includes('Failed to fetch')){
+      if(msg==='TD_RATE_LIMIT'){
+        msg = 'Rate-Limit erreicht (8 req/min). Bitte 60s warten und erneut scannen. Tipp: Cache hilft bei Folge-Scans.';
+      } else if(msg.includes('Failed to fetch')){
         msg = 'Netzwerkfehler — Twelve Data nicht erreichbar. Key prüfen: Admin-Tab → Twelve Data Key. Aktuell gesetzt: '+(getTwelveKey()?'Ja ('+getTwelveKey().substring(0,8)+'...)':'NEIN');
       }
       renderCard(t,{error:msg});
