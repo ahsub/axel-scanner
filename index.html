@@ -1093,6 +1093,77 @@ function setTwelveKey(k){
   localStorage.setItem('ko_twelve_key', k.trim());
 }
 
+// ─── EARNINGS CALENDAR (Patch v20260606) ─────────────────────────
+const ER_CACHE_KEY = 'ko_er_cache';
+const ER_CACHE_TTL = 60 * 60 * 1000;
+
+function getErCache() {
+  try {
+    const raw = sessionStorage.getItem(ER_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed._ts > ER_CACHE_TTL) return {};
+    return parsed;
+  } catch(e) { return {}; }
+}
+function setErCache(data) {
+  try { data._ts = Date.now(); sessionStorage.setItem(ER_CACHE_KEY, JSON.stringify(data)); } catch(e) {}
+}
+
+async function fetchEarningsDate(sym) {
+  const cache = getErCache();
+  if (cache[sym] !== undefined) return cache[sym];
+  const key = getFinnhubKey();
+  if (!key) return null;
+  try {
+    const today = new Date();
+    const from = today.toISOString().split('T')[0];
+    const to = new Date(today.getTime() + 45*24*60*60*1000).toISOString().split('T')[0];
+    const url = 'https://finnhub.io/api/v1/calendar/earnings?from='+from+'&to='+to+'&symbol='+sym+'&token='+key;
+    const r = await fetch(url);
+    if (!r.ok) { cache[sym]=null; setErCache(cache); return null; }
+    const j = await r.json();
+    const earnings = j.earningsCalendar || [];
+    if (!earnings.length) { cache[sym]=null; setErCache(cache); return null; }
+    const next = earnings[0];
+    const erDate = new Date(next.date);
+    const diffMs = erDate - new Date(from);
+    const daysUntil = Math.ceil(diffMs / (1000*60*60*24));
+    const result = { daysUntil:daysUntil, date:next.date, time:next.hour||'' };
+    cache[sym] = result; setErCache(cache);
+    return result;
+  } catch(e) { cache[sym]=null; setErCache(cache); return null; }
+}
+
+function earningsBadgeHtml(er) {
+  if (!er || er.daysUntil > 45) return '';
+  const timeStr = er.time==='amc'?' (NC)':er.time==='bmo'?' (VM)':'';
+  let bg, color, icon, label;
+  if (er.daysUntil <= 3) {
+    bg='rgba(240,86,86,0.18)'; color='var(--red)'; icon='ti-alert-triangle';
+    label = er.daysUntil===0?'ER heute'+timeStr:er.daysUntil===1?'ER morgen'+timeStr:'ER in '+er.daysUntil+'T'+timeStr;
+  } else if (er.daysUntil <= 14) {
+    bg='rgba(240,169,58,0.15)'; color='var(--amber)'; icon='ti-calendar-event';
+    label = 'ER in '+er.daysUntil+'T'+timeStr;
+  } else {
+    bg='rgba(255,255,255,0.06)'; color='var(--text3)'; icon='ti-calendar';
+    label = 'ER '+er.date.slice(5).replace('-','.');
+  }
+  return '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:'+bg+';color:'+color+
+    ';display:inline-flex;align-items:center;gap:3px;margin-left:4px" title="Earnings: '+er.date+'">'+
+    '<i class="ti '+icon+'" style="font-size:10px"></i>'+label+'</span>';
+}
+
+function earningsScoreMalus(er) {
+  if (!er) return 0;
+  if (er.daysUntil <= 3)  return 15;
+  if (er.daysUntil <= 7)  return 8;
+  if (er.daysUntil <= 14) return 3;
+  return 0;
+}
+// ─────────────────────────────────────────────────────────────────
+
+
 async function finnhubQuote(sym){
   const key = getFinnhubKey();
   if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
@@ -1570,6 +1641,9 @@ async function runScan(){
         if(rsResult){ raw.rs=rsResult.rs; raw.rsData=rsResult; }
       }
       tickerData[t.sym]=raw;
+      // Earnings-Datum laden (Finnhub, gecacht)
+      const erData = await fetchEarningsDate(t.sym);
+      raw._er = erData;
       renderCard(t,processData(raw));
     }catch(e){
       var msg = e.message;
@@ -1807,7 +1881,8 @@ function processData(raw){
   const rsPts = rs>=80?5:rs>=60?3:rs<40?-5:0;
   // Market phase multiplier
   const mktPhase = typeof getMarketPhase==='function'?getMarketPhase():1;
-  const compositeScore = Math.max(0,Math.min(100,Math.round((techPts+sepaPts+bpPts+stkPts+volPts+rsPts)*mktPhase)));
+  const erMalus = earningsScoreMalus(raw._er || null);
+  const compositeScore = Math.max(0,Math.min(100,Math.round((techPts+sepaPts+bpPts+stkPts+volPts+rsPts)*mktPhase)-erMalus));
   const scoreLabel = compositeScore>=80?'A+':compositeScore>=70?'A':compositeScore>=60?'B+':
                      compositeScore>=50?'B':compositeScore>=40?'C':compositeScore>=30?'D':'F';
   const scoreColor = compositeScore>=70?'var(--green)':compositeScore>=50?'var(--accent)':
@@ -1874,6 +1949,7 @@ function renderCard(t,state){
       (state.scoreLabel||'?')+' '+(state.compositeScore||0)+
     '</span>'+
     (state.sessionNote?'<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,0.08);color:var(--text3);margin-left:4px">'+state.sessionNote+'</span>':'')+
+    earningsBadgeHtml(state._er||null)+
     '</div>'+
     '<div class="sig-grid">'+
     '<div class="sig-box"><div class="sig-label">50d MA $'+ma50.toFixed(0)+'</div>'+
