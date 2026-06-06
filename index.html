@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260604-1500">
+<meta name="app-version" content="20260606-0900">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0a">
@@ -243,7 +243,24 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <option value="default">50 US-Aktien (alle scannen)</option>
           <option value="top50-us">Top-50 Liste (IBD Momentum)</option>
           <option value="custom">Eigene Ticker</option>
-          <optgroup label="── Meine Watchlisten ──" id="watchlist-options"></optgroup>
+          <optgroup label="── 🇩🇪 Deutsche Indizes ──">
+            <option value="fixed:DAX40">📊 DAX 40 (alle 40 Titel)</option>
+            <option value="fixed:MDAX">📈 MDAX Top 20</option>
+            <option value="fixed:TECDAX">💻 TecDAX Top 20</option>
+          </optgroup>
+          <optgroup label="── 🇺🇸 US-Indizes ──">
+            <option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>
+            <option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>
+          </optgroup>
+          <optgroup label="── 🏭 Sektoren ──">
+            <option value="fixed:DEFENSE">🛡️ Defense &amp; Aerospace</option>
+            <option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>
+            <option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>
+            <option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>
+            <option value="fixed:FINANCE">🏦 Financials &amp; Banks</option>
+            <option value="fixed:CONSUMER">🛒 Consumer Discretionary</option>
+          </optgroup>
+          <optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options"></optgroup>
         </select>
         <button class="btn btn-primary" onclick="runScan()" id="scan-btn">
           <i class="ti ti-player-play"></i> Scan
@@ -631,17 +648,31 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <button class="btn btn-sm" onclick="openListEditor('us50')" style="font-size:11px;padding:3px 9px">🇺🇸 US-50</button>
           <button class="btn btn-sm" onclick="openListEditor('de50')" style="font-size:11px;padding:3px 9px">🇩🇪 DE-50</button>
           <button class="btn btn-sm" onclick="openListEditor('ibd')" style="font-size:11px;padding:3px 9px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">📊 IBD</button>
-          <button class="btn btn-sm" onclick="openListEditor('watchlist')" style="font-size:11px;padding:3px 9px">⭐ Watchlisten</button>
+          <button class="btn btn-sm" onclick="openListEditor('watchlist')" style="font-size:11px;padding:3px 9px;background:var(--green-bg);border-color:var(--green);color:var(--green)">⭐ Watchlisten</button>
         </div>
       </div>
+
+      <!-- WATCHLIST QUICK-OVERVIEW -->
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:.65rem"><i class="ti ti-star"></i> Meine Watchlisten</div>
+        <div id="admin-wl-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:.75rem"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-primary" onclick="openListEditor('watchlist')" style="font-size:12px"><i class="ti ti-pencil"></i> Watchlist-Editor öffnen</button>
+          <button class="btn btn-sm" onclick="leWLNew();setTimeout(function(){openListEditor('watchlist');},100)" style="font-size:12px;background:var(--green-bg);border-color:var(--green);color:var(--green)"><i class="ti ti-plus"></i> Neue Watchlist</button>
+        </div>
+      </div>
+
+      <!-- STANDARD LISTEN -->
+      <div class="sec"><i class="ti ti-list"></i> Standard-Listen bearbeiten</div>
       <div class="card" style="margin-bottom:1rem">
         <div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">
-          Ticker-Listen anzeigen, bearbeiten, importieren und als CSV oder TradingView-Format exportieren.
+          Ticker-Listen bearbeiten, importieren und als CSV oder TradingView-Format exportieren.
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-sm" onclick="openListEditor('us50')" style="font-size:12px"><i class="ti ti-pencil"></i> Liste bearbeiten</button>
+          <button class="btn btn-sm" onclick="openListEditor('us50')" style="font-size:12px"><i class="ti ti-pencil"></i> US-50 bearbeiten</button>
+          <button class="btn btn-sm" onclick="openListEditor('de50')" style="font-size:12px"><i class="ti ti-pencil"></i> DE-50 bearbeiten</button>
           <button class="btn btn-sm" onclick="exportListCSV()" style="font-size:12px"><i class="ti ti-download"></i> CSV Export</button>
-          <button class="btn btn-sm" onclick="exportListTV()" style="font-size:12px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c"><i class="ti ti-brand-tradingview"></i> TradingView Export</button>
+          <button class="btn btn-sm" onclick="exportListTV()" style="font-size:12px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c"><i class="ti ti-brand-tradingview"></i> TradingView</button>
           <button class="btn btn-sm" onclick="document.getElementById('list-import-file').click()" style="font-size:12px"><i class="ti ti-upload"></i> CSV Import</button>
           <input type="file" id="list-import-file" accept=".csv,.txt" style="display:none" onchange="importListCSV(this)">
         </div>
@@ -1290,6 +1321,7 @@ function showPanel(id){
     const antInp=document.getElementById('ant-key-input');
     if(antInp&&getAnthropicKey()) antInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
     loadPortfolioSettings();
+    renderAdminWLList();
   }
   if(id==='ibd'){
     updateSessionBar();
@@ -1355,8 +1387,25 @@ function setMarket(mkt){
         '<option value="default">50 US-Aktien (alle scannen)</option>'+
         '<option value="top50-us">Top-50 Liste (IBD Momentum)</option>'+
         '<option value="custom">Eigene Ticker</option>'+
-        (wlOpts?'<optgroup label="── Meine Watchlisten ──" id="watchlist-options">'+wlOpts+'</optgroup>':
-          '<optgroup label="── Meine Watchlisten ──" id="watchlist-options"></optgroup>');
+        '<optgroup label="── 🇩🇪 Deutsche Indizes ──">'+
+          '<option value="fixed:DAX40">📊 DAX 40 (alle 40 Titel)</option>'+
+          '<option value="fixed:MDAX">📈 MDAX Top 20</option>'+
+          '<option value="fixed:TECDAX">💻 TecDAX Top 20</option>'+
+        '</optgroup>'+
+        '<optgroup label="── 🇺🇸 US-Indizes ──">'+
+          '<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
+          '<option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>'+
+        '</optgroup>'+
+        '<optgroup label="── 🏭 Sektoren ──">'+
+          '<option value="fixed:DEFENSE">🛡️ Defense &amp; Aerospace</option>'+
+          '<option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>'+
+          '<option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>'+
+          '<option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>'+
+          '<option value="fixed:FINANCE">🏦 Financials &amp; Banks</option>'+
+          '<option value="fixed:CONSUMER">🛒 Consumer Discretionary</option>'+
+        '</optgroup>'+
+        (wlOpts?'<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options">'+wlOpts+'</optgroup>':
+          '<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options"></optgroup>');
     }
   } else {
     if(deBtn){ deBtn.style.background='var(--accent)'; deBtn.style.color='#fff'; }
@@ -1369,8 +1418,25 @@ function setMarket(mkt){
       preset.innerHTML=
         '<option value="default-de">50 DE-Aktien (alle scannen)</option>'+
         '<option value="custom">Eigene Ticker</option>'+
-        (wlOpts2?'<optgroup label="── Meine Watchlisten ──" id="watchlist-options">'+wlOpts2+'</optgroup>':
-          '<optgroup label="── Meine Watchlisten ──" id="watchlist-options"></optgroup>');
+        '<optgroup label="── 🇩🇪 Deutsche Indizes ──">'+
+          '<option value="fixed:DAX40">📊 DAX 40 (alle 40 Titel)</option>'+
+          '<option value="fixed:MDAX">📈 MDAX Top 20</option>'+
+          '<option value="fixed:TECDAX">💻 TecDAX Top 20</option>'+
+        '</optgroup>'+
+        '<optgroup label="── 🇺🇸 US-Indizes ──">'+
+          '<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
+          '<option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>'+
+        '</optgroup>'+
+        '<optgroup label="── 🏭 Sektoren ──">'+
+          '<option value="fixed:DEFENSE">🛡️ Defense &amp; Aerospace</option>'+
+          '<option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>'+
+          '<option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>'+
+          '<option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>'+
+          '<option value="fixed:FINANCE">🏦 Financials &amp; Banks</option>'+
+          '<option value="fixed:CONSUMER">🛒 Consumer Discretionary</option>'+
+        '</optgroup>'+
+        (wlOpts2?'<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options">'+wlOpts2+'</optgroup>':
+          '<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options"></optgroup>');
     }
   }
   document.getElementById('scan-container').innerHTML='';
@@ -3648,8 +3714,16 @@ function updateWatchlistDropdown(){
       opt.textContent = '⭐ '+name+' ('+((wls[name]||'').split(',').filter(Boolean).length)+')';
       optgroup.appendChild(opt);
     });
-    // Show/hide optgroup label
-    optgroup.label = names.length ? '── Meine Watchlisten ──' : '';
+    optgroup.label = names.length ? '── ⭐ Meine Watchlisten ──' : '';
+  }
+
+  // Update le-wl-select in editor modal if open
+  var sel = document.getElementById('le-wl-select');
+  if(sel && _listEditorMode === 'watchlist'){
+    var activeKey = window._leActiveWatchlist || (names.length ? names[0] : null);
+    sel.innerHTML = names.map(function(n){
+      return '<option value="'+n+'"'+(n===activeKey?' selected':'')+'>⭐ '+n+' ('+((wls[n]||'').split(',').filter(Boolean).length)+')</option>';
+    }).join('');
   }
 }
 
@@ -3666,16 +3740,27 @@ function onPresetChange(){
     const name = val.substring(3);
     const wls = getWatchlists();
     if(wls[name]){
-      // Show custom wrap with watchlist tickers
       document.getElementById('custom-wrap').style.display='block';
       document.getElementById('custom-input').value = wls[name];
-      // Update label to show it's a watchlist
       const label = document.querySelector('#custom-wrap div');
       if(label) label.textContent = '⭐ Watchlist: "'+name+'" — '+wls[name].split(',').filter(Boolean).length+' Titel';
     }
+  } else if(val && val.startsWith('fixed:')){
+    const key = val.substring(6);
+    const list = getFixedListTickers(key);
+    document.getElementById('custom-wrap').style.display='none';
+    // Show count hint in scanner-market-hint
+    const hint = document.getElementById('scanner-market-hint');
+    const labels = {
+      DAX40:'📊 DAX 40', MDAX:'📈 MDAX Top 20', TECDAX:'💻 TecDAX Top 20',
+      SP500:'🇺🇸 S&P 500 Kern', NDX100:'🇺🇸 NASDAQ 100',
+      DEFENSE:'🛡️ Defense & Aerospace', REIT:'🏢 REITs', ENERGY:'⚡ Energy',
+      HEALTH:'🏥 Healthcare', FINANCE:'🏦 Financials', CONSUMER:'🛒 Consumer'
+    };
+    if(hint) hint.innerHTML='<i class="ti ti-info-circle"></i> '+
+      (labels[key]||key)+' · '+list.length+' Titel · Kaufsignal = alle 3 bullisch';
   } else {
     toggleCustom();
-    // Reset label
     const label = document.querySelector('#custom-wrap div');
     if(label) label.textContent = 'Komma-getrennte Ticker';
   }
@@ -3692,6 +3777,11 @@ getTickers = function(){
       return wls[name].split(',').map(function(s){ return s.trim().toUpperCase(); })
         .filter(Boolean).map(function(s){ return {sym:s,name:s}; });
     }
+  }
+  if(preset && preset.startsWith('fixed:')){
+    const key = preset.substring(6);
+    const list = getFixedListTickers(key);
+    if(list && list.length) return list;
   }
   return _origGetTickers();
 };
@@ -4876,6 +4966,21 @@ function openListEditor(mode){
   if(!modal) return;
   modal.style.display = 'block';
   document.body.style.overflow = 'hidden';
+  // Show/hide WL toolbar
+  var wlToolbar = document.getElementById('le-wl-toolbar');
+  var wlImport  = document.getElementById('le-wl-import-btn');
+  var stdImport = document.getElementById('le-std-import-btn');
+  var shareBtn  = document.querySelector('[onclick="leWLShare()"]');
+  var isWL = (mode === 'watchlist');
+  if(wlToolbar)  wlToolbar.style.display  = isWL ? 'flex' : 'none';
+  if(wlImport)   wlImport.style.display   = isWL ? '' : 'none';
+  if(stdImport)  stdImport.style.display  = isWL ? 'none' : '';
+  if(shareBtn)   shareBtn.style.display   = isWL ? '' : 'none';
+  // Close share menu if open
+  var shareMenu = document.getElementById('le-share-menu');
+  if(shareMenu) shareMenu.style.display = 'none';
+  // Reset active WL on first open (if switching mode)
+  if(!isWL) window._leActiveWatchlist = null;
   loadListEditorData();
 }
 
@@ -4911,17 +5016,30 @@ function loadListEditorData(){
   } else if(_listEditorMode === 'watchlist'){
     var wls = getWatchlists();
     var names = Object.keys(wls);
-    if(!names.length){
+    // Determine which WL is active
+    var activeKey = window._leActiveWatchlist || (names.length ? names[0] : null);
+    if(!names.length || !activeKey){
       _listEditorData = [];
       if(titleEl) titleEl.textContent = '⭐ Watchlisten (keine vorhanden)';
     } else {
-      // Show first watchlist, with selector
-      var firstKey = names[0];
-      _listEditorData = (wls[firstKey]||'').split(',').map(function(s){
+      if(!wls[activeKey]) activeKey = names[0];
+      window._leActiveWatchlist = activeKey;
+      _listEditorData = (wls[activeKey]||'').split(',').map(function(s){
         s = s.trim();
         return {sym:s, name:s, exchange:getExchange(s), comp:'', eps:'', rs:'', lastEps:'', sales:'', sector:'', note:''};
       }).filter(function(r){return r.sym;});
-      if(titleEl) titleEl.textContent = '⭐ Watchlist: ' + firstKey;
+      if(titleEl) titleEl.textContent = '⭐ ' + activeKey;
+    }
+    // Render WL selector toolbar
+    var wlToolbar = document.getElementById('le-wl-toolbar');
+    if(wlToolbar){
+      wlToolbar.style.display = 'flex';
+      var sel = document.getElementById('le-wl-select');
+      if(sel){
+        sel.innerHTML = names.map(function(n){
+          return '<option value="'+n+'"'+(n===activeKey?' selected':'')+'>⭐ '+n+' ('+((wls[n]||'').split(',').filter(Boolean).length)+')</option>';
+        }).join('');
+      }
     }
   }
 
@@ -5010,16 +5128,225 @@ function leSaveList(){
     renderIBD();
     msg = '✓ IBD-Liste gespeichert (' + newIbd.length + ' Titel)';
   } else if(_listEditorMode === 'watchlist'){
-    var titleEl = document.getElementById('le-title');
-    var wlName = (titleEl ? titleEl.textContent : '').replace(/^[\s\S]*?Watchlist: /, '');
+    var wlName = window._leActiveWatchlist;
+    if(!wlName){ leShowStatus('✗ Keine Watchlist ausgewählt', 'var(--red)'); return; }
     var tickers = _listEditorData.map(function(r){return r.sym;}).filter(Boolean);
     var wls = getWatchlists();
     wls[wlName] = tickers.join(', ');
     localStorage.setItem('ko_watchlists', JSON.stringify(wls));
     updateWatchlistDropdown();
+    // Refresh dropdown count
+    var sel = document.getElementById('le-wl-select');
+    if(sel){
+      var opt = sel.querySelector('option[value="'+wlName+'"]');
+      if(opt) opt.textContent = '⭐ '+wlName+' ('+tickers.length+')';
+    }
     msg = '✓ Watchlist "' + wlName + '" gespeichert (' + tickers.length + ' Titel)';
   }
   leShowStatus(msg, 'var(--green)');
+}
+
+// ─── WATCHLIST EDITOR: Selektor, Rename, Neu, Löschen, Share ─────────────────
+function leWLSwitch(name){
+  window._leActiveWatchlist = name;
+  var titleEl = document.getElementById('le-title');
+  if(titleEl) titleEl.textContent = '⭐ ' + name;
+  var wls = getWatchlists();
+  _listEditorData = (wls[name]||'').split(',').map(function(s){
+    s = s.trim();
+    return {sym:s, name:s, exchange:getExchange(s), comp:'', eps:'', rs:'', lastEps:'', sales:'', sector:'', note:''};
+  }).filter(function(r){return r.sym;});
+  var countEl = document.getElementById('le-count');
+  if(countEl) countEl.textContent = _listEditorData.length + ' Titel';
+  renderListEditorTable();
+}
+
+function leWLNew(){
+  var name = prompt('Name der neuen Watchlist:', 'Meine Watchlist');
+  if(!name || !name.trim()) return;
+  name = name.trim();
+  var wls = getWatchlists();
+  if(wls[name]){ alert('Eine Watchlist mit diesem Namen existiert bereits.'); return; }
+  wls[name] = '';
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  updateWatchlistDropdown();
+  window._leActiveWatchlist = name;
+  openListEditor('watchlist');
+  leShowStatus('✓ Watchlist "'+name+'" erstellt', 'var(--green)');
+}
+
+function leWLRename(){
+  var oldName = window._leActiveWatchlist;
+  if(!oldName){ alert('Keine Watchlist ausgewählt.'); return; }
+  var newName = prompt('Neuer Name für "'+oldName+'":', oldName);
+  if(!newName || !newName.trim() || newName.trim()===oldName) return;
+  newName = newName.trim();
+  var wls = getWatchlists();
+  if(wls[newName]){ alert('Name bereits vergeben.'); return; }
+  wls[newName] = wls[oldName];
+  delete wls[oldName];
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  updateWatchlistDropdown();
+  window._leActiveWatchlist = newName;
+  openListEditor('watchlist');
+  leShowStatus('✓ Umbenannt: "'+oldName+'" → "'+newName+'"', 'var(--green)');
+}
+
+function leWLDelete(){
+  var name = window._leActiveWatchlist;
+  if(!name){ alert('Keine Watchlist ausgewählt.'); return; }
+  if(!confirm('Watchlist "'+name+'" wirklich löschen?')) return;
+  var wls = getWatchlists();
+  delete wls[name];
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  updateWatchlistDropdown();
+  window._leActiveWatchlist = null;
+  openListEditor('watchlist');
+  leShowStatus('✓ Watchlist "'+name+'" gelöscht', 'var(--amber)');
+}
+
+function leWLShare(){
+  // Build CSV content for current WL
+  var name = window._leActiveWatchlist || _listEditorMode;
+  var data = _listEditorData.length ? _listEditorData : getCurrentListData();
+  var hasScores = data.some(function(r){ return r.comp; });
+  var header = 'Ticker,Name,Exchange' + (hasScores ? ',Comp,EPS_Rtg,RS_Rtg,LastEPS%,Sales%' : '') + ',Sector,Notiz';
+  var rows = data.map(function(r){
+    var base = '"'+r.sym+'","'+(r.name||r.sym)+'","'+(r.exchange||'')+'"';
+    if(hasScores) base += ','+(r.comp||'')+','+(r.eps||'')+','+(r.rs||'')+','+(r.lastEps||'')+','+(r.sales||'');
+    base += ',"'+(r.sector||'')+'","'+(r.note||'')+'"';
+    return base;
+  });
+  var csv = '# KO-Scanner Watchlist: '+name+'\n# Exportiert: '+new Date().toLocaleDateString('de-DE')+'\n# Version: 1.0\n'
+            + header + '\n' + rows.join('\n');
+  var today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\./g,'-');
+  var fname = 'KO-Scanner-WL-'+name.replace(/[^a-zA-Z0-9]/g,'_')+'-'+today+'.csv';
+
+  // Show share dialog
+  var menu = document.getElementById('le-share-menu');
+  if(menu){
+    menu.style.display = menu.style.display==='block' ? 'none' : 'block';
+    // Store for share actions
+    window._leShareData = {csv:csv, fname:fname, name:name};
+  }
+}
+
+function leShareDownload(){
+  var d = window._leShareData; if(!d) return;
+  downloadTextFile(d.csv, d.fname, 'text/csv;charset=utf-8');
+  leShowStatus('✓ CSV heruntergeladen: '+d.fname, 'var(--green)');
+  document.getElementById('le-share-menu').style.display='none';
+}
+
+function leShareMail(){
+  var d = window._leShareData; if(!d) return;
+  var subject = encodeURIComponent('KO-Scanner Watchlist: '+d.name);
+  var body = encodeURIComponent('Hallo,\n\nanbei meine KO-Scanner Watchlist "'+d.name+'":\n\n'+d.csv+'\n\nViele Grüße');
+  window.open('mailto:?subject='+subject+'&body='+body);
+  document.getElementById('le-share-menu').style.display='none';
+}
+
+function leShareSystem(){
+  var d = window._leShareData; if(!d) return;
+  var blob = new Blob(['\uFEFF'+d.csv], {type:'text/csv;charset=utf-8'});
+  var file = new File([blob], d.fname, {type:'text/csv'});
+  if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({
+      title: 'KO-Scanner Watchlist: '+d.name,
+      text: 'Watchlist aus dem KO-Scanner',
+      files: [file]
+    }).then(function(){ leShowStatus('✓ Geteilt!', 'var(--green)'); })
+      .catch(function(e){ if(e.name!=='AbortError') leShareCopyFallback(d); });
+  } else if(navigator.share){
+    navigator.share({title:'KO-Scanner Watchlist: '+d.name, text:d.csv})
+      .catch(function(e){ if(e.name!=='AbortError') leShareCopyFallback(d); });
+  } else {
+    leShareCopyFallback(d);
+  }
+  document.getElementById('le-share-menu').style.display='none';
+}
+
+function leShareCopyFallback(d){
+  navigator.clipboard.writeText(d.csv).then(function(){
+    leShowStatus('✓ In Zwischenablage kopiert ('+d.fname+')', 'var(--green)');
+  }).catch(function(){
+    leShowStatus('⚠ Bitte manuell kopieren', 'var(--amber)');
+  });
+}
+
+function leShareCopy(){
+  var d = window._leShareData; if(!d) return;
+  leShareCopyFallback(d);
+  document.getElementById('le-share-menu').style.display='none';
+}
+
+function leWLImportToActive(input){
+  var file = input.files[0]; if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var text = e.target.result.replace(/^\uFEFF/,'');
+      var lines = text.split('\n').map(function(l){return l.trim();}).filter(function(l){return l && !l.startsWith('#');});
+      if(!lines.length) throw new Error('Leere Datei');
+      // Create new WL from imported data
+      var wlName = file.name.replace(/\.csv$/i,'').replace(/_/g,' ') || 'Import '+new Date().toLocaleDateString('de-DE');
+      var tickers = [];
+      if(lines[0].match(/^[A-Z]+:[A-Z0-9.]+$/)){
+        // TradingView format
+        tickers = lines.map(function(l){ return l.split(':')[1]; }).filter(Boolean);
+      } else {
+        // CSV: find ticker column
+        var headers = lines[0].split(',').map(function(h){return h.replace(/"/g,'').trim().toLowerCase();});
+        var tickerIdx = headers.indexOf('ticker');
+        if(tickerIdx<0) tickerIdx=0;
+        tickers = lines.slice(1).map(function(l){
+          var cols = l.split(','); return (cols[tickerIdx]||'').replace(/"/g,'').trim().toUpperCase();
+        }).filter(Boolean);
+      }
+      if(!tickers.length) throw new Error('Keine Ticker gefunden');
+      var wls = getWatchlists();
+      // Avoid name collision
+      var baseName = wlName; var n=1;
+      while(wls[wlName]){ wlName = baseName+' ('+n+')'; n++; }
+      wls[wlName] = tickers.join(', ');
+      localStorage.setItem(WL_KEY, JSON.stringify(wls));
+      updateWatchlistDropdown();
+      window._leActiveWatchlist = wlName;
+      openListEditor('watchlist');
+      leShowStatus('✓ Importiert als "'+wlName+'" ('+tickers.length+' Titel)', 'var(--green)');
+    } catch(err){
+      leShowStatus('✗ Import-Fehler: '+err.message, 'var(--red)');
+    }
+    input.value='';
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+function leWLScanNow(){
+  var name = window._leActiveWatchlist;
+  if(!name||!_listEditorData.length){ alert('Bitte zuerst eine Watchlist mit Tickers auswählen.'); return; }
+  leSaveList();
+  closeListEditor();
+  var tickers = _listEditorData.map(function(r){return r.sym;}).filter(Boolean).join(', ');
+  document.getElementById('ticker-preset').value = 'wl:'+name;
+  document.getElementById('custom-wrap').style.display='block';
+  document.getElementById('custom-input').value = tickers;
+  showPanel('scanner');
+  setTimeout(function(){ runScan(); }, 200);
+}
+
+function leWLAddToScanner(){
+  var name = window._leActiveWatchlist;
+  if(!name){ alert('Keine Watchlist ausgewählt.'); return; }
+  closeListEditor();
+  showPanel('scanner');
+  // Trigger preset selection
+  var sel = document.getElementById('ticker-preset');
+  if(sel){
+    // Find option with this WL value
+    var opt = Array.from(sel.options).find(function(o){ return o.value==='wl:'+name; });
+    if(opt){ sel.value='wl:'+name; onPresetChange(); }
+  }
 }
 
 function leShowStatus(msg, color){
@@ -5237,6 +5564,27 @@ async function loadIBDFromGist(){
 }
 
 // Load saved gist URL into input field on admin tab open
+function renderAdminWLList(){
+  var container = document.getElementById('admin-wl-list');
+  if(!container) return;
+  var wls = getWatchlists();
+  var names = Object.keys(wls);
+  if(!names.length){
+    container.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:6px 0"><i class="ti ti-info-circle"></i> Noch keine eigenen Watchlisten vorhanden.</div>';
+    return;
+  }
+  container.innerHTML = names.map(function(name){
+    var tickers = (wls[name]||'').split(',').filter(Boolean);
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border-radius:var(--radius-sm);border:0.5px solid var(--border)">'
+      + '<i class="ti ti-star" style="color:var(--amber);font-size:13px;flex-shrink:0"></i>'
+      + '<span style="flex:1;font-size:13px;font-weight:500">'+name+'</span>'
+      + '<span style="font-size:11px;color:var(--text3)">'+tickers.length+' Titel</span>'
+      + '<button onclick="window._leActiveWatchlist=\''+name+'\';openListEditor(\'watchlist\')" class="btn btn-sm" style="font-size:10px;padding:2px 7px"><i class="ti ti-pencil"></i> Bearbeiten</button>'
+      + '<button onclick="if(confirm(\'Watchlist &quot;'+name+'&quot; löschen?\')){var wls=getWatchlists();delete wls[\''+name+'\'];localStorage.setItem(\'ko_watchlists\',JSON.stringify(wls));updateWatchlistDropdown();renderAdminWLList();}" class="btn btn-sm" style="font-size:10px;padding:2px 7px;color:var(--red);border-color:var(--red)"><i class="ti ti-trash"></i></button>'
+      + '</div>';
+  }).join('');
+}
+
 function loadGistUrlField(){
   var DEFAULT_GIST = 'https://gist.githubusercontent.com/ahsub/bbbfed945e4d8292fbb300cf4012cfa5/raw/4dc45670fb3e50dd1df3fc832413047961d78558/ibd50.json';
   var saved = localStorage.getItem('ko_ibd_gist_url') || DEFAULT_GIST;
@@ -5314,6 +5662,147 @@ var DE_LIST_GROUPS = {
   ],
 };
 
+// ─── FIXED LISTS: S&P500 Kern, NASDAQ100, Sektoren ────────────────────────────
+var FIXED_LISTS = {
+  'DAX40': DE_LIST_GROUPS['DAX 40'],
+  'MDAX':  DE_LIST_GROUPS['MDAX Top 20'],
+  'TECDAX': DE_LIST_GROUPS['TecDAX Top 20'],
+  'SP500': [
+    {sym:'AAPL',name:'Apple Inc.'},{sym:'MSFT',name:'Microsoft Corp.'},{sym:'NVDA',name:'NVIDIA Corp.'},
+    {sym:'AMZN',name:'Amazon.com'},{sym:'META',name:'Meta Platforms'},{sym:'GOOGL',name:'Alphabet A'},
+    {sym:'TSLA',name:'Tesla Inc.'},{sym:'BRK.B',name:'Berkshire Hathaway'},{sym:'JPM',name:'JPMorgan Chase'},
+    {sym:'AVGO',name:'Broadcom Inc.'},{sym:'LLY',name:'Eli Lilly'},{sym:'V',name:'Visa Inc.'},
+    {sym:'XOM',name:'ExxonMobil'},{sym:'UNH',name:'UnitedHealth Group'},{sym:'JNJ',name:'Johnson & Johnson'},
+    {sym:'MA',name:'Mastercard'},{sym:'PG',name:'Procter & Gamble'},{sym:'HD',name:'Home Depot'},
+    {sym:'COST',name:'Costco Wholesale'},{sym:'WMT',name:'Walmart Inc.'},{sym:'ABBV',name:'AbbVie Inc.'},
+    {sym:'MRK',name:'Merck & Co.'},{sym:'CVX',name:'Chevron Corp.'},{sym:'BAC',name:'Bank of America'},
+    {sym:'NFLX',name:'Netflix Inc.'},{sym:'CRM',name:'Salesforce'},{sym:'AMD',name:'AMD Inc.'},
+    {sym:'ORCL',name:'Oracle Corp.'},{sym:'LIN',name:'Linde plc'},{sym:'TMO',name:'Thermo Fisher'},
+    {sym:'ACN',name:'Accenture'},{sym:'ADBE',name:'Adobe Inc.'},{sym:'QCOM',name:'Qualcomm'},
+    {sym:'TXN',name:'Texas Instruments'},{sym:'AMGN',name:'Amgen Inc.'},{sym:'INTU',name:'Intuit Inc.'},
+    {sym:'ISRG',name:'Intuitive Surgical'},{sym:'NOW',name:'ServiceNow'},{sym:'CAT',name:'Caterpillar'},
+    {sym:'HON',name:'Honeywell'},{sym:'GE',name:'GE Aerospace'},{sym:'RTX',name:'RTX Corp.'},
+    {sym:'UNP',name:'Union Pacific'},{sym:'BKNG',name:'Booking Holdings'},{sym:'GS',name:'Goldman Sachs'},
+    {sym:'AMAT',name:'Applied Materials'},{sym:'SYK',name:'Stryker Corp.'},{sym:'SPGI',name:'S&P Global'},
+    {sym:'AXP',name:'American Express'},{sym:'VRTX',name:'Vertex Pharma'},{sym:'REGN',name:'Regeneron'},
+    {sym:'PFE',name:'Pfizer Inc.'},{sym:'MO',name:'Altria Group'},{sym:'BMY',name:'Bristol-Myers'},
+    {sym:'GILD',name:'Gilead Sciences'},{sym:'MDT',name:'Medtronic'},{sym:'ELV',name:'Elevance Health'},
+    {sym:'CI',name:'Cigna Group'},{sym:'HCA',name:'HCA Healthcare'},{sym:'DUK',name:'Duke Energy'},
+    {sym:'SO',name:'Southern Company'},{sym:'NEE',name:'NextEra Energy'},{sym:'D',name:'Dominion Energy'},
+    {sym:'CL',name:'Colgate-Palmolive'},{sym:'KO',name:'Coca-Cola'},{sym:'PEP',name:'PepsiCo'},
+    {sym:'PM',name:'Philip Morris'},{sym:'MCD',name:'McDonald\'s'},{sym:'SBUX',name:'Starbucks'},
+    {sym:'NKE',name:'Nike Inc.'},{sym:'LOW',name:'Lowe\'s'},{sym:'TGT',name:'Target Corp.'},
+    {sym:'LRCX',name:'Lam Research'},{sym:'KLAC',name:'KLA Corp.'},{sym:'MCHP',name:'Microchip Tech.'},
+    {sym:'PANW',name:'Palo Alto Networks'},{sym:'CRWD',name:'CrowdStrike'},{sym:'FTNT',name:'Fortinet'},
+    {sym:'SNPS',name:'Synopsys'},{sym:'CDNS',name:'Cadence Design'},{sym:'MRVL',name:'Marvell Tech.'},
+    {sym:'PLTR',name:'Palantir Tech.'},{sym:'APP',name:'Applovin'},{sym:'COIN',name:'Coinbase'},
+    {sym:'SQ',name:'Block Inc.'},{sym:'PYPL',name:'PayPal Holdings'},{sym:'HOOD',name:'Robinhood'},
+    {sym:'WFC',name:'Wells Fargo'},{sym:'MS',name:'Morgan Stanley'},{sym:'BLK',name:'BlackRock'},
+    {sym:'SCHW',name:'Charles Schwab'},{sym:'COF',name:'Capital One'},{sym:'USB',name:'U.S. Bancorp'},
+    {sym:'MMM',name:'3M Company'},{sym:'DE',name:'Deere & Company'},{sym:'EMR',name:'Emerson Electric'},
+    {sym:'LMT',name:'Lockheed Martin'},{sym:'NOC',name:'Northrop Grumman'},{sym:'GD',name:'General Dynamics'},
+  ],
+  'NDX100': [
+    {sym:'AAPL',name:'Apple Inc.'},{sym:'MSFT',name:'Microsoft Corp.'},{sym:'NVDA',name:'NVIDIA Corp.'},
+    {sym:'AMZN',name:'Amazon.com'},{sym:'META',name:'Meta Platforms'},{sym:'GOOGL',name:'Alphabet A'},
+    {sym:'GOOG',name:'Alphabet C'},{sym:'TSLA',name:'Tesla Inc.'},{sym:'AVGO',name:'Broadcom Inc.'},
+    {sym:'COST',name:'Costco Wholesale'},{sym:'NFLX',name:'Netflix Inc.'},{sym:'ASML',name:'ASML Holding'},
+    {sym:'AMD',name:'AMD Inc.'},{sym:'QCOM',name:'Qualcomm'},{sym:'ADBE',name:'Adobe Inc.'},
+    {sym:'INTU',name:'Intuit Inc.'},{sym:'TXN',name:'Texas Instruments'},{sym:'AMAT',name:'Applied Materials'},
+    {sym:'ISRG',name:'Intuitive Surgical'},{sym:'MELI',name:'MercadoLibre'},{sym:'BKNG',name:'Booking Holdings'},
+    {sym:'PANW',name:'Palo Alto Networks'},{sym:'NOW',name:'ServiceNow'},{sym:'LRCX',name:'Lam Research'},
+    {sym:'KLAC',name:'KLA Corp.'},{sym:'ADP',name:'ADP'},{sym:'SNPS',name:'Synopsys'},
+    {sym:'CDNS',name:'Cadence Design'},{sym:'MCHP',name:'Microchip Tech.'},{sym:'MRVL',name:'Marvell Tech.'},
+    {sym:'CRWD',name:'CrowdStrike'},{sym:'FTNT',name:'Fortinet'},{sym:'DDOG',name:'Datadog'},
+    {sym:'ABNB',name:'Airbnb Inc.'},{sym:'DASH',name:'DoorDash'},{sym:'UBER',name:'Uber Tech.'},
+    {sym:'LYFT',name:'Lyft Inc.'},{sym:'PLTR',name:'Palantir Tech.'},{sym:'APP',name:'Applovin'},
+    {sym:'RBLX',name:'Roblox Corp.'},{sym:'ZS',name:'Zscaler'},{sym:'OKTA',name:'Okta Inc.'},
+    {sym:'MDB',name:'MongoDB'},{sym:'SNOW',name:'Snowflake'},{sym:'NET',name:'Cloudflare'},
+    {sym:'TEAM',name:'Atlassian'},{sym:'WDAY',name:'Workday'},{sym:'VEEV',name:'Veeva Systems'},
+    {sym:'TTD',name:'Trade Desk'},{sym:'DOCU',name:'DocuSign'},{sym:'ZM',name:'Zoom Video'},
+    {sym:'AMGN',name:'Amgen Inc.'},{sym:'VRTX',name:'Vertex Pharma'},{sym:'REGN',name:'Regeneron'},
+    {sym:'GILD',name:'Gilead Sciences'},{sym:'BIIB',name:'Biogen Inc.'},{sym:'IDXX',name:'IDEXX Labs'},
+    {sym:'GEHC',name:'GE HealthCare'},{sym:'ILMN',name:'Illumina'},{sym:'EXAS',name:'Exact Sciences'},
+    {sym:'NXPI',name:'NXP Semiconductors'},{sym:'ON',name:'ON Semiconductor'},{sym:'SWKS',name:'Skyworks'},
+    {sym:'MPWR',name:'Monolithic Power'},{sym:'ENPH',name:'Enphase Energy'},{sym:'FSLR',name:'First Solar'},
+    {sym:'PCAR',name:'PACCAR Inc.'},{sym:'FAST',name:'Fastenal'},{sym:'CTAS',name:'Cintas Corp.'},
+    {sym:'PAYX',name:'Paychex'},{sym:'VRSK',name:'Verisk Analytics'},{sym:'CPRT',name:'Copart Inc.'},
+    {sym:'ORLY',name:'O\'Reilly Auto'},{sym:'ROST',name:'Ross Stores'},{sym:'DLTR',name:'Dollar Tree'},
+    {sym:'KDP',name:'Keurig Dr Pepper'},{sym:'MDLZ',name:'Mondelez Int\'l'},{sym:'PDD',name:'PDD Holdings'},
+    {sym:'TCOM',name:'Trip.com Group'},{sym:'JD',name:'JD.com'},{sym:'BIDU',name:'Baidu Inc.'},
+    {sym:'SGEN',name:'Seagen Inc.'},{sym:'ALGN',name:'Align Technology'},{sym:'DXCM',name:'DexCom Inc.'},
+    {sym:'HON',name:'Honeywell'},{sym:'MNST',name:'Monster Beverage'},{sym:'AEP',name:'AEP'},
+    {sym:'XEL',name:'Xcel Energy'},{sym:'EXC',name:'Exelon Corp.'},{sym:'WBD',name:'Warner Bros.'},
+    {sym:'PARA',name:'Paramount Global'},{sym:'FOXA',name:'Fox Corp. A'},
+    {sym:'ARM',name:'ARM Holdings'},{sym:'ALAB',name:'Astera Labs'},{sym:'CRDO',name:'Credo Tech.'},
+    {sym:'CEG',name:'Constellation Energy'},{sym:'VST',name:'Vistra Corp.'},
+  ],
+  'DEFENSE': [
+    {sym:'LMT',name:'Lockheed Martin'},{sym:'NOC',name:'Northrop Grumman'},{sym:'RTX',name:'RTX Corp.'},
+    {sym:'GD',name:'General Dynamics'},{sym:'BA',name:'Boeing'},{sym:'L3H',name:'L3Harris Tech.'},
+    {sym:'HEI',name:'HEICO Corp.'},{sym:'AXON',name:'Axon Enterprise'},{sym:'LDOS',name:'Leidos Holdings'},
+    {sym:'SAIC',name:'Science Applications'},{sym:'DRS',name:'Leonardo DRS'},{sym:'KTOS',name:'Kratos Defense'},
+    {sym:'AVAV',name:'AeroVironment'},{sym:'CACI',name:'CACI Int\'l'},{sym:'HII',name:'Huntington Ingalls'},
+    {sym:'TDG',name:'TransDigm Group'},{sym:'SPR',name:'Spirit AeroSystems'},{sym:'RHM',name:'Rheinmetall AG'},
+    {sym:'AIR',name:'Airbus SE'},{sym:'HAG',name:'Hensoldt AG'},{sym:'MTX',name:'MTU Aero Engines'},
+    {sym:'BAESY',name:'BAE Systems'},{sym:'SAAB.B',name:'SAAB AB'},{sym:'THLLY',name:'Thales SA'},
+  ],
+  'REIT': [
+    {sym:'PLD',name:'Prologis'},{sym:'AMT',name:'American Tower'},{sym:'EQIX',name:'Equinix'},
+    {sym:'CCI',name:'Crown Castle'},{sym:'WELL',name:'Welltower'},{sym:'DLR',name:'Digital Realty'},
+    {sym:'O',name:'Realty Income'},{sym:'SPG',name:'Simon Property'},{sym:'PSA',name:'Public Storage'},
+    {sym:'EXR',name:'Extra Space Storage'},{sym:'VICI',name:'VICI Properties'},{sym:'ARE',name:'Alexandria RE'},
+    {sym:'VNO',name:'Vornado Realty'},{sym:'BXP',name:'BXP Inc.'},{sym:'KIM',name:'Kimco Realty'},
+    {sym:'REG',name:'Regency Centers'},{sym:'NNN',name:'NNN REIT'},{sym:'EQR',name:'Equity Residential'},
+    {sym:'AVB',name:'AvalonBay'},{sym:'UDR',name:'UDR Inc.'},{sym:'MAA',name:'Mid-America Apt.'},
+    {sym:'INVH',name:'Invitation Homes'},{sym:'AMH',name:'American Homes 4 Rent'},{sym:'IRT',name:'IRT Trust'},
+  ],
+  'ENERGY': [
+    {sym:'XOM',name:'ExxonMobil'},{sym:'CVX',name:'Chevron Corp.'},{sym:'COP',name:'ConocoPhillips'},
+    {sym:'SLB',name:'Schlumberger'},{sym:'EOG',name:'EOG Resources'},{sym:'MPC',name:'Marathon Petroleum'},
+    {sym:'PSX',name:'Phillips 66'},{sym:'VLO',name:'Valero Energy'},{sym:'PXD',name:'Pioneer Natural'},
+    {sym:'OXY',name:'Occidental Petro.'},{sym:'HAL',name:'Halliburton'},{sym:'BKR',name:'Baker Hughes'},
+    {sym:'DVN',name:'Devon Energy'},{sym:'FANG',name:'Diamondback Energy'},{sym:'KMI',name:'Kinder Morgan'},
+    {sym:'WMB',name:'Williams Cos.'},{sym:'LNG',name:'Cheniere Energy'},{sym:'RIG',name:'Transocean'},
+    {sym:'VST',name:'Vistra Corp.'},{sym:'CEG',name:'Constellation Energy'},{sym:'NEE',name:'NextEra Energy'},
+    {sym:'ENPH',name:'Enphase Energy'},{sym:'FSLR',name:'First Solar'},{sym:'RUN',name:'Sunrun Inc.'},
+  ],
+  'HEALTH': [
+    {sym:'UNH',name:'UnitedHealth Group'},{sym:'JNJ',name:'Johnson & Johnson'},{sym:'LLY',name:'Eli Lilly'},
+    {sym:'ABBV',name:'AbbVie Inc.'},{sym:'MRK',name:'Merck & Co.'},{sym:'TMO',name:'Thermo Fisher'},
+    {sym:'ABT',name:'Abbott Labs'},{sym:'DHR',name:'Danaher Corp.'},{sym:'SYK',name:'Stryker Corp.'},
+    {sym:'ISRG',name:'Intuitive Surgical'},{sym:'VRTX',name:'Vertex Pharma'},{sym:'REGN',name:'Regeneron'},
+    {sym:'AMGN',name:'Amgen Inc.'},{sym:'GILD',name:'Gilead Sciences'},{sym:'BIIB',name:'Biogen Inc.'},
+    {sym:'PFE',name:'Pfizer Inc.'},{sym:'BMY',name:'Bristol-Myers'},{sym:'MDT',name:'Medtronic'},
+    {sym:'EW',name:'Edwards Lifesciences'},{sym:'HCA',name:'HCA Healthcare'},{sym:'DXCM',name:'DexCom'},
+    {sym:'IDXX',name:'IDEXX Labs'},{sym:'ILMN',name:'Illumina'},{sym:'MRNA',name:'Moderna Inc.'},
+  ],
+  'FINANCE': [
+    {sym:'JPM',name:'JPMorgan Chase'},{sym:'BAC',name:'Bank of America'},{sym:'WFC',name:'Wells Fargo'},
+    {sym:'GS',name:'Goldman Sachs'},{sym:'MS',name:'Morgan Stanley'},{sym:'BLK',name:'BlackRock'},
+    {sym:'SCHW',name:'Charles Schwab'},{sym:'AXP',name:'American Express'},{sym:'COF',name:'Capital One'},
+    {sym:'USB',name:'U.S. Bancorp'},{sym:'PNC',name:'PNC Financial'},{sym:'TFC',name:'Truist Financial'},
+    {sym:'SPGI',name:'S&P Global'},{sym:'MCO',name:'Moody\'s Corp.'},{sym:'ICE',name:'Intercontinental Exch.'},
+    {sym:'CME',name:'CME Group'},{sym:'CB',name:'Chubb Ltd.'},{sym:'PGR',name:'Progressive Corp.'},
+    {sym:'MET',name:'MetLife Inc.'},{sym:'PRU',name:'Prudential Financial'},{sym:'AFL',name:'Aflac Inc.'},
+    {sym:'COIN',name:'Coinbase'},{sym:'HOOD',name:'Robinhood'},{sym:'SQ',name:'Block Inc.'},
+  ],
+  'CONSUMER': [
+    {sym:'AMZN',name:'Amazon.com'},{sym:'TSLA',name:'Tesla Inc.'},{sym:'HD',name:'Home Depot'},
+    {sym:'LOW',name:'Lowe\'s'},{sym:'MCD',name:'McDonald\'s'},{sym:'SBUX',name:'Starbucks'},
+    {sym:'NKE',name:'Nike Inc.'},{sym:'TGT',name:'Target Corp.'},{sym:'BKNG',name:'Booking Holdings'},
+    {sym:'ABNB',name:'Airbnb Inc.'},{sym:'UBER',name:'Uber Tech.'},{sym:'LYFT',name:'Lyft Inc.'},
+    {sym:'DASH',name:'DoorDash'},{sym:'EBAY',name:'eBay Inc.'},{sym:'ETSY',name:'Etsy Inc.'},
+    {sym:'W',name:'Wayfair Inc.'},{sym:'RH',name:'RH (Restoration Hw.)'},{sym:'RVTY',name:'Revvity Inc.'},
+    {sym:'GM',name:'General Motors'},{sym:'F',name:'Ford Motor'},{sym:'RIVN',name:'Rivian Automotive'},
+    {sym:'LCID',name:'Lucid Group'},{sym:'LVS',name:'Las Vegas Sands'},{sym:'MGM',name:'MGM Resorts'},
+  ],
+};
+
+function getFixedListTickers(key){
+  return (FIXED_LISTS[key] || []);
+}
+
 function openDEListSelector(){
   var modal = document.getElementById('de-list-modal');
   if(modal){ modal.style.display='block'; document.body.style.overflow='hidden'; }
@@ -5358,29 +5847,55 @@ function addDEGroupToWatchlist(groupName){
         <span style="font-size:11px;color:var(--text3)" id="le-count"></span>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <!-- List selector -->
         <button onclick="openListEditor('us50')" id="le-btn-us50" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🇺🇸 US-50</button>
         <button onclick="openListEditor('de50')" id="le-btn-de50" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🇩🇪 DE-50</button>
         <button onclick="openListEditor('ibd')" id="le-btn-ibd" class="btn btn-sm" style="font-size:11px;padding:3px 8px">📊 IBD</button>
-        <button onclick="openListEditor('watchlist')" id="le-btn-watchlist" class="btn btn-sm" style="font-size:11px;padding:3px 8px">⭐ WL</button>
+        <button onclick="openListEditor('watchlist')" id="le-btn-watchlist" class="btn btn-sm" style="font-size:11px;padding:3px 8px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">⭐ WL</button>
         <button onclick="closeListEditor()" style="background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer;padding:4px;line-height:1">✕</button>
       </div>
     </div>
+
+    <!-- WATCHLIST TOOLBAR (nur bei WL-Modus sichtbar) -->
+    <div id="le-wl-toolbar" style="display:none;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 12px;background:rgba(79,142,247,0.07);border-left:0.5px solid var(--accent);border-right:0.5px solid var(--accent);border-bottom:0.5px solid var(--border)">
+      <select id="le-wl-select" onchange="leWLSwitch(this.value)" style="flex:1;min-width:160px;font-size:12px;padding:4px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"></select>
+      <button onclick="leWLNew()" class="btn btn-sm" style="font-size:11px;background:var(--green-bg);border-color:var(--green);color:var(--green);white-space:nowrap"><i class="ti ti-plus"></i> Neue WL</button>
+      <button onclick="leWLRename()" class="btn btn-sm" style="font-size:11px;white-space:nowrap"><i class="ti ti-pencil"></i> Umbenennen</button>
+      <button onclick="leWLDelete()" class="btn btn-sm" style="font-size:11px;color:var(--red);border-color:var(--red);white-space:nowrap"><i class="ti ti-trash"></i> Löschen</button>
+      <button onclick="leWLScanNow()" class="btn btn-sm btn-primary" style="font-size:11px;white-space:nowrap"><i class="ti ti-radar"></i> Jetzt scannen</button>
+    </div>
+
     <!-- Toolbar -->
-    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg3);border-left:0.5px solid var(--border2);border-right:0.5px solid var(--border2);flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg3);border-left:0.5px solid var(--border2);border-right:0.5px solid var(--border2);flex-wrap:wrap;position:relative">
       <button onclick="leSaveList()" class="btn btn-sm btn-primary" style="font-size:11px"><i class="ti ti-device-floppy"></i> Speichern</button>
       <button onclick="exportListCSV()" class="btn btn-sm" style="font-size:11px"><i class="ti ti-download"></i> CSV</button>
       <button onclick="exportListTV()" class="btn btn-sm" style="font-size:11px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c"><i class="ti ti-chart-candle"></i> TradingView</button>
-      <label class="btn btn-sm" style="font-size:11px;cursor:pointer"><i class="ti ti-upload"></i> Import <input type="file" accept=".csv,.txt" style="display:none" onchange="importListCSV(this)"></label>
+
+      <!-- Share Button mit Dropdown -->
+      <div style="position:relative">
+        <button onclick="leWLShare()" class="btn btn-sm" style="font-size:11px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)"><i class="ti ti-share"></i> Teilen ▾</button>
+        <div id="le-share-menu" style="display:none;position:absolute;top:100%;left:0;z-index:200;background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.5);min-width:190px;margin-top:4px;overflow:hidden">
+          <button onclick="leShareDownload()" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;border-bottom:0.5px solid var(--border);color:var(--text);cursor:pointer;font-size:13px;text-align:left"><i class="ti ti-download" style="color:var(--accent)"></i> CSV herunterladen</button>
+          <button onclick="leShareMail()" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;border-bottom:0.5px solid var(--border);color:var(--text);cursor:pointer;font-size:13px;text-align:left"><i class="ti ti-mail" style="color:var(--accent)"></i> Per E-Mail senden</button>
+          <button onclick="leShareSystem()" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;border-bottom:0.5px solid var(--border);color:var(--text);cursor:pointer;font-size:13px;text-align:left"><i class="ti ti-brand-whatsapp" style="color:#25d366"></i> Teilen… (WhatsApp / AirDrop)</button>
+          <button onclick="leShareCopy()" style="display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text);cursor:pointer;font-size:13px;text-align:left"><i class="ti ti-clipboard" style="color:var(--text2)"></i> In Zwischenablage</button>
+        </div>
+      </div>
+
+      <!-- WL Import -->
+      <label class="btn btn-sm" style="font-size:11px;cursor:pointer" id="le-wl-import-btn"><i class="ti ti-upload"></i> CSV Import <input type="file" accept=".csv,.txt" style="display:none" onchange="leWLImportToActive(this)"></label>
+      <!-- Standard Import (für andere Modi) -->
+      <label class="btn btn-sm" style="font-size:11px;cursor:pointer" id="le-std-import-btn"><i class="ti ti-upload"></i> Import <input type="file" accept=".csv,.txt" style="display:none" onchange="importListCSV(this)"></label>
       <span style="flex:1"></span>
       <span id="le-status" style="display:none;font-size:11px"></span>
     </div>
+
     <!-- Add row -->
     <div style="display:flex;gap:6px;padding:7px 12px;background:var(--bg2);border-left:0.5px solid var(--border2);border-right:0.5px solid var(--border2);align-items:center;flex-wrap:wrap">
       <input type="text" id="le-new-sym" placeholder="Ticker" oninput="this.value=this.value.toUpperCase()" style="width:70px;padding:4px 7px;font-size:12px;font-family:var(--mono);background:var(--bg3);border:0.5px solid var(--border2);color:var(--accent);border-radius:6px">
       <input type="text" id="le-new-name" placeholder="Unternehmensname" style="flex:1;min-width:120px;padding:4px 7px;font-size:12px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px">
       <button onclick="leAddRow()" class="btn btn-sm" style="font-size:12px;background:var(--green-bg);border-color:var(--green);color:var(--green)"><i class="ti ti-plus"></i> Hinzufügen</button>
     </div>
+
     <!-- Table -->
     <div style="background:var(--bg);border:0.5px solid var(--border2);border-top:none;border-radius:0 0 var(--radius) var(--radius);overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -5402,7 +5917,7 @@ function addDEGroupToWatchlist(groupName){
     </div>
     <!-- Footer hint -->
     <div style="padding:8px 12px;font-size:11px;color:var(--text3)">
-      <i class="ti ti-info-circle"></i> Änderungen erst nach "Speichern" aktiv · TradingView Import: Watchlist → Import → Datei wählen
+      <i class="ti ti-info-circle"></i> Änderungen erst nach "Speichern" aktiv · Teilen: CSV per Mail, WhatsApp oder AirDrop weitergeben
     </div>
   </div>
 </div>
