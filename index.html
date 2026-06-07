@@ -1457,6 +1457,9 @@ function updateClock(){
 const charts={};
 let tickerData={};
 let activeTickers=[...DEFAULT_TICKERS];
+// Fruehzeitige Deklaration zur Vermeidung von Hoisting-Fehlern
+var _listEditorMode = 'us50';
+var _listEditorData = [];
 
 // TD THROTTLE + CACHE (8 req/min Free Plan)
 const TD_CACHE_KEY='ko_td_cache';
@@ -5081,9 +5084,8 @@ async function loadIndexMovers(){
 
 // ═══ LISTEN-EDITOR ═══════════════════════════════════════════════════════════
 
-// Current editor state
-var _listEditorMode = 'us50';
-var _listEditorData = [];  // [{sym, name, exchange, comp, eps, rs, lastEps, sales, sector, note}]
+// Current editor state (_listEditorMode und _listEditorData oben deklariert)
+// [{sym, name, exchange, comp, eps, rs, lastEps, sales, sector, note}]
 
 var LIST_EXCHANGE_MAP = {
   // US stocks
@@ -6244,18 +6246,57 @@ function renderFiboCards(filter) {
     const barPct = Math.max(0, Math.min(100, d.retrace)).toFixed(0);
     const barColor = d.zone === 'buy' ? 'var(--green)' : d.zone === 'watch' ? 'var(--amber)' : 'var(--red)';
 
-    // Empfehlungstext
+    // Handlungsempfehlung mit Kapitalallokation (lv, pr, swing bereits deklariert)
     let advice = '';
-    if (d.zone === 'buy' && swing.direction === 'down') {
-      advice = 'Kurs im Retracement-Goldbereich (38-62%). Einstieg pruefen.';
-    } else if (d.zone === 'buy' && swing.direction === 'up') {
-      advice = 'Gesunder Pullback in Kauf-Zone. Trend intakt.';
+
+    // Naechstes sinnvolles Level berechnen
+    const allLevels = [
+      {pct:'23.6%', val:lv.p236},
+      {pct:'38.2%', val:lv.p382},
+      {pct:'50%',   val:lv.p500},
+      {pct:'61.8%', val:lv.p618},
+      {pct:'78.6%', val:lv.p786}
+    ];
+
+    // Naechstes Level unterhalb des aktuellen Kurses
+    const nextSupport = allLevels.filter(l => l.val < pr).sort((a,b) => b.val - a.val)[0];
+    // Naechstes Level oberhalb (Widerstand / Ziel)
+    const nextResist  = allLevels.filter(l => l.val > pr).sort((a,b) => a.val - b.val)[0];
+
+    if (d.zone === 'buy') {
+      // Starter 40% jetzt, Aufstockung 40% bei Bounce-Bestaetigung, Rest 20%
+      const starterPrice = pr.toFixed(2);
+      const addPrice = nextResist ? nextResist.val.toFixed(2) : (pr * 1.03).toFixed(2);
+      const stopPrice = nextSupport ? (nextSupport.val * 0.99).toFixed(2) : (pr * 0.95).toFixed(2);
+      const addLabel  = nextResist ? nextResist.pct+'-Level' : '+3%';
+      advice = '<b style="color:var(--green)">Einstieg empfohlen:</b> ' +
+        'Starter 40% bei $'+starterPrice+' &rarr; ' +
+        'Aufstocken 40% wenn Bounce ueber $'+addPrice+' ('+addLabel+') bestaetigt &rarr; ' +
+        'Rest 20% bei Trend-Bestaetigung. ' +
+        'Stop-Loss unter $'+stopPrice+'.';
     } else if (d.zone === 'watch' && swing.direction === 'down') {
-      advice = 'Noch nicht in optimaler Zone. Warten auf weiteren Rueckgang oder Bounce-Bestaetigung.';
+      const targetEntry = nextSupport ? nextSupport.val.toFixed(2) : (pr * 0.97).toFixed(2);
+      const targetLabel = nextSupport ? nextSupport.pct+'-Level' : '-3%';
+      const bounceConf  = nextResist  ? '$'+nextResist.val.toFixed(2)+' ('+nextResist.pct+')' : 'naechsten Widerstand';
+      advice = '<b style="color:var(--amber)">Noch warten:</b> ' +
+        'Optimale Zone noch nicht erreicht. ' +
+        'Einstieg bei $'+targetEntry+' ('+targetLabel+') pruefen &rarr; ' +
+        'oder Bounce-Bestaetigung abwarten: Kurs muss '+bounceConf+' von unten durchbrechen. ' +
+        'Dann Starter 40%.';
+    } else if (d.zone === 'watch' && swing.direction === 'up') {
+      const targetEntry = nextSupport ? nextSupport.val.toFixed(2) : (pr * 0.97).toFixed(2);
+      const targetLabel = nextSupport ? nextSupport.pct+'-Level' : '-3%';
+      advice = '<b style="color:var(--amber)">Pullback beobachten:</b> ' +
+        'Gesunder Ruecksetzer. Einstieg wenn Kurs $'+targetEntry+' ('+targetLabel+') haelt. ' +
+        'Starter 40%, Aufstocken bei erneutem Anstieg.';
     } else if (d.zone === 'early') {
-      advice = 'Zu frueh fuer Einstieg. Kurs noch nicht zurueckgekommen.';
-    } else if (d.zone === 'deep') {
-      advice = 'Starker Einbruch. Stabilisierung abwarten.';
+      const targetEntry = lv.p382.toFixed(2);
+      advice = '<b style="color:var(--red)">Zu frueh:</b> ' +
+        'Kurs noch nicht zurueckgekommen. Watchlist setzen, ' +
+        'Alert bei $'+targetEntry+' (38.2%-Level) einrichten.';
+    } else {
+      advice = '<b style="color:var(--text3)">Abwarten:</b> Starker Einbruch. ' +
+        'Stabilisierung und Volumen-Bestaetigung abwarten bevor Einstieg.';
     }
 
     return '<div class="card" style="margin-bottom:.6rem;border-left:3px solid '+cfg.color+';background:'+cfg.bg+'">' +
@@ -6292,7 +6333,7 @@ function renderFiboCards(filter) {
         fiboLevelCell('78.6%', lv.p786, pr) +
       '</div>' +
       // Empfehlung
-      '<div style="font-size:11px;color:var(--text2);border-top:.5px solid var(--border);padding-top:.4rem">' +
+      (d.zone==='buy'||d.zone==='watch' ? '<div style="font-size:11px;color:var(--text2);border-top:.5px solid var(--border);padding-top:.5rem;margin-top:.2rem;line-height:1.5">' : '<div style="font-size:11px;color:var(--text3);border-top:.5px solid var(--border);padding-top:.4rem">') +
         advice +
       '</div>' +
     '</div>';
