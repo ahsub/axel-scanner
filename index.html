@@ -5763,11 +5763,25 @@ function importListCSV(input){
             sector: col(colIdx.sector), note: col(colIdx.note),
           };
         }).filter(function(r){return r.sym;});
-        leShowStatus('✓ CSV importiert: ' + _listEditorData.length + ' Titel', 'var(--green)');
+        leShowStatus('\u2713 CSV importiert: ' + _listEditorData.length + ' Titel', 'var(--green)');
       }
       renderListEditorTable();
+      // Direkt als Watchlist speichern
+      var defName = file.name.replace(/\.csv$/i,'').replace(/[^a-zA-Z0-9_\- ]/g,'').trim() || 'CSV Import';
+      var wlName = prompt('Als Watchlist speichern unter:', defName);
+      if (wlName && wlName.trim()) {
+        var tickers = _listEditorData.map(function(r){ return r.sym; }).filter(Boolean);
+        var wls = getWatchlists();
+        wls[wlName.trim()] = tickers.join(', ');
+        localStorage.setItem('ko_watchlists', JSON.stringify(wls));
+        updateWatchlistDropdown();
+        var scanSel = document.getElementById('ticker-preset');
+        if (scanSel) { scanSel.value = 'wl:' + wlName.trim(); scanSel.dispatchEvent(new Event('change')); }
+        if (typeof showKoToast === 'function') showKoToast('\u2713 Watchlist "' + wlName.trim() + '" gespeichert');
+        leShowStatus('\u2713 Gespeichert als "' + wlName.trim() + '" (' + tickers.length + ' Ticker)', 'var(--green)');
+      }
     }catch(err){
-      leShowStatus('✗ Import-Fehler: ' + err.message, 'var(--red)');
+      leShowStatus('\u2717 Import-Fehler: ' + err.message, 'var(--red)');
     }
     input.value = '';
   };
