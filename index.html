@@ -634,6 +634,27 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
         <div id="yahoo-news-list" style="font-size:12px;color:var(--text2);line-height:1.8"></div>
       </div>
+
+      <!-- SEKTOR RS-TABELLE -->
+      <div style="margin-top:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+          <div style="font-size:13px;font-weight:500">Sektor Relative Strength vs. SPY</div>
+          <button class="btn btn-sm" onclick="loadSektorRS()" id="sektor-rs-btn" style="font-size:11px">
+            <i class="ti ti-refresh"></i> Aktualisieren
+          </button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:.5rem">
+          5-Tage-Performance relativ zu SPY &middot; <span id="sektor-rs-time" style="color:var(--text3)">nicht geladen</span>
+        </div>
+        <div id="sektor-rs-content">
+          <div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:12px">
+            <i class="ti ti-chart-bar" style="font-size:1.5rem;display:block;margin-bottom:.4rem"></i>
+            Auf "Aktualisieren" klicken um Sektor-Daten zu laden
+          </div>
+        </div>
+      </div>
+      <!-- ENDE SEKTOR RS-TABELLE -->
+
       <div style="margin-top:.5rem;font-size:11px;color:var(--text3)">
         <i class="ti ti-info-circle"></i> Admin-Tab → Makro täglich aktualisieren · Keine Anlageberatung
       </div>
@@ -6593,6 +6614,143 @@ async function fetchQqqRegime() {
     renderQqqBanner(_qqqRegime);
   } catch(e) { console.log('QQQ regime error:', e.message); }
 }
+
+// ===============================================================
+//  SEKTOR RELATIVE STRENGTH
+// ===============================================================
+const SEKTOREN = [
+  { sym:'SMH',  name:'Halbleiter',      icon:'ti-cpu' },
+  { sym:'XLK',  name:'Technologie',     icon:'ti-device-laptop' },
+  { sym:'XLV',  name:'Gesundheit',      icon:'ti-heart-rate-monitor' },
+  { sym:'XLF',  name:'Finanzen',        icon:'ti-building-bank' },
+  { sym:'XLE',  name:'Energie',         icon:'ti-bolt' },
+  { sym:'XLI',  name:'Industrie',       icon:'ti-tool' },
+  { sym:'XLC',  name:'Kommunikation',   icon:'ti-antenna' },
+  { sym:'XLY',  name:'Konsum zyklisch', icon:'ti-shopping-cart' },
+  { sym:'XLP',  name:'Konsum stabil',   icon:'ti-shopping-bag' },
+  { sym:'XLB',  name:'Materialien',     icon:'ti-flask' },
+  { sym:'XLRE', name:'Immobilien',      icon:'ti-home' },
+  { sym:'XBI',  name:'Biotech',         icon:'ti-dna' },
+];
+
+let _sektorData = [];
+let _sektorLoading = false;
+
+async function fetchSektorPerf(sym) {
+  const key = getTwelveKey();
+  if (!key) return null;
+  try {
+    const url = 'https://api.twelvedata.com/time_series?symbol='+sym+'&interval=1day&outputsize=10&apikey='+key;
+    const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(url);
+    const res = await tdThrottledFetch(proxy, 'sektor_'+sym+'_10d');
+    const j = res.data;
+    if (!j.values || j.values.length < 6) return null;
+    const vals = [...j.values].reverse().map(v => parseFloat(v.close));
+    const perf5d  = (vals[vals.length-1] - vals[vals.length-6]) / vals[vals.length-6] * 100;
+    const perf1d  = (vals[vals.length-1] - vals[vals.length-2]) / vals[vals.length-2] * 100;
+    return { sym, perf5d, perf1d, price: vals[vals.length-1], fromCache: res.fromCache };
+  } catch(e) { return null; }
+}
+
+async function loadSektorRS() {
+  if (_sektorLoading) return;
+  _sektorLoading = true;
+  const btn = document.getElementById('sektor-rs-btn');
+  const el  = document.getElementById('sektor-rs-content');
+  const timeEl = document.getElementById('sektor-rs-time');
+  if (btn) btn.disabled = true;
+
+  el.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text3);font-size:12px"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Lade Sektor-Daten...</div>';
+
+  // SPY als Referenz
+  const spyData = await fetchSektorPerf('SPY');
+  const spy5d = spyData ? spyData.perf5d : 0;
+  const spy1d = spyData ? spyData.perf1d : 0;
+
+  // Alle Sektoren laden
+  const results = [];
+  for (const s of SEKTOREN) {
+    const d = await fetchSektorPerf(s.sym);
+    if (d) {
+      results.push({
+        ...s,
+        perf5d: d.perf5d,
+        perf1d: d.perf1d,
+        rs5d: d.perf5d - spy5d,   // Relative Strength vs SPY
+        rs1d: d.perf1d - spy1d,
+        price: d.price,
+        fromCache: d.fromCache
+      });
+    }
+  }
+
+  // Sortierung: RS 5d absteigend
+  results.sort((a,b) => b.rs5d - a.rs5d);
+  _sektorData = results;
+
+  renderSektorRS(results, spy5d, spy1d);
+  if (timeEl) timeEl.textContent = 'Stand: ' + new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'});
+  if (btn) btn.disabled = false;
+  _sektorLoading = false;
+}
+
+function renderSektorRS(results, spy5d, spy1d) {
+  const el = document.getElementById('sektor-rs-content');
+  if (!el) return;
+
+  if (!results.length) {
+    el.innerHTML = '<div style="color:var(--red);font-size:12px;padding:.5rem">Keine Daten - Twelve Data Key pruefen</div>';
+    return;
+  }
+
+  // Max RS fuer Balkenbreite
+  const maxAbs = Math.max(...results.map(r => Math.abs(r.rs5d)), 1);
+
+  // SPY-Referenzzeile
+  const spyRow = '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;margin-bottom:6px;background:var(--bg3);border-radius:8px;font-size:11px">' +
+    '<span style="width:40px;font-weight:600;color:var(--text3)">SPY</span>' +
+    '<span style="flex:1;color:var(--text3)">S&P 500 (Referenz)</span>' +
+    '<span style="width:60px;text-align:right;color:var(--text3)">' + (spy5d>=0?'+':'') + spy5d.toFixed(2) + '%</span>' +
+    '<span style="width:55px;text-align:right;color:var(--text3)">+0.00%</span>' +
+    '</div>';
+
+  const rows = results.map(function(r) {
+    const rs5Color = r.rs5d >= 2 ? 'var(--green)' : r.rs5d >= 0 ? 'var(--text2)' : r.rs5d >= -2 ? 'var(--amber)' : 'var(--red)';
+    const rs1Color = r.rs1d >= 0.5 ? 'var(--green)' : r.rs1d >= 0 ? 'var(--text2)' : 'var(--red)';
+    const barW = Math.min(Math.abs(r.rs5d) / maxAbs * 100, 100);
+    const barColor = r.rs5d >= 0 ? 'var(--green)' : 'var(--red)';
+    const bgRow = r.rs5d >= 3 ? 'rgba(52,199,89,0.06)' : r.rs5d <= -3 ? 'rgba(255,59,48,0.06)' : 'transparent';
+
+    // Trend-Pfeil 1d
+    const arrow = r.rs1d >= 0.3 ? ' \u2191' : r.rs1d <= -0.3 ? ' \u2193' : ' \u2192';
+    const arrowColor = r.rs1d >= 0.3 ? 'var(--green)' : r.rs1d <= -0.3 ? 'var(--red)' : 'var(--text3)';
+
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;background:'+bgRow+';margin-bottom:3px">' +
+      '<span style="width:40px;font-weight:700;font-size:12px;color:var(--text1)">'+r.sym+'</span>' +
+      '<span style="width:120px;font-size:11px;color:var(--text2)"><i class="ti '+r.icon+'" style="font-size:10px"></i> '+r.name+'</span>' +
+      // RS-Balken
+      '<div style="flex:1;background:var(--bg3);border-radius:3px;height:6px;position:relative">' +
+        '<div style="position:absolute;'+(r.rs5d>=0?'left:50%':'right:'+(100-50)+'%')+';top:0;height:100%;width:'+barW/2+'%;background:'+barColor+';border-radius:3px"></div>' +
+        '<div style="position:absolute;left:50%;top:-3px;width:1px;height:12px;background:var(--text3);opacity:.4"></div>' +
+      '</div>' +
+      // RS 5d
+      '<span style="width:65px;text-align:right;font-size:12px;font-weight:600;color:'+rs5Color+'">'+(r.rs5d>=0?'+':'')+r.rs5d.toFixed(2)+'%</span>' +
+      // 1d Trend
+      '<span style="width:40px;text-align:right;font-size:11px;color:'+arrowColor+'">'+arrow+'</span>' +
+      '</div>';
+  }).join('');
+
+  // Legende
+  const legend = '<div style="display:flex;gap:16px;margin-top:8px;font-size:10px;color:var(--text3);padding:0 10px">' +
+    '<span style="color:var(--green)">\u25A0 Outperformt SPY</span>' +
+    '<span style="color:var(--red)">\u25A0 Underperformt SPY</span>' +
+    '<span>\u2191\u2193 1-Tages-Trend</span>' +
+    '<span>Balken = RS 5d relativ</span>' +
+    '</div>';
+
+  el.innerHTML = spyRow + rows + legend;
+}
+// ===============================================================
 </script>
 
 <!-- LIST EDITOR MODAL -->
