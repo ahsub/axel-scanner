@@ -1502,7 +1502,7 @@ var _listEditorData = [];
 // TD THROTTLE + CACHE (8 req/min Free Plan)
 const TD_CACHE_KEY='ko_td_cache';
 const TD_CACHE_TTL=4*60*60*1000;
-const TD_MIN_DELAY=8000;
+const TD_MIN_DELAY=12000; // 12s = max 5 req/min, sicher unter Free Plan Limit
 let _tdLastCall=0;
 function getTdCache(){try{const r=localStorage.getItem(TD_CACHE_KEY);return r?JSON.parse(r):{};}catch(e){return{};}}
 function setTdCache(c){try{localStorage.setItem(TD_CACHE_KEY,JSON.stringify(c));}catch(e){}}
@@ -1515,7 +1515,20 @@ async function tdThrottledFetch(url,cacheKey){
   if(_tdLastCall>0&&elapsed<TD_MIN_DELAY) await new Promise(r=>setTimeout(r,TD_MIN_DELAY-elapsed));
   _tdLastCall=Date.now();
   const r=await fetch(url);
-  if(!r.ok){if(r.status===429)throw new Error('TD_RATE_LIMIT');throw new Error('TD HTTP '+r.status);}
+  if(!r.ok){
+    if(r.status===429){
+      // Warte 60s und versuche einmal nochmal
+      console.log('TD 429 - warte 60s...');
+      await new Promise(res=>setTimeout(res,60000));
+      const r2=await fetch(url);
+      if(!r2.ok) throw new Error('TD_RATE_LIMIT');
+      const j2=await r2.json();
+      if(j2.status==='error') throw new Error('TD: '+(j2.message||'API error'));
+      setTdCacheEntry(cacheKey,j2);
+      return{data:j2,fromCache:false};
+    }
+    throw new Error('TD HTTP '+r.status);
+  }
   const j=await r.json();
   if(j.status==='error')throw new Error('TD: '+(j.message||'API error'));
   setTdCacheEntry(cacheKey,j);
@@ -3281,15 +3294,13 @@ async function autoMakro(){
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }]
     });
-    // Anthropic API via Proxy (CORS-Problem bei direktem Browser-Call von GitHub Pages)
+    // Anthropic immer via Proxy (CORS-Problem bei direktem GitHub Pages Call)
     const antProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
       + encodeURIComponent('https://api.anthropic.com/v1/messages')
       + '&ant_key=' + encodeURIComponent(antKey);
     const response = await fetch(antProxyUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: antBody
     });
 
@@ -7183,13 +7194,12 @@ async function openKiBriefing() {
   const dummy = 'Du bist ein erfahrener Knock-out-Trading-Experte'; // ersetzt durch stratCfg.prompt
 
     try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const makroProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
+      + encodeURIComponent('https://api.anthropic.com/v1/messages')
+      + '&ant_key=' + encodeURIComponent(apiKey);
+    const response = await fetch(makroProxyUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
