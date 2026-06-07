@@ -267,6 +267,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <button class="btn btn-primary" onclick="runScan()" id="scan-btn">
           <i class="ti ti-player-play"></i> Scan
         </button>
+        <button class="btn" onclick="openKiBriefing()"
+          style="background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.2));border-color:#818cf8;color:#818cf8;font-size:13px"
+          title="KI-Analyse der Scanner-Ergebnisse">
+          <i class="ti ti-brain"></i>
+        </button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem">
         <span style="font-size:11px;color:var(--text3);white-space:nowrap">Zeitrahmen:</span>
@@ -1689,7 +1694,7 @@ async function runScan(){
           const cacheKey=tdSym+'_'+interval+'_'+outputsize;
           const tdResult=await tdThrottledFetch(proxyUrl,cacheKey);
           const j=tdResult.data;
-          raw._fromTdCache = tdResult.fromCache;
+          const _tdFromCache = tdResult.fromCache; // gespeichert bis raw definiert ist
           if(true){
             if(j.values&&j.values.length>=20){
               const rev=[...j.values].reverse();
@@ -1744,6 +1749,7 @@ async function runScan(){
 
       if(closes.length<20) throw new Error('Keine Daten verfügbar (TD & YF via Proxy)');
       const raw=computeFromRaw(closes,volumes,timestamps);
+      raw._fromTdCache = typeof _tdFromCache !== 'undefined' ? _tdFromCache : false;
       raw.dates_20d=dates.slice(-20);
       raw.dataSource=dataSource;
       raw.sessionNote=sessionNote;
@@ -6707,12 +6713,18 @@ async function fetchSektorPerf(sym) {
   try {
     const url = 'https://api.twelvedata.com/time_series?symbol='+sym+'&interval=1day&outputsize=10&apikey='+key;
     const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(url);
-    const res = await tdThrottledFetch(proxy, 'sektor_'+sym+'_10d');
+    // Sektor-Cache: 6h TTL - separater Cache-Key
+  const sektorCacheKey = 'sektor_'+sym+'_10d';
+  const sektorCached = getTdCacheEntry(sektorCacheKey);
+  if (sektorCached) return { sym, perf5d: sektorCached.p5, perf1d: sektorCached.p1, price: sektorCached.px, fromCache: true };
+  const res = await tdThrottledFetch(proxy, sektorCacheKey);
     const j = res.data;
     if (!j.values || j.values.length < 6) return null;
     const vals = [...j.values].reverse().map(v => parseFloat(v.close));
     const perf5d  = (vals[vals.length-1] - vals[vals.length-6]) / vals[vals.length-6] * 100;
     const perf1d  = (vals[vals.length-1] - vals[vals.length-2]) / vals[vals.length-2] * 100;
+    // Cache Sektor-Ergebnis explizit
+    setTdCacheEntry(sektorCacheKey, { p5: perf5d, p1: perf1d, px: vals[vals.length-1] });
     return { sym, perf5d, perf1d, price: vals[vals.length-1], fromCache: res.fromCache };
   } catch(e) { return null; }
 }
@@ -6869,6 +6881,8 @@ function updateWlButtons() {
 }
 
 // SCAN-RESULT-REGISTRY (tagesbasiert)
+const SEKTOR_CACHE_TTL = 6 * 60 * 60 * 1000; // 6h Cache fuer Sektor-Daten
+let _sektorLastLoad = 0;
 const SR_KEY = 'ko_scan_registry';
 const SR_TTL = 24 * 60 * 60 * 1000; // 24 Stunden
 
