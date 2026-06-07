@@ -241,7 +241,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
 
       <div class="btn-row">
-        <select id="ticker-preset" style="flex:1;font-size:12px" onchange="onPresetChange()">
+        <select id="ticker-preset" style="flex:1;font-size:12px" onchange="onPresetChange();updateWlButtons()">
           <option value="default">50 US-Aktien (alle scannen)</option>
           <option value="top50-us">Top-50 Liste (IBD Momentum)</option>
           <option value="custom">Eigene Ticker</option>
@@ -279,9 +279,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
         <span style="font-size:11px;color:var(--text3)" id="tf-label">Tageschart · MACD (12/26/9)</span>
       </div>
-      <div id="custom-wrap" style="display:none;margin-bottom:.75rem">
-        <input type="text" id="custom-input" placeholder="AAPL, MSFT, NVDA (kommagetrennt)">
-      </div>
+      <div id="custom-wrap" style="display:none;margin-bottom:.75rem"><div style="display:flex;gap:6px;align-items:center"><input type="text" id="custom-input" placeholder="AAPL, MSFT, NVDA (kommagetrennt)" style="flex:1"><button class="btn btn-sm" onclick="saveCurrentAsWatchlist()" title="Als neue Watchlist speichern" style="white-space:nowrap;font-size:11px;flex-shrink:0"><i class="ti ti-bookmark-plus"></i> Speichern</button><button class="btn btn-sm" id="update-wl-btn" onclick="updateExistingWatchlist()" title="Aktuelle Watchlist aktualisieren" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)"><i class="ti ti-refresh"></i> WL aktualisieren</button></div></div>
       <div id="qqq-regime-banner" style="display:none;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;margin:6px 1rem 0" title="Markov-Regime des NASDAQ100"></div>
       <div id="vix-ampel" style="display:none;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;margin:8px 1rem 0;cursor:default" title="VIX = CBOE Volatility Index"></div>
       <div id="scan-progress" style="display:none;margin-bottom:.75rem">
@@ -672,6 +670,17 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <i class="ti ti-refresh"></i>
           </button>
         </div>
+        <!-- Eigene Ticker fuer Fibo -->
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:.75rem;padding:8px 10px;background:var(--bg3);border-radius:8px">
+          <i class="ti ti-search" style="font-size:14px;color:var(--text3);flex-shrink:0"></i>
+          <input type="text" id="fibo-custom-input"
+            placeholder="Eigene Ticker: AAPL, NVDA, TSM (kommagetrennt)"
+            style="flex:1;font-size:12px;background:transparent;border:none;outline:none;color:var(--text1)"
+            onkeydown="if(event.key==='Enter') scanFiboCustom()">
+          <button class="btn btn-sm btn-primary" onclick="scanFiboCustom()" style="font-size:11px;flex-shrink:0">
+            <i class="ti ti-chart-arrows-vertical"></i> Analysieren
+          </button>
+        </div>
         <div style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap" id="fibo-filters">
           <button class="pill fibo-f active-filter" data-f="all" onclick="fiboFilter(this)" style="cursor:pointer">Alle</button>
           <button class="pill fibo-f" data-f="buy" onclick="fiboFilter(this)" style="cursor:pointer">&#x1F7E2; Einstieg</button>
@@ -1040,6 +1049,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="sec">Twelve Data Cache</div>
       <div class="card" style="margin-bottom:1rem">
         <div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">Kursdaten 4h lokal gecacht. Cache leeren erzwingt frische API-Daten.</div>
+        <button class="btn btn-sm" onclick="clearScanRegistry();showKoToast('Scan-Registry geleert');" style="font-size:12px"><i class="ti ti-history"></i> Scan-Registry leeren</button>
         <button class="btn btn-sm" onclick="clearTdCache();this.textContent='✓ Geleert';setTimeout(()=>this.textContent='Cache leeren',2000)" style="font-size:12px"><i class="ti ti-trash"></i> Cache leeren</button>
       </div>
       <div class="sec">PIN ändern</div>
@@ -1670,6 +1680,7 @@ async function runScan(){
           const cacheKey=tdSym+'_'+interval+'_'+outputsize;
           const tdResult=await tdThrottledFetch(proxyUrl,cacheKey);
           const j=tdResult.data;
+          raw._fromTdCache = tdResult.fromCache;
           if(true){
             if(j.values&&j.values.length>=20){
               const rev=[...j.values].reverse();
@@ -1745,6 +1756,7 @@ async function runScan(){
       if(raw.closes_full && raw.closes_full.length >= 25){
         raw._markov = calcMarkovRegime(raw.closes_full);
       }
+      markScanned(t.sym, !!raw._fromTdCache);
       renderCard(t,processData(raw));
     }catch(e){
       var msg = e.message;
@@ -2003,6 +2015,7 @@ function processData(raw){
 
   return Object.assign({},raw,{
     markov:raw._markov||null,
+    _fromTdCache:raw._fromTdCache||false,
     above50:above50,macdBull:macdBull,obvBull:obvBull,bullCount:bullCount,
     histVal:raw.macd_hist,obvSlope:raw.obv_slope_5d,volRatio:raw.volume_ratio,
     closes:raw.closes_20d||[],hist:raw.macd_hist_20d||[],
@@ -2064,6 +2077,8 @@ function renderCard(t,state){
     '</span>'+
     (state.sessionNote?'<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,0.08);color:var(--text3);margin-left:4px">'+state.sessionNote+'</span>':'')+
     earningsBadgeHtml(state._er||null)+
+    (state._fromTdCache ? '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(120,120,128,0.15);color:var(--text3);margin-left:4px" title="Daten aus lokalem Cache"><i class="ti ti-database" style="font-size:9px"></i> Cache</span>' : '')+
+    (state._fromTdCache ? '<button onclick="event.stopPropagation();rescanTicker(\'' + state.sym + '\')" style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg3);color:var(--text3);border:0.5px solid var(--border2);cursor:pointer;margin-left:4px" title="Frische Kursdaten laden"><i class="ti ti-refresh" style="font-size:9px"></i> Neu</button>' : '')+
     '</div>'+
     '<div class="sig-grid">'+
     '<div class="sig-box"><div class="sig-label">50d MA $'+ma50.toFixed(0)+'</div>'+
@@ -6200,9 +6215,9 @@ function buildFiboTab() {
 
   syms.forEach(function(sym) {
     const raw = tickerData[sym];
-    if (!raw || !raw.closes || raw.closes.length < 20) return;
-
-    const closes = raw.closes;
+    // closes_full hat alle Bars (bis 220), closes_20d nur 20 - Fibo braucht mindestens 30
+    const closes = raw && (raw.closes_full || raw.closes_20d);
+    if (!closes || closes.length < 20) return;
     const last = closes[closes.length - 1];
     const swing = detectSwing(closes);
     if (!swing) return;
@@ -6764,6 +6779,241 @@ function renderSektorRS(results, spy5d, spy1d) {
   el.innerHTML = spyRow + rows + legend;
 }
 // ===============================================================
+
+// WATCHLIST VERWALTUNG
+function saveCurrentAsWatchlist() {
+  const input = document.getElementById('custom-input');
+  if (!input || !input.value.trim()) { alert('Bitte zuerst Ticker eingeben'); return; }
+  const name = prompt('Name der neuen Watchlist:', 'Meine Watchlist');
+  if (!name) return;
+  const wls = getWatchlists();
+  wls[name] = input.value.trim();
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  updateWatchlistDropdown();
+  const sel = document.getElementById('ticker-preset');
+  if (sel) { sel.value = 'wl:' + name; sel.dispatchEvent(new Event('change')); }
+  showKoToast('Watchlist "' + name + '" gespeichert');
+}
+
+function updateExistingWatchlist() {
+  const input = document.getElementById('custom-input');
+  const sel = document.getElementById('list-select');
+  if (!input || !sel) return;
+  const val = sel ? sel.value : '';
+  if (!val.startsWith('wl:')) { alert('Keine gespeicherte Watchlist ausgewaehlt'); return; }
+  const name = val.replace('wl:', '');
+  if (!confirm('Watchlist "' + name + '" aktualisieren?')) return;
+  const wls = getWatchlists();
+  wls[name] = input.value.trim();
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  updateWatchlistDropdown();
+  if (sel) sel.value = val;
+  showKoToast('Watchlist "' + name + '" aktualisiert');
+}
+
+function showKoToast(msg) {
+  let t = document.getElementById('ko-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'ko-toast';
+    t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;z-index:9999;pointer-events:none;transition:opacity .3s';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  setTimeout(function() { t.style.opacity = '0'; }, 2500);
+}
+
+function updateWlButtons() {
+  const btn = document.getElementById('update-wl-btn');
+  const sel = document.getElementById('ticker-preset');
+  if (!btn || !sel) return;
+  btn.style.display = sel.value.startsWith('wl:') ? 'flex' : 'none';
+}
+
+// SCAN-RESULT-REGISTRY (tagesbasiert)
+const SR_KEY = 'ko_scan_registry';
+const SR_TTL = 24 * 60 * 60 * 1000; // 24 Stunden
+
+function getScanRegistry() {
+  try {
+    const r = localStorage.getItem(SR_KEY);
+    if (!r) return {};
+    const parsed = JSON.parse(r);
+    // Veraltete Eintraege bereinigen
+    const now = Date.now();
+    let cleaned = false;
+    Object.keys(parsed).forEach(function(k) {
+      if (now - (parsed[k].ts || 0) > SR_TTL) { delete parsed[k]; cleaned = true; }
+    });
+    if (cleaned) localStorage.setItem(SR_KEY, JSON.stringify(parsed));
+    return parsed;
+  } catch(e) { return {}; }
+}
+
+function setScanRegistry(reg) {
+  try { localStorage.setItem(SR_KEY, JSON.stringify(reg)); } catch(e) {}
+}
+
+function markScanned(sym, fromCache) {
+  const reg = getScanRegistry();
+  reg[sym] = { ts: Date.now(), fromCache: !!fromCache };
+  setScanRegistry(reg);
+}
+
+function isInScanRegistry(sym) {
+  const reg = getScanRegistry();
+  const entry = reg[sym];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > SR_TTL) return null;
+  return entry;
+}
+
+function clearScanRegistry() {
+  try { localStorage.removeItem(SR_KEY); } catch(e) {}
+}
+
+// Einzelnen Ticker neu scannen
+async function rescanTicker(sym) {
+  const card = document.getElementById('card-' + sym);
+  if (card) {
+    card.style.opacity = '0.5';
+    card.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:12px">'
+      + '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i>'
+      + ' ' + sym + ' wird neu gescannt...</div>';
+  }
+  // TD-Cache fuer diesen Ticker loeschen damit frische Daten kommen
+  const tdCache = getTdCache();
+  const keysToDelete = Object.keys(tdCache).filter(function(k) { return k.startsWith(sym + '_'); });
+  keysToDelete.forEach(function(k) { delete tdCache[k]; });
+  setTdCache(tdCache);
+  // Ticker-Info finden
+  const tInfo = activeTickers.find(function(t) { return t.sym === sym; }) || { sym: sym, name: sym };
+  try {
+    const raw = await fetchTickerData(tInfo);
+    if (raw) {
+      tickerData[sym] = raw;
+      const erData = await fetchEarningsDate(sym);
+      raw._er = erData;
+      if (raw.closes_full && raw.closes_full.length >= 25) {
+        raw._markov = calcMarkovRegime(raw.closes_full);
+      }
+      markScanned(sym, false);
+      renderCard(tInfo, processData(raw));
+    }
+  } catch(e) {
+    console.log('Rescan error:', sym, e.message);
+    if (card) { card.style.opacity = '1'; }
+  }
+}
+
+// FIBO EIGENE TICKER
+async function scanFiboCustom() {
+  const input = document.getElementById('fibo-custom-input');
+  if (!input || !input.value.trim()) { alert('Bitte Ticker eingeben'); return; }
+
+  const syms = input.value.split(',')
+    .map(function(s){ return s.trim().toUpperCase(); })
+    .filter(function(s){ return s.length > 0; });
+
+  if (!syms.length) return;
+
+  const el = document.getElementById('fibo-content');
+  el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:12px">'
+    + '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;font-size:1.5rem"></i>'
+    + '<div style="margin-top:.5rem">Lade Fibo-Daten fuer ' + syms.join(', ') + '...</div></div>';
+
+  const tdKey = getTwelveKey();
+  const loaded = [];
+
+  for (var i = 0; i < syms.length; i++) {
+    const sym = syms[i];
+    try {
+      // Aus bestehendem tickerData wenn vorhanden
+      if (tickerData[sym] && tickerData[sym].closes_full && tickerData[sym].closes_full.length >= 20) {
+        loaded.push({ sym: sym, closes: tickerData[sym].closes_full, fromCache: true });
+        continue;
+      }
+      // Sonst: Twelve Data abrufen
+      if (!tdKey) { console.log('Kein TD Key fuer', sym); continue; }
+      const url = 'https://api.twelvedata.com/time_series?symbol=' + sym
+        + '&interval=1day&outputsize=60&apikey=' + tdKey;
+      const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url);
+      const result = await tdThrottledFetch(proxy, 'fibo_custom_' + sym + '_60d');
+      const j = result.data;
+      if (j.values && j.values.length >= 20) {
+        const closes = [...j.values].reverse().map(function(v){ return parseFloat(v.close); });
+        // In tickerData speichern fuer spaetere Nutzung
+        if (!tickerData[sym]) tickerData[sym] = {};
+        tickerData[sym].closes_full = closes;
+        tickerData[sym].price = closes[closes.length - 1];
+        tickerData[sym].sym = sym;
+        loaded.push({ sym: sym, closes: closes, fromCache: result.fromCache });
+      } else {
+        el.innerHTML += '<div style="color:var(--amber);font-size:11px;padding:4px 0">'
+          + sym + ': Keine Daten verfuegbar (Symbol pruefen)</div>';
+      }
+    } catch(e) {
+      console.log('Fibo custom error:', sym, e.message);
+    }
+  }
+
+  if (!loaded.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--red);font-size:12px">'
+      + 'Keine Daten geladen. Twelve Data Key pruefen oder Symbol-Schreibweise kontrollieren.</div>';
+    return;
+  }
+
+  // Fibo-Daten berechnen und rendern
+  const customFiboData = [];
+  loaded.forEach(function(item) {
+    const closes = item.closes;
+    const last = closes[closes.length - 1];
+    const swing = detectSwing(closes);
+    if (!swing) return;
+    const levels = calcFiboLevels(swing);
+    const zone = fiboZone(last, levels);
+    const diff = swing.high - swing.low;
+    const retrace = swing.direction === 'down'
+      ? (swing.high - last) / diff * 100
+      : (last - swing.low) / diff * 100;
+    const perf52w = closes.length >= 2
+      ? (last - closes[0]) / closes[0] * 100 : 0;
+
+    customFiboData.push({
+      sym: item.sym,
+      name: item.sym,
+      price: last,
+      swing: swing,
+      levels: levels,
+      zone: zone,
+      perf52w: perf52w,
+      retrace: retrace,
+      er: null,
+      fromCache: item.fromCache
+    });
+  });
+
+  // Sortierung: Einstiegszonen zuerst
+  customFiboData.sort(function(a,b){
+    const o = { buy:0, watch:1, early:2, deep:3 };
+    return (o[a.zone]||9) - (o[b.zone]||9);
+  });
+
+  // Temporaer in _fiboData einfuegen (vor bestehenden)
+  _fiboData = customFiboData.concat(_fiboData.filter(function(d){
+    return !customFiboData.find(function(c){ return c.sym === d.sym; });
+  }));
+
+  renderFiboCards('all');
+
+  // Filter zuruecksetzen
+  document.querySelectorAll('.fibo-f').forEach(function(b){
+    b.style.background = ''; b.style.color = '';
+  });
+  const allBtn = document.querySelector('.fibo-f[data-f="all"]');
+  if (allBtn) { allBtn.style.background = 'var(--accent)'; allBtn.style.color = '#fff'; }
+}
 </script>
 
 <!-- LIST EDITOR MODAL -->
