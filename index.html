@@ -1499,40 +1499,59 @@ let activeTickers=[...DEFAULT_TICKERS];
 var _listEditorMode = 'us50';
 var _listEditorData = [];
 
-// TD THROTTLE + CACHE (8 req/min Free Plan)
+// TD GLOBAL QUEUE + CACHE
+// Einziger globaler Request-Queue fuer ALLE Twelve Data Calls
 const TD_CACHE_KEY='ko_td_cache';
 const TD_CACHE_TTL=4*60*60*1000;
-const TD_MIN_DELAY=12000; // 12s = max 5 req/min, sicher unter Free Plan Limit
+const TD_MIN_DELAY=13000; // 13s zwischen Calls = max 4.6 req/min
+let _tdQueue=Promise.resolve();
 let _tdLastCall=0;
+let _tdCallCount=0;
+
 function getTdCache(){try{const r=localStorage.getItem(TD_CACHE_KEY);return r?JSON.parse(r):{};}catch(e){return{};}}
 function setTdCache(c){try{localStorage.setItem(TD_CACHE_KEY,JSON.stringify(c));}catch(e){}}
 function getTdCacheEntry(key){const c=getTdCache();const e=c[key];if(!e)return null;if(Date.now()-e.ts>TD_CACHE_TTL)return null;return e.data;}
 function setTdCacheEntry(key,data){const c=getTdCache();const keys=Object.keys(c);if(keys.length>200){keys.sort((a,b)=>(c[a].ts||0)-(c[b].ts||0));keys.slice(0,50).forEach(k=>delete c[k]);}c[key]={ts:Date.now(),data:data};setTdCache(c);}
+
+// Alle TD-Calls laufen durch diesen Queue - verhindert parallele Requests
 async function tdThrottledFetch(url,cacheKey){
+  // Cache zuerst - kein Queue-Eintrag noetig
   const cached=getTdCacheEntry(cacheKey);
   if(cached)return{data:cached,fromCache:true};
-  const elapsed=Date.now()-_tdLastCall;
-  if(_tdLastCall>0&&elapsed<TD_MIN_DELAY) await new Promise(r=>setTimeout(r,TD_MIN_DELAY-elapsed));
-  _tdLastCall=Date.now();
-  const r=await fetch(url);
-  if(!r.ok){
-    if(r.status===429){
-      // Warte 60s und versuche einmal nochmal
-      console.log('TD 429 - warte 60s...');
-      await new Promise(res=>setTimeout(res,60000));
-      const r2=await fetch(url);
-      if(!r2.ok) throw new Error('TD_RATE_LIMIT');
-      const j2=await r2.json();
-      if(j2.status==='error') throw new Error('TD: '+(j2.message||'API error'));
-      setTdCacheEntry(cacheKey,j2);
-      return{data:j2,fromCache:false};
+
+  // In Queue einreihen - serialisiert ALLE Requests global
+  const result = await (_tdQueue = _tdQueue.then(async function(){
+    // Warte bis Mindestabstand zum letzten Call erreicht ist
+    const elapsed=Date.now()-_tdLastCall;
+    if(_tdLastCall>0&&elapsed<TD_MIN_DELAY){
+      await new Promise(r=>setTimeout(r,TD_MIN_DELAY-elapsed));
     }
-    throw new Error('TD HTTP '+r.status);
-  }
-  const j=await r.json();
-  if(j.status==='error')throw new Error('TD: '+(j.message||'API error'));
-  setTdCacheEntry(cacheKey,j);
-  return{data:j,fromCache:false};
+    _tdLastCall=Date.now();
+    _tdCallCount++;
+
+    // Fetch mit Retry bei 429
+    for(var attempt=0;attempt<3;attempt++){
+      try{
+        const r=await fetch(url);
+        if(r.status===429){
+          var wait=attempt===0?65000:120000;
+          console.log('TD 429 (Versuch '+attempt+') - warte '+(wait/1000)+'s...');
+          await new Promise(res=>setTimeout(res,wait));
+          _tdLastCall=Date.now();
+          continue;
+        }
+        if(!r.ok) throw new Error('TD HTTP '+r.status);
+        const j=await r.json();
+        if(j.status==='error') throw new Error('TD: '+(j.message||'error'));
+        setTdCacheEntry(cacheKey,j);
+        return{data:j,fromCache:false};
+      }catch(e){
+        if(attempt===2) throw e;
+      }
+    }
+    throw new Error('TD_RATE_LIMIT');
+  }));
+  return result;
 }
 function clearTdCache(){try{localStorage.removeItem(TD_CACHE_KEY);}catch(e){}}
 
@@ -1648,8 +1667,11 @@ async function runScan(){
   btn.disabled=true;
   document.getElementById('scan-progress').style.display='block';
   // VIX-Ampel aktualisieren
-  fetchVix().then(function(vix){ renderVixAmpel(vix); });
-  fetchQqqRegime();
+  // VIX und QQQ nur laden wenn noch nicht geladen (kein API-Spam beim Scan)
+  if (_vixLevel === null) fetchVix().then(function(vix){ renderVixAmpel(vix); });
+  else renderVixAmpel(_vixLevel);
+  if (!_qqqRegime) fetchQqqRegime();
+  else renderQqqBanner(_qqqRegime);
   const container=document.getElementById('scan-container');
   container.innerHTML=tickers.map(t=>`<div class="card" id="card-${t.sym}">
     <div class="ticker-head">
@@ -6729,20 +6751,24 @@ async function fetchSektorPerf(sym) {
   const key = getTwelveKey();
   if (!key) return null;
   try {
+    // Sektor: separater Cache-Key mit 6h TTL - kein tdThrottledFetch (wuerde Rate-Limit teilen)
+    const sektorCacheKey2 = 'sektor_v2_'+sym;
+    const cached2 = getTdCacheEntry(sektorCacheKey2);
+    if (cached2) return { sym, perf5d: cached2.p5, perf1d: cached2.p1, price: cached2.px, fromCache: true };
+
     const url = 'https://api.twelvedata.com/time_series?symbol='+sym+'&interval=1day&outputsize=10&apikey='+key;
     const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(url);
     // Sektor-Cache: 6h TTL - separater Cache-Key
   const sektorCacheKey = 'sektor_'+sym+'_10d';
   const sektorCached = getTdCacheEntry(sektorCacheKey);
   if (sektorCached) return { sym, perf5d: sektorCached.p5, perf1d: sektorCached.p1, price: sektorCached.px, fromCache: true };
-  const res = await tdThrottledFetch(proxy, sektorCacheKey);
+  const res = await tdThrottledFetch(proxy, sektorCacheKey2);
     const j = res.data;
     if (!j.values || j.values.length < 6) return null;
     const vals = [...j.values].reverse().map(v => parseFloat(v.close));
     const perf5d  = (vals[vals.length-1] - vals[vals.length-6]) / vals[vals.length-6] * 100;
     const perf1d  = (vals[vals.length-1] - vals[vals.length-2]) / vals[vals.length-2] * 100;
-    // Cache Sektor-Ergebnis explizit
-    setTdCacheEntry(sektorCacheKey, { p5: perf5d, p1: perf1d, px: vals[vals.length-1] });
+    setTdCacheEntry(sektorCacheKey2, { p5: perf5d, p1: perf1d, px: vals[vals.length-1] });
     return { sym, perf5d, perf1d, price: vals[vals.length-1], fromCache: res.fromCache };
   } catch(e) { return null; }
 }
