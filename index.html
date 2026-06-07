@@ -6418,15 +6418,20 @@ async function fetchVix() {
   const key = getTwelveKey();
   if (!key) return null;
   try {
-    const url = 'https://api.twelvedata.com/time_series?symbol=VIX&interval=1day&outputsize=1&apikey=' + key;
-    const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url);
+    // VIX via Yahoo Finance (^VIX) - Twelve Data Free Plan hat keinen VIX
+    const yfUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=5d';
+    const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(yfUrl);
     const r = await fetch(proxy);
     if (!r.ok) return null;
     const j = await r.json();
-    if (j.values && j.values.length > 0) {
-      _vixLevel = parseFloat(j.values[0].close);
-      _vixLastFetch = now;
-      return _vixLevel;
+    const result = j.chart && j.chart.result && j.chart.result[0];
+    if (result && result.indicators && result.indicators.quote) {
+      const closes = result.indicators.quote[0].close.filter(function(v){ return v != null; });
+      if (closes.length > 0) {
+        _vixLevel = parseFloat(closes[closes.length - 1].toFixed(2));
+        _vixLastFetch = now;
+        return _vixLevel;
+      }
     }
   } catch(e) { console.log('VIX fetch error:', e.message); }
   return null;
