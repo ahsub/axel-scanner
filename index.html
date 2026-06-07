@@ -279,7 +279,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
         <span style="font-size:11px;color:var(--text3)" id="tf-label">Tageschart · MACD (12/26/9)</span>
       </div>
-      <div id="custom-wrap" style="display:none;margin-bottom:.75rem"><div style="display:flex;gap:6px;align-items:center"><input type="text" id="custom-input" placeholder="AAPL, MSFT, NVDA (kommagetrennt)" style="flex:1"><button class="btn btn-sm" onclick="saveCurrentAsWatchlist()" title="Als neue Watchlist speichern" style="white-space:nowrap;font-size:11px;flex-shrink:0"><i class="ti ti-bookmark-plus"></i> Speichern</button><button class="btn btn-sm" id="update-wl-btn" onclick="updateExistingWatchlist()" title="Aktuelle Watchlist aktualisieren" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)"><i class="ti ti-refresh"></i> WL aktualisieren</button></div></div>
+      <div id="custom-wrap" style="display:block;margin-bottom:.75rem"><div style="display:flex;gap:6px;align-items:center"><input type="text" id="custom-input" placeholder="AAPL, MSFT, NVDA (kommagetrennt)" style="flex:1"><button class="btn btn-sm" onclick="saveCurrentAsWatchlist()" title="Als neue Watchlist speichern" style="white-space:nowrap;font-size:11px;flex-shrink:0"><i class="ti ti-bookmark-plus"></i> Speichern</button><button class="btn btn-sm" id="update-wl-btn" onclick="updateExistingWatchlist()" title="Aktuelle Watchlist aktualisieren" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)"><i class="ti ti-refresh"></i> WL aktualisieren</button></div></div>
       <div id="qqq-regime-banner" style="display:none;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;margin:6px 1rem 0" title="Markov-Regime des NASDAQ100"></div>
       <div id="vix-ampel" style="display:none;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;margin:8px 1rem 0;cursor:default" title="VIX = CBOE Volatility Index"></div>
       <div id="scan-progress" style="display:none;margin-bottom:.75rem">
@@ -1525,15 +1525,24 @@ function toggleCustom(){
 
 function getTickers(){
   const preset = document.getElementById('ticker-preset').value;
-  if(preset==='custom'){
-    const raw=document.getElementById('custom-input').value;
-    return raw.split(',').map(function(s){ return s.trim().toUpperCase(); }).filter(Boolean).map(function(s){ return {sym:s,name:s}; });
+  const customWrap = document.getElementById('custom-wrap');
+  const customInput = document.getElementById('custom-input');
+
+  // Wenn custom-input sichtbar und bearbeitet wurde: custom-input hat Vorrang
+  // So kann man bei JEDER Liste noch Ticker ergaenzen oder die Liste direkt bearbeiten
+  if(customWrap && customWrap.style.display !== 'none' && customInput && customInput.value.trim()){
+    const raw = customInput.value;
+    return raw.split(',')
+      .map(function(s){ return s.trim().toUpperCase(); })
+      .filter(Boolean)
+      .map(function(s){ return {sym:s, name:s}; });
   }
+
+  // Fallback: Standard-Listen
   if(preset==='default-de' || window.currentMarket==='de'){
     return DEFAULT_TICKERS_DE;
   }
   if(preset==='top50-us'){
-    // Use IBD Top-50 list tickers
     return ibdData.filter(function(r){ return r.ticker; }).map(function(r){ return {sym:r.ticker, name:r.name}; });
   }
   return DEFAULT_TICKERS;
@@ -3956,34 +3965,60 @@ function deleteWatchlist(name){
 
 function onPresetChange(){
   const val = document.getElementById('ticker-preset').value;
+  const wrap = document.getElementById('custom-wrap');
+  const input = document.getElementById('custom-input');
+  const hint = document.getElementById('scanner-market-hint');
+
+  // Immer anzeigen - bei allen Listen kann man Ticker manuell ergaenzen
+  if(wrap) wrap.style.display = 'block';
+
   if(val && val.startsWith('wl:')){
+    // Gespeicherte Watchlist - Ticker laden
     const name = val.substring(3);
     const wls = getWatchlists();
-    if(wls[name]){
-      document.getElementById('custom-wrap').style.display='block';
-      document.getElementById('custom-input').value = wls[name];
-      const label = document.querySelector('#custom-wrap div');
-      if(label) label.textContent = '⭐ Watchlist: "'+name+'" — '+wls[name].split(',').filter(Boolean).length+' Titel';
+    if(wls[name] && input){
+      input.value = wls[name];
+      input.placeholder = 'Watchlist "'+name+'" — Ticker bearbeiten oder ergaenzen';
     }
+    if(hint) hint.innerHTML = '<i class="ti ti-bookmark"></i> Watchlist "'+name
+      +'" geladen &middot; Ticker bearbeiten und Scan starten';
+
   } else if(val && val.startsWith('fixed:')){
+    // Feste Liste - Ticker in Eingabefeld laden zum Bearbeiten
     const key = val.substring(6);
     const list = getFixedListTickers(key);
-    document.getElementById('custom-wrap').style.display='none';
-    // Show count hint in scanner-market-hint
-    const hint = document.getElementById('scanner-market-hint');
     const labels = {
-      DAX40:'📊 DAX 40', MDAX:'📈 MDAX Top 20', TECDAX:'💻 TecDAX Top 20',
-      SP500:'🇺🇸 S&P 500 Kern', NDX100:'🇺🇸 NASDAQ 100',
-      DEFENSE:'🛡️ Defense & Aerospace', REIT:'🏢 REITs', ENERGY:'⚡ Energy',
-      HEALTH:'🏥 Healthcare', FINANCE:'🏦 Financials', CONSUMER:'🛒 Consumer'
+      DAX40:'DAX 40', MDAX:'MDAX Top 20', TECDAX:'TecDAX Top 20',
+      SP500:'S&P 500 Kern', NDX100:'NASDAQ 100',
+      DEFENSE:'Defense & Aerospace', REIT:'REITs', ENERGY:'Energy',
+      HEALTH:'Healthcare', FINANCE:'Financials', CONSUMER:'Consumer'
     };
-    if(hint) hint.innerHTML='<i class="ti ti-info-circle"></i> '+
-      (labels[key]||key)+' · '+list.length+' Titel · Kaufsignal = alle 3 bullisch';
+    if(input){
+      // Feste Ticker anzeigen - editierbar
+      const tickerStr = list.map(function(t){ return t.sym||t; }).join(', ');
+      input.value = tickerStr;
+      input.placeholder = (labels[key]||key) + ' — Ticker bearbeiten oder ergaenzen';
+    }
+    if(hint) hint.innerHTML = '<i class="ti ti-info-circle"></i> '
+      + (labels[key]||key) + ' &middot; ' + list.length
+      + ' Titel &middot; Bearbeiten und Scan starten';
+
+  } else if(val === 'custom'){
+    // Eigene Ticker - leeres Feld
+    if(input){ input.value = ''; input.placeholder = 'AAPL, MSFT, NVDA (kommagetrennt)'; }
+    if(hint) hint.innerHTML = '<i class="ti ti-pencil"></i> Eigene Ticker eingeben und Scan starten';
+
   } else {
-    toggleCustom();
-    const label = document.querySelector('#custom-wrap div');
-    if(label) label.textContent = 'Komma-getrennte Ticker';
+    // Default (50 US-Aktien)
+    if(input){
+      const defaultStr = DEFAULT_TICKERS.map(function(t){ return t.sym; }).join(', ');
+      input.value = defaultStr;
+      input.placeholder = 'Standard-Liste — Ticker bearbeiten oder ergaenzen';
+    }
+    if(hint) hint.innerHTML = '<i class="ti ti-list"></i> Standard-Liste &middot; '
+      + DEFAULT_TICKERS.length + ' Titel';
   }
+  updateWlButtons();
 }
 
 // ─── PATCH getTickers FOR WATCHLISTS ──────────────────────────────────────────
