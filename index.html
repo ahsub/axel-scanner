@@ -3111,7 +3111,7 @@ function requestMakroUpdate(){
   }
 }
 
-async function testTwelveKey(){
+async async function testTwelveKey(){
   const key = getTwelveKey();
   const msg = document.getElementById('td-test-msg');
   if(!msg) return;
@@ -3142,7 +3142,7 @@ async function testTwelveKey(){
   }
 }
 
-async function testProxy(){
+async async function testProxy(){
   const msg = document.getElementById('td-test-msg');
   if(!msg) return;
   msg.style.display='block';
@@ -3821,7 +3821,7 @@ async function scanTickerList(syms, label){
   setTimeout(function(){ runScan(); }, 150);
 }
 
-async function debugDEFetch(){
+async async function debugDEFetch(){
   const tdKey=getTwelveKey();
   if(!tdKey){ alert('Kein Twelve Data Key!'); return; }
   const proxy='https://my-cors-proxy.ahildebrand.workers.dev/';
