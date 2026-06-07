@@ -637,6 +637,35 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
     </div>
 
+    <!-- FIBO PANEL -->
+    <div id="panel-fibo" class="panel">
+      <div style="padding:1rem 1rem 0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:16px;font-weight:600">Fibonacci Einstiegszonen</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">Basiert auf letztem Scan &middot; Swing automatisch erkannt</div>
+          </div>
+          <button class="btn btn-sm" onclick="buildFiboTab()" style="font-size:12px">
+            <i class="ti ti-refresh"></i>
+          </button>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap" id="fibo-filters">
+          <button class="pill fibo-f active-filter" data-f="all" onclick="fiboFilter(this)" style="cursor:pointer">Alle</button>
+          <button class="pill fibo-f" data-f="buy" onclick="fiboFilter(this)" style="cursor:pointer">&#x1F7E2; Einstieg</button>
+          <button class="pill fibo-f" data-f="watch" onclick="fiboFilter(this)" style="cursor:pointer">&#x1F7E1; Beobachten</button>
+          <button class="pill fibo-f" data-f="early" onclick="fiboFilter(this)" style="cursor:pointer">&#x1F534; Zu frueh</button>
+          <button class="pill fibo-f" data-f="loser" onclick="fiboFilter(this)" style="cursor:pointer">&#x1F4C9; Verlierer</button>
+          <button class="pill fibo-f" data-f="winner" onclick="fiboFilter(this)" style="cursor:pointer">&#x1F4C8; Gewinner</button>
+        </div>
+      </div>
+      <div id="fibo-content" style="padding:0 1rem 6rem">
+        <div style="text-align:center;padding:3rem;color:var(--text3)">
+          <i class="ti ti-chart-arrows-vertical" style="font-size:2rem;display:block;margin-bottom:.5rem"></i>
+          Zuerst Scanner starten, dann hier erscheinen die Fibo-Analysen.
+        </div>
+      </div>
+    </div>
+
     <!-- ADMIN PANEL -->
     <div id="panel-admin" class="panel">
       <div class="admin-warn">
@@ -1391,6 +1420,7 @@ function changePin(){
 
 // ─── NAV ─────────────────────────────────────────────────────────────
 function showPanel(id){
+  if(id==='fibo' && !_fiboData.length){ buildFiboTab(); }
   if(id==='admin'){
     loadScoreWeights(); loadMktPhase();
     const inp=document.getElementById('fh-key-input');
@@ -3048,7 +3078,7 @@ async function testTwelveKey(){
   msg.style.display='block'; msg.style.color='var(--text2)';
   msg.textContent='Teste Verbindung…';
   try{
-    const testTdUrl = 'https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&outputsize=2&apikey='+key;
+    const testTdUrl = 'https://api.twelvedata.com/time_series?symbol=AAPL&interval=1day&outputsize=10&apikey='+key;
     const r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(testTdUrl));
     const j = await r.json();
     if(j.status === 'error'){
@@ -3755,7 +3785,7 @@ async function debugDEFetch(){
   for(var i=0;i<testSyms.length;i++){
     var sym=testSyms[i];
     try{
-      var url='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(sym)+'&interval=1day&outputsize=2&apikey='+tdKey;
+      var url='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(sym)+'&interval=1day&outputsize=10&apikey='+tdKey;
       var r=await fetch(proxy+'?url='+encodeURIComponent(url));
       var j=await r.json();
       if(j.status==='ok'&&j.values&&j.values.length>0){
@@ -6000,6 +6030,287 @@ function addDEGroupToWatchlist(groupName){
   closeDEListSelector();
   alert('✓ "' + name + '" als Watchlist gespeichert (' + tickers.length + ' Titel)');
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  FIBONACCI EINSTIEGSZONEN
+// ═══════════════════════════════════════════════════════════════
+
+// Swing-Hoch und -Tief aus closes[] ermitteln
+// Sucht das letzte signifikante Hoch (vor dem Rückgang)
+// und das letzte signifikante Tief (nach dem Hoch)
+function detectSwing(closes) {
+  if (!closes || closes.length < 20) return null;
+  const n = closes.length;
+  const last = closes[n - 1];
+
+  // Suche letztes Hoch in den letzten 60 Bars
+  const lookback = Math.min(60, n - 1);
+  let swingHigh = -Infinity, swingHighIdx = -1;
+  for (let i = n - lookback; i < n; i++) {
+    if (closes[i] > swingHigh) { swingHigh = closes[i]; swingHighIdx = i; }
+  }
+
+  // Suche tiefstes Tief NACH dem Swing-Hoch
+  let swingLow = Infinity, swingLowIdx = -1;
+  for (let i = swingHighIdx; i < n; i++) {
+    if (closes[i] < swingLow) { swingLow = closes[i]; swingLowIdx = i; }
+  }
+
+  // Falls kein Rückgang: suche Tief VOR dem Hoch (Aufwaertsbewegung)
+  if (swingLowIdx <= swingHighIdx || swingHighIdx === n - 1) {
+    swingLow = Infinity;
+    for (let i = Math.max(0, n - lookback); i <= swingHighIdx; i++) {
+      if (closes[i] < swingLow) { swingLow = closes[i]; swingLowIdx = i; }
+    }
+    return { high: swingHigh, low: swingLow, direction: 'up', highIdx: swingHighIdx, lowIdx: swingLowIdx };
+  }
+
+  return { high: swingHigh, low: swingLow, direction: 'down', highIdx: swingHighIdx, lowIdx: swingLowIdx };
+}
+
+// Fibo-Levels berechnen
+function calcFiboLevels(swing) {
+  const diff = swing.high - swing.low;
+  if (swing.direction === 'down') {
+    // Retracement nach unten: Levels von Hoch zum Tief
+    return {
+      p0:   swing.high,
+      p236: swing.high - diff * 0.236,
+      p382: swing.high - diff * 0.382,
+      p500: swing.high - diff * 0.500,
+      p618: swing.high - diff * 0.618,
+      p786: swing.high - diff * 0.786,
+      p100: swing.low,
+      direction: 'down'
+    };
+  } else {
+    // Retracement nach oben: Pullback-Levels vom Tief
+    return {
+      p0:   swing.low,
+      p236: swing.low + diff * 0.236,
+      p382: swing.low + diff * 0.382,
+      p500: swing.low + diff * 0.500,
+      p618: swing.low + diff * 0.618,
+      p786: swing.low + diff * 0.786,
+      p100: swing.high,
+      direction: 'up'
+    };
+  }
+}
+
+// Einstiegszone bestimmen
+function fiboZone(price, levels) {
+  if (levels.direction === 'down') {
+    // Gefallener Titel: Einstieg zwischen 38.2% und 61.8%
+    if (price >= levels.p382 && price <= levels.p618) return 'buy';
+    if (price > levels.p236 && price < levels.p382) return 'watch'; // fast bereit
+    if (price < levels.p618 && price >= levels.p786) return 'watch'; // leicht ueberschossen
+    if (price > levels.p618) return 'early'; // zu frueh, noch fallend
+    return 'deep'; // tief gefallen, Vorsicht
+  } else {
+    // Gestiegener Titel: Pullback-Einstieg zwischen 38.2% und 50%
+    if (price >= levels.p382 && price <= levels.p500) return 'buy';
+    if (price > levels.p236 && price < levels.p382) return 'watch';
+    if (price > levels.p500 && price <= levels.p618) return 'watch';
+    if (price < levels.p236) return 'early';
+    return 'deep';
+  }
+}
+
+// 52W-Performance fuer Winner/Loser-Sortierung
+function get52wPerf(raw) {
+  if (!raw || !raw.closes) return 0;
+  const c = raw.closes;
+  if (c.length < 2) return 0;
+  const oldest = c[0];
+  const newest = c[c.length - 1];
+  return oldest > 0 ? (newest - oldest) / oldest * 100 : 0;
+}
+
+// Hauptfunktion: Fibo-Tab aufbauen
+let _fiboData = [];
+let _fiboCurrentFilter = 'all';
+
+function buildFiboTab() {
+  const el = document.getElementById('fibo-content');
+  if (!el) return;
+
+  // tickerData aus dem Scanner nutzen
+  const syms = Object.keys(tickerData);
+  if (!syms.length) {
+    el.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--text3)">Zuerst einen Scan durchfuehren.</div>';
+    return;
+  }
+
+  _fiboData = [];
+
+  syms.forEach(function(sym) {
+    const raw = tickerData[sym];
+    if (!raw || !raw.closes || raw.closes.length < 20) return;
+
+    const closes = raw.closes;
+    const last = closes[closes.length - 1];
+    const swing = detectSwing(closes);
+    if (!swing) return;
+
+    const levels = calcFiboLevels(swing);
+    const zone = fiboZone(last, levels);
+    const perf52w = get52wPerf(raw);
+    const retrace = swing.direction === 'down'
+      ? ((swing.high - last) / (swing.high - swing.low) * 100)
+      : ((last - swing.low) / (swing.high - swing.low) * 100);
+
+    // Ticker-Info aus activeTickers
+    const tInfo = activeTickers.find(function(t){ return t.sym === sym; }) || { sym: sym, name: sym };
+
+    _fiboData.push({
+      sym: sym,
+      name: tInfo.name || sym,
+      price: last,
+      swing: swing,
+      levels: levels,
+      zone: zone,
+      perf52w: perf52w,
+      retrace: retrace,
+      er: raw._er || null
+    });
+  });
+
+  // Standard-Sortierung: Einstiegszonen zuerst, dann Beobachten
+  _fiboData.sort(function(a, b) {
+    const order = { buy: 0, watch: 1, early: 2, deep: 3 };
+    return (order[a.zone] || 9) - (order[b.zone] || 9);
+  });
+
+  renderFiboCards(_fiboCurrentFilter);
+}
+
+function fiboFilter(btn) {
+  // Filter-Button Styling
+  document.querySelectorAll('.fibo-f').forEach(function(b){ b.style.background=''; b.style.color=''; });
+  btn.style.background = 'var(--accent)';
+  btn.style.color = '#fff';
+  _fiboCurrentFilter = btn.dataset.f;
+
+  // Spezielle Sortierung fuer Winner/Loser
+  if (_fiboCurrentFilter === 'winner') {
+    _fiboData.sort(function(a,b){ return b.perf52w - a.perf52w; });
+  } else if (_fiboCurrentFilter === 'loser') {
+    _fiboData.sort(function(a,b){ return a.perf52w - b.perf52w; });
+  } else {
+    _fiboData.sort(function(a,b){
+      const order = { buy:0, watch:1, early:2, deep:3 };
+      return (order[a.zone]||9) - (order[b.zone]||9);
+    });
+  }
+  renderFiboCards(_fiboCurrentFilter);
+}
+
+function renderFiboCards(filter) {
+  const el = document.getElementById('fibo-content');
+  if (!el) return;
+
+  let items = _fiboData;
+  if (filter === 'buy')    items = _fiboData.filter(function(d){ return d.zone === 'buy'; });
+  if (filter === 'watch')  items = _fiboData.filter(function(d){ return d.zone === 'watch'; });
+  if (filter === 'early')  items = _fiboData.filter(function(d){ return d.zone === 'early'; });
+  if (filter === 'loser')  items = _fiboData.filter(function(d){ return d.perf52w < 0; }).slice(0,15);
+  if (filter === 'winner') items = _fiboData.filter(function(d){ return d.perf52w > 0; }).slice(0,15);
+
+  if (!items.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text3)">Keine Titel in dieser Kategorie.</div>';
+    return;
+  }
+
+  const zoneConfig = {
+    buy:   { icon: '&#x1F7E2;', label: 'Einstiegszone',   bg: 'rgba(52,199,89,0.10)',  color: 'var(--green)' },
+    watch: { icon: '&#x1F7E1;', label: 'Beobachten',      bg: 'rgba(255,204,0,0.10)',  color: 'var(--amber)' },
+    early: { icon: '&#x1F534;', label: 'Zu frueh',         bg: 'rgba(255,59,48,0.08)',  color: 'var(--red)'   },
+    deep:  { icon: '&#x26A0;&#xFE0F;',  label: 'Tief ueberschossen', bg: 'rgba(120,120,128,0.12)', color: 'var(--text3)' }
+  };
+
+  el.innerHTML = items.map(function(d) {
+    const cfg = zoneConfig[d.zone] || zoneConfig.deep;
+    const lv = d.levels;
+    const pr = d.price;
+    const swing = d.swing;
+    const dirLabel = swing.direction === 'down' ? 'Rueckgang' : 'Aufstieg';
+    const swingPct = Math.abs((swing.high - swing.low) / swing.high * 100).toFixed(1);
+    const perfColor = d.perf52w >= 0 ? 'var(--green)' : 'var(--red)';
+    const perfSign  = d.perf52w >= 0 ? '+' : '';
+    const erBadge   = d.er ? earningsBadgeHtml(d.er) : '';
+
+    // Fibo-Balken: wo liegt der Kurs relativ zu den Levels
+    const barPct = Math.max(0, Math.min(100, d.retrace)).toFixed(0);
+    const barColor = d.zone === 'buy' ? 'var(--green)' : d.zone === 'watch' ? 'var(--amber)' : 'var(--red)';
+
+    // Empfehlungstext
+    let advice = '';
+    if (d.zone === 'buy' && swing.direction === 'down') {
+      advice = 'Kurs im Retracement-Goldbereich (38-62%). Einstieg pruefen.';
+    } else if (d.zone === 'buy' && swing.direction === 'up') {
+      advice = 'Gesunder Pullback in Kauf-Zone. Trend intakt.';
+    } else if (d.zone === 'watch' && swing.direction === 'down') {
+      advice = 'Noch nicht in optimaler Zone. Warten auf weiteren Rueckgang oder Bounce-Bestaetigung.';
+    } else if (d.zone === 'early') {
+      advice = 'Zu frueh fuer Einstieg. Kurs noch nicht zurueckgekommen.';
+    } else if (d.zone === 'deep') {
+      advice = 'Starker Einbruch. Stabilisierung abwarten.';
+    }
+
+    return '<div class="card" style="margin-bottom:.6rem;border-left:3px solid '+cfg.color+';background:'+cfg.bg+'">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-weight:700;font-size:15px">'+d.sym+'</span>' +
+          '<span style="font-size:11px;color:var(--text3)">'+d.name+'</span>' +
+          erBadge +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div style="font-weight:600">$'+pr.toFixed(2)+'</div>' +
+          '<div style="font-size:11px;color:'+perfColor+'">'+perfSign+d.perf52w.toFixed(1)+'% (52W)</div>' +
+        '</div>' +
+      '</div>' +
+      // Zone-Badge + Swing-Info
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:.6rem">' +
+        '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:'+cfg.color+';color:#fff">'+cfg.icon+' '+cfg.label+'</span>' +
+        '<span style="font-size:11px;color:var(--text3)">'+dirLabel+' '+swingPct+'% &middot; Retracement '+d.retrace.toFixed(0)+'%</span>' +
+      '</div>' +
+      // Fortschrittsbalken
+      '<div style="background:var(--bg3);border-radius:4px;height:6px;margin-bottom:.5rem;position:relative">' +
+        '<div style="position:absolute;left:0;top:0;height:100%;width:'+barPct+'%;background:'+barColor+';border-radius:4px;transition:width .3s"></div>' +
+        // Markierungen bei 38.2%, 50%, 61.8%
+        '<div style="position:absolute;left:38.2%;top:-3px;width:2px;height:12px;background:var(--text3);opacity:.5"></div>' +
+        '<div style="position:absolute;left:50%;top:-3px;width:2px;height:12px;background:var(--text3);opacity:.5"></div>' +
+        '<div style="position:absolute;left:61.8%;top:-3px;width:2px;height:12px;background:var(--text3);opacity:.5"></div>' +
+      '</div>' +
+      // Fibo-Levels Tabelle
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-bottom:.5rem">' +
+        fiboLevelCell('23.6%', lv.p236, pr) +
+        fiboLevelCell('38.2%', lv.p382, pr) +
+        fiboLevelCell('50%',   lv.p500, pr) +
+        fiboLevelCell('61.8%', lv.p618, pr) +
+        fiboLevelCell('78.6%', lv.p786, pr) +
+      '</div>' +
+      // Empfehlung
+      '<div style="font-size:11px;color:var(--text2);border-top:.5px solid var(--border);padding-top:.4rem">' +
+        advice +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function fiboLevelCell(label, level, currentPrice) {
+  const diff = ((currentPrice - level) / level * 100);
+  const isActive = Math.abs(diff) < 3; // Kurs nahe diesem Level (+/-3%)
+  const bg = isActive ? 'var(--accent)' : 'var(--bg3)';
+  const col = isActive ? '#fff' : 'var(--text3)';
+  return '<div style="background:'+bg+';border-radius:4px;padding:3px 4px;text-align:center">' +
+    '<div style="font-size:9px;color:'+col+';opacity:.8">'+label+'</div>' +
+    '<div style="font-size:10px;font-weight:600;color:'+col+'">${'+level.toFixed(0)+'}</div>' +
+    '<div style="font-size:9px;color:'+col+';opacity:.8">'+(diff >= 0 ? '+' : '')+diff.toFixed(1)+'%</div>' +
+  '</div>';
+}
+// ═══════════════════════════════════════════════════════════════
 </script>
 
 <!-- LIST EDITOR MODAL -->
