@@ -1656,10 +1656,11 @@ async function runScan(){
 
       // Source 1: Twelve Data via CORS Proxy
       const tdKey=getTwelveKey();
-      // For DE market: add exchange suffix for Twelve Data
-      const tdSym = window.currentMarket==='de' ? t.sym+':XETR' : t.sym;
-      const yfSym = window.currentMarket==='de' ? t.sym+'.DE' : t.sym;
-      if(tdKey){
+      // For DE market: Twelve Data Free Plan hat keine EU-Boersen -> DE direkt via Yahoo
+      const isDeMarket = window.currentMarket==='de';
+      const tdSym = isDeMarket ? null : t.sym;
+      const yfSym = isDeMarket ? t.sym+'.DE' : t.sym;
+      if(tdKey && !isDeMarket){
         try{
           const interval=intervalMapTD[effectiveTF]||'1day';
           const outputsize=outputMap[effectiveTF]||130;
@@ -3149,12 +3150,12 @@ async function testProxy(){
   msg.style.color='var(--text2)';
   msg.textContent='Teste Proxy-Verbindung…';
   try{
-    const proxyUrl='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent('https://httpbin.org/get');
+    const proxyUrl='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent('https://api.twelvedata.com/price?symbol=AAPL&apikey=demo');
     const r = await fetch(proxyUrl);
     if(r.ok){
       const j = await r.json();
       msg.style.color='var(--green)';
-      msg.textContent='✓ Proxy erreichbar — URL: '+j.url;
+      msg.textContent='✓ Proxy erreichbar — AAPL: $'+(j.price||j.close||'ok');
     } else {
       msg.style.color='var(--red)';
       msg.textContent='✗ Proxy HTTP '+r.status;
@@ -3822,6 +3823,13 @@ async function scanTickerList(syms, label){
 }
 
 async function debugDEFetch(){
+  // Twelve Data DE-Symbole: Format ist "SAP" (ohne Boersensuffix!) fuer XETRA-Listing
+  // Oder "SAP:XETR" - aber NUR wenn Twelve Data das kennt
+  // Korrekte Formate laut Twelve Data Doku:
+  // US:  AAPL, MSFT (kein Suffix)
+  // DE:  SAP (kein .DE!), RHM, BAYN
+  // Falls nicht gefunden: Yahoo Finance als Fallback (SAP.DE)
+
   const tdKey=getTwelveKey();
   if(!tdKey){ alert('Kein Twelve Data Key!'); return; }
   const proxy='https://my-cors-proxy.ahildebrand.workers.dev/';
