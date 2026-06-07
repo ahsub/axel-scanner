@@ -282,6 +282,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div id="custom-wrap" style="display:none;margin-bottom:.75rem">
         <input type="text" id="custom-input" placeholder="AAPL, MSFT, NVDA (kommagetrennt)">
       </div>
+      <div id="qqq-regime-banner" style="display:none;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;margin:6px 1rem 0" title="Markov-Regime des NASDAQ100"></div>
+      <div id="vix-ampel" style="display:none;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;margin:8px 1rem 0;cursor:default" title="VIX = CBOE Volatility Index"></div>
       <div id="scan-progress" style="display:none;margin-bottom:.75rem">
         <div style="font-size:12px;color:var(--text2)" id="scan-label">Analysiere…</div>
         <div class="progress"><div class="progress-fill" id="scan-bar" style="width:0%"></div></div>
@@ -1587,6 +1589,9 @@ async function runScan(){
   const btn=document.getElementById('scan-btn');
   btn.disabled=true;
   document.getElementById('scan-progress').style.display='block';
+  // VIX-Ampel aktualisieren
+  fetchVix().then(function(vix){ renderVixAmpel(vix); });
+  fetchQqqRegime();
   const container=document.getElementById('scan-container');
   container.innerHTML=tickers.map(t=>`<div class="card" id="card-${t.sym}">
     <div class="ticker-head">
@@ -1714,6 +1719,10 @@ async function runScan(){
       // Earnings-Datum laden (Finnhub, gecacht)
       const erData = await fetchEarningsDate(t.sym);
       raw._er = erData;
+      // Markov-Regime berechnen
+      if(raw.closes && raw.closes.length >= 25){
+        raw._markov = calcMarkovRegime(raw.closes);
+      }
       renderCard(t,processData(raw));
     }catch(e){
       var msg = e.message;
@@ -1954,13 +1963,23 @@ function processData(raw){
   // Market phase multiplier
   const mktPhase = typeof getMarketPhase==='function'?getMarketPhase():1;
   const erMalus = earningsScoreMalus(raw._er || null);
-  const compositeScore = Math.max(0,Math.min(100,Math.round((techPts+sepaPts+bpPts+stkPts+volPts+rsPts)*mktPhase)-erMalus));
+  // Markov-Multiplikator: Bull+stabil=+10%, Bull+schwach=-15%, Bear=-30%
+  const mk = raw._markov;
+  const markovMult = mk ? (
+    mk.regime === 1 && mk.warnLevel === 0 ? 1.10 :
+    mk.regime === 1 && mk.warnLevel === 1 ? 1.00 :
+    mk.regime === 1 && mk.warnLevel === 2 ? 0.90 :
+    mk.regime === 1 && mk.warnLevel === 3 ? 0.85 :
+    mk.regime === -1                       ? 0.75 : 0.95
+  ) : 1.0;
+  const compositeScore = Math.max(0,Math.min(100,Math.round((techPts+sepaPts+bpPts+stkPts+volPts+rsPts)*mktPhase*markovMult)-erMalus));
   const scoreLabel = compositeScore>=80?'A+':compositeScore>=70?'A':compositeScore>=60?'B+':
                      compositeScore>=50?'B':compositeScore>=40?'C':compositeScore>=30?'D':'F';
   const scoreColor = compositeScore>=70?'var(--green)':compositeScore>=50?'var(--accent)':
                      compositeScore>=35?'var(--amber)':'var(--red)';
 
   return Object.assign({},raw,{
+    markov:raw._markov||null,
     above50:above50,macdBull:macdBull,obvBull:obvBull,bullCount:bullCount,
     histVal:raw.macd_hist,obvSlope:raw.obv_slope_5d,volRatio:raw.volume_ratio,
     closes:raw.closes_20d||[],hist:raw.macd_hist_20d||[],
@@ -2113,6 +2132,7 @@ function renderCard(t,state){
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
           '<span style="font-size:12px;font-weight:600;color:'+scC+'">SEPA '+sc+'/8 · '+scL+'</span>'+
           '<span style="font-size:11px;color:'+stC+'">Stickyness '+stk+'% · '+stL+(cons>2?' · '+cons+'d'+(dir===1?'↑':'↓'):'')+' </span>'+
+        (state.markov ? markovBadgeHtml(state.markov) : '') +
         '</div>'+
         '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">'+crit+'</div>'+
         '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-top:5px;font-size:10px;text-align:center">'+
@@ -4291,6 +4311,8 @@ async function fetchSPYData(){
     const j=await r.json();
     if(j.status==='error'||!j.values) return null;
     spyData=[...j.values].reverse().map(function(v){return parseFloat(v.close);});
+    // QQQ-Regime berechnen (nutzt SPY-Logik, aber mit QQQ-Daten)
+    fetchQqqRegime();
     spyLoadTime=Date.now();
     return spyData;
   }catch(e){ return null; }
@@ -6352,6 +6374,224 @@ function fiboLevelCell(label, level, currentPrice) {
   '</div>';
 }
 // ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  VIX-AMPEL
+// ═══════════════════════════════════════════════════════════════
+let _vixLevel = null;
+let _vixLastFetch = 0;
+const VIX_TTL = 30 * 60 * 1000; // 30 Minuten Cache
+
+async function fetchVix() {
+  const now = Date.now();
+  if (_vixLevel !== null && now - _vixLastFetch < VIX_TTL) return _vixLevel;
+  const key = getTwelveKey();
+  if (!key) return null;
+  try {
+    const url = 'https://api.twelvedata.com/time_series?symbol=VIX&interval=1day&outputsize=1&apikey=' + key;
+    const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url);
+    const r = await fetch(proxy);
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (j.values && j.values.length > 0) {
+      _vixLevel = parseFloat(j.values[0].close);
+      _vixLastFetch = now;
+      return _vixLevel;
+    }
+  } catch(e) { console.log('VIX fetch error:', e.message); }
+  return null;
+}
+
+function renderVixAmpel(vix) {
+  const el = document.getElementById('vix-ampel');
+  if (!el) return;
+  if (vix === null) { el.style.display = 'none'; return; }
+
+  let color, bg, icon, label, sublabel;
+  if (vix < 15) {
+    color = 'var(--green)'; bg = 'rgba(52,199,89,0.12)';
+    icon = 'ti-mood-smile'; label = 'VIX ' + vix.toFixed(1);
+    sublabel = 'Niedrig - Risikobereitschaft hoch';
+  } else if (vix < 22) {
+    color = 'var(--amber)'; bg = 'rgba(255,204,0,0.12)';
+    icon = 'ti-mood-neutral'; label = 'VIX ' + vix.toFixed(1);
+    sublabel = 'Erhoehte Vorsicht - Absicherung pruefen';
+  } else if (vix < 30) {
+    color = 'var(--red)'; bg = 'rgba(255,59,48,0.12)';
+    icon = 'ti-mood-sad'; label = 'VIX ' + vix.toFixed(1);
+    sublabel = 'Hohe Volatilitaet - Keine neuen Longs!';
+  } else {
+    color = 'var(--red)'; bg = 'rgba(255,59,48,0.20)';
+    icon = 'ti-alert-triangle'; label = 'VIX ' + vix.toFixed(1);
+    sublabel = 'EXTREME Volatilitaet - Put-KOs pruefen';
+  }
+
+  el.style.display = 'flex';
+  el.style.background = bg;
+  el.style.borderLeft = '3px solid ' + color;
+  el.innerHTML =
+    '<i class="ti ' + icon + '" style="font-size:18px;color:' + color + ';flex-shrink:0"></i>' +
+    '<div style="flex:1">' +
+      '<div style="font-weight:600;color:' + color + ';font-size:13px">' + label + '</div>' +
+      '<div style="font-size:11px;color:var(--text2)">' + sublabel + '</div>' +
+    '</div>' +
+    '<div style="font-size:10px;color:var(--text3)">Markt-Regime</div>';
+}
+// ═══════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+//  MARKOV-REGIME (JS-Port des Pine Script v4)
+// ═══════════════════════════════════════════════════════════════
+function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
+  lookback  = lookback  || 21;
+  bullThresh= bullThresh|| 3.0;
+  bearThresh= bearThresh|| 3.0;
+  smoothLen = smoothLen || 5;
+  if (!closes || closes.length < lookback + 5) return null;
+
+  const n = closes.length;
+
+  // Regime pro Bar bestimmen
+  const regimes = [];
+  for (let i = lookback; i < n; i++) {
+    const logRet = Math.log(closes[i] / closes[i - lookback]) * 100;
+    regimes.push(logRet > bullThresh ? 1 : logRet < -bearThresh ? -1 : 0);
+  }
+
+  // Rollende Transition-Matrix ueber letzten lookback-Bars
+  let bb=0,bn=0,bc=0,nb=0,nn=0,nc=0,cb=0,cn=0,cc=0;
+  const rn = regimes.length;
+  for (let i = 1; i < Math.min(lookback + 1, rn); i++) {
+    const prev = regimes[rn - 1 - i];
+    const curr = regimes[rn - i];
+    if (prev === 1)       { if(curr===1) bb++; else if(curr===0) bn++; else bc++; }
+    else if (prev === 0)  { if(curr===1) nb++; else if(curr===0) nn++; else nc++; }
+    else                  { if(curr===1) cb++; else if(curr===0) cn++; else cc++; }
+  }
+
+  const fromBull = bb+bn+bc;
+  const fromBear = cb+cn+cc;
+  const fromSide = nb+nn+nc;
+
+  const bullSticky = fromBull > 0 ? bb/fromBull*100 : 50;
+  const bearSticky = fromBear > 0 ? cc/fromBear*100 : 50;
+  const sideSticky = fromSide > 0 ? nn/fromSide*100 : 50;
+
+  const currentRegime = regimes[rn - 1];
+  const prevRegime    = regimes[rn - 2];
+
+  // Warnstufe
+  const warnBull = 60;
+  const warnBear = 55;
+  const bullGap  = warnBull - bullSticky;
+  const bearGap  = bearSticky - warnBear;
+  let warnLevel  = 0;
+  if (currentRegime === 1 && bullSticky < warnBull) {
+    warnLevel = bullGap > 15 ? 3 : bullGap > 8 ? 2 : 1;
+  } else if (currentRegime === -1 && bearSticky > warnBear) {
+    warnLevel = bearGap > 15 ? 3 : bearGap > 8 ? 2 : 1;
+  }
+
+  return {
+    regime: currentRegime,      // 1=Bull, -1=Bear, 0=Side
+    bullSticky: Math.round(bullSticky),
+    bearSticky: Math.round(bearSticky),
+    sideSticky: Math.round(sideSticky),
+    warnLevel: warnLevel,
+    bullGap: Math.round(bullGap * 10) / 10,
+    regimeChanged: currentRegime !== prevRegime
+  };
+}
+
+// Markov-Badge HTML fuer Ticker-Karte
+function markovBadgeHtml(markov) {
+  if (!markov) return '';
+  const regime = markov.regime;
+  const sticky = regime === 1 ? markov.bullSticky :
+                 regime === -1 ? markov.bearSticky : markov.sideSticky;
+  const wl = markov.warnLevel;
+
+  // Regime-Basis
+  let regStr, regColor, regBg;
+  if (regime === 1) {
+    regStr = 'BULL'; regColor = 'var(--green)'; regBg = 'rgba(52,199,89,0.12)';
+  } else if (regime === -1) {
+    regStr = 'BEAR'; regColor = 'var(--red)';   regBg = 'rgba(255,59,48,0.12)';
+  } else {
+    regStr = 'SIDE'; regColor = 'var(--text3)'; regBg = 'rgba(120,120,128,0.10)';
+  }
+
+  // Warnstufe ueberschreibt Farbe
+  if (wl === 3) { regColor = 'var(--red)';    regBg = 'rgba(255,59,48,0.18)'; }
+  else if (wl === 2) { regColor = 'var(--amber)'; regBg = 'rgba(255,159,10,0.15)'; }
+  else if (wl === 1) { regColor = 'var(--amber)'; regBg = 'rgba(255,204,0,0.12)'; }
+
+  const warnIcon = wl === 3 ? ' &#x26A0;&#xFE0F;' : wl === 2 ? ' &#x26A0;' : wl === 1 ? ' &#x25BE;' : '';
+  const stickyLabel = sticky >= 70 ? 'stabil' : sticky >= 55 ? 'mittel' : 'schwach';
+
+  return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;' +
+    'background:'+regBg+';color:'+regColor+';display:inline-flex;align-items:center;gap:3px;' +
+    'border:1px solid '+regColor+';opacity:0.9" ' +
+    'title="Markov-Regime: '+regStr+' | Stickiness: '+sticky+'% | Warnstufe: '+wl+'">' +
+    regStr + ' ' + sticky + '%' + warnIcon +
+    '</span>';
+}
+
+// QQQ-Regime global (wird beim Scan-Start berechnet)
+let _qqqRegime = null;
+
+function renderQqqBanner(markov) {
+  const el = document.getElementById('qqq-regime-banner');
+  if (!el) return;
+  if (!markov) { el.style.display = 'none'; return; }
+
+  const regime = markov.regime;
+  const wl = markov.warnLevel;
+  let color, bg, icon, label, sub;
+
+  if (regime === 1 && wl === 0) {
+    color='var(--green)'; bg='rgba(52,199,89,0.10)'; icon='ti-trending-up';
+    label='QQQ: BULL-Regime'; sub='Stickiness '+markov.bullSticky+'% - Momentum intakt';
+  } else if (regime === 1 && wl > 0) {
+    color='var(--amber)'; bg='rgba(255,159,10,0.12)'; icon='ti-alert-triangle';
+    label='QQQ: BULL schwaechelt (Stufe '+wl+')';
+    sub='Stickiness nur '+markov.bullSticky+'% - Vorsicht bei neuen Longs';
+  } else if (regime === 0) {
+    color='var(--amber)'; bg='rgba(255,204,0,0.10)'; icon='ti-minus';
+    label='QQQ: SIDEWAYS-Regime';
+    sub='Kein klarer Trend - Selektiv vorgehen';
+  } else {
+    color='var(--red)'; bg='rgba(255,59,48,0.12)'; icon='ti-trending-down';
+    label='QQQ: BEAR-Regime';
+    sub='Bear Stickiness '+markov.bearSticky+'% - Keine neuen Longs!';
+  }
+
+  el.style.display = 'flex';
+  el.style.background = bg;
+  el.style.borderLeft = '3px solid ' + color;
+  el.innerHTML =
+    '<i class="ti '+icon+'" style="font-size:16px;color:'+color+';flex-shrink:0"></i>' +
+    '<div style="flex:1">' +
+      '<div style="font-weight:600;color:'+color+';font-size:12px">'+label+'</div>' +
+      '<div style="font-size:10px;color:var(--text2)">'+sub+'</div>' +
+    '</div>';
+}
+// ═══════════════════════════════════════════════════════════════
+
+async function fetchQqqRegime() {
+  const key = getTwelveKey();
+  if (!key) return;
+  try {
+    const url = 'https://api.twelvedata.com/time_series?symbol=QQQ&interval=1day&outputsize=60&apikey=' + key;
+    const r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j.values || j.values.length < 25) return;
+    const closes = [...j.values].reverse().map(function(v){ return parseFloat(v.close); });
+    _qqqRegime = calcMarkovRegime(closes);
+    renderQqqBanner(_qqqRegime);
+  } catch(e) { console.log('QQQ regime error:', e.message); }
+}
 </script>
 
 <!-- LIST EDITOR MODAL -->
