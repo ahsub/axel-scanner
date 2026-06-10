@@ -3443,22 +3443,78 @@ async function autoMakro(){
     } catch(e){}
   }
 
+  // Sektor-RS-Daten einlesen (das wichtigste fehlende Signal!)
+  let sektorContext = '';
+  let rotationSignal = 'unbekannt';
+  let defensivCount = 0, offensivCount = 0;
+  const defensivSektoren = ['XLP','XLV','XLRE','XLU','XLF'];
+  const offensivSektoren = ['XLK','SMH','XLY','XLC','XBI'];
+
+  if (_sektorData && _sektorData.length > 0) {
+    const sorted = _sektorData.slice().sort(function(a,b){return b.rs5d-a.rs5d;});
+    const top3 = sorted.slice(0,3);
+    const bot3 = sorted.slice(-3);
+
+    top3.forEach(function(s){ if(defensivSektoren.includes(s.sym)) defensivCount++; });
+    top3.forEach(function(s){ if(offensivSektoren.includes(s.sym)) offensivCount++; });
+    bot3.forEach(function(s){ if(offensivSektoren.includes(s.sym)) offensivCount--; });
+
+    // Rotationsklassifikation
+    const xlk = _sektorData.find(function(s){return s.sym==='XLK';});
+    const smh = _sektorData.find(function(s){return s.sym==='SMH';});
+    const xlp = _sektorData.find(function(s){return s.sym==='XLP';});
+    const xlv = _sektorData.find(function(s){return s.sym==='XLV';});
+    const techRS  = xlk ? xlk.rs5d : 0;
+    const semRS   = smh ? smh.rs5d : 0;
+    const stapRS  = xlp ? xlp.rs5d : 0;
+    const healthRS= xlv ? xlv.rs5d : 0;
+
+    if (stapRS > 2 && healthRS > 2 && techRS < -2) rotationSignal = 'DEFENSIV — Klare Risk-OFF Rotation';
+    else if (techRS > 2 && semRS > 2 && stapRS < 0) rotationSignal = 'OFFENSIV — Risk-ON, Tech führt';
+    else if (techRS < 0 && stapRS > 0) rotationSignal = 'LEICHT DEFENSIV — Sektorwechsel läuft';
+    else rotationSignal = 'NEUTRAL — keine klare Rotation';
+
+    sektorContext = '\n\nSEKTOR-ROTATION (5-Tage RS vs. SPY) — KRITISCH FÜR VERDICT:\n';
+    sektorContext += 'Rotations-Signal: ' + rotationSignal + '\n';
+    sorted.forEach(function(s){
+      const trend = s.rs1d >= 0 ? '↑' : '↓';
+      sektorContext += s.sym + ' (' + s.name + '): ' + (s.rs5d>=0?'+':'') + s.rs5d.toFixed(2) + '% 5d, ' + (s.rs1d>=0?'+':'') + s.rs1d.toFixed(2) + '% 1d ' + trend + '\n';
+    });
+  } else {
+    sektorContext = '\n\n[Sektor-RS-Daten nicht geladen — bitte Sektor-Tabelle aktualisieren]\n';
+  }
+
+  // Konsistenz-Regeln: verhindert falsche "stabile Märkte" bei klarem Risk-OFF
+  const vixNum = parseFloat(vix) || 20;
+  let consistencyHint = '';
+  if (vixNum > 22 && rotationSignal.includes('DEFENSIV')) {
+    consistencyHint = '\n\nPFLICHTHINWEIS: VIX > 22 UND defensive Rotation aktiv — verdict MUSS "bear" sein. verdictText MUSS explizit Risk-OFF, Sektorwechsel und erhöhte Vorsicht benennen. "Stabile Märkte" oder "gemischte Signale" sind bei diesen Daten FALSCH.';
+  } else if (vixNum > 18 && rotationSignal.includes('DEFENSIV')) {
+    consistencyHint = '\n\nPFLICHTHINWEIS: VIX erhöht UND defensive Rotation — verdict sollte "bear" oder mindestens "neu" sein. Vorsichtige Handelsstrategie empfehlen.';
+  }
+
   const prompt = 'Du bist ein erfahrener Trendfolge-Trader und analysierst täglich die Makro-Marktlage für Knock-out Turbo-Zertifikate auf US-Tech-Aktien (Trade Republic).\n\n'+
     'Heute ist der '+today+'. Aktuelle Live-Marktdaten:\n'+
     '- S&P 500: '+sp+'\n- Nasdaq: '+nq+'\n- VIX: '+vix+'\n- WTI Öl: '+oil+'\n'+
     '- Bitcoin: '+btc+'\n- Ethereum: '+eth+'\n- Solana: '+sol+'\n- XRP: '+xrp+'\n'+
-    '- Gold: '+gold+'\n- Silber: '+silver+'\n- Kupfer: '+copper+'\n- Öl (Rohstoff): '+oil2+newsContext+'\n\n'+
+    '- Gold: '+gold+'\n- Silber: '+silver+'\n- Kupfer: '+copper+'\n- Öl (Rohstoff): '+oil2+
+    sektorContext + newsContext + consistencyHint + '\n\n'+
+    'WICHTIG: Die Sektor-Rotation ist das stärkste Marktstruktur-Signal. Berücksichtige es als primären Faktor für das verdict.\n\n'+
+    'Das verdictText muss konkrete Handlungsempfehlungen für KO-Trader enthalten:\n'+
+    '- Bei "bear": welche Sektoren meiden, KO-Abstand erhöhen, Positionsgrößen reduzieren\n'+
+    '- Bei "bull": welche Sektoren bevorzugen, welche Setups bevorzugen\n'+
+    '- Bei "neu": selektive Strategie, welche Signale abwarten\n\n'+
     'Erstelle eine prägnante Tages-Makroeinschätzung als JSON-Objekt mit exakt dieser Struktur:\n'+
     '{\n'+
     '  "verdict": "bull" oder "neu" oder "bear",\n'+
-    '  "verdictText": "2-3 Sätze Tagesfazit auf Deutsch",\n'+
+    '  "verdictText": "2-3 Sätze mit konkreter Handlungsempfehlung auf Deutsch",\n'+
     '  "factors": [\n'+
     '    {"icon":"bull","title":"Titel","desc":"Beschreibung"},\n'+
     '    {"icon":"neu","title":"Titel","desc":"Beschreibung"},\n'+
     '    {"icon":"bear","title":"Titel","desc":"Beschreibung"}\n'+
     '  ]\n'+
     '}\n\n'+
-    'icon muss "bull", "neu" oder "bear" sein. Maximal 5 Faktoren. Antworte NUR mit dem JSON, kein weiterer Text.';
+    'icon muss "bull", "neu" oder "bear" sein. Maximal 5 Faktoren. Ein Faktor MUSS die Sektorrotation benennen. Antworte NUR mit dem JSON, kein weiterer Text.';
 
   try {
     // Anthropic API direkt (Browser-Zugriff mit speziellem Header)
@@ -3571,7 +3627,6 @@ function loadYahooNewsFromCache(){
 }
 
 function generateRuleBasedSummary(){
-  // Read live values from DOM
   const spEl = document.getElementById('m-sp');
   const vixEl = document.getElementById('m-vix');
   const btcChgEl = document.getElementById('m-btc-chg');
@@ -3584,53 +3639,106 @@ function generateRuleBasedSummary(){
   const btcChg = parseFloat((btcChgEl?.textContent||'0').replace('%','').replace('+','')) || 0;
   const goldPrice = parseFloat((goldEl?.textContent||'0').replace('$','').replace('.','').replace(',','.')) || 0;
 
-  // Determine verdict
   let verdict = 'neu';
   let verdictText = '';
   const factors = [];
 
-  if(vix < 16){
-    verdict = 'bull';
-    factors.push({icon:'bull',title:'VIX '+vix.toFixed(1)+' — Niedriges Risiko',desc:'VIX unter 16 signalisiert entspannte Marktlage. Gutes Umfeld für Momentum-Trades.'});
-  } else if(vix > 25){
-    verdict = 'bear';
-    factors.push({icon:'bear',title:'VIX '+vix.toFixed(1)+' — Erhöhte Volatilität',desc:'VIX über 25 — Positionsgrößen reduzieren, KO-Abstand erhöhen auf ≥25%.'});
+  // ── Sektor-Rotation als primäres Signal ──
+  let rotationVerdict = null;
+  if (_sektorData && _sektorData.length > 0) {
+    const xlk  = _sektorData.find(function(s){return s.sym==='XLK';});
+    const smh  = _sektorData.find(function(s){return s.sym==='SMH';});
+    const xlp  = _sektorData.find(function(s){return s.sym==='XLP';});
+    const xlv  = _sektorData.find(function(s){return s.sym==='XLV';});
+    const xlre = _sektorData.find(function(s){return s.sym==='XLRE';});
+    const techRS  = xlk ? xlk.rs5d : 0;
+    const semRS   = smh ? smh.rs5d : 0;
+    const stapRS  = xlp ? xlp.rs5d : 0;
+    const healthRS= xlv ? xlv.rs5d : 0;
+    const reitRS  = xlre ? xlre.rs5d : 0;
+
+    const isDefensiv = stapRS > 2 || healthRS > 2 || reitRS > 2;
+    const isTechWeak = techRS < -2 || semRS < -2;
+    const isTechStrong = techRS > 2 && semRS > 1;
+
+    if (isDefensiv && isTechWeak) {
+      rotationVerdict = 'bear';
+      factors.push({icon:'bear', title:'Risk-OFF Rotation — Defensiv dominiert',
+        desc:'Kapital rotiert in ' +
+          (stapRS>2?'Staples (XLP +'+stapRS.toFixed(1)+'%) ':'') +
+          (healthRS>2?'Health (XLV +'+healthRS.toFixed(1)+'%) ':'') +
+          (reitRS>2?'REIT (XLRE +'+reitRS.toFixed(1)+'%) ':'') +
+          '. Tech/Semis schwach (' + (xlk?'XLK '+xlk.rs5d.toFixed(1)+'%':'') + '). Keine neuen Long-Positionen in Tech/Semis.'
+      });
+    } else if (isTechStrong && stapRS < 0) {
+      rotationVerdict = 'bull';
+      factors.push({icon:'bull', title:'Risk-ON Rotation — Tech führt',
+        desc:'Technologie (XLK +'+techRS.toFixed(1)+'%) und Halbleiter (SMH +'+semRS.toFixed(1)+'%) outperformen. Günstig für Momentum-Setups in AI/Tech.'
+      });
+    } else if (isTechWeak) {
+      rotationVerdict = 'neu';
+      factors.push({icon:'neu', title:'Tech-Schwäche — selektiv vorgehen',
+        desc:'Tech/Semis underperformen SPY. Sektorwechsel beobachten, nur stärkste Setups handeln.'
+      });
+    }
+  }
+
+  // ── VIX ──
+  if (vix < 16) {
+    if (rotationVerdict !== 'bear') verdict = 'bull';
+    factors.push({icon:'bull', title:'VIX '+vix.toFixed(1)+' — Niedriges Risiko',
+      desc:'VIX unter 16 signalisiert entspannte Marktlage. Gutes Umfeld für Momentum-Trades.'});
+  } else if (vix > 25) {
+    verdict = 'bear'; // VIX > 25 überstimmt alles
+    factors.push({icon:'bear', title:'VIX '+vix.toFixed(1)+' — Erhöhte Volatilität',
+      desc:'VIX über 25 — Positionsgrößen auf max. 50% reduzieren, KO-Abstand ≥25%, keine neuen Einstiege ohne klares Signal.'});
+  } else if (vix > 20) {
+    if (rotationVerdict === 'bear') verdict = 'bear';
+    else if (verdict !== 'bear') verdict = 'neu';
+    factors.push({icon:'neu', title:'VIX '+vix.toFixed(1)+' — Erhöhte Unsicherheit',
+      desc:'VIX über 20 — Vorsicht, Positionsgrößen reduzieren, KO-Abstand ≥22%.'});
   } else {
-    factors.push({icon:'neu',title:'VIX '+vix.toFixed(1)+' — Neutrale Volatilität',desc:'Normales Marktumfeld. Standard Positionsgrößen anwenden.'});
+    factors.push({icon:'neu', title:'VIX '+vix.toFixed(1)+' — Neutrale Volatilität',
+      desc:'Normales Marktumfeld. Standard-Positionsgrößen anwenden.'});
   }
 
-  if(btcChg > 2){
-    factors.push({icon:'bull',title:'Bitcoin +'+btcChg.toFixed(1)+'% — Risk-on Signal',desc:'Starke Krypto-Performance bestätigt Risk-on Stimmung. Günstig für Tech/AI Turbos.'});
-    if(verdict !== 'bear') verdict = 'bull';
-  } else if(btcChg < -2){
-    factors.push({icon:'bear',title:'Bitcoin '+btcChg.toFixed(1)+'% — Risk-off Signal',desc:'Krypto-Schwäche signalisiert Risk-off. Neue Positionen mit erhöhter Vorsicht.'});
-    if(verdict === 'bull') verdict = 'neu';
+  // Rotations-Verdict übernehmen wenn VIX nicht überstimmt
+  if (rotationVerdict && vix <= 25) verdict = rotationVerdict;
+
+  // ── Bitcoin ──
+  if (btcChg > 2) {
+    factors.push({icon:'bull', title:'Bitcoin +'+btcChg.toFixed(1)+'% — Risk-on',
+      desc:'Krypto-Stärke bestätigt Risk-on. Günstig für Tech/AI Turbos sofern Rotation stimmt.'});
+    if (verdict === 'neu' && rotationVerdict !== 'bear') verdict = 'bull';
+  } else if (btcChg < -2) {
+    factors.push({icon:'bear', title:'Bitcoin '+btcChg.toFixed(1)+'% — Risk-off',
+      desc:'Krypto-Schwäche bestätigt Risk-off Stimmung. Neue Positionen mit erhöhter Vorsicht.'});
+    if (verdict === 'bull') verdict = 'neu';
   }
 
-  if(goldPrice > 3000){
-    factors.push({icon:'neu',title:'Gold $'+goldPrice.toFixed(0)+' — Sicherheitsnachfrage',desc:'Hoher Goldpreis zeigt geopolitische Unsicherheit. Overnight-Risiko beachten.'});
+  // ── Gold ──
+  if (goldPrice > 3000) {
+    factors.push({icon:'neu', title:'Gold $'+goldPrice.toFixed(0)+' — Sicherheitsnachfrage',
+      desc:'Hoher Goldpreis zeigt geopolitische Unsicherheit und Risk-off. Overnight-Risiko beachten.'});
   }
 
-  // Set verdict text
-  if(verdict === 'bull') verdictText = 'Technisch bullisches Umfeld — VIX niedrig, Krypto positiv. Momentum-Setups mit 3/3 Scanner-Signal bevorzugen.';
-  else if(verdict === 'bear') verdictText = 'Vorsicht geboten — erhöhte Volatilität. Kleinere Positionen, KO-Abstand ≥25%, keine neuen Einstiege bei schwachem Krypto.';
-  else verdictText = 'Neutrales Marktumfeld — selektiv vorgehen. Nur 3/3 Scanner-Signale handeln, Standard KO-Abstand ≥20%.';
+  // ── verdictText mit konkreten Handlungsempfehlungen ──
+  if (verdict === 'bull') {
+    verdictText = 'Risk-ON Umfeld — Tech/AI führt die Rotation an. Momentum-Setups mit 3/3 Scanner-Signal bevorzugen. KO-Abstand Standard ≥20%, max. €2.000 pro Position.';
+  } else if (verdict === 'bear') {
+    verdictText = 'Risk-OFF — ' + (vix > 20 ? 'VIX ' + vix.toFixed(0) + ' erhöht, ' : '') +
+      'defensive Sektorrotation aktiv. Keine neuen Long-Positionen in Tech/Semis. Bestehende Positionen absichern, KO-Abstand ≥25%, Positionsgrößen auf 50% reduzieren.';
+  } else {
+    verdictText = 'Neutrales bis vorsichtiges Umfeld — Sektorwechsel beobachten. Nur 3/3 Scanner-Signale in nicht-defensiven Sektoren handeln. KO-Abstand ≥22%.';
+  }
 
-  // Update stored makro with rule-based summary (only if no manual data today)
   const stored = JSON.parse(localStorage.getItem('ko_makro') || '{}');
   const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-
-  // Only auto-update if no AI/manual makro with multiple factors exists for today
   const hasRealFactors = stored.factors && stored.factors.length > 1;
   const hasDataToday = stored.date === today && hasRealFactors;
   if(!hasDataToday){
-    const newMakro = Object.assign({}, stored, {
-      verdict: verdict,
-      verdictText: verdictText,
-      factors: factors,
-    });
+    const newMakro = Object.assign({}, stored, { verdict, verdictText, factors });
     localStorage.setItem('ko_makro', JSON.stringify(newMakro));
-    // Only update verdict pill, NOT renderMakro (would wipe live DOM prices)
     const vPill = document.getElementById('makro-verdict-pill');
     if(vPill){
       if(verdict==='bull'){vPill.className='pill pill-green';vPill.textContent='Confirmed Uptrend';}
@@ -7346,31 +7454,54 @@ async function openKiBriefing() {
   ) : 'unbekannt';
   const vixStr = _vixLevel ? _vixLevel.toFixed(1) : 'unbekannt';
 
-  // Sektor-RS Top/Bottom
+  // Sektor-RS vollständig + Rotationssignal für KI-Briefing
   let sektorStr = '';
+  let rotationWarning = '';
   if (_sektorData && _sektorData.length > 0) {
-    const top3 = _sektorData.slice(0, 3).map(function(s) { return s.sym + ' ' + (s.rs5d >= 0 ? '+' : '') + s.rs5d.toFixed(1) + '%'; }).join(', ');
-    const bot3 = _sektorData.slice(-3).map(function(s) { return s.sym + ' ' + s.rs5d.toFixed(1) + '%'; }).join(', ');
-    sektorStr = '\nStaerkste Sektoren: ' + top3 + '\nSchwaechste Sektoren: ' + bot3;
-  }
+    const sorted = _sektorData.slice().sort(function(a,b){return b.rs5d-a.rs5d;});
+    const top3 = sorted.slice(0,3).map(function(s){ return s.sym+' '+(s.rs5d>=0?'+':'')+s.rs5d.toFixed(1)+'%'; }).join(', ');
+    const bot3 = sorted.slice(-3).map(function(s){ return s.sym+' '+s.rs5d.toFixed(1)+'%'; }).join(', ');
+    const allRS = sorted.map(function(s){ return s.sym+':'+(s.rs5d>=0?'+':'')+s.rs5d.toFixed(1)+'%'; }).join(' | ');
 
-  // Ticker-Liste formatieren
-  const tickerList = top25.map(function(r, i) {
-    const mk = r.markov ? r.markov.regime + ' ' + r.markov.sticky + '%' + (r.markov.warnLevel > 0 ? ' Warn' + r.markov.warnLevel : '') : 'n/a';
-    const er = r.er && r.er.days ? 'ER in ' + r.er.days + 'T' : 'kein ER';
-    const fibo = r.fibo ? r.fibo.zone + ' ' + r.fibo.retrace + '%' : 'n/a';
-    const bp = r.bullCount >= 3 ? 'Kaufsignal' : r.bullCount === 2 ? 'Vorsicht' : 'Schwach';
-    return (i + 1) + '. ' + r.sym + ' | Score ' + r.grade + r.score
-      + ' | SEPA ' + r.sepa + '/8 | ' + mk + ' | ' + er + ' | Fibo: ' + fibo + ' | ' + bp;
-  }).join('\n');
+    // Rotationssignal berechnen
+    const xlk  = _sektorData.find(function(s){return s.sym==='XLK';});
+    const smh  = _sektorData.find(function(s){return s.sym==='SMH';});
+    const xlp  = _sektorData.find(function(s){return s.sym==='XLP';});
+    const xlv  = _sektorData.find(function(s){return s.sym==='XLV';});
+    const xlre = _sektorData.find(function(s){return s.sym==='XLRE';});
+    const techRS = xlk ? xlk.rs5d : 0;
+    const semRS  = smh ? smh.rs5d : 0;
+    const stapRS = xlp ? xlp.rs5d : 0;
+    const hlthRS = xlv ? xlv.rs5d : 0;
+
+    let rotSig = '';
+    if ((stapRS > 2 || hlthRS > 2) && techRS < -2) {
+      rotSig = '⚠️ DEFENSIV-ROTATION AKTIV — Kapital flieht aus Tech/Semis in Defensive. Risk-OFF.';
+      rotationWarning = '\n\nKRITISCHE HANDLUNGSREGEL: Aktive Defensiv-Rotation — KEINE neuen Long-Positionen in Tech/Semis/AI empfehlen. Nur defensive oder nicht-korrelierte Sektoren berücksichtigen. KO-Abstand auf ≥25% erhöhen.';
+    } else if (techRS > 2 && semRS > 1) {
+      rotSig = '✅ OFFENSIV-ROTATION — Tech/Semis führen, Risk-ON Umfeld.';
+    } else if (techRS < 0) {
+      rotSig = '⚡ LEICHT DEFENSIV — Tech schwächer als SPY, selektiv vorgehen.';
+      rotationWarning = '\n\nHINWEIS: Tech underperformt SPY — nur die stärksten Einzeltitel mit 3/3 Signal empfehlen.';
+    } else {
+      rotSig = 'NEUTRAL — keine klare Sektorrotation.';
+    }
+
+    sektorStr = '\n\nSEKTOR-RS 5d vs SPY (PRIMÄRES MARKTSIGNAL):\n'
+      + 'Rotations-Signal: ' + rotSig + '\n'
+      + 'Alle Sektoren: ' + allRS + '\n'
+      + 'Top-3: ' + top3 + '\n'
+      + 'Bottom-3: ' + bot3;
+  }
 
   // Marktkontext-String bauen (wird an Strategie-Prompt übergeben)
   const marktkontext = 'SCANNER-ERGEBNISSE (Top ' + top25.length + ' Titel, Score >= 65):\n'
     + tickerList + '\n\n'
     + 'MARKTKONTEXT:\n'
     + '- QQQ-Regime: ' + qqqRegime + '\n'
-    + '- VIX: ' + vixStr + (parseFloat(vixStr) > 20 ? ' (ERHOEHT)' : ' (normal)') + '\n'
-    + sektorStr;
+    + '- VIX: ' + vixStr + (parseFloat(vixStr) > 20 ? ' ⚠️ ERHÖHT — erhöhte Vorsicht geboten' : ' (normal)') + '\n'
+    + sektorStr
+    + rotationWarning;
 
   // Strategie-spezifischen Prompt holen
   const stratCfg = KI_STRAT_CONFIG[_kiStrat] || KI_STRAT_CONFIG.ko;
