@@ -1124,6 +1124,81 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         Noch keine Positionen — erste Position oben erfassen
       </div>
     </div>
+    <!-- BACKLOG PANEL -->
+    <div id="panel-backlog" class="panel">
+      <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
+        <span><i class="ti ti-archive" style="margin-right:4px"></i>Scan-Backlog</span>
+        <span style="font-size:10px;color:var(--text3)" id="backlog-last-saved">—</span>
+      </div>
+
+      <!-- KI-QK Stats Banner -->
+      <div id="backlog-qk-banner" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:.75rem;background:var(--bg2);border:0.5px solid var(--border2)">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px"><i class="ti ti-chart-bar"></i> KI-Empfehlungs-Qualitätskontrolle</div>
+        <div id="backlog-qk-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:11px"></div>
+      </div>
+
+      <!-- Sub-Tabs -->
+      <div style="display:flex;gap:4px;margin-bottom:.75rem">
+        <button class="btn btn-sm backlog-tab-btn active-backlog-tab" id="btab-winner" onclick="switchBacklogTab('winner')"
+          style="font-size:11px;flex:1;background:rgba(52,194,110,0.15);border-color:var(--green);color:var(--green)">
+          🏆 Longtime-Winners
+        </button>
+        <button class="btn btn-sm backlog-tab-btn" id="btab-oversold" onclick="switchBacklogTab('oversold')"
+          style="font-size:11px;flex:1">
+          📉 Oversold-Kandidaten
+        </button>
+        <button class="btn btn-sm backlog-tab-btn" id="btab-tracking" onclick="switchBacklogTab('tracking')"
+          style="font-size:11px;flex:1">
+          🎯 KI-Tracking
+        </button>
+      </div>
+
+      <!-- Longtime-Winners Tab -->
+      <div id="backlog-winner-tab">
+        <div style="display:flex;gap:6px;margin-bottom:.75rem;align-items:center">
+          <span style="font-size:11px;color:var(--text3);flex:1">Top-20 aus letztem Scan speichern:</span>
+          <button class="btn btn-sm btn-primary" onclick="saveTop20ToBacklog()" style="font-size:11px">
+            <i class="ti ti-device-floppy"></i> Top-20 speichern
+          </button>
+          <button class="btn btn-sm" onclick="clearBacklogWinners()" style="font-size:11px;color:var(--red);border-color:var(--red)">
+            <i class="ti ti-trash"></i>
+          </button>
+        </div>
+        <div id="backlog-winner-list" style="font-size:12px;color:var(--text3);text-align:center;padding:1.5rem">
+          <i class="ti ti-archive" style="font-size:24px;display:block;margin-bottom:.5rem"></i>
+          Noch keine Einträge — Scan durchführen, dann Top-20 speichern
+        </div>
+      </div>
+
+      <!-- Oversold-Kandidaten Tab -->
+      <div id="backlog-oversold-tab" style="display:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:.5rem">Claude analysiert RSI, OBV, Volumen und Abverkauf-Muster auf Oversold-Wahrscheinlichkeit:</div>
+        <div style="display:flex;gap:6px;margin-bottom:.75rem">
+          <button class="btn btn-sm btn-primary" onclick="runOversoldScan()" style="font-size:11px;flex:1">
+            <i class="ti ti-brain"></i> Oversold-Scan starten (Claude)
+          </button>
+          <button class="btn btn-sm" onclick="clearOversoldList()" style="font-size:11px;color:var(--red);border-color:var(--red)">
+            <i class="ti ti-trash"></i>
+          </button>
+        </div>
+        <div id="backlog-oversold-list" style="font-size:12px;color:var(--text3);text-align:center;padding:1.5rem">
+          <i class="ti ti-trending-down" style="font-size:24px;display:block;margin-bottom:.5rem"></i>
+          Scan starten — Claude bewertet alle gescannten Titel auf Oversold-Signal
+        </div>
+      </div>
+
+      <!-- KI-Tracking Tab -->
+      <div id="backlog-tracking-tab" style="display:none">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem">
+          Gespeicherte KI-Empfehlungen mit Kurs-Performance vergleichen:
+        </div>
+        <div id="backlog-tracking-list" style="font-size:12px;color:var(--text3);text-align:center;padding:1.5rem">
+          <i class="ti ti-target" style="font-size:24px;display:block;margin-bottom:.5rem"></i>
+          KI-Briefing durchführen → Empfehlungen werden automatisch gespeichert
+        </div>
+      </div>
+    </div>
+
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <button class="nav-btn active" id="nav-scanner" onclick="showPanel('scanner')">
@@ -1140,6 +1215,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </button>
     <button class="nav-btn" id="nav-journal" onclick="showPanel('journal')">
       <i class="ti ti-notebook"></i>Journal
+    </button>
+    <button class="nav-btn" id="nav-backlog" onclick="showPanel('backlog');renderBacklogPanel()">
+      <i class="ti ti-archive"></i>Backlog
     </button>
     <button class="nav-btn" id="nav-admin" onclick="showPanel('admin')">
       <i class="ti ti-settings"></i>Admin
@@ -1476,6 +1554,8 @@ function showPanel(id){
   if(id==='makro'){
     loadYahooNewsFromCache();
     refreshLivePrices();
+    // VIX-Sync: echten ^VIX Wert in Makro-Tab laden (einheitliche Quelle)
+    fetchVix().then(function(vix){ if(vix) renderVixAmpel(vix); });
   }
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -2991,7 +3071,8 @@ async function refreshLivePrices(){
       const usIdxMap = [
         {sym:'SPY', el:'m-sp', chgEl:'m-sp-chg', label:'S&P 500'},
         {sym:'QQQ', el:'m-nq', chgEl:'m-nq-chg', label:'Nasdaq'},
-        {sym:'VIXY',el:'m-vix',chgEl:'m-vix-chg',label:'VIX'},
+        // VIXY entfernt — war ETF-Preis (~$15), nicht echter VIX-Index!
+        // VIX wird jetzt ausschließlich via fetchVix() (^VIX Yahoo) geladen
         {sym:'USO', el:'m-oil',chgEl:'m-oil-chg', label:'WTI Öl'},
       ];
       const usResults = await Promise.all(usIdxMap.map(function(idx) {
@@ -6528,6 +6609,13 @@ async function fetchVix() {
       if (closes.length > 0) {
         _vixLevel = parseFloat(closes[closes.length - 1].toFixed(2));
         _vixLastFetch = now;
+        // Einheitliche VIX-Quelle: #m-vix DOM mit echtem ^VIX-Wert befüllen
+        // (ersetzt den alten VIXY-ETF-Wert der erheblich abwich)
+        const vixDomEl = document.getElementById('m-vix');
+        if (vixDomEl) {
+          vixDomEl.textContent = _vixLevel.toFixed(2);
+          vixDomEl.style.color = _vixLevel < 16 ? 'var(--green)' : _vixLevel > 25 ? 'var(--red)' : 'var(--amber)';
+        }
         return _vixLevel;
       }
     }
@@ -7255,6 +7343,11 @@ async function openKiBriefing() {
       + '</div>'
       + '<div>' + formatted + '</div>';
 
+    // ── KI-Tracking: Top-3 Empfehlungen automatisch speichern ──
+    // Extrahiere die Top-3 Symbole aus dem generierten Text (erste 3 der sortierten Liste)
+    const top3Syms = top25.slice(0, 3).map(function(r) { return r.sym; });
+    saveKiRecommendationsForTracking(top3Syms, _vixLevel ? _vixLevel.toFixed(1) : null, _kiStrat);
+
   } catch(e) {
     content.innerHTML = '<div style="color:var(--red)">Fehler: ' + e.message + '</div>';
   }
@@ -7667,5 +7760,485 @@ function csvSaveConfirm(tickers) {
   </div>
 </div>
 
-</body>
-</html>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     BACKLOG-SYSTEM: TrackingStore · Longtime-Winners · Oversold · KI-QK
+     ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+// ── TrackingStore: saubere localStorage-Abstraktion (späterer Backend-Swap möglich) ──
+const TrackingStore = {
+  _key: function(scope) { return 'ko_backlog_' + scope; },
+
+  save: function(scope, data) {
+    try {
+      localStorage.setItem(this._key(scope), JSON.stringify({ ts: Date.now(), data: data }));
+      return true;
+    } catch(e) { console.warn('TrackingStore.save failed:', e); return false; }
+  },
+
+  load: function(scope) {
+    try {
+      const raw = localStorage.getItem(this._key(scope));
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch(e) { return null; }
+  },
+
+  update: function(scope, updateFn) {
+    const current = this.load(scope);
+    const currentData = current ? current.data : null;
+    const updated = updateFn(currentData);
+    return this.save(scope, updated);
+  },
+
+  clear: function(scope) {
+    localStorage.removeItem(this._key(scope));
+  }
+};
+
+// ── Backlog-Panel: Sub-Tab-Switcher ──
+function switchBacklogTab(tab) {
+  document.querySelectorAll('.backlog-tab-btn').forEach(function(b) {
+    b.classList.remove('active-backlog-tab');
+    b.style.background = 'transparent';
+    b.style.borderColor = 'var(--border2)';
+    b.style.color = 'var(--text2)';
+  });
+  const activeBtn = document.getElementById('btab-' + tab);
+  if (activeBtn) {
+    activeBtn.classList.add('active-backlog-tab');
+    if (tab === 'winner') { activeBtn.style.background='rgba(52,194,110,0.15)'; activeBtn.style.borderColor='var(--green)'; activeBtn.style.color='var(--green)'; }
+    else if (tab === 'oversold') { activeBtn.style.background='rgba(240,86,86,0.12)'; activeBtn.style.borderColor='var(--red)'; activeBtn.style.color='var(--red)'; }
+    else { activeBtn.style.background='rgba(99,102,241,0.15)'; activeBtn.style.borderColor='#818cf8'; activeBtn.style.color='#818cf8'; }
+  }
+  ['winner','oversold','tracking'].forEach(function(t) {
+    const el = document.getElementById('backlog-' + t + '-tab');
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+  });
+}
+
+// ── Top-20 aus aktuellem Scan speichern ──
+function saveTop20ToBacklog() {
+  if (!Object.keys(tickerData).length) {
+    alert('Kein Scan vorhanden — bitte zuerst Scan durchführen.');
+    return;
+  }
+
+  // Scores berechnen
+  const allScored = [];
+  Object.keys(tickerData).forEach(function(sym) {
+    const raw = tickerData[sym];
+    if (!raw) return;
+    const state = processData ? processData(raw) : raw;
+    if (!state || state.error) return;
+    allScored.push({
+      sym: sym,
+      score: state.compositeScore || 0,
+      grade: state.scoreGrade || '?',
+      price: (state.price || raw.price || 0).toFixed(2),
+      sepa: state.sepaScore || 0,
+      bullCount: state.bullCount || 0,
+      rsi: state.rsi || null,
+      dist52wHigh: state.dist52wHigh || 0,
+      ma50: state.ma50 ? state.ma50.toFixed(2) : null,
+      savedAt: Date.now(),
+      vix: _vixLevel || null
+    });
+  });
+
+  allScored.sort(function(a, b) { return b.score - a.score; });
+  const top20 = allScored.slice(0, 20);
+
+  if (!top20.length) { alert('Keine Scan-Ergebnisse verfügbar.'); return; }
+
+  const entry = {
+    date: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    time: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+    vix: _vixLevel ? _vixLevel.toFixed(1) : '—',
+    tickers: top20
+  };
+
+  TrackingStore.update('winners', function(current) {
+    const list = current || [];
+    // Duplikat gleichen Tages ersetzen
+    const today = entry.date;
+    const filtered = list.filter(function(e) { return e.date !== today; });
+    filtered.unshift(entry); // neueste zuerst
+    return filtered.slice(0, 30); // max 30 Tage
+  });
+
+  renderBacklogWinners();
+  showKoToast('✅ Top-' + top20.length + ' gespeichert (' + entry.date + ')');
+}
+
+function clearBacklogWinners() {
+  if (!confirm('Alle Longtime-Winner-Einträge löschen?')) return;
+  TrackingStore.clear('winners');
+  renderBacklogWinners();
+}
+
+function renderBacklogWinners() {
+  const el = document.getElementById('backlog-winner-list');
+  if (!el) return;
+
+  const stored = TrackingStore.load('winners');
+  const entries = stored ? stored.data : null;
+
+  const lastSaved = document.getElementById('backlog-last-saved');
+  if (lastSaved && entries && entries.length) {
+    lastSaved.textContent = 'Zuletzt: ' + entries[0].date + ' ' + entries[0].time;
+  }
+
+  if (!entries || !entries.length) {
+    el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text3)"><i class="ti ti-archive" style="font-size:24px;display:block;margin-bottom:.5rem"></i>Noch keine Einträge</div>';
+    return;
+  }
+
+  let html = '';
+  entries.forEach(function(entry) {
+    html += '<div style="margin-bottom:.75rem;padding:10px;background:var(--bg2);border-radius:10px;border:0.5px solid var(--border2)">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+    html += '<span style="font-size:12px;font-weight:600;color:var(--text2)">📅 ' + entry.date + ' ' + entry.time + '</span>';
+    html += '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:var(--bg3);color:var(--text3)">VIX ' + (entry.vix || '—') + '</span>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    entry.tickers.forEach(function(t) {
+      const scoreColor = t.score >= 80 ? 'var(--green)' : t.score >= 65 ? 'var(--accent)' : 'var(--amber)';
+      const bullBg = t.bullCount === 3 ? 'rgba(52,194,110,0.12)' : 'rgba(255,255,255,0.05)';
+      html += '<div style="padding:3px 7px;border-radius:6px;background:' + bullBg + ';border:0.5px solid var(--border2);cursor:pointer" '
+        + 'onclick="useInRechner && useInRechner(\'' + t.sym + '\')" title="Score ' + t.grade + t.score + ' | $' + t.price + '">'
+        + '<span style="font-size:11px;font-weight:600;color:' + scoreColor + '">' + t.sym + '</span>'
+        + '<span style="font-size:9px;color:var(--text3);margin-left:3px">' + t.score + '</span>'
+        + '</div>';
+    });
+    html += '</div></div>';
+  });
+
+  el.innerHTML = html;
+}
+
+// ── Oversold-Scan via Claude ──
+async function runOversoldScan() {
+  const el = document.getElementById('backlog-oversold-list');
+  if (!el) return;
+
+  const apiKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_anthropic_key');
+  if (!apiKey) {
+    el.innerHTML = '<div style="color:var(--red);padding:1rem">Kein Anthropic API-Key gesetzt.</div>';
+    return;
+  }
+
+  if (!Object.keys(tickerData).length) {
+    el.innerHTML = '<div style="color:var(--amber);padding:1rem">Kein Scan vorhanden — bitte zuerst Scan durchführen.</div>';
+    return;
+  }
+
+  el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text3)">'
+    + '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;font-size:1.5rem"></i>'
+    + '<div style="margin-top:.5rem">Claude analysiert Oversold-Signale...</div></div>';
+
+  // Kandidaten aufbereiten (RSI < 50, Kurs > 5% unter MA50 oder 52W-Hoch-Abstand > 15%)
+  const candidates = [];
+  Object.keys(tickerData).forEach(function(sym) {
+    const raw = tickerData[sym];
+    if (!raw) return;
+    const state = processData ? processData(raw) : raw;
+    if (!state || state.error) return;
+
+    const rsi = state.rsi || null;
+    const dist52 = state.dist52wHigh || 0;
+    const price = state.price || 0;
+    const ma50 = state.ma50 || 0;
+    const distMa50 = ma50 > 0 ? ((price - ma50) / ma50 * 100) : 0;
+
+    // Vorfilter: potenzielle Oversold-Kandidaten
+    if ((rsi && rsi < 45) || dist52 < -15 || distMa50 < -8) {
+      candidates.push({
+        sym: sym,
+        rsi: rsi ? rsi.toFixed(1) : 'n/a',
+        dist52wHigh: dist52.toFixed(1),
+        distMa50: distMa50.toFixed(1),
+        price: price.toFixed(2),
+        score: state.compositeScore || 0,
+        bullCount: state.bullCount || 0,
+        macdBull: state.macdBull,
+        obvBull: state.obvBull,
+        volRatio: state.volRatio ? state.volRatio.toFixed(0) : 'n/a'
+      });
+    }
+  });
+
+  if (!candidates.length) {
+    el.innerHTML = '<div style="color:var(--amber);padding:1rem;text-align:center">Keine Oversold-Kandidaten im aktuellen Scan (RSI < 45 oder > 15% unter 52W-Hoch).</div>';
+    return;
+  }
+
+  // Prompt für Claude
+  const candidateStr = candidates.map(function(c) {
+    return c.sym + ': RSI=' + c.rsi + ' | 52W-H: ' + c.dist52wHigh + '% | MA50: ' + c.distMa50 + '% | Vol: ' + c.volRatio + '% Ø | MACD: ' + (c.macdBull ? 'bull' : c.macdBull === false ? 'bear' : 'n/a') + ' | OBV: ' + (c.obvBull ? 'bull' : c.obvBull === false ? 'bear' : 'n/a') + ' | Score: ' + c.score;
+  }).join('\n');
+
+  const prompt = 'Du bist ein erfahrener technischer Analyst spezialisiert auf Oversold-Rebounds.\n\n'
+    + 'VIX zum Scanzeitpunkt: ' + (_vixLevel ? _vixLevel.toFixed(1) : 'unbekannt') + '\n\n'
+    + 'Folgende Titel zeigen potenzielle Oversold-Signale (RSI niedrig, unter MA50 oder 52W-Hoch stark gefallen):\n\n'
+    + candidateStr + '\n\n'
+    + 'AUFGABE: Bewerte jeden Titel auf Oversold-Rebound-Potenzial. Antworte NUR mit JSON, kein anderer Text:\n'
+    + '{"candidates":[{"sym":"AAPL","oversold_score":75,"rebound_days":"3-7","rationale":"RSI 28, Volume-Spike, MACD dreht","risk":"BEAR-Markt, kein Boden bestätigt"}]}\n'
+    + 'oversold_score: 0-100 (100 = maximale Oversold-Wahrscheinlichkeit mit Rebound-Potenzial)\n'
+    + 'Sortiere absteigend nach oversold_score. Nur Titel mit oversold_score >= 40 zurückgeben.';
+
+  try {
+    const proxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
+      + encodeURIComponent('https://api.anthropic.com/v1/messages')
+      + '&ant_key=' + encodeURIComponent(apiKey);
+
+    const resp = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!resp.ok) throw new Error('API-Fehler ' + resp.status);
+    const data = await resp.json();
+    const text = (data.content && data.content[0] && data.content[0].text) || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    const results = parsed.candidates || [];
+
+    if (!results.length) {
+      el.innerHTML = '<div style="color:var(--amber);padding:1rem;text-align:center">Claude hat keine Titel mit ausreichendem Rebound-Potenzial (≥40) gefunden.</div>';
+      return;
+    }
+
+    // Ergebnisse in TrackingStore speichern
+    TrackingStore.save('oversold', {
+      date: new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }),
+      vix: _vixLevel ? _vixLevel.toFixed(1) : '—',
+      candidates: results
+    });
+
+    renderOversoldList(results);
+    showKoToast('📉 ' + results.length + ' Oversold-Kandidaten gefunden');
+
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--red);padding:1rem">Fehler: ' + e.message + '</div>';
+  }
+}
+
+function renderOversoldList(candidates) {
+  const el = document.getElementById('backlog-oversold-list');
+  if (!el || !candidates || !candidates.length) return;
+
+  const ts = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  let html = '<div style="font-size:10px;color:var(--text3);margin-bottom:.75rem">Generiert: ' + ts + ' · VIX: ' + (_vixLevel ? _vixLevel.toFixed(1) : '—') + '</div>';
+
+  candidates.forEach(function(c) {
+    const score = c.oversold_score || 0;
+    const scoreColor = score >= 70 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--text3)';
+    const scoreBg = score >= 70 ? 'rgba(52,194,110,0.12)' : score >= 50 ? 'rgba(240,169,58,0.10)' : 'rgba(255,255,255,0.04)';
+    html += '<div style="margin-bottom:.5rem;padding:10px;background:var(--bg2);border-radius:10px;border-left:3px solid ' + scoreColor + '">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+    html += '<span style="font-size:13px;font-weight:700;color:var(--text1)">' + c.sym + '</span>';
+    html += '<span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;background:' + scoreBg + ';color:' + scoreColor + '">OS-Score: ' + score + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:3px">⏱ Rebound-Fenster: <strong>' + (c.rebound_days || '?') + ' Tage</strong></div>';
+    html += '<div style="font-size:11px;color:var(--text3);margin-bottom:3px">✅ ' + (c.rationale || '—') + '</div>';
+    html += '<div style="font-size:11px;color:var(--red)">⚠️ ' + (c.risk || '—') + '</div>';
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+// ── KI-Empfehlungen Tracking + Qualitätskontrolle ──
+function saveKiRecommendationsForTracking(topSyms, vixAtScan, strat) {
+  if (!topSyms || !topSyms.length) return;
+  TrackingStore.update('ki_tracking', function(current) {
+    const list = current || [];
+    const entry = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }),
+      time: new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }),
+      strat: strat || 'ko',
+      vix: vixAtScan,
+      recommendations: topSyms.map(function(sym) {
+        const raw = tickerData[sym];
+        const state = raw && processData ? processData(raw) : null;
+        return {
+          sym: sym,
+          priceAtScan: state ? parseFloat((state.price || 0).toFixed(2)) : null,
+          scoreAtScan: state ? (state.compositeScore || 0) : 0,
+          // Performance wird später beim Tracking-Check befüllt
+          perfChecked: false,
+          perfPct: null,
+          perfDate: null
+        };
+      })
+    };
+    list.unshift(entry);
+    return list.slice(0, 20); // max 20 KI-Briefings tracken
+  });
+}
+
+async function checkTrackingPerformance(entryId) {
+  const stored = TrackingStore.load('ki_tracking');
+  if (!stored || !stored.data) return;
+  const entry = stored.data.find(function(e) { return e.id === entryId; });
+  if (!entry) return;
+
+  const apiKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_anthropic_key');
+  if (!apiKey) return;
+
+  // Kurse für empfohlene Titel holen
+  const syms = entry.recommendations.filter(function(r) { return !r.perfChecked && r.priceAtScan; });
+  if (!syms.length) return;
+
+  const pricePromises = syms.map(function(r) {
+    const yfUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(r.sym) + '?interval=1d&range=2d';
+    return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(yfUrl))
+      .then(function(res) { return res.json(); })
+      .then(function(j) {
+        const result = j && j.chart && j.chart.result && j.chart.result[0];
+        if (!result) return { sym: r.sym, currentPrice: null };
+        const closes = result.indicators.quote[0].close.filter(function(v) { return v != null; });
+        return { sym: r.sym, currentPrice: closes.length ? closes[closes.length - 1] : null, entryPrice: r.priceAtScan };
+      })
+      .catch(function() { return { sym: r.sym, currentPrice: null }; });
+  });
+
+  const prices = await Promise.all(pricePromises);
+
+  TrackingStore.update('ki_tracking', function(current) {
+    const list = current || [];
+    const idx = list.findIndex(function(e) { return e.id === entryId; });
+    if (idx < 0) return list;
+    prices.forEach(function(p) {
+      if (!p.currentPrice || !p.entryPrice) return;
+      const rec = list[idx].recommendations.find(function(r) { return r.sym === p.sym; });
+      if (!rec) return;
+      rec.perfChecked = true;
+      rec.perfPct = parseFloat(((p.currentPrice - p.entryPrice) / p.entryPrice * 100).toFixed(2));
+      rec.perfDate = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' });
+      rec.currentPrice = parseFloat(p.currentPrice.toFixed(2));
+    });
+    return list;
+  });
+
+  renderBacklogTracking();
+  showKoToast('📊 Performance-Update abgeschlossen');
+}
+
+function renderBacklogTracking() {
+  const el = document.getElementById('backlog-tracking-list');
+  if (!el) return;
+
+  const stored = TrackingStore.load('ki_tracking');
+  const entries = stored ? stored.data : null;
+
+  if (!entries || !entries.length) {
+    el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text3)">'
+      + '<i class="ti ti-target" style="font-size:24px;display:block;margin-bottom:.5rem"></i>'
+      + 'KI-Briefing durchführen → Empfehlungen werden automatisch gespeichert</div>';
+    return;
+  }
+
+  // Gesamtstatistik berechnen
+  let totalChecked = 0, totalPositive = 0, totalPerfSum = 0;
+  entries.forEach(function(entry) {
+    entry.recommendations.forEach(function(r) {
+      if (r.perfChecked && r.perfPct !== null) {
+        totalChecked++;
+        if (r.perfPct > 0) totalPositive++;
+        totalPerfSum += r.perfPct;
+      }
+    });
+  });
+
+  // QK-Banner updaten
+  const qkBanner = document.getElementById('backlog-qk-banner');
+  const qkStats = document.getElementById('backlog-qk-stats');
+  if (qkBanner && qkStats && totalChecked > 0) {
+    qkBanner.style.display = 'block';
+    const winRate = Math.round(totalPositive / totalChecked * 100);
+    const avgPerf = (totalPerfSum / totalChecked).toFixed(2);
+    const wColor = winRate >= 60 ? 'var(--green)' : winRate >= 45 ? 'var(--amber)' : 'var(--red)';
+    const pColor = parseFloat(avgPerf) >= 0 ? 'var(--green)' : 'var(--red)';
+    qkStats.innerHTML =
+      '<div style="background:var(--bg3);border-radius:8px;padding:6px;text-align:center">'
+      + '<div style="font-size:9px;color:var(--text3)">Trefferquote</div>'
+      + '<div style="font-size:15px;font-weight:700;color:' + wColor + '">' + winRate + '%</div>'
+      + '<div style="font-size:9px;color:var(--text3)">' + totalChecked + ' geprüft</div></div>'
+      + '<div style="background:var(--bg3);border-radius:8px;padding:6px;text-align:center">'
+      + '<div style="font-size:9px;color:var(--text3)">Ø Performance</div>'
+      + '<div style="font-size:15px;font-weight:700;color:' + pColor + '">' + (parseFloat(avgPerf) >= 0 ? '+' : '') + avgPerf + '%</div>'
+      + '<div style="font-size:9px;color:var(--text3)">nach Check</div></div>'
+      + '<div style="background:var(--bg3);border-radius:8px;padding:6px;text-align:center">'
+      + '<div style="font-size:9px;color:var(--text3)">Briefings</div>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--text2)">' + entries.length + '</div>'
+      + '<div style="font-size:9px;color:var(--text3)">gespeichert</div></div>';
+  }
+
+  let html = '';
+  entries.forEach(function(entry) {
+    const checkedRecs = entry.recommendations.filter(function(r) { return r.perfChecked && r.perfPct !== null; });
+    const posCount = checkedRecs.filter(function(r) { return r.perfPct > 0; }).length;
+    const entryWinRate = checkedRecs.length ? Math.round(posCount / checkedRecs.length * 100) : null;
+
+    html += '<div style="margin-bottom:.75rem;padding:10px;background:var(--bg2);border-radius:10px;border:0.5px solid var(--border2)">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+    html += '<div>';
+    html += '<span style="font-size:12px;font-weight:600;color:var(--text2)">📅 ' + entry.date + ' ' + entry.time + '</span>';
+    html += '<span style="font-size:10px;color:var(--text3);margin-left:6px">' + (entry.strat || 'ko').toUpperCase() + ' · VIX ' + (entry.vix || '—') + '</span>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:6px;align-items:center">';
+    if (entryWinRate !== null) {
+      const wc = entryWinRate >= 60 ? 'var(--green)' : entryWinRate >= 45 ? 'var(--amber)' : 'var(--red)';
+      html += '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,0.06);color:' + wc + '">' + entryWinRate + '% Hit</span>';
+    }
+    html += '<button class="btn btn-sm" onclick="checkTrackingPerformance(' + entry.id + ')" style="font-size:10px;padding:2px 8px">'
+      + '<i class="ti ti-refresh"></i> Update</button>';
+    html += '</div></div>';
+
+    // Empfehlungs-Pills
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    entry.recommendations.forEach(function(r) {
+      let pillColor = 'var(--text3)', pillBg = 'var(--bg3)';
+      let perfStr = '';
+      if (r.perfChecked && r.perfPct !== null) {
+        pillColor = r.perfPct >= 0 ? 'var(--green)' : 'var(--red)';
+        pillBg = r.perfPct >= 0 ? 'rgba(52,194,110,0.12)' : 'rgba(240,86,86,0.10)';
+        perfStr = ' ' + (r.perfPct >= 0 ? '+' : '') + r.perfPct + '%';
+      }
+      html += '<div style="padding:3px 8px;border-radius:6px;background:' + pillBg + ';border:0.5px solid var(--border2)">'
+        + '<span style="font-size:11px;font-weight:600;color:' + pillColor + '">' + r.sym + perfStr + '</span>'
+        + (r.priceAtScan ? '<span style="font-size:9px;color:var(--text3);margin-left:3px">$' + r.priceAtScan + '</span>' : '')
+        + '</div>';
+    });
+    html += '</div></div>';
+  });
+
+  el.innerHTML = html;
+}
+
+// ── Backlog Panel initialisieren ──
+function renderBacklogPanel() {
+  renderBacklogWinners();
+  renderBacklogTracking();
+  // Gespeicherte Oversold-Kandidaten laden
+  const osStored = TrackingStore.load('oversold');
+  if (osStored && osStored.data && osStored.data.candidates) {
+    renderOversoldList(osStored.data.candidates);
+  }
+}
+
+function clearOversoldList() {
+  TrackingStore.clear('oversold');
+  const el = document.getElementById('backlog-oversold-list');
+  if (el) el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text3)"><i class="ti ti-trending-down" style="font-size:24px;display:block;margin-bottom:.5rem"></i>Oversold-Liste geleert</div>';
+}
+</script>
+
+
