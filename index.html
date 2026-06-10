@@ -1128,7 +1128,31 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="panel-backlog" class="panel">
       <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
         <span><i class="ti ti-archive" style="margin-right:4px"></i>Scan-Backlog</span>
-        <span style="font-size:10px;color:var(--text3)" id="backlog-last-saved">—</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button onclick="exportBacklogData()" title="Backup exportieren"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px">
+            <i class="ti ti-download"></i>
+          </button>
+          <button onclick="importBacklogData()" title="Backup importieren"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px">
+            <i class="ti ti-upload"></i>
+          </button>
+          <span style="font-size:10px;color:var(--text3)" id="backlog-last-saved">—</span>
+        </div>
+      </div>
+
+      <!-- Datenpunkt-Fortschrittsbalken -->
+      <div id="backlog-progress-wrap" style="padding:10px 14px;border-radius:10px;margin-bottom:.75rem;background:var(--bg2);border:0.5px solid var(--border2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-size:11px;font-weight:600;color:var(--text2)"><i class="ti ti-database"></i> Datenpunkte für Backtesting</span>
+          <span style="font-size:11px;font-weight:700" id="backlog-dp-count">0 / 150</span>
+        </div>
+        <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:5px">
+          <div id="backlog-dp-bar" style="height:100%;width:0%;border-radius:3px;background:var(--amber);transition:width .4s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text3)" id="backlog-dp-phase">
+          Phase 1 — Datensammlung läuft · Backtesting ab 80 Punkten verfügbar
+        </div>
       </div>
 
       <!-- KI-QK Stats Banner -->
@@ -1138,18 +1162,22 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
 
       <!-- Sub-Tabs -->
-      <div style="display:flex;gap:4px;margin-bottom:.75rem">
+      <div style="display:flex;gap:4px;margin-bottom:.75rem;flex-wrap:wrap">
         <button class="btn btn-sm backlog-tab-btn active-backlog-tab" id="btab-winner" onclick="switchBacklogTab('winner')"
-          style="font-size:11px;flex:1;background:rgba(52,194,110,0.15);border-color:var(--green);color:var(--green)">
-          🏆 Longtime-Winners
+          style="font-size:11px;flex:1;min-width:80px;background:rgba(52,194,110,0.15);border-color:var(--green);color:var(--green)">
+          🏆 Winners
         </button>
         <button class="btn btn-sm backlog-tab-btn" id="btab-oversold" onclick="switchBacklogTab('oversold')"
-          style="font-size:11px;flex:1">
-          📉 Oversold-Kandidaten
+          style="font-size:11px;flex:1;min-width:80px">
+          📉 Oversold
         </button>
         <button class="btn btn-sm backlog-tab-btn" id="btab-tracking" onclick="switchBacklogTab('tracking')"
-          style="font-size:11px;flex:1">
+          style="font-size:11px;flex:1;min-width:80px">
           🎯 KI-Tracking
+        </button>
+        <button class="btn btn-sm backlog-tab-btn" id="btab-backtest" onclick="switchBacklogTab('backtest')"
+          style="font-size:11px;flex:1;min-width:80px">
+          🧪 Backtest
         </button>
       </div>
 
@@ -1197,6 +1225,48 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           KI-Briefing durchführen → Empfehlungen werden automatisch gespeichert
         </div>
       </div>
+
+      <!-- Backtesting Tab -->
+      <div id="backlog-backtest-tab" style="display:none">
+        <!-- Konfidenz-Status -->
+        <div id="bt-confidence-box" style="padding:10px 14px;border-radius:10px;margin-bottom:.75rem;background:var(--bg2);border:0.5px solid var(--border2)">
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px"><i class="ti ti-shield-check"></i> Konfidenz-Status</div>
+          <div id="bt-confidence-text" style="font-size:11px;color:var(--text3)">Wird berechnet...</div>
+        </div>
+
+        <!-- Gewichtungsvarianten -->
+        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">Zu testende Gewichtungsvarianten:</div>
+        <div id="bt-variants-list" style="margin-bottom:.75rem;font-size:11px"></div>
+
+        <!-- Aktionen -->
+        <div style="display:flex;gap:6px;margin-bottom:.75rem">
+          <button class="btn btn-sm btn-primary" id="bt-run-btn" onclick="runBacktest()" style="font-size:11px;flex:1" disabled>
+            <i class="ti ti-player-play"></i> Backtest starten
+          </button>
+          <button class="btn btn-sm" id="bt-meta-btn" onclick="runMetaAnalysis()" style="font-size:11px;flex:1;background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.2));border-color:#818cf8;color:#818cf8" disabled>
+            <i class="ti ti-brain"></i> Meta-Analyse (Claude)
+          </button>
+        </div>
+
+        <!-- Ergebnisse -->
+        <div id="bt-results" style="font-size:12px;color:var(--text3);text-align:center;padding:1.5rem">
+          <i class="ti ti-test-pipe" style="font-size:24px;display:block;margin-bottom:.5rem"></i>
+          <span id="bt-results-placeholder">Backtest noch nicht gestartet</span>
+        </div>
+
+        <!-- Claude Meta-Analyse Output -->
+        <div id="bt-meta-output" style="display:none;margin-top:.75rem;padding:12px;background:var(--bg2);border-radius:10px;border-left:3px solid #818cf8;font-size:12px;line-height:1.7;color:var(--text2)"></div>
+
+        <!-- Gewichts-Übernahme -->
+        <div id="bt-apply-wrap" style="display:none;margin-top:.75rem;padding:10px;background:rgba(52,194,110,0.08);border-radius:10px;border:0.5px solid var(--green)">
+          <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:6px"><i class="ti ti-check"></i> Empfohlene Gewichtung übernehmen?</div>
+          <div id="bt-apply-preview" style="font-size:11px;color:var(--text2);margin-bottom:8px"></div>
+          <button class="btn btn-sm btn-primary" onclick="applyBacktestWeights()" style="font-size:11px;width:100%">
+            <i class="ti ti-settings"></i> Gewichte in Admin-Tab übernehmen
+          </button>
+        </div>
+      </div>
+
     </div>
 
   <!-- BOTTOM NAV -->
@@ -7806,14 +7876,16 @@ function switchBacklogTab(tab) {
   const activeBtn = document.getElementById('btab-' + tab);
   if (activeBtn) {
     activeBtn.classList.add('active-backlog-tab');
-    if (tab === 'winner') { activeBtn.style.background='rgba(52,194,110,0.15)'; activeBtn.style.borderColor='var(--green)'; activeBtn.style.color='var(--green)'; }
-    else if (tab === 'oversold') { activeBtn.style.background='rgba(240,86,86,0.12)'; activeBtn.style.borderColor='var(--red)'; activeBtn.style.color='var(--red)'; }
+    if (tab === 'winner')   { activeBtn.style.background='rgba(52,194,110,0.15)'; activeBtn.style.borderColor='var(--green)'; activeBtn.style.color='var(--green)'; }
+    else if (tab === 'oversold')  { activeBtn.style.background='rgba(240,86,86,0.12)'; activeBtn.style.borderColor='var(--red)'; activeBtn.style.color='var(--red)'; }
+    else if (tab === 'backtest')  { activeBtn.style.background='rgba(240,169,58,0.12)'; activeBtn.style.borderColor='var(--amber)'; activeBtn.style.color='var(--amber)'; }
     else { activeBtn.style.background='rgba(99,102,241,0.15)'; activeBtn.style.borderColor='#818cf8'; activeBtn.style.color='#818cf8'; }
   }
-  ['winner','oversold','tracking'].forEach(function(t) {
+  ['winner','oversold','tracking','backtest'].forEach(function(t) {
     const el = document.getElementById('backlog-' + t + '-tab');
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
+  if (tab === 'backtest') renderBacktestTab();
 }
 
 // ── Top-20 aus aktuellem Scan speichern ──
@@ -8227,11 +8299,428 @@ function renderBacklogTracking() {
 function renderBacklogPanel() {
   renderBacklogWinners();
   renderBacklogTracking();
+  updateDatapointCounter();
   // Gespeicherte Oversold-Kandidaten laden
   const osStored = TrackingStore.load('oversold');
   if (osStored && osStored.data && osStored.data.candidates) {
     renderOversoldList(osStored.data.candidates);
   }
+}
+
+// ── Datenpunkt-Zähler ──
+function countDatapoints() {
+  let dp = 0;
+  const winners = TrackingStore.load('winners');
+  if (winners && winners.data) {
+    winners.data.forEach(function(e) { dp += (e.tickers ? e.tickers.length : 0); });
+  }
+  const tracking = TrackingStore.load('ki_tracking');
+  if (tracking && tracking.data) {
+    tracking.data.forEach(function(e) {
+      e.recommendations.forEach(function(r) { if (r.perfChecked) dp += 2; }); // gewichtet
+    });
+  }
+  return dp;
+}
+
+function updateDatapointCounter() {
+  const dp = countDatapoints();
+  const target = 150;
+  const phase2 = 80;
+  const pct = Math.min(100, Math.round(dp / target * 100));
+
+  const countEl = document.getElementById('backlog-dp-count');
+  const barEl = document.getElementById('backlog-dp-bar');
+  const phaseEl = document.getElementById('backlog-dp-phase');
+  const runBtn = document.getElementById('bt-run-btn');
+  const metaBtn = document.getElementById('bt-meta-btn');
+
+  if (countEl) countEl.textContent = dp + ' / ' + target;
+  if (barEl) {
+    barEl.style.width = pct + '%';
+    barEl.style.background = dp >= target ? 'var(--green)' : dp >= phase2 ? 'var(--amber)' : 'var(--red)';
+  }
+
+  let phaseText = '';
+  if (dp < phase2) {
+    phaseText = '📊 Phase 1 — Datensammlung · Backtesting ab ' + phase2 + ' Punkten · noch ' + (phase2 - dp) + ' fehlen';
+  } else if (dp < target) {
+    phaseText = '⚡ Phase 2 — Erste Tendenzen erkennbar · Konfidenz noch niedrig · Aussagen mit Vorsicht interpretieren';
+  } else {
+    phaseText = '✅ Phase 3 — Belastbare Datenbasis · Backtesting-Ergebnisse statistisch verwertbar';
+  }
+  if (phaseEl) phaseEl.textContent = phaseText;
+
+  // Buttons freischalten
+  if (runBtn) runBtn.disabled = dp < phase2;
+  if (metaBtn) metaBtn.disabled = dp < phase2;
+
+  return dp;
+}
+
+// ── Backtesting-Tab rendern ──
+const BT_VARIANTS = [
+  { id: 'default',  label: 'Standard (aktuell)',      w: {tech:30, sepa:30, bp:15, sticky:15, vol:10}, color: 'var(--text2)' },
+  { id: 'tech',     label: 'Tech-Heavy',               w: {tech:45, sepa:20, bp:15, sticky:10, vol:10}, color: 'var(--accent)' },
+  { id: 'sepa',     label: 'SEPA-Fokus',               w: {tech:20, sepa:45, bp:15, sticky:10, vol:10}, color: 'var(--green)' },
+  { id: 'markov',   label: 'Markov-Heavy (Sticky)',    w: {tech:25, sepa:20, bp:15, sticky:30, vol:10}, color: '#a78bfa' },
+  { id: 'bp',       label: 'Buy-Point-Fokus',          w: {tech:25, sepa:25, bp:30, sticky:10, vol:10}, color: 'var(--amber)' },
+  { id: 'balanced', label: 'Ausgewogen',               w: {tech:25, sepa:25, bp:20, sticky:20, vol:10}, color: '#06b6d4' },
+  { id: 'vix_adpt', label: 'VIX-adaptiv*',             w: null, color: '#f472b6', special: 'vix_adaptive' },
+];
+
+function renderBacktestTab() {
+  updateDatapointCounter();
+
+  const variantsEl = document.getElementById('bt-variants-list');
+  if (!variantsEl) return;
+
+  let html = '<div style="display:grid;gap:4px">';
+  BT_VARIANTS.forEach(function(v) {
+    const wStr = v.w ? 'Tech:'+v.w.tech+' SEPA:'+v.w.sepa+' BP:'+v.w.bp+' Sticky:'+v.w.sticky+' Vol:'+v.w.vol
+                     : 'VIX<16→Tech-Heavy · VIX 16-25→Standard · VIX>25→Markov-Heavy';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--bg2);border-radius:6px;border-left:3px solid '+v.color+'">'
+      + '<span style="font-size:11px;font-weight:500;color:'+v.color+'">'+v.label+'</span>'
+      + '<span style="font-size:10px;color:var(--text3)">'+wStr+'</span>'
+      + '</div>';
+  });
+  html += '</div>';
+  variantsEl.innerHTML = html;
+
+  // Konfidenz-Box
+  const dp = countDatapoints();
+  const confEl = document.getElementById('bt-confidence-text');
+  if (confEl) {
+    if (dp < 80) {
+      confEl.innerHTML = '<span style="color:var(--red)">⛔ Zu wenig Daten (' + dp + '/80) — Backtesting gesperrt. Täglich Top-20 speichern und KI-Briefings durchführen.</span>';
+    } else if (dp < 150) {
+      confEl.innerHTML = '<span style="color:var(--amber)">⚠️ Niedrige Konfidenz (' + dp + '/150) — Tendenzen erkennbar, aber noch nicht statistisch belastbar. Ergebnisse als Hinweis, nicht als Fakt werten.</span>';
+    } else {
+      confEl.innerHTML = '<span style="color:var(--green)">✅ Hohe Konfidenz (' + dp + ' Datenpunkte) — Ergebnisse statistisch verwertbar.</span>';
+    }
+  }
+
+  // Vorhandene Ergebnisse laden
+  const btStored = TrackingStore.load('backtest_results');
+  if (btStored && btStored.data) renderBacktestResults(btStored.data);
+}
+
+// ── Backtest-Rechenkern (JS) ──
+function computeBacktestVariant(variant, winnerEntries) {
+  // Für jede gespeicherte Top-20-Liste: Scores mit dieser Gewichtung neu berechnen
+  // und gegen tatsächliche Performance (aus KI-Tracking) prüfen
+  const tracking = TrackingStore.load('ki_tracking');
+  const trackedPerf = {}; // sym → {perfPct, date}
+  if (tracking && tracking.data) {
+    tracking.data.forEach(function(e) {
+      e.recommendations.forEach(function(r) {
+        if (r.perfChecked && r.perfPct !== null) {
+          if (!trackedPerf[r.sym] || r.perfPct > trackedPerf[r.sym].perfPct) {
+            trackedPerf[r.sym] = { perfPct: r.perfPct, price: r.priceAtScan };
+          }
+        }
+      });
+    });
+  }
+
+  let hits = 0, total = 0, perfSum = 0;
+  const scoredEntries = [];
+
+  winnerEntries.forEach(function(entry) {
+    entry.tickers.forEach(function(t) {
+      // Score mit dieser Variante neu berechnen
+      let newScore;
+      if (variant.special === 'vix_adaptive') {
+        const vix = parseFloat(entry.vix) || 20;
+        let w;
+        if (vix < 16)      w = BT_VARIANTS.find(function(v){return v.id==='tech'}).w;
+        else if (vix > 25) w = BT_VARIANTS.find(function(v){return v.id==='markov'}).w;
+        else               w = BT_VARIANTS.find(function(v){return v.id==='default'}).w;
+        newScore = calcHypotheticalScore(t, w);
+      } else {
+        newScore = calcHypotheticalScore(t, variant.w);
+      }
+
+      // Gegen Tracking-Performance prüfen (falls vorhanden)
+      if (trackedPerf[t.sym]) {
+        total++;
+        if (trackedPerf[t.sym].perfPct > 0) hits++;
+        perfSum += trackedPerf[t.sym].perfPct;
+        scoredEntries.push({ sym: t.sym, newScore: newScore, origScore: t.score, perf: trackedPerf[t.sym].perfPct });
+      }
+    });
+  });
+
+  const winRate = total > 0 ? Math.round(hits / total * 100) : null;
+  const avgPerf = total > 0 ? parseFloat((perfSum / total).toFixed(2)) : null;
+
+  // Rang-Korrelation: Waren höher-gescore Titel auch besser?
+  let rankCorr = null;
+  if (scoredEntries.length >= 5) {
+    scoredEntries.sort(function(a,b){return b.newScore-a.newScore;});
+    const n = scoredEntries.length;
+    let dSq = 0;
+    scoredEntries.forEach(function(e, i) {
+      const perfRank = scoredEntries.slice().sort(function(a,b){return b.perf-a.perf;}).findIndex(function(x){return x.sym===e.sym;});
+      dSq += Math.pow(i - perfRank, 2);
+    });
+    rankCorr = parseFloat((1 - (6 * dSq) / (n * (n*n - 1))).toFixed(2));
+  }
+
+  return { variantId: variant.id, label: variant.label, color: variant.color,
+           winRate: winRate, avgPerf: avgPerf, total: total, rankCorr: rankCorr };
+}
+
+function calcHypotheticalScore(ticker, w) {
+  // Vereinfachte Score-Formel mit gespeicherten Ticker-Daten
+  const bullCount = ticker.bullCount || 0;
+  const sepa = ticker.sepa || 0;
+  const techPts  = Math.round((bullCount/3) * w.tech);
+  const sepaPts  = Math.round((sepa/8) * w.sepa);
+  const bpPts    = 0; // nicht gespeichert in Top-20 Snapshot
+  const stkPts   = Math.round(0.5 * w.sticky); // Mittelwert als Fallback
+  const volPts   = Math.round(0.4 * w.vol);
+  return Math.max(0, Math.min(100, techPts + sepaPts + bpPts + stkPts + volPts));
+}
+
+async function runBacktest() {
+  const winners = TrackingStore.load('winners');
+  if (!winners || !winners.data || !winners.data.length) {
+    alert('Keine gespeicherten Top-20-Listen vorhanden.');
+    return;
+  }
+
+  const btn = document.getElementById('bt-run-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Rechne...'; }
+
+  const results = BT_VARIANTS.map(function(v) {
+    return computeBacktestVariant(v, winners.data);
+  });
+
+  // Beste Variante ermitteln
+  const withData = results.filter(function(r) { return r.winRate !== null; });
+  if (withData.length) {
+    withData.sort(function(a,b) {
+      const scoreA = (a.winRate||0)*0.6 + (a.avgPerf||0)*0.4;
+      const scoreB = (b.winRate||0)*0.6 + (b.avgPerf||0)*0.4;
+      return scoreB - scoreA;
+    });
+    results._best = withData[0];
+  }
+
+  TrackingStore.save('backtest_results', results);
+  renderBacktestResults(results);
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-player-play"></i> Backtest starten'; }
+  const metaBtn = document.getElementById('bt-meta-btn');
+  if (metaBtn) metaBtn.disabled = false;
+
+  showKoToast('🧪 Backtest abgeschlossen — ' + BT_VARIANTS.length + ' Varianten berechnet');
+}
+
+function renderBacktestResults(results) {
+  const el = document.getElementById('bt-results');
+  if (!el) return;
+
+  const dp = countDatapoints();
+  const withData = results.filter(function(r) { return r.winRate !== null; });
+
+  if (!withData.length) {
+    el.innerHTML = '<div style="color:var(--amber);padding:1rem;text-align:center">'
+      + 'Noch keine Performance-Daten im KI-Tracking — '
+      + 'erst KI-Briefings durchführen und Performance-Updates auslösen.</div>';
+    return;
+  }
+
+  // Sortieren: beste zuerst
+  const sorted = withData.slice().sort(function(a,b) {
+    return ((b.winRate||0)*0.6 + (b.avgPerf||0)*0.4) - ((a.winRate||0)*0.6 + (a.avgPerf||0)*0.4);
+  });
+  const bestId = sorted[0] ? sorted[0].variantId : null;
+
+  const confWarn = dp < 150 ? '<div style="font-size:10px;padding:4px 8px;border-radius:6px;background:rgba(240,169,58,0.10);color:var(--amber);margin-bottom:.5rem">⚠️ Konfidenz niedrig ('+dp+'/150 Datenpunkte) — Tendenz erkennbar, nicht final</div>' : '';
+
+  let html = confWarn + '<div style="display:grid;gap:4px">';
+  results.forEach(function(r) {
+    const isBest = r.variantId === bestId;
+    const wc = (r.winRate||0) >= 60 ? 'var(--green)' : (r.winRate||0) >= 45 ? 'var(--amber)' : 'var(--red)';
+    const pc = (r.avgPerf||0) >= 0 ? 'var(--green)' : 'var(--red)';
+    const bg = isBest ? 'rgba(52,194,110,0.08)' : 'var(--bg2)';
+    const border = isBest ? 'var(--green)' : r.color;
+
+    html += '<div style="padding:8px 10px;background:'+bg+';border-radius:8px;border-left:3px solid '+border+'">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">';
+    html += '<span style="font-size:11px;font-weight:600;color:'+r.color+'">'+r.label+(isBest?' 🏆':'')+' </span>';
+    html += '<span style="font-size:10px;color:var(--text3)">n='+r.total+'</span>';
+    html += '</div>';
+
+    if (r.winRate !== null) {
+      html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:11px">';
+      html += '<div style="text-align:center"><div style="font-size:9px;color:var(--text3)">Trefferquote</div><div style="font-weight:700;color:'+wc+'">'+(r.winRate)+'%</div></div>';
+      html += '<div style="text-align:center"><div style="font-size:9px;color:var(--text3)">Ø Performance</div><div style="font-weight:700;color:'+pc+'">'+(r.avgPerf>=0?'+':'')+r.avgPerf+'%</div></div>';
+      html += '<div style="text-align:center"><div style="font-size:9px;color:var(--text3)">Rang-Korr.</div><div style="font-weight:700;color:var(--text2)">'+(r.rankCorr !== null ? r.rankCorr : '—')+'</div></div>';
+      html += '</div>';
+    } else {
+      html += '<div style="font-size:10px;color:var(--text3)">Keine Performance-Daten verfügbar</div>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+
+  // Übernahme-Box für beste Variante
+  const applyWrap = document.getElementById('bt-apply-wrap');
+  const applyPreview = document.getElementById('bt-apply-preview');
+  if (applyWrap && applyPreview && bestId && bestId !== 'default' && bestId !== 'vix_adpt') {
+    const bestVariant = BT_VARIANTS.find(function(v){return v.id===bestId;});
+    if (bestVariant && bestVariant.w) {
+      applyWrap.style.display = 'block';
+      applyWrap._weights = bestVariant.w;
+      applyPreview.textContent = 'Variante "'+bestVariant.label+'": Tech:'+bestVariant.w.tech+' · SEPA:'+bestVariant.w.sepa+' · BP:'+bestVariant.w.bp+' · Sticky:'+bestVariant.w.sticky+' · Vol:'+bestVariant.w.vol;
+    }
+  }
+}
+
+// ── Gewichte aus Backtest in Admin-Tab übernehmen ──
+function applyBacktestWeights() {
+  const wrap = document.getElementById('bt-apply-wrap');
+  if (!wrap || !wrap._weights) return;
+  const w = wrap._weights;
+  // In Admin-Tab-Felder schreiben
+  const fields = {tech:'w-tech', sepa:'w-sepa', bp:'w-bp', sticky:'w-sticky', vol:'w-vol'};
+  Object.keys(fields).forEach(function(k) {
+    const el = document.getElementById(fields[k]);
+    if (el) el.value = w[k];
+  });
+  // Speichern
+  localStorage.setItem('ko_score_weights', JSON.stringify(w));
+  showKoToast('✅ Gewichte übernommen — nächster Scan verwendet neue Gewichtung');
+  wrap.style.display = 'none';
+}
+
+// ── Meta-Analyse via Claude ──
+async function runMetaAnalysis() {
+  const metaEl = document.getElementById('bt-meta-output');
+  if (!metaEl) return;
+  metaEl.style.display = 'block';
+  metaEl.innerHTML = '<div style="text-align:center;color:var(--text3)"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Claude analysiert deine Backtesting-Daten...</div>';
+
+  const apiKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_anthropic_key');
+  if (!apiKey) { metaEl.innerHTML = '<div style="color:var(--red)">Kein API-Key gesetzt.</div>'; return; }
+
+  const btStored = TrackingStore.load('backtest_results');
+  const winners = TrackingStore.load('winners');
+  const tracking = TrackingStore.load('ki_tracking');
+  const dp = countDatapoints();
+
+  // Kontext aufbauen
+  let ctx = 'BACKTESTING-KONTEXT:\n';
+  ctx += 'Datenpunkte: ' + dp + ' (Konfidenz: ' + (dp>=150?'hoch':dp>=80?'mittel':'niedrig') + ')\n';
+  ctx += 'Gespeicherte Scan-Tage: ' + (winners && winners.data ? winners.data.length : 0) + '\n';
+  ctx += 'KI-Briefings getrackt: ' + (tracking && tracking.data ? tracking.data.length : 0) + '\n\n';
+
+  if (btStored && btStored.data) {
+    ctx += 'BACKTEST-ERGEBNISSE (7 Gewichtungsvarianten):\n';
+    btStored.data.forEach(function(r) {
+      if (r.winRate !== null) {
+        ctx += r.label + ': Trefferquote=' + r.winRate + '% · Ø-Perf=' + (r.avgPerf>=0?'+':'') + r.avgPerf + '% · n=' + r.total + ' · RangKorr=' + (r.rankCorr||'n/a') + '\n';
+      }
+    });
+  }
+
+  if (tracking && tracking.data) {
+    ctx += '\nKI-TRACKING (letzte 5 Briefings):\n';
+    tracking.data.slice(0,5).forEach(function(e) {
+      const checked = e.recommendations.filter(function(r){return r.perfChecked;});
+      if (checked.length) {
+        const avg = (checked.reduce(function(s,r){return s+r.perfPct;},0)/checked.length).toFixed(1);
+        ctx += e.date + ' · ' + e.strat + ' · VIX=' + (e.vix||'?') + ' · Ø-Perf=' + (parseFloat(avg)>=0?'+':'') + avg + '% · n=' + checked.length + '\n';
+      }
+    });
+  }
+
+  const prompt = 'Du bist ein quantitativer Analyst der Trading-Scanner-Systeme optimiert.\n\n'
+    + ctx + '\n\n'
+    + 'AUFGABE: Meta-Analyse dieser Backtesting-Daten.\n'
+    + '1. STÄRKEN: Welche Gewichtungsvariante zeigt die robusteste Performance? Warum?\n'
+    + '2. SCHWÄCHEN: Was funktioniert nicht? Welche Signale sind wenig prädiktiv?\n'
+    + '3. KONFIDENZ: Wie belastbar sind die Aussagen bei ' + dp + ' Datenpunkten?\n'
+    + '4. EMPFEHLUNG: Konkrete Gewichtungsanpassung (Tech/SEPA/BP/Sticky/Vol, Summe=100) und Begründung.\n'
+    + '5. NÄCHSTE SCHRITTE: Was sollte gesammelt werden um die Datenbasis zu verbessern?\n\n'
+    + 'Antworte auf Deutsch, strukturiert 1-5, max. 400 Wörter. Sei ehrlich über Datenlimits.';
+
+  try {
+    const proxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
+      + encodeURIComponent('https://api.anthropic.com/v1/messages')
+      + '&ant_key=' + encodeURIComponent(apiKey);
+
+    const resp = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!resp.ok) throw new Error('API-Fehler ' + resp.status);
+    const data = await resp.json();
+    const text = (data.content && data.content[0] && data.content[0].text) || '';
+    const formatted = text
+      .replace(/^(\d\. [A-ZÄÖÜA-Z\- ]+:?)/gm, '<div style="font-weight:600;color:#818cf8;margin-top:.75rem;margin-bottom:.2rem">$1</div>')
+      .replace(/\n/g, '<br>');
+    const ts = new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'});
+    metaEl.innerHTML = '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">Meta-Analyse · ' + ts + ' · ' + dp + ' Datenpunkte</div>' + formatted;
+  } catch(e) {
+    metaEl.innerHTML = '<div style="color:var(--red)">Fehler: ' + e.message + '</div>';
+  }
+}
+
+// ── Export / Import ──
+function exportBacklogData() {
+  const allData = {
+    version: 2,
+    exportDate: new Date().toISOString(),
+    winners: TrackingStore.load('winners'),
+    oversold: TrackingStore.load('oversold'),
+    ki_tracking: TrackingStore.load('ki_tracking'),
+    backtest_results: TrackingStore.load('backtest_results')
+  };
+  const blob = new Blob([JSON.stringify(allData, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ko-scanner-backlog-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showKoToast('💾 Backlog exportiert');
+}
+
+function importBacklogData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.version) throw new Error('Ungültiges Format');
+        if (data.winners)         TrackingStore.save('winners', data.winners.data);
+        if (data.oversold)        TrackingStore.save('oversold', data.oversold.data);
+        if (data.ki_tracking)     TrackingStore.save('ki_tracking', data.ki_tracking.data);
+        if (data.backtest_results)TrackingStore.save('backtest_results', data.backtest_results.data);
+        renderBacklogPanel();
+        showKoToast('✅ Backlog importiert (' + (data.exportDate || 'unbekannt') + ')');
+      } catch(err) {
+        alert('Import-Fehler: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 function clearOversoldList() {
