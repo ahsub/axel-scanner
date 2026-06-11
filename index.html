@@ -1956,6 +1956,19 @@ async function runScan(){
       if(raw.closes_full && raw.closes_full.length >= 25){
         raw._markov = calcMarkovRegime(raw.closes_full);
       }
+      // Erweiterte Scoring-Daten: PDH/PDL + MTF
+      // Nur bei Watchlist-Scan (<= 20 Titel) um TD-Credits zu schonen
+      // (+3 Credits pro Ticker: 1x PDH/PDL + 2x MTF)
+      const _presetVal = (document.getElementById('ticker-preset')||{}).value || '';
+      const _isWatchlistScan = _presetVal.startsWith('wl:') && tickers.length <= 20;
+      if(_isWatchlistScan && tdKey && !isDeMarket){
+        const [_pdhl, _mtf] = await Promise.all([
+          fetchPdhlLevels(t.sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/'),
+          fetchMtfData(t.sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/')
+        ]);
+        if(_pdhl) { raw.pdh=_pdhl.pdh; raw.pdl=_pdhl.pdl; raw.pwh=_pdhl.pwh; raw.pwl=_pdhl.pwl; }
+        if(_mtf)  { raw._mtfData = _mtf; }
+      }
       markScanned(t.sym, !!raw._fromTdCache);
       renderCard(t,processData(raw));
     }catch(e){
@@ -2128,8 +2141,7 @@ function computeFromRaw(closes, volumes, timestamps){
   const sepa6 = ma200Rising ? 1 : 0;         // SMA200 rising
   const sepa7 = dist52wHigh >= -25 ? 1 : 0;  // Within 25% of 52W high
   const sepa8 = low52w>0 ? ((price-low52w)/low52w*100)>=25 ? 1 : 0 : 0;  // At least 25% above 52W low
-  const sepa8b = low52w > 0 ? ((price - low52w) / low52w * 100) >= 25 ? 1 : 0 : 0;
-  const sepaScore = sepa1+sepa2+sepa3+sepa4+sepa5+sepa6+sepa7+sepa8b;
+  const sepaScore = sepa1+sepa2+sepa3+sepa4+sepa5+sepa6+sepa7+sepa8;
 
   // ─── Trend Stickyness (ADX-ähnlich via Directional Movement) ─────────────
   // Simplified ADX: measure trend consistency over last 14 bars
@@ -2157,7 +2169,8 @@ function computeFromRaw(closes, volumes, timestamps){
 
   return {
     price:+price.toFixed(2),ma50:+ma50.toFixed(2),
-    price:+price.toFixed(2),ma50:+ma50.toFixed(2),
+    ma9:+(ema(closes,9)[n-1]??closes[n-1]).toFixed(2),
+    ma21:+(ema(closes,21)[n-1]??closes[n-1]).toFixed(2),
     macd_hist:hist[n-1]!=null?+hist[n-1].toFixed(4):null,
     macd_hist_prev:hist[n-2]!=null?+hist[n-2].toFixed(4):null,
     obv_slope_5d:obvSlope!=null?+obvSlope.toFixed(2):null,
@@ -2178,6 +2191,172 @@ function computeFromRaw(closes, volumes, timestamps){
     buyPointScore:buyPointScore, buyPointSignals:buyPointSignals,
     high52w:+high52w.toFixed(2), low52w:+low52w.toFixed(2),
   };
+}
+
+
+// ============================================================================
+// SCORING-ERWEITERUNG v1.0 - EMA-Stack, MTF-Konsistenz, PDH/PDL-Proximity
+// Eingebaut aus ko_scoring_patch.js
+// ============================================================================
+
+function computeEmaStackScore(raw) {
+  const c   = raw.price;
+  const e9  = raw.ma9;
+  const e21 = raw.ma21;
+  const e50 = raw.ma50;
+  const e200= raw.ma200;
+  if (!c || !e9 || !e21 || !e50 || !e200) return { score: 0, label: 'EMA-Stack: n/v', detail: [] };
+  const checks = [
+    { ok: c   > e9,   pts: 2, txt: 'Kurs > EMA9'    },
+    { ok: c   > e21,  pts: 2, txt: 'Kurs > EMA21'   },
+    { ok: c   > e50,  pts: 2, txt: 'Kurs > EMA50'   },
+    { ok: c   > e200, pts: 2, txt: 'Kurs > EMA200'  },
+    { ok: e9  > e21,  pts: 1, txt: 'EMA9 > EMA21'   },
+    { ok: e21 > e50,  pts: 2, txt: 'EMA21 > EMA50'  },
+    { ok: e50 > e200, pts: 2, txt: 'EMA50 > EMA200' },
+    { ok: c > e9 && e9 > e21 && e21 > e50 && e50 > e200, pts: 2, txt: 'Volle Staffelung (+Bonus)' }
+  ];
+  let score = 0;
+  const detail = [];
+  checks.forEach(function(ch) {
+    if (ch.ok) { score += ch.pts; detail.push(ch.txt); }
+  });
+  score = Math.min(score, 15);
+  const label = score >= 13 ? 'EMA-Stack: STARK'
+              : score >= 8  ? 'EMA-Stack: GUT'
+              : score >= 4  ? 'EMA-Stack: SCHWACH'
+              :                'EMA-Stack: NEGATIV';
+  return { score: score, label: label, detail: detail };
+}
+
+function computeMtfConsistencyScore(mtfData) {
+  if (!mtfData || mtfData.length === 0) return { score: 0, label: 'MTF: n/v', detail: [] };
+  const validTfs = mtfData.filter(function(t) { return t.emaFast != null && t.emaSlow != null; });
+  if (validTfs.length === 0) return { score: 0, label: 'MTF: n/v', detail: [] };
+  const bullishCount = validTfs.filter(function(t) { return t.emaFast > t.emaSlow; }).length;
+  const total = validTfs.length;
+  const ratio = bullishCount / total;
+  const rsiBonus = validTfs.filter(function(t) { return t.rsi != null && t.rsi > 55; }).length > total / 2 ? 2 : 0;
+  let baseScore;
+  if      (ratio >= 1.0)  baseScore = 10;
+  else if (ratio >= 0.75) baseScore = 6;
+  else if (ratio >= 0.5)  baseScore = 2;
+  else if (ratio >= 0.25) baseScore = -4;
+  else                    baseScore = -10;
+  const score = Math.max(-10, Math.min(10, baseScore + rsiBonus));
+  const detail = validTfs.map(function(t) {
+    const bull = t.emaFast > t.emaSlow;
+    return (bull ? '+ ' : '- ') + t.tf + (t.rsi ? ' (RSI ' + t.rsi.toFixed(0) + ')' : '');
+  });
+  const label = score >= 8  ? 'MTF: ALLE BULLISH'
+              : score >= 4  ? 'MTF: UEBERWIEGEND BULLISH'
+              : score >= 0  ? 'MTF: GEMISCHT'
+              : score >= -5 ? 'MTF: UEBERWIEGEND BEARISH'
+              :                'MTF: ALLE BEARISH';
+  return { score: score, label: label, detail: detail };
+}
+
+function computePdhlScore(raw) {
+  const c   = raw.price;
+  const pdh = raw.pdh;
+  const pdl = raw.pdl;
+  const pwh = raw.pwh;
+  const pwl = raw.pwl;
+  if (!c || !pdh || !pdl) return { score: 0, label: 'PDH/PDL: n/v', detail: [] };
+  const detail = [];
+  let score = 0;
+  const distPdh = (c - pdh) / pdh * 100;
+  const distPdl = (c - pdl) / pdl * 100;
+  if (distPdh > 0.5) {
+    score += 8;
+    detail.push('Ausbruch ueber PDH (+' + distPdh.toFixed(2) + '%)');
+  } else if (distPdh >= -0.5 && distPdh <= 0.5) {
+    score -= 3;
+    detail.push('Nahe PDH - Widerstand (' + distPdh.toFixed(2) + '%)');
+  }
+  if (distPdl < -0.5) {
+    score -= 8;
+    detail.push('Breakdown unter PDL (' + distPdl.toFixed(2) + '%)');
+  } else if (distPdl >= -0.5 && distPdl <= 1.0) {
+    score -= 2;
+    detail.push('Nahe PDL - Support-Test (' + distPdl.toFixed(2) + '%)');
+  }
+  if (pwh && pwl) {
+    const distPwh = (c - pwh) / pwh * 100;
+    const distPwl = (c - pwl) / pwl * 100;
+    if (distPwh > 0.5)  { score += 4; detail.push('Ueber Vorwochenhoch (+' + distPwh.toFixed(2) + '%)'); }
+    else if (distPwl < -0.5) { score -= 4; detail.push('Unter Vorwochentief (' + distPwl.toFixed(2) + '%)'); }
+  }
+  score = Math.max(-10, Math.min(10, score));
+  const label = score >= 7  ? 'Level: AUSBRUCH'
+              : score >= 2  ? 'Level: POSITIV'
+              : score >= -2 ? 'Level: NEUTRAL'
+              : score >= -6 ? 'Level: WARNUNG'
+              :                'Level: BREAKDOWN';
+  return { score: score, label: label, detail: detail };
+}
+
+// PDH/PDL/PWH/PWL aus Twelve Data (1day, 10 Bars) - 1 TD-Credit
+async function fetchPdhlLevels(sym, tdKey, proxy) {
+  const url = proxy + 'twelvedata/time_series?symbol=' + encodeURIComponent(sym)
+              + '&interval=1day&outputsize=10&apikey=' + tdKey;
+  try {
+    const res  = await fetch(url);
+    const json = await res.json();
+    if (!json.values || json.values.length < 2) return null;
+    const yesterday = json.values[1];
+    const weekBars  = json.values.slice(2, 7);
+    const pwh = weekBars.length > 0 ? Math.max.apply(null, weekBars.map(function(b){ return parseFloat(b.high); })) : null;
+    const pwl = weekBars.length > 0 ? Math.min.apply(null, weekBars.map(function(b){ return parseFloat(b.low);  })) : null;
+    return { pdh: parseFloat(yesterday.high), pdl: parseFloat(yesterday.low), pwh: pwh, pwl: pwl };
+  } catch(e) {
+    console.warn('fetchPdhlLevels:', e.message);
+    return null;
+  }
+}
+
+// MTF-Daten: 1h + 1day EMA21/50 + RSI14 - 2 TD-Credits
+async function fetchMtfData(sym, tdKey, proxy) {
+  const tfs = [{tf:'1h',interval:'1h'},{tf:'1day',interval:'1day'}];
+  const results = [];
+  for (let ti = 0; ti < tfs.length; ti++) {
+    const t = tfs[ti];
+    const url = proxy + 'twelvedata/time_series?symbol=' + encodeURIComponent(sym)
+                + '&interval=' + t.interval + '&outputsize=60&apikey=' + tdKey;
+    try {
+      const res  = await fetch(url);
+      const json = await res.json();
+      if (!json.values || json.values.length < 55) {
+        results.push({ tf: t.tf, emaFast: null, emaSlow: null, rsi: null });
+        continue;
+      }
+      // Twelve Data gibt neueste Bar zuerst - umkehren
+      const closes = json.values.map(function(b){ return parseFloat(b.close); }).reverse();
+      function calcEma(data, len) {
+        const k = 2 / (len + 1);
+        let ema = data.slice(0, len).reduce(function(a,b){ return a+b; }, 0) / len;
+        for (let i = len; i < data.length; i++) { ema = data[i] * k + ema * (1 - k); }
+        return ema;
+      }
+      function calcRsi(data, len) {
+        const changes = data.slice(1).map(function(v, i){ return v - data[i]; });
+        const gains   = changes.map(function(c){ return c > 0 ? c : 0; });
+        const losses  = changes.map(function(c){ return c < 0 ? -c : 0; });
+        let avgGain = gains.slice(0, len).reduce(function(a,b){ return a+b; }, 0) / len;
+        let avgLoss = losses.slice(0, len).reduce(function(a,b){ return a+b; }, 0) / len;
+        for (let i = len; i < gains.length; i++) {
+          avgGain = (avgGain * (len - 1) + gains[i]) / len;
+          avgLoss = (avgLoss * (len - 1) + losses[i]) / len;
+        }
+        return avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+      }
+      results.push({ tf: t.tf, emaFast: calcEma(closes, 21), emaSlow: calcEma(closes, 50), rsi: calcRsi(closes, 14) });
+    } catch(e) {
+      console.warn('fetchMtfData', t.tf, e.message);
+      results.push({ tf: t.tf, emaFast: null, emaSlow: null, rsi: null });
+    }
+  }
+  return results;
 }
 
 function processData(raw){
@@ -2209,7 +2388,12 @@ function processData(raw){
     mk.regime === 1 && mk.warnLevel === 3 ? 0.85 :
     mk.regime === -1                       ? 0.75 : 0.95
   ) : 1.0;
-  const compositeScore = Math.max(0,Math.min(100,Math.round((techPts+sepaPts+bpPts+stkPts+volPts+rsPts)*mktPhase*markovMult)-erMalus));
+  // Neue Scoring-Faktoren (EMA-Stack, MTF, PDH/PDL)
+  const emaStackResult = computeEmaStackScore(raw);
+  const mtfResult      = computeMtfConsistencyScore(raw._mtfData || []);
+  const pdhlResult     = computePdhlScore(raw);
+  const newFactorPts   = emaStackResult.score + mtfResult.score + pdhlResult.score;
+  const compositeScore = Math.max(0,Math.min(100,Math.round((techPts+sepaPts+bpPts+stkPts+volPts+rsPts+newFactorPts)*mktPhase*markovMult)-erMalus));
   const scoreLabel = compositeScore>=80?'A+':compositeScore>=70?'A':compositeScore>=60?'B+':
                      compositeScore>=50?'B':compositeScore>=40?'C':compositeScore>=30?'D':'F';
   const scoreColor = compositeScore>=70?'var(--green)':compositeScore>=50?'var(--accent)':
@@ -2223,7 +2407,11 @@ function processData(raw){
     closes:raw.closes_20d||[],hist:raw.macd_hist_20d||[],
     obvNorm:raw.obv_norm_20d||[],dates:raw.dates_20d||[],
     compositeScore:compositeScore,scoreLabel:scoreLabel,scoreColor:scoreColor,
-    techPts:techPts,sepaPts:sepaPts,bpPts:bpPts,stkPts:stkPts,volPts:volPts
+    techPts:techPts,sepaPts:sepaPts,bpPts:bpPts,stkPts:stkPts,volPts:volPts,
+    emaStackScore:emaStackResult.score,emaStackLabel:emaStackResult.label,emaStackDetail:emaStackResult.detail,
+    mtfScore:mtfResult.score,mtfLabel:mtfResult.label,mtfDetail:mtfResult.detail,
+    pdhlScore:pdhlResult.score,pdhlLabel:pdhlResult.label,pdhlDetail:pdhlResult.detail,
+    newFactorPts:newFactorPts
   });
 }
 
@@ -2382,6 +2570,29 @@ function renderCard(t,state){
           '<div style="background:var(--bg2);border-radius:4px;padding:2px"><div style="color:var(--text3)">Sticky</div><div style="font-weight:600">'+stPts+'/15</div></div>'+
           '<div style="background:var(--bg2);border-radius:4px;padding:2px"><div style="color:var(--text3)">Vol</div><div style="font-weight:600">'+vPts+'/10</div></div>'+
         '</div>'+
+        // Neue Faktoren: EMA-Stack, MTF, PDH/PDL (nur wenn Daten vorhanden)
+        (state.emaStackScore!==undefined?
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:4px;font-size:10px;text-align:center">'+
+            '<div style="background:var(--bg2);border-radius:4px;padding:2px">'+
+              '<div style="color:var(--text3)">EMA-Stack</div>'+
+              '<div style="font-weight:600;color:'+(state.emaStackScore>=10?'var(--green)':state.emaStackScore>=5?'var(--accent)':state.emaStackScore>=0?'var(--amber)':'var(--red)')+'">'+
+                (state.emaStackScore>0?'+':'')+state.emaStackScore+
+              '</div>'+
+            '</div>'+
+            '<div style="background:var(--bg2);border-radius:4px;padding:2px">'+
+              '<div style="color:var(--text3)">MTF</div>'+
+              '<div style="font-weight:600;color:'+(state.mtfScore>=6?'var(--green)':state.mtfScore>=2?'var(--accent)':state.mtfScore>=-2?'var(--text3)':state.mtfScore>=-5?'var(--amber)':'var(--red)')+'">'+
+                (state.mtfScore>0?'+':'')+state.mtfScore+
+              '</div>'+
+            '</div>'+
+            '<div style="background:var(--bg2);border-radius:4px;padding:2px">'+
+              '<div style="color:var(--text3)">PDH/PDL</div>'+
+              '<div style="font-weight:600;color:'+(state.pdhlScore>=5?'var(--green)':state.pdhlScore>=-2?'var(--text3)':'var(--red)')+'">'+
+                (state.pdhlScore>0?'+':'')+state.pdhlScore+
+              '</div>'+
+            '</div>'+
+          '</div>'
+        :'')+
       '</div>';
     }():'')+ 
     '<div class="chart-wrap"><canvas id="ch-'+t.sym+'" role="img" aria-label="Chart '+t.sym+'"></canvas></div>';
