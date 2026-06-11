@@ -7720,12 +7720,10 @@ async function openKiBriefing() {
   const dummy = 'Du bist ein erfahrener Knock-out-Trading-Experte'; // ersetzt durch stratCfg.prompt
 
     try {
-    const makroProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-      + encodeURIComponent('https://api.anthropic.com/v1/messages')
-      + '&ant_key=' + encodeURIComponent(apiKey);
+    const makroProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/anthropic';
     const response = await fetch(makroProxyUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
