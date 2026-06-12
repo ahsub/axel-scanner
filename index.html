@@ -7822,19 +7822,19 @@ async function openKiBriefing() {
       + 'Bottom-3: ' + bot3;
   }
 
-  // Ticker-Liste für Prompt aufbauen
-  const tickerList = top25.map(function(r, i) {
-    var line = (i+1) + '. ' + r.sym + ' Score:' + r.score + ' ' + (r.grade||'?');
-    if (r.bullCount !== undefined) line += ' ' + r.bullCount + '/3';
-    if (r.sepa !== undefined) line += ' SEPA:' + r.sepa + '/8';
-    if (r.markov) line += ' Markov:' + r.markov.regime + '(' + (r.markov.sticky||0) + '%)';
-    if (r.er && r.er.days) line += ' ER:' + r.er.days + 'd';
-    if (r.fibo) line += ' Fibo:' + r.fibo.zone;
-    return line;
+  // Ticker-Liste kompakt (max 10 Titel für Prompt-Größe)
+  const top10 = top25.slice(0, 10);
+  const tickerList = top10.map(function(r, i) {
+    return (i+1) + '. ' + r.sym
+      + ' S:' + r.score
+      + ' ' + r.bullCount + '/3'
+      + ' SEPA:' + r.sepa
+      + (r.markov ? ' ' + r.markov.regime : '')
+      + (r.er && r.er.days ? ' ER:' + r.er.days + 'd' : '');
   }).join('\n');
 
   // Marktkontext-String bauen (wird an Strategie-Prompt übergeben)
-  const marktkontext = 'SCANNER-ERGEBNISSE (Top ' + top25.length + ' Titel):\n'
+  const marktkontext = 'TOP ' + top10.length + ' SCANNER-ERGEBNISSE:\n'
     + tickerList + '\n\n'
     + 'MARKTKONTEXT:\n'
     + '- QQQ-Regime: ' + qqqRegime + '\n'
@@ -7865,8 +7865,7 @@ async function openKiBriefing() {
       });
     } catch(fetchErr) {
       content.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:12px">'
-        + '⚠️ Fetch-Fehler: ' + fetchErr.message + '<br><br>'
-        + 'URL: ' + makroProxyUrl.substring(0, 80) + '...</div>';
+        + '⚠️ Fetch-Fehler: ' + fetchErr.message + '</div>';
       return;
     }
 
