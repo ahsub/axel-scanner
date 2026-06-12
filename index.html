@@ -1899,10 +1899,18 @@ async function runScan(){
           const _tdFromCache = tdResult.fromCache; // gespeichert bis raw definiert ist
           // PDH/PDL direkt hier extrahieren solange j im Scope ist
           var _pdhlFromScan = null;
-          if(j.values && j.values.length >= 3 && interval === '1day'){
+          // PDH/PDL aus 1day Daten — funktioniert bei jedem interval
+          // Bei 1h/intraday: separaten 1day Cache-Eintrag prüfen
+          var _pdhlSource = (interval === '1day') ? j : null;
+          if(!_pdhlSource){
+            // Versuche 1day Cache-Eintrag zu lesen
+            var _dayEntry = getTdCacheEntry(tdSym + '_1day_220') || getTdCacheEntry(tdSym + '_1day_130');
+            if(_dayEntry && _dayEntry.values) _pdhlSource = _dayEntry;
+          }
+          if(_pdhlSource && _pdhlSource.values && _pdhlSource.values.length >= 3){
             try {
-              const yd = j.values[1];
-              const wb = j.values.slice(2, 7);
+              const yd = _pdhlSource.values[1];
+              const wb = _pdhlSource.values.slice(2, 7);
               _pdhlFromScan = {
                 pdh: parseFloat(yd.high),
                 pdl: parseFloat(yd.low),
@@ -5919,19 +5927,27 @@ function renderListEditorTable(){
 
     var leScore = (function(){
       try {
-        var cache = getTdCache();
         var sym = (row.sym||'').toUpperCase();
-        // Cache key format: SYM_interval_outputsize e.g. NVDA_1day_130
+        // Zuerst tickerData prüfen (frisch gescannte Daten dieser Session)
         var entry = null;
-        for(var ck in cache){
-          if(ck.toUpperCase().indexOf(sym+'_') === 0){
-            entry = cache[ck] && cache[ck].data;
-            if(entry) break;
+        if(typeof tickerData !== 'undefined'){
+          // Case-insensitiv suchen
+          entry = tickerData[sym] || tickerData[sym.toLowerCase()] || tickerData[row.sym];
+          if(!entry){
+            for(var k in tickerData){
+              if(k.toUpperCase() === sym){ entry = tickerData[k]; break; }
+            }
           }
         }
-        // Also check tickerData directly (freshly scanned)
-        if(!entry && typeof tickerData !== 'undefined' && tickerData[sym]) {
-          entry = tickerData[sym];
+        // Fallback: TD-Cache (Cache-Key: SYM_interval_outputsize)
+        if(!entry){
+          var cache = getTdCache();
+          for(var ck in cache){
+            if(ck.toUpperCase().indexOf(sym+'_') === 0){
+              entry = cache[ck] && cache[ck].data;
+              if(entry) break;
+            }
+          }
         }
         if(entry){
           var pd = processData(entry);
