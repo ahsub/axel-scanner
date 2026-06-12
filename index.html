@@ -7724,7 +7724,7 @@ async function openKiBriefing() {
     + '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;font-size:1.5rem"></i>'
     + '<div style="margin-top:.5rem">Analysiere Top-Ergebnisse...</div></div>';
 
-  // Top-Ergebnisse sammeln (max 25, Score >= 65)
+  // Top-Ergebnisse sammeln (max 25, Score >= 40, Fallback: alle verfügbaren)
   const topResults = [];
   Object.keys(tickerData).forEach(function(sym) {
     const raw = tickerData[sym];
@@ -7732,7 +7732,6 @@ async function openKiBriefing() {
     const state = processData(raw);
     if (!state || state.error) return;
     const score = state.compositeScore || 0;
-    if (score < 65) return;
     topResults.push({
       sym: sym,
       score: score,
@@ -7771,7 +7770,7 @@ async function openKiBriefing() {
   const top25 = topResults.slice(0, 25);
 
   if (!top25.length) {
-    content.innerHTML = '<div style="color:var(--amber);padding:1rem">Keine Ergebnisse mit Score >= 65. Bitte zuerst einen Scan durchführen.</div>';
+    content.innerHTML = '<div style="color:var(--amber);padding:1rem">Keine Scan-Ergebnisse vorhanden. Bitte zuerst einen Scan durchführen.</div>';
     return;
   }
 
@@ -7837,28 +7836,43 @@ async function openKiBriefing() {
   const prompt = stratCfg.prompt({ marktkontext: marktkontext });
   const dummy = 'Du bist ein erfahrener Knock-out-Trading-Experte'; // ersetzt durch stratCfg.prompt
 
+  try {
+    const makroProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
+      + encodeURIComponent('https://api.anthropic.com/v1/messages')
+      + '&ant_key=' + encodeURIComponent(apiKey);
+
+    let response;
     try {
-  const makroProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-    + encodeURIComponent('https://api.anthropic.com/v1/messages')
-    + '&ant_key=' + encodeURIComponent(apiKey);
-    const response = await fetch(makroProxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
+      response = await fetch(makroProxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+    } catch(fetchErr) {
+      content.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:12px">'
+        + '⚠️ Fetch-Fehler: ' + fetchErr.message + '<br><br>'
+        + 'URL: ' + makroProxyUrl.substring(0, 80) + '...</div>';
+      return;
+    }
 
     if (!response.ok) {
-      const err = await response.json();
-      content.innerHTML = '<div style="color:var(--red)">API-Fehler: ' + (err.error && err.error.message || response.status) + '</div>';
+      const errText = await response.text();
+      content.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:12px">'
+        + '⚠️ HTTP ' + response.status + '<br>' + errText.substring(0, 400) + '</div>';
       return;
     }
 
     const data = await response.json();
-    const text = data.content && data.content[0] && data.content[0].text || '';
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      content.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:12px">'
+        + '⚠️ Unerwartete Antwort: ' + JSON.stringify(data).substring(0, 300) + '</div>';
+      return;
+    }
+    const text = data.content[0].text || '';
 
     // Text formatieren: Nummern als Abschnitte
     const formatted = text
