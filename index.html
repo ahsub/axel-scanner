@@ -1897,6 +1897,20 @@ async function runScan(){
           const tdResult=await tdThrottledFetch(proxyUrl,cacheKey);
           const j=tdResult.data;
           const _tdFromCache = tdResult.fromCache; // gespeichert bis raw definiert ist
+          // PDH/PDL direkt hier extrahieren solange j im Scope ist
+          var _pdhlFromScan = null;
+          if(j.values && j.values.length >= 3 && interval === '1day'){
+            try {
+              const yd = j.values[1];
+              const wb = j.values.slice(2, 7);
+              _pdhlFromScan = {
+                pdh: parseFloat(yd.high),
+                pdl: parseFloat(yd.low),
+                pwh: wb.length > 0 ? Math.max.apply(null, wb.map(function(b){ return parseFloat(b.high); })) : null,
+                pwl: wb.length > 0 ? Math.min.apply(null, wb.map(function(b){ return parseFloat(b.low);  })) : null
+              };
+            } catch(e){ }
+          }
           if(true){
             if(j.values&&j.values.length>=20){
               const rev=[...j.values].reverse();
@@ -1966,6 +1980,44 @@ async function runScan(){
         if(rsResult){ raw.rs=rsResult.rs; raw.rsData=rsResult; }
       }
       tickerData[t.sym]=raw;
+      // PDH/PDL aus Scan-Daten übernehmen (bereits im TD-Block extrahiert)
+      if(typeof _pdhlFromScan !== 'undefined' && _pdhlFromScan){
+        raw.pdh = _pdhlFromScan.pdh;
+        raw.pdl = _pdhlFromScan.pdl;
+        raw.pwh = _pdhlFromScan.pwh;
+        raw.pwl = _pdhlFromScan.pwl;
+      }
+      // MTF aus closes_full berechnen (1day bereits vorhanden, keine extra API-Calls)
+      if(raw.closes_full && raw.closes_full.length >= 21 && !isDeMarket){
+        try {
+          var mtfCloses = raw.closes_full;
+          function _calcEma(data, len) {
+            var k = 2 / (len + 1);
+            var ema = data.slice(0, len).reduce(function(a,b){ return a+b; }, 0) / len;
+            for (var i = len; i < data.length; i++) { ema = data[i] * k + ema * (1 - k); }
+            return ema;
+          }
+          function _calcRsi(data, len) {
+            var changes = data.slice(1).map(function(v, i){ return v - data[i]; });
+            var gains   = changes.map(function(c){ return c > 0 ? c : 0; });
+            var losses  = changes.map(function(c){ return c < 0 ? -c : 0; });
+            var avgGain = gains.slice(0, len).reduce(function(a,b){ return a+b; }, 0) / len;
+            var avgLoss = losses.slice(0, len).reduce(function(a,b){ return a+b; }, 0) / len;
+            for (var i = len; i < gains.length; i++) {
+              avgGain = (avgGain * (len - 1) + gains[i]) / len;
+              avgLoss = (avgLoss * (len - 1) + losses[i]) / len;
+            }
+            return avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+          }
+          var emaFast1d = _calcEma(mtfCloses, 21);
+          var emaSlow1d = _calcEma(mtfCloses, 50);
+          var rsi1d     = mtfCloses.length >= 28 ? _calcRsi(mtfCloses, 14) : null;
+          // 1h simulieren aus 4h-Daten falls vorhanden, sonst 1day als einziger TF
+          raw._mtfData = [
+            { tf: '1day', emaFast: emaFast1d, emaSlow: emaSlow1d, rsi: rsi1d }
+          ];
+        } catch(e){ console.warn('MTF aus Scan:', e.message); }
+      }
       // Earnings-Datum laden (Finnhub, gecacht)
       const erData = await fetchEarningsDate(t.sym);
       raw._er = erData;
@@ -1973,17 +2025,7 @@ async function runScan(){
       if(raw.closes_full && raw.closes_full.length >= 25){
         raw._markov = calcMarkovRegime(raw.closes_full);
       }
-      // Erweiterte Scoring-Daten: PDH/PDL + MTF
-      // Bei allen Scans bis 50 Titel (außer DE-Markt)
-      const _isWatchlistScan = (tickers.length <= 50) && !isDeMarket;
-      if(_isWatchlistScan && tdKey){
-        const [_pdhl, _mtf] = await Promise.all([
-          fetchPdhlLevels(t.sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/'),
-          fetchMtfData(t.sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/')
-        ]);
-        if(_pdhl) { raw.pdh=_pdhl.pdh; raw.pdl=_pdhl.pdl; raw.pwh=_pdhl.pwh; raw.pwl=_pdhl.pwl; }
-        if(_mtf)  { raw._mtfData = _mtf; }
-      }
+      // Erweiterte Scoring-Daten: PDH/PDL + MTF werden direkt aus Scan-Daten berechnet (siehe oben)
       markScanned(t.sym, !!raw._fromTdCache);
       renderCard(t,processData(raw));
     }catch(e){
@@ -2006,36 +2048,6 @@ async function runScan(){
   setTimeout(function(){ document.getElementById('scan-progress').style.display='none'; },2000);
   btn.disabled=false;
   try { autoSaveShortlist(); } catch(e) {}
-
-  // MTF/PDH Nachladen: nach dem Hauptscan sequenziell für alle Ticker
-  // (vermeidet Rate-Limit während des Hauptscans)
-  if(!isDeMarket && tdKey && tickers.length <= 50){
-    var mtfTickers = activeTickers.slice();
-    (async function loadMtfSequential(){
-      var refreshed = 0;
-      for(var mi=0; mi<mtfTickers.length; mi++){
-        var sym = mtfTickers[mi].sym;
-        var raw = tickerData[sym];
-        if(!raw) continue;
-        // Nur wenn noch keine MTF-Daten vorhanden
-        if(raw._mtfData && raw._mtfData.some(function(x){ return x.emaFast != null; })) continue;
-        try {
-          await new Promise(function(r){ setTimeout(r, 800); }); // Rate-Limit Pause
-          var _pdhl = await fetchPdhlLevels(sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/');
-          var _mtf  = await fetchMtfData(sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/');
-          if(_pdhl){ raw.pdh=_pdhl.pdh; raw.pdl=_pdhl.pdl; raw.pwh=_pdhl.pwh; raw.pwl=_pdhl.pwl; }
-          if(_mtf) { raw._mtfData = _mtf; }
-          // Karte neu rendern mit aktualisierten Daten
-          renderCard(mtfTickers[mi], processData(raw));
-          refreshed++;
-        } catch(e){ console.warn('MTF nachladen '+sym+':', e.message); }
-      }
-      if(refreshed > 0){
-        document.getElementById('scan-label').textContent='MTF/PDH aktualisiert (' + refreshed + ' Titel) ✓';
-        setTimeout(function(){ document.getElementById('scan-label').textContent=''; }, 3000);
-      }
-    })();
-  }
 }
 
 function sortAndRenderCards(tickers){
