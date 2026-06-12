@@ -7822,8 +7822,19 @@ async function openKiBriefing() {
       + 'Bottom-3: ' + bot3;
   }
 
+  // Ticker-Liste für Prompt aufbauen
+  const tickerList = top25.map(function(r, i) {
+    var line = (i+1) + '. ' + r.sym + ' Score:' + r.score + ' ' + (r.grade||'?');
+    if (r.bullCount !== undefined) line += ' ' + r.bullCount + '/3';
+    if (r.sepa !== undefined) line += ' SEPA:' + r.sepa + '/8';
+    if (r.markov) line += ' Markov:' + r.markov.regime + '(' + (r.markov.sticky||0) + '%)';
+    if (r.er && r.er.days) line += ' ER:' + r.er.days + 'd';
+    if (r.fibo) line += ' Fibo:' + r.fibo.zone;
+    return line;
+  }).join('\n');
+
   // Marktkontext-String bauen (wird an Strategie-Prompt übergeben)
-  const marktkontext = 'SCANNER-ERGEBNISSE (Top ' + top25.length + ' Titel, Score >= 65):\n'
+  const marktkontext = 'SCANNER-ERGEBNISSE (Top ' + top25.length + ' Titel):\n'
     + tickerList + '\n\n'
     + 'MARKTKONTEXT:\n'
     + '- QQQ-Regime: ' + qqqRegime + '\n'
