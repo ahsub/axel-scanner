@@ -1274,13 +1274,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <!-- Auto-Shortlist Tab -->
       <div id="backlog-shortlist-tab" style="display:none">
         <div style="display:flex;gap:6px;margin-bottom:.75rem;align-items:center">
-          <span style="font-size:11px;color:var(--text3);flex:1">Kaufliste 3/3 — automatisch nach jedem Scan gespeichert</span>
-          <button class="btn btn-sm" onclick="renderShortlistTab()" style="font-size:11px">
-            <i class="ti ti-refresh"></i>
-          </button>
-          <button class="btn btn-sm" onclick="localStorage.removeItem('ko_auto_shortlist');renderShortlistTab();" style="font-size:11px;color:var(--red);border-color:var(--red)">
-            <i class="ti ti-trash"></i>
-          </button>
+          <span style="font-size:11px;color:var(--text3);flex:1">Kaufliste 3/3 — automatisch nach jedem Scan</span>
+          <button class="btn btn-sm" onclick="renderShortlistTab()" style="font-size:11px"><i class="ti ti-refresh"></i></button>
+          <button class="btn btn-sm" onclick="localStorage.removeItem('ko_auto_shortlist');renderShortlistTab();" style="font-size:11px;color:var(--red);border-color:var(--red)"><i class="ti ti-trash"></i></button>
         </div>
         <div id="shortlist-content" style="font-size:12px;color:var(--text3);text-align:center;padding:1.5rem">
           <i class="ti ti-star" style="font-size:24px;display:block;margin-bottom:.5rem"></i>
@@ -2010,7 +2006,6 @@ async function runScan(){
   document.getElementById('scan-label').textContent='Scan abgeschlossen ✓';
   setTimeout(function(){ document.getElementById('scan-progress').style.display='none'; },2000);
   btn.disabled=false;
-  // Auto-Shortlist: alle Kaufliste 3/3 automatisch speichern
   try { autoSaveShortlist(); } catch(e) {}
 }
 
@@ -2348,7 +2343,7 @@ async function fetchMtfData(sym, tdKey, proxy) {
     try {
       const res  = await fetch(url);
       const json = await res.json();
-      if (!json.values || json.values.length < 55) {
+      if (!json.values || json.values.length < 20) {
         results.push({ tf: t.tf, emaFast: null, emaSlow: null, rsi: null });
         continue;
       }
@@ -5872,10 +5867,9 @@ function renderListEditorTable(){
         var cache = getTdCache();
         var sym = (row.sym||'').toUpperCase();
         for(var ck in cache){
-          if(ck.toUpperCase().indexOf(sym+':') === 0 || ck.toUpperCase() === sym){
+          if(ck.toUpperCase().indexOf(sym+':') === 0){
             var d = cache[ck] && cache[ck].data;
-            if(d){
-              var pd = processData(d);
+            if(d){ var pd = processData(d);
               if(pd && pd.compositeScore != null){
                 var s = Math.round(pd.compositeScore);
                 var sc = s>=70?'var(--green)':s>=50?'var(--accent)':s>=35?'var(--amber)':'var(--text3)';
@@ -5889,7 +5883,7 @@ function renderListEditorTable(){
       return '<span style="color:var(--text3);font-size:11px">—</span>';
     })();
     return '<tr style="border-bottom:0.5px solid var(--border)">'
-      + '<td style="text-align:center;padding:4px 6px;color:var(--text3);font-size:10px;font-family:var(--mono);min-width:22px">'+(i+1)+'</td>'
+      + '<td style="text-align:center;padding:4px 6px;color:var(--text3);font-size:10px;font-family:var(--mono)">'+(i+1)+'</td>'
       + '<td style="text-align:center;padding:4px 6px"><button onclick="leDeleteRow('+i+')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0;line-height:1">×</button></td>'
       + '<td style="padding:4px 6px"><input type="text" value="'+row.sym+'" onchange="_listEditorData['+i+'].sym=this.value.toUpperCase()" style="width:60px;padding:2px 4px;font-size:11px;font-family:var(--mono);font-weight:600;background:var(--bg3);border:0.5px solid var(--border2);color:var(--accent);border-radius:4px"></td>'
       + '<td style="text-align:center;padding:4px 6px">'+leScore+'</td>'
@@ -8287,33 +8281,65 @@ function renderShortlistTab() {
     }
     el.innerHTML = data.map(function(entry) {
       var rows = (entry.tickers || []).map(function(t, idx) {
-        var sc = t.score >= 70 ? 'var(--green)' : t.score >= 50 ? 'var(--accent)' : 'var(--amber)';
-        var gl = t.grade || '?';
+        var sc = t.score>=70?'var(--green)':t.score>=50?'var(--accent)':'var(--amber)';
         return '<tr style="border-bottom:0.5px solid var(--border)">'
           + '<td style="padding:4px 8px;color:var(--text3);font-size:10px;font-family:var(--mono)">'+(idx+1)+'</td>'
-          + '<td style="padding:4px 8px;font-family:var(--mono);font-weight:700;color:var(--accent)">' + t.sym + '</td>'
-          + '<td style="padding:4px 8px;text-align:center"><span style="font-family:var(--mono);font-weight:700;color:'+sc+'">'+gl+' '+t.score+'</span></td>'
+          + '<td style="padding:4px 8px;font-family:var(--mono);font-weight:700;color:var(--accent)">'+t.sym+'</td>'
+          + '<td style="padding:4px 8px;text-align:center"><span style="font-family:var(--mono);font-weight:700;color:'+sc+'">'+(t.grade||'?')+' '+t.score+'</span></td>'
           + '<td style="padding:4px 8px;text-align:center;color:var(--text3);font-size:11px">$'+t.price+'</td>'
-          + '<td style="padding:4px 8px;text-align:center"><span style="color:var(--green);font-size:11px">3/3</span></td>'
+          + '<td style="padding:4px 8px;text-align:center;color:var(--green);font-size:11px">3/3</td>'
           + '</tr>';
       }).join('');
       return '<div style="margin-bottom:1rem;background:var(--bg2);border-radius:8px;overflow:hidden;border:0.5px solid var(--border2)">'
         + '<div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:0.5px solid var(--border2)">'
-        + '<span style="font-size:12px;font-weight:600;color:var(--text2)">⭐ Shortlist '+ entry.date +' · '+ entry.time +'</span>'
+        + '<span style="font-size:12px;font-weight:600;color:var(--text2)">⭐ '+entry.date+' · '+entry.time+'</span>'
         + '<span style="font-size:11px;color:var(--text3)">'+(entry.tickers||[]).length+' Titel · VIX '+(entry.vix||'—')+'</span>'
         + '</div>'
         + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
         + '<thead><tr style="background:var(--bg3)">'
-        + '<th style="padding:4px 8px;color:var(--text3);font-size:10px;text-align:left">#</th>'
-        + '<th style="padding:4px 8px;color:var(--text3);font-size:10px;text-align:left">TICKER</th>'
+        + '<th style="padding:4px 8px;color:var(--text3);font-size:10px">#</th>'
+        + '<th style="padding:4px 8px;color:var(--text3);font-size:10px">TICKER</th>'
         + '<th style="padding:4px 8px;color:var(--text3);font-size:10px;text-align:center">SCORE</th>'
         + '<th style="padding:4px 8px;color:var(--text3);font-size:10px;text-align:center">KURS</th>'
         + '<th style="padding:4px 8px;color:var(--text3);font-size:10px;text-align:center">SIGNAL</th>'
-        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+        + '</tr></thead><tbody>'+rows+'</tbody></table></div>';
     }).join('');
-  } catch(e) {
-    el.innerHTML = '<span style="color:var(--red)">Fehler beim Laden</span>';
-  }
+  } catch(e) { el.innerHTML = '<span style="color:var(--red)">Fehler</span>'; }
+}
+
+function autoSaveShortlist() {
+  if (!Object.keys(tickerData).length) return;
+  var allScored = [];
+  Object.keys(tickerData).forEach(function(sym) {
+    var raw = tickerData[sym];
+    if (!raw) return;
+    var state = processData ? processData(raw) : raw;
+    if (!state || state.error) return;
+    allScored.push({
+      sym: sym,
+      score: state.compositeScore || 0,
+      grade: state.scoreGrade || '?',
+      price: (state.price || raw.price || 0).toFixed(2),
+      bullCount: state.bullCount || 0,
+      savedAt: Date.now()
+    });
+  });
+  var shortlist = allScored
+    .filter(function(r){ return r.bullCount === 3; })
+    .sort(function(a,b){ return b.score - a.score; });
+  if (!shortlist.length) return;
+  var entry = {
+    date: new Date().toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'}),
+    time: new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}),
+    vix: _vixLevel ? _vixLevel.toFixed(1) : '—',
+    tickers: shortlist
+  };
+  try {
+    var existing = JSON.parse(localStorage.getItem('ko_auto_shortlist') || '[]');
+    existing = existing.filter(function(e){ return e.date !== entry.date; });
+    existing.unshift(entry);
+    localStorage.setItem('ko_auto_shortlist', JSON.stringify(existing.slice(0,30)));
+  } catch(e) {}
 }
 
 // ── Top-20 aus aktuellem Scan speichern ──
@@ -8368,51 +8394,6 @@ function saveTop20ToBacklog() {
 
   renderBacklogWinners();
   showKoToast('✅ Top-' + top20.length + ' gespeichert (' + entry.date + ')');
-}
-
-// ── Auto-Shortlist: wird nach jedem Scan automatisch aufgerufen ───────────────
-function autoSaveShortlist() {
-  if (!Object.keys(tickerData).length) return;
-  const allScored = [];
-  Object.keys(tickerData).forEach(function(sym) {
-    const raw = tickerData[sym];
-    if (!raw) return;
-    const state = processData ? processData(raw) : raw;
-    if (!state || state.error) return;
-    allScored.push({
-      sym: sym,
-      score: state.compositeScore || 0,
-      grade: state.scoreGrade || '?',
-      price: (state.price || raw.price || 0).toFixed(2),
-      bullCount: state.bullCount || 0,
-      sepa: state.sepaScore || 0,
-      dist52wHigh: state.dist52wHigh || 0,
-      savedAt: Date.now()
-    });
-  });
-  // Nur Kaufliste 3/3, nach Score sortiert
-  const shortlist = allScored
-    .filter(function(r){ return r.bullCount === 3; })
-    .sort(function(a,b){ return b.score - a.score; });
-
-  if (!shortlist.length) return;
-
-  const entry = {
-    date: new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }),
-    time: new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }),
-    vix: _vixLevel ? _vixLevel.toFixed(1) : '—',
-    tickers: shortlist
-  };
-
-  // In localStorage speichern (gleicher Tag wird ersetzt)
-  try {
-    var existing = JSON.parse(localStorage.getItem('ko_auto_shortlist') || '[]');
-    existing = existing.filter(function(e){ return e.date !== entry.date; });
-    existing.unshift(entry);
-    localStorage.setItem('ko_auto_shortlist', JSON.stringify(existing.slice(0, 30)));
-  } catch(e) {}
-
-  console.log('[Shortlist] Auto-gespeichert: ' + shortlist.length + ' Kaufliste 3/3 Titel');
 }
 
 function clearBacklogWinners() {
