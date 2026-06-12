@@ -7795,6 +7795,8 @@ async function openKiBriefing() {
       sym: sym,
       score: score,
       grade: state.scoreGrade || '?',
+      price: state.price || 0,
+      ma200: state.ma200 || null,
       sepa: state.sepaScore || 0,
       bullCount: state.bullCount || 0,
       markov: raw._markov ? {
@@ -7884,12 +7886,19 @@ async function openKiBriefing() {
   // Ticker-Liste kompakt (max 10 Titel für Prompt-Größe)
   const top10 = top25.slice(0, 10);
   const tickerList = top10.map(function(r, i) {
-    return (i+1) + '. ' + r.sym
+    var line = (i+1) + '. ' + r.sym
       + ' S:' + r.score
       + ' ' + r.bullCount + '/3'
       + ' SEPA:' + r.sepa
       + (r.markov ? ' ' + r.markov.regime : '')
       + (r.er && r.er.days ? ' ER:' + r.er.days + 'd' : '');
+    // 200d EMA Abstand für Options-Kontext
+    if(r.ma200 && r.price){
+      var d200 = +((r.price - r.ma200) / r.ma200 * 100).toFixed(1);
+      var ema200flag = d200 < -15 ? '🔴' : d200 < -5 ? '🟡' : d200 <= 5 ? '🟢' : d200 < 20 ? '🟡' : '🔴';
+      line += ' EMA200:' + (d200>=0?'+':'') + d200 + '%('+ema200flag+'$' + r.ma200.toFixed(0) + ')';
+    }
+    return line;
   }).join('\n');
 
   // Marktkontext-String bauen (wird an Strategie-Prompt übergeben)
@@ -8006,15 +8015,26 @@ const KI_STRAT_CONFIG = {
     color: 'var(--amber)',
     prompt: function(ctx) {
       return 'Du bist ein erfahrener Options-Trader mit Fokus auf Wheel-Strategie (CSP + Covered Calls).\n\n'
+        + '⚠️ WICHTIG: Du gibst keine Anlageberatung. Alle Empfehlungen sind informativer Natur.\n'
+        + 'Jede Position MUSS vor dem Einstieg auf folgende Kriterien geprüft werden:\n'
+        + '  1. IV Rank / IV Percentile > 30% (Mindest-Prämienqualität) — in IBKR/CapTrader prüfen\n'
+        + '  2. Open Interest am gewählten Strike > 500 Kontrakte (Slippage-Schutz) — in IBKR/CapTrader prüfen\n'
+        + '  3. Bid-Ask-Spread der Option < 10% der Prämie\n'
+        + '  4. Kein Earnings-Event innerhalb der Laufzeit\n\n'
         + ctx.marktkontext
         + '\n\nAUFGABE:\n'
         + '1. MARKTUMFELD: Günstig für neue CSPs? VIX-Niveau und Implikation für Prämien. (2-3 Sätze)\n'
-        + '2. TOP 3 OPTIONS-KANDIDATEN: Welche Titel eignen sich für Cash Secured Puts oder Covered Calls? '
-        + 'Für jeden: Begründung (Trend + ER-Abstand), empfohlener Strike-Bereich, '
-        + 'optimale Laufzeit, Mindest-Prämienerwartung.\n'
-        + '3. WATCHLIST: Titel die nach dem nächsten ER interessant werden.\n'
-        + '4. RISIKEN: IV-Crush, ER-Überraschungen, Sektorschwäche.\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4, max. 500 Wörter.';
+        + '2. TOP 3 OPTIONS-KANDIDATEN: Für jeden Titel:\n'
+        + '   a) 200d EMA Abstand und Strike-Empfehlung (Strike nahe oder leicht unter 200d EMA)\n'
+        + '   b) Empfohlener Strike-Bereich in $ und % OTM\n'
+        + '   c) Optimale Laufzeit (bevorzugt 30-45 DTE)\n'
+        + '   d) Mindest-Prämienerwartung\n'
+        + '   e) ⚠️ Pflicht-Checks vor Einstieg: "IV Rank in IBKR prüfen (Ziel >30%), '
+        + 'OI am Strike prüfen (Ziel >500), Bid-Ask-Spread prüfen"\n'
+        + '3. WATCHLIST: Titel die nach dem nächsten ER oder bei höherem IV interessant werden.\n'
+        + '4. RISIKEN: IV-Crush, ER-Überraschungen, Titel unter 200d EMA (kein CSP empfohlen).\n'
+        + '\n⚠️ ABSCHLUSS-HINWEIS: Immer mit Pflicht-Checks in IBKR/CapTrader abschließen bevor eine Position eröffnet wird.\n'
+        + '\nAntworte auf Deutsch, strukturiert 1-4, max. 600 Wörter.';
     }
   },
   swing: {
