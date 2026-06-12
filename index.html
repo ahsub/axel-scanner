@@ -1996,6 +1996,8 @@ async function runScan(){
         raw.pwl = _pdhlFromScan.pwl;
       }
       // MTF aus closes_full berechnen (1day bereits vorhanden, keine extra API-Calls)
+      // TF1: 1day — direkt aus closes_full
+      // TF2: Wochentrend — 5-Tage-Aggregation aus closes_full (simuliert Weekly-Chart)
       if(raw.closes_full && raw.closes_full.length >= 21 && !isDeMarket){
         try {
           var mtfCloses = raw.closes_full;
@@ -2017,13 +2019,30 @@ async function runScan(){
             }
             return avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
           }
+
+          // TF1: 1day EMA21/50 + RSI14
           var emaFast1d = _calcEma(mtfCloses, 21);
           var emaSlow1d = _calcEma(mtfCloses, 50);
           var rsi1d     = mtfCloses.length >= 28 ? _calcRsi(mtfCloses, 14) : null;
-          // 1h simulieren aus 4h-Daten falls vorhanden, sonst 1day als einziger TF
-          raw._mtfData = [
+
+          // TF2: Wochentrend — jede 5. Kerze als Wochenclose (approximiert Weekly-Chart)
+          // Braucht mindestens 60 Tageskerzen für sinnvolle 12 Wochenkerzen
+          var mtfData = [
             { tf: '1day', emaFast: emaFast1d, emaSlow: emaSlow1d, rsi: rsi1d }
           ];
+          if(mtfCloses.length >= 60){
+            var weeklyCloses = [];
+            for(var wi = 4; wi < mtfCloses.length; wi += 5){
+              weeklyCloses.push(mtfCloses[wi]);
+            }
+            if(weeklyCloses.length >= 10){
+              var emaFastW = _calcEma(weeklyCloses, 4);  // ~4 Wochen = 1 Monat
+              var emaSlowW = _calcEma(weeklyCloses, 10); // ~10 Wochen = 2.5 Monate
+              var rsiW     = weeklyCloses.length >= 18 ? _calcRsi(weeklyCloses, 7) : null;
+              mtfData.push({ tf: '1week', emaFast: emaFastW, emaSlow: emaSlowW, rsi: rsiW });
+            }
+          }
+          raw._mtfData = mtfData;
         } catch(e){ console.warn('MTF aus Scan:', e.message); }
       }
       // Earnings-Datum laden (Finnhub, gecacht)
