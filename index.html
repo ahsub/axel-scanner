@@ -1975,7 +1975,6 @@ async function runScan(){
       }
       // Erweiterte Scoring-Daten: PDH/PDL + MTF
       // Bei allen Scans bis 50 Titel (außer DE-Markt)
-      const _presetVal = (document.getElementById('ticker-preset')||{}).value || '';
       const _isWatchlistScan = (tickers.length <= 50) && !isDeMarket;
       if(_isWatchlistScan && tdKey){
         const [_pdhl, _mtf] = await Promise.all([
@@ -2007,6 +2006,36 @@ async function runScan(){
   setTimeout(function(){ document.getElementById('scan-progress').style.display='none'; },2000);
   btn.disabled=false;
   try { autoSaveShortlist(); } catch(e) {}
+
+  // MTF/PDH Nachladen: nach dem Hauptscan sequenziell für alle Ticker
+  // (vermeidet Rate-Limit während des Hauptscans)
+  if(!isDeMarket && tdKey && tickers.length <= 50){
+    var mtfTickers = activeTickers.slice();
+    (async function loadMtfSequential(){
+      var refreshed = 0;
+      for(var mi=0; mi<mtfTickers.length; mi++){
+        var sym = mtfTickers[mi].sym;
+        var raw = tickerData[sym];
+        if(!raw) continue;
+        // Nur wenn noch keine MTF-Daten vorhanden
+        if(raw._mtfData && raw._mtfData.some(function(x){ return x.emaFast != null; })) continue;
+        try {
+          await new Promise(function(r){ setTimeout(r, 800); }); // Rate-Limit Pause
+          var _pdhl = await fetchPdhlLevels(sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/');
+          var _mtf  = await fetchMtfData(sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/');
+          if(_pdhl){ raw.pdh=_pdhl.pdh; raw.pdl=_pdhl.pdl; raw.pwh=_pdhl.pwh; raw.pwl=_pdhl.pwl; }
+          if(_mtf) { raw._mtfData = _mtf; }
+          // Karte neu rendern mit aktualisierten Daten
+          renderCard(mtfTickers[mi], processData(raw));
+          refreshed++;
+        } catch(e){ console.warn('MTF nachladen '+sym+':', e.message); }
+      }
+      if(refreshed > 0){
+        document.getElementById('scan-label').textContent='MTF/PDH aktualisiert (' + refreshed + ' Titel) ✓';
+        setTimeout(function(){ document.getElementById('scan-label').textContent=''; }, 3000);
+      }
+    })();
+  }
 }
 
 function sortAndRenderCards(tickers){
@@ -2315,6 +2344,10 @@ function computePdhlScore(raw) {
 
 // PDH/PDL/PWH/PWL aus Twelve Data (1day, 10 Bars) - 1 TD-Credit
 async function fetchPdhlLevels(sym, tdKey, proxy) {
+  // Eigener Cache - 8h TTL
+  const ck = 'pdhl_' + sym;
+  const cached = getTdCacheEntry(ck);
+  if(cached) return cached;
   const url = proxy + 'twelvedata/time_series?symbol=' + encodeURIComponent(sym)
               + '&interval=1day&outputsize=10&apikey=' + tdKey;
   try {
@@ -2325,7 +2358,9 @@ async function fetchPdhlLevels(sym, tdKey, proxy) {
     const weekBars  = json.values.slice(2, 7);
     const pwh = weekBars.length > 0 ? Math.max.apply(null, weekBars.map(function(b){ return parseFloat(b.high); })) : null;
     const pwl = weekBars.length > 0 ? Math.min.apply(null, weekBars.map(function(b){ return parseFloat(b.low);  })) : null;
-    return { pdh: parseFloat(yesterday.high), pdl: parseFloat(yesterday.low), pwh: pwh, pwl: pwl };
+    const result = { pdh: parseFloat(yesterday.high), pdl: parseFloat(yesterday.low), pwh: pwh, pwl: pwl };
+    setTdCacheEntry(ck, result);
+    return result;
   } catch(e) {
     console.warn('fetchPdhlLevels:', e.message);
     return null;
@@ -2334,10 +2369,16 @@ async function fetchPdhlLevels(sym, tdKey, proxy) {
 
 // MTF-Daten: 1h + 1day EMA21/50 + RSI14 - 2 TD-Credits
 async function fetchMtfData(sym, tdKey, proxy) {
+  // Eigener Cache - 4h TTL
+  const ck = 'mtf_' + sym;
+  const cached = getTdCacheEntry(ck);
+  if(cached) return cached;
   const tfs = [{tf:'1h',interval:'1h'},{tf:'1day',interval:'1day'}];
   const results = [];
   for (let ti = 0; ti < tfs.length; ti++) {
     const t = tfs[ti];
+    // Kurze Pause zwischen Requests um Rate-Limit zu vermeiden
+    if(ti > 0) await new Promise(function(r){ setTimeout(r, 1200); });
     const url = proxy + 'twelvedata/time_series?symbol=' + encodeURIComponent(sym)
                 + '&interval=' + t.interval + '&outputsize=60&apikey=' + tdKey;
     try {
@@ -2347,7 +2388,6 @@ async function fetchMtfData(sym, tdKey, proxy) {
         results.push({ tf: t.tf, emaFast: null, emaSlow: null, rsi: null });
         continue;
       }
-      // Twelve Data gibt neueste Bar zuerst - umkehren
       const closes = json.values.map(function(b){ return parseFloat(b.close); }).reverse();
       function calcEma(data, len) {
         const k = 2 / (len + 1);
@@ -2372,6 +2412,9 @@ async function fetchMtfData(sym, tdKey, proxy) {
       console.warn('fetchMtfData', t.tf, e.message);
       results.push({ tf: t.tf, emaFast: null, emaSlow: null, rsi: null });
     }
+  }
+  if(results.some(function(r){ return r.emaFast != null; })) {
+    setTdCacheEntry(ck, results);
   }
   return results;
 }
@@ -5866,17 +5909,25 @@ function renderListEditorTable(){
       try {
         var cache = getTdCache();
         var sym = (row.sym||'').toUpperCase();
+        // Cache key format: SYM_interval_outputsize e.g. NVDA_1day_130
+        var entry = null;
         for(var ck in cache){
-          if(ck.toUpperCase().indexOf(sym+':') === 0){
-            var d = cache[ck] && cache[ck].data;
-            if(d){ var pd = processData(d);
-              if(pd && pd.compositeScore != null){
-                var s = Math.round(pd.compositeScore);
-                var sc = s>=70?'var(--green)':s>=50?'var(--accent)':s>=35?'var(--amber)':'var(--text3)';
-                var sl = s>=80?'A+':s>=70?'A':s>=60?'B+':s>=50?'B':s>=40?'C':s>=30?'D':'F';
-                return '<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:'+sc+'">'+sl+' '+s+'</span>';
-              }
-            }
+          if(ck.toUpperCase().indexOf(sym+'_') === 0){
+            entry = cache[ck] && cache[ck].data;
+            if(entry) break;
+          }
+        }
+        // Also check tickerData directly (freshly scanned)
+        if(!entry && typeof tickerData !== 'undefined' && tickerData[sym]) {
+          entry = tickerData[sym];
+        }
+        if(entry){
+          var pd = processData(entry);
+          if(pd && pd.compositeScore != null){
+            var s = Math.round(pd.compositeScore);
+            var sc = s>=70?'var(--green)':s>=50?'var(--accent)':s>=35?'var(--amber)':'var(--text3)';
+            var sl = s>=80?'A+':s>=70?'A':s>=60?'B+':s>=50?'B':s>=40?'C':s>=30?'D':'F';
+            return '<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:'+sc+'">'+sl+' '+s+'</span>';
           }
         }
       } catch(e){}
