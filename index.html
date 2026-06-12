@@ -1978,11 +1978,10 @@ async function runScan(){
         raw._markov = calcMarkovRegime(raw.closes_full);
       }
       // Erweiterte Scoring-Daten: PDH/PDL + MTF
-      // Nur bei Watchlist-Scan (<= 20 Titel) um TD-Credits zu schonen
-      // (+3 Credits pro Ticker: 1x PDH/PDL + 2x MTF)
+      // Bei allen Scans bis 50 Titel (außer DE-Markt)
       const _presetVal = (document.getElementById('ticker-preset')||{}).value || '';
-      const _isWatchlistScan = _presetVal.startsWith('wl:') && tickers.length <= 20;
-      if(_isWatchlistScan && tdKey && !isDeMarket){
+      const _isWatchlistScan = (tickers.length <= 50) && !isDeMarket;
+      if(_isWatchlistScan && tdKey){
         const [_pdhl, _mtf] = await Promise.all([
           fetchPdhlLevels(t.sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/'),
           fetchMtfData(t.sym, tdKey, 'https://my-cors-proxy.ahildebrand.workers.dev/')
