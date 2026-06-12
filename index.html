@@ -2617,32 +2617,35 @@ function renderCard(t,state){
       var aboveBelow = dist200 >= 0 ? 'über' : 'unter';
       var absD = Math.abs(dist200);
       // Farb-Logik für Options:
-      // 0-10% über 200d = ideal für konservativen CSP (Strike nahe 200d)
-      // 10-25% über = moderat, CSP-Strike kann bei 200d liegen
-      // >25% über = weit weg, CSP Strike weit weg vom Kurs
-      // unter 200d = bearish, kein CSP
+      // Grün:  -5% bis +5% (nahe 200d — ideal für CSP)
+      // Amber: +5% bis +20% über / -5% bis -15% unter
+      // Rot:   >=20% über oder <=-15% unter
       var bg, col, label, hint;
-      if(dist200 < 0){
+      if(dist200 <= -15){
         bg='rgba(248,81,73,0.08)'; col='var(--bear)';
         label='200d EMA: '+dist200+'%';
-        hint='Kurs unter 200d — kein CSP';
-      } else if(absD <= 10){
+        hint='Weit unter 200d — kein CSP';
+      } else if(dist200 < -5){
+        bg='rgba(210,153,34,0.08)'; col='var(--warn)';
+        label='200d EMA: '+dist200+'%';
+        hint='Unter 200d — CSP mit Vorsicht';
+      } else if(dist200 <= 5){
         bg='rgba(63,185,80,0.08)'; col='var(--bull)';
-        label='200d EMA: +'+dist200+'%';
+        label='200d EMA: '+(dist200>=0?'+':'')+dist200+'%';
         hint='Ideal — Strike nahe 200d platzierbar';
-      } else if(absD <= 25){
+      } else if(dist200 < 20){
         bg='rgba(210,153,34,0.08)'; col='var(--warn)';
         label='200d EMA: +'+dist200+'%';
         hint='Moderat — Strike bei 200d ($'+ma200.toFixed(0)+')';
       } else {
-        bg='rgba(88,166,255,0.08)'; col='var(--accent)';
+        bg='rgba(248,81,73,0.08)'; col='var(--bear)';
         label='200d EMA: +'+dist200+'%';
-        hint='Weit über 200d — CSP Strike weit unter Kurs';
+        hint='Zu weit über 200d — CSP Strike weit weg';
       }
       return '<div style="display:flex;justify-content:space-between;align-items:center;'
         +'padding:5px 8px;border-radius:6px;background:'+bg+';margin-bottom:6px">'
         +'<span style="font-size:11px;font-weight:600;color:'+col+'">📊 '+label+'</span>'
-        +'<span style="font-size:10px;color:var(--text3)">'+hint+' · $'+ma200.toFixed(0)+'</span>'
+        +'<span style="font-size:10px;color:'+col+'">'+'EMA200: $'+ma200.toFixed(0)+' · '+hint+'</span>'
         +'</div>';
     }())+
     (state._er?'<div style="font-size:11px;padding:4px 8px;border-radius:6px;margin-bottom:6px;background:'+(state._er.daysUntil<=7?'rgba(240,86,86,0.12)':state._er.daysUntil<=14?'rgba(240,169,58,0.12)':'rgba(255,255,255,0.04)')+';color:'+(state._er.daysUntil<=7?'var(--red)':state._er.daysUntil<=14?'var(--amber)':'var(--text3)')+'"><i class="ti ti-calendar-event"></i> Earnings: '+state._er.date+' (in '+(parseInt(state._er.daysUntil)||'?')+' T) '+(state._er.time&&state._er.time==='amc'?'NC ':'')+(state._er.time&&state._er.time==='bmo'?'VM ':'')+( state._er.daysUntil<=7?'⚠️ Sehr nah — KO-Abstand ≥25%!':state._er.daysUntil<=14?'📅 Bald — erhoehten KO-Abstand waehlen':'📊 Kein sofortiges Risiko')+'</div>':'<div style="font-size:11px;padding:4px 8px;border-radius:6px;margin-bottom:6px;background:rgba(255,255,255,0.03);color:var(--text3)"><i class="ti ti-calendar-event"></i> Kein Earnings in den naechsten 45 Tagen</div>')+
