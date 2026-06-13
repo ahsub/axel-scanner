@@ -1137,6 +1137,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px">
             <i class="ti ti-upload"></i>
           </button>
+          <button onclick="koSyncManual()" title="Cloud-Sync (ko-sync Worker)"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 4px">
+            <span id="kosync-badge" style="color:var(--text3);font-size:11px;font-weight:600">☁</span>
+          </button>
           <span style="font-size:10px;color:var(--text3)" id="backlog-last-saved">—</span>
         </div>
       </div>
@@ -1317,6 +1321,134 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 const DEFAULT_PIN = '2409';
 const API_BASE = '/api/scan';
 const PROXY = 'https://my-cors-proxy.ahildebrand.workers.dev/'; // legacy - not used
+
+// ── KoSync: Cloud-Sync via ko-sync Worker ──────────────────────────────────────
+const KoSync = {
+  BASE: 'https://ko-sync.ahildebrand.workers.dev',
+
+  // Alle Keys die wir synchronisieren
+  KEYS: ['watchlist', 'backlog_winners', 'backlog_oversold', 'backlog_tracking'],
+
+  // Push: lokale Daten → Cloud
+  push: async function(key, data) {
+    try {
+      const r = await fetch(this.BASE + '/sync/' + key, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: data, ts: Date.now() })
+      });
+      return r.ok;
+    } catch(e) { console.warn('KoSync.push failed:', key, e); return false; }
+  },
+
+  // Pull: Cloud → lokale Daten
+  pull: async function(key) {
+    try {
+      const r = await fetch(this.BASE + '/sync/' + key);
+      if (!r.ok) return null;
+      return await r.json();
+    } catch(e) { console.warn('KoSync.pull failed:', key, e); return null; }
+  },
+
+  // Status aller Keys
+  status: async function() {
+    try {
+      const r = await fetch(this.BASE + '/sync/status');
+      if (!r.ok) return null;
+      return await r.json();
+    } catch(e) { return null; }
+  },
+
+  // Alle lokalen Daten → Cloud pushen
+  pushAll: async function() {
+    const results = {};
+    // Watchlists
+    const wls = localStorage.getItem('ko_watchlists');
+    if (wls) results.watchlist = await this.push('watchlist', JSON.parse(wls));
+    // Backlog Winner
+    const bw = localStorage.getItem('ko_backlog_winners');
+    if (bw) results.backlog_winners = await this.push('backlog_winners', JSON.parse(bw));
+    // Backlog Oversold
+    const bo = localStorage.getItem('ko_backlog_oversold');
+    if (bo) results.backlog_oversold = await this.push('backlog_oversold', JSON.parse(bo));
+    // Backlog Tracking
+    const bt = localStorage.getItem('ko_backlog_tracking');
+    if (bt) results.backlog_tracking = await this.push('backlog_tracking', JSON.parse(bt));
+    return results;
+  },
+
+  // Cloud → alle lokalen Daten ziehen (neuere gewinnen)
+  pullAll: async function() {
+    let pulled = 0;
+    // Watchlists
+    const wls = await this.pull('watchlist');
+    if (wls && wls.data) {
+      const localTs = JSON.parse(localStorage.getItem('ko_watchlists_ts') || '0');
+      if ((wls.updated_at || 0) > localTs) {
+        localStorage.setItem('ko_watchlists', JSON.stringify(wls.data));
+        localStorage.setItem('ko_watchlists_ts', wls.updated_at || Date.now());
+        if (typeof updateWatchlistDropdown === 'function') updateWatchlistDropdown();
+        pulled++;
+      }
+    }
+    // Backlog Winner
+    const bw = await this.pull('backlog_winners');
+    if (bw && bw.data) {
+      localStorage.setItem('ko_backlog_winners', JSON.stringify(bw.data));
+      pulled++;
+    }
+    // Backlog Oversold
+    const bo = await this.pull('backlog_oversold');
+    if (bo && bo.data) {
+      localStorage.setItem('ko_backlog_oversold', JSON.stringify(bo.data));
+      pulled++;
+    }
+    // Backlog Tracking
+    const bt = await this.pull('backlog_tracking');
+    if (bt && bt.data) {
+      localStorage.setItem('ko_backlog_tracking', JSON.stringify(bt.data));
+      pulled++;
+    }
+    return pulled;
+  }
+};
+
+// KoSync UI-Helfer: Status-Badge im Backlog-Header aktualisieren
+function koSyncUpdateBadge(state, text) {
+  const el = document.getElementById('kosync-badge');
+  if (!el) return;
+  const colors = { ok: 'var(--green)', err: 'var(--red)', busy: 'var(--amber)', idle: 'var(--text3)' };
+  el.style.color = colors[state] || 'var(--text3)';
+  el.textContent = text;
+}
+
+// Manueller Sync-Button-Handler
+async function koSyncManual() {
+  koSyncUpdateBadge('busy', '⏳ Sync…');
+  try {
+    const pushResults = await KoSync.pushAll();
+    const ok = Object.values(pushResults).every(Boolean);
+    koSyncUpdateBadge(ok ? 'ok' : 'err', ok ? '☁ Sync OK' : '⚠ Teilfehler');
+    setTimeout(function(){ koSyncUpdateBadge('idle', '☁'); }, 3000);
+    if (typeof renderBacklogPanel === 'function') renderBacklogPanel();
+  } catch(e) {
+    koSyncUpdateBadge('err', '✗ Fehler');
+    setTimeout(function(){ koSyncUpdateBadge('idle', '☁'); }, 3000);
+  }
+}
+
+// Pull beim Start (neuere Cloud-Daten übernehmen)
+async function koSyncOnStart() {
+  koSyncUpdateBadge('busy', '⏳…');
+  try {
+    const n = await KoSync.pullAll();
+    koSyncUpdateBadge('ok', '☁ ' + n + ' geladen');
+    setTimeout(function(){ koSyncUpdateBadge('idle', '☁'); }, 2500);
+  } catch(e) {
+    koSyncUpdateBadge('idle', '☁');
+  }
+}
+// ── END KoSync ─────────────────────────────────────────────────────────────────
 window.currentTF = '1d';
 
 function getFinnhubKey(){
@@ -1590,6 +1722,8 @@ function unlockApp(){
   try{ loadPortfolioSettings(); }catch(e){ console.warn('loadPortfolioSettings:',e); }
   try{ updateWatchlistDropdown(); }catch(e){ console.warn('updateWatchlistDropdown:',e); }
   try{ loadCustomLists(); }catch(e){ console.warn('loadCustomLists:',e); }
+  // Cloud-Sync beim Start: neuere Daten vom Worker ziehen
+  setTimeout(function(){ try{ koSyncOnStart(); }catch(e){ console.warn('koSyncOnStart:',e); } }, 1500);
 }
 function saveTwelveKey(){
   const k=document.getElementById('td-key-input').value.trim();
@@ -4561,6 +4695,18 @@ function getWatchlists(){
   try { return JSON.parse(localStorage.getItem(WL_KEY)||'{}'); } catch(e){ return {}; }
 }
 
+// Watchlists speichern + auto-sync zur Cloud
+function saveWatchlistsWithSync(wls) {
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  localStorage.setItem('ko_watchlists_ts', Date.now());
+  if (typeof KoSync !== 'undefined') {
+    KoSync.push('watchlist', wls).then(function(ok) {
+      koSyncUpdateBadge(ok ? 'ok' : 'err', ok ? '☁ ✓' : '☁ ⚠');
+      setTimeout(function(){ koSyncUpdateBadge('idle', '☁'); }, 2000);
+    });
+  }
+}
+
 function saveWatchlist(){
   const input = document.getElementById('custom-input').value.trim();
   if(!input){ alert('Bitte zuerst Ticker eingeben'); return; }
@@ -5704,7 +5850,7 @@ function mmSaveWatchlist(){
   var name=(nameEl&&nameEl.value.trim())||('Scan '+today);
   var wls=getWatchlists();
   wls[name]=tickers.join(', ');
-  localStorage.setItem('ko_watchlists',JSON.stringify(wls));
+  saveWatchlistsWithSync(wls);
   updateWatchlistDropdown();
   // Feedback
   var countEl=document.getElementById('mm-select-count');
@@ -6092,7 +6238,7 @@ function leSaveList(){
     var tickers = _listEditorData.map(function(r){return r.sym;}).filter(Boolean);
     var wls = getWatchlists();
     wls[wlName] = tickers.join(', ');
-    localStorage.setItem('ko_watchlists', JSON.stringify(wls));
+    saveWatchlistsWithSync(wls);
     updateWatchlistDropdown();
     // Refresh dropdown count
     var sel = document.getElementById('le-wl-select');
@@ -6824,7 +6970,7 @@ function addDEGroupToWatchlist(groupName){
   var today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
   var name = groupName + ' ' + today;
   wls[name] = tickers.map(function(t){return t.sym;}).join(', ');
-  localStorage.setItem('ko_watchlists', JSON.stringify(wls));
+  saveWatchlistsWithSync(wls);
   updateWatchlistDropdown();
   closeDEListSelector();
   alert('✓ "' + name + '" als Watchlist gespeichert (' + tickers.length + ' Titel)');
@@ -8477,6 +8623,14 @@ const TrackingStore = {
   save: function(scope, data) {
     try {
       localStorage.setItem(this._key(scope), JSON.stringify({ ts: Date.now(), data: data }));
+      // Auto-Sync: scopes die ko-sync kennt → Cloud pushen
+      var syncMap = { winners: 'backlog_winners', oversold: 'backlog_oversold', ki_tracking: 'backlog_tracking' };
+      if (syncMap[scope] && typeof KoSync !== 'undefined') {
+        KoSync.push(syncMap[scope], data).then(function(ok) {
+          koSyncUpdateBadge(ok ? 'ok' : 'err', ok ? '☁ ✓' : '☁ ⚠');
+          setTimeout(function(){ koSyncUpdateBadge('idle', '☁'); }, 2000);
+        });
+      }
       return true;
     } catch(e) { console.warn('TrackingStore.save failed:', e); return false; }
   },
