@@ -291,6 +291,25 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div style="font-size:12px;color:var(--text2)" id="scan-label">Analysiere…</div>
         <div class="progress"><div class="progress-fill" id="scan-bar" style="width:0%"></div></div>
       </div>
+
+      <!-- Kursrahmen-Filter -->
+      <div id="price-filter-bar" style="display:flex;align-items:center;gap:6px;margin-bottom:.6rem;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text3);white-space:nowrap"><i class="ti ti-filter"></i> Kurs:</span>
+        <span style="font-size:11px;color:var(--text3)">$</span>
+        <input type="number" id="price-min" min="0" placeholder="min"
+          style="width:60px;font-size:11px;padding:3px 6px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px;text-align:right"
+          onchange="savePriceFilter()" oninput="savePriceFilter()">
+        <span style="font-size:11px;color:var(--text3)">–</span>
+        <input type="number" id="price-max" min="0" placeholder="max"
+          style="width:60px;font-size:11px;padding:3px 6px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px;text-align:right"
+          onchange="savePriceFilter()" oninput="savePriceFilter()">
+        <span style="font-size:11px;color:var(--text3)">$</span>
+        <button onclick="clearPriceFilter()" id="price-filter-clear"
+          style="display:none;background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 5px"
+          title="Filter aufheben">✕</button>
+        <span id="price-filter-hint" style="font-size:10px;color:var(--text3);margin-left:2px"></span>
+      </div>
+
       <div id="scan-container"></div>
       <div style="font-size:11px;color:var(--text3);margin-top:.5rem" id="scanner-market-hint">
         <i class="ti ti-info-circle"></i> 🔔 US-Markt · Daten via Twelve Data · Kaufsignal = alle 3 bullisch
@@ -1722,6 +1741,8 @@ function unlockApp(){
   try{ loadPortfolioSettings(); }catch(e){ console.warn('loadPortfolioSettings:',e); }
   try{ updateWatchlistDropdown(); }catch(e){ console.warn('updateWatchlistDropdown:',e); }
   try{ loadCustomLists(); }catch(e){ console.warn('loadCustomLists:',e); }
+  // Kursrahmen-Filter wiederherstellen
+  try{ loadPriceFilterUI(); }catch(e){ console.warn('loadPriceFilterUI:',e); }
   // Cloud-Sync beim Start: neuere Daten vom Worker ziehen
   setTimeout(function(){ try{ koSyncOnStart(); }catch(e){ console.warn('koSyncOnStart:',e); } }, 1500);
 }
@@ -2222,7 +2243,14 @@ function sortAndRenderCards(tickers){
   });
 
   // Sort: 3/3 first → 0/3 last, within group by MACD histogram descending
-  results.sort(function(a, b){
+  // Kursrahmen-Filter anwenden
+  var filteredResults = applyPriceFilter(results);
+  var hiddenCount = results.length - filteredResults.length;
+  if (hiddenCount > 0) {
+    var hint = document.getElementById('price-filter-hint');
+    if (hint) hint.textContent += ' · ' + hiddenCount + ' ausgeblendet';
+  }
+  filteredResults.sort(function(a, b){
     // Primary: composite score + backtest bonus
     const aScore=(a.data.compositeScore||0)+(a.data.backtest&&a.data.backtest.winRate>=70?3:0);
     const bScore=(b.data.compositeScore||0)+(b.data.backtest&&b.data.backtest.winRate>=70?3:0);
@@ -2245,7 +2273,7 @@ function sortAndRenderCards(tickers){
     0: '<div style="font-size:11px;font-weight:500;padding:6px 0 4px;color:var(--text3)"><i class="ti ti-x"></i> Bärisch — 0/3</div>',
   };
 
-  results.forEach(function(r){
+  filteredResults.forEach(function(r){
     if(r.data.bullCount !== lastGroup){
       lastGroup = r.data.bullCount;
       html += groupLabels[lastGroup]||'';
@@ -2262,31 +2290,32 @@ function sortAndRenderCards(tickers){
   container.innerHTML = html;
 
   // Render cards
-  results.forEach(function(r){ renderCard(r.t, r.data); });
+  filteredResults.forEach(function(r){ renderCard(r.t, r.data); });
   errors.forEach(function(t){
     const el = document.getElementById('card-'+t.sym);
     if(el) el.innerHTML = '<div class="ticker-head"><span class="ticker-sym">'+t.sym+'</span></div><div style="font-size:12px;color:var(--text3)">Keine Daten verfügbar</div>';
   });
 
   // Summary bar
-  const bull3 = results.filter(function(r){ return r.data.bullCount===3; }).length;
-  const bull2 = results.filter(function(r){ return r.data.bullCount===2; }).length;
-  if(results.length > 0){
+  const bull3 = filteredResults.filter(function(r){ return r.data.bullCount===3; }).length;
+  const bull2 = filteredResults.filter(function(r){ return r.data.bullCount===2; }).length;
+  if(filteredResults.length > 0){
     const summary = document.createElement('div');
     summary.style.cssText = 'font-size:11px;color:var(--text3);margin-top:.5rem;padding:8px 10px;background:var(--bg2);border-radius:8px';
+    var hiddenNote = hiddenCount > 0 ? ' · <span style="color:var(--amber)">'+hiddenCount+' gefiltert</span>' : '';
     summary.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">'+
-      '<span><i class="ti ti-sort-descending"></i> '+results.length+' Titel · '+
+      '<span><i class="ti ti-sort-descending"></i> '+filteredResults.length+' Titel'+hiddenNote+' · '+
       '<span style="color:var(--green)">'+bull3+' Kaufsignal</span> · '+
       '<span style="color:var(--amber)">'+bull2+' Vorsicht</span> · '+
-      '<span style="color:var(--text3)">'+(results.length-bull3-bull2)+' Bärisch</span></span>'+
+      '<span style="color:var(--text3)">'+(filteredResults.length-bull3-bull2)+' Bärisch</span></span>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
       '<button onclick="saveFromScan(3)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:rgba(52,194,110,0.12);border-color:var(--green);color:var(--green)">'+
         '<i class="ti ti-star"></i> 3/3 speichern ('+bull3+')</button>'+
       '<button onclick="saveFromScan(2)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:rgba(240,169,58,0.1);border-color:var(--amber);color:var(--amber)">'+
         '<i class="ti ti-star"></i> ≥2/3 speichern ('+(bull3+bull2)+')</button>'+
       '<button onclick="saveFromScan(0)" class="btn btn-sm" style="font-size:10px;padding:2px 7px">'+
-        '<i class="ti ti-star"></i> Alle ('+results.length+')</button>'+
+        '<i class="ti ti-star"></i> Alle ('+filteredResults.length+')</button>'+
       '<button onclick="openKiBriefing()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.15));border-color:#818cf8;color:#818cf8"><i class=\"ti ti-brain\"></i> KI-Briefing</button>'+
       
       '<button onclick="showSectorHeatmap()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">'+
@@ -4694,6 +4723,75 @@ const WL_KEY = 'ko_watchlists';
 function getWatchlists(){
   try { return JSON.parse(localStorage.getItem(WL_KEY)||'{}'); } catch(e){ return {}; }
 }
+
+// ── Kursrahmen-Filter ────────────────────────────────────────────────────────
+function getPriceFilter() {
+  try {
+    return JSON.parse(localStorage.getItem('ko_price_filter') || '{}');
+  } catch(e) { return {}; }
+}
+
+function savePriceFilter() {
+  var minEl = document.getElementById('price-min');
+  var maxEl = document.getElementById('price-max');
+  var min = minEl && minEl.value !== '' ? parseFloat(minEl.value) : null;
+  var max = maxEl && maxEl.value !== '' ? parseFloat(maxEl.value) : null;
+  var f = {};
+  if (min !== null && !isNaN(min)) f.min = min;
+  if (max !== null && !isNaN(max)) f.max = max;
+  localStorage.setItem('ko_price_filter', JSON.stringify(f));
+  updatePriceFilterUI(f);
+}
+
+function clearPriceFilter() {
+  localStorage.removeItem('ko_price_filter');
+  var minEl = document.getElementById('price-min');
+  var maxEl = document.getElementById('price-max');
+  if (minEl) minEl.value = '';
+  if (maxEl) maxEl.value = '';
+  updatePriceFilterUI({});
+}
+
+function updatePriceFilterUI(f) {
+  var clearBtn = document.getElementById('price-filter-clear');
+  var hint = document.getElementById('price-filter-hint');
+  var hasFilter = f.min != null || f.max != null;
+  if (clearBtn) clearBtn.style.display = hasFilter ? 'inline' : 'none';
+  if (hint) {
+    if (hasFilter) {
+      var parts = [];
+      if (f.min != null) parts.push('≥ $' + f.min);
+      if (f.max != null) parts.push('≤ $' + f.max);
+      hint.textContent = '(' + parts.join(' · ') + ')';
+      hint.style.color = 'var(--accent)';
+    } else {
+      hint.textContent = 'kein Filter';
+      hint.style.color = 'var(--text3)';
+    }
+  }
+}
+
+function applyPriceFilter(results) {
+  var f = getPriceFilter();
+  if (f.min == null && f.max == null) return results;
+  return results.filter(function(r) {
+    var p = r.data.price;
+    if (p == null || p <= 0) return true; // kein Kurs → nicht filtern
+    if (f.min != null && p < f.min) return false;
+    if (f.max != null && p > f.max) return false;
+    return true;
+  });
+}
+
+function loadPriceFilterUI() {
+  var f = getPriceFilter();
+  var minEl = document.getElementById('price-min');
+  var maxEl = document.getElementById('price-max');
+  if (minEl && f.min != null) minEl.value = f.min;
+  if (maxEl && f.max != null) maxEl.value = f.max;
+  updatePriceFilterUI(f);
+}
+// ── END Kursrahmen-Filter ────────────────────────────────────────────────────
 
 // Watchlists speichern + auto-sync zur Cloud
 function saveWatchlistsWithSync(wls) {
