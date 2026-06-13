@@ -8327,7 +8327,7 @@ async function openKiBriefing() {
 
   // Strategie-spezifischen Prompt holen
   const stratCfg = KI_STRAT_CONFIG[_kiStrat] || KI_STRAT_CONFIG.ko;
-  const prompt = stratCfg.prompt({ marktkontext: marktkontext });
+  const prompt = stratCfg.prompt({ marktkontext: marktkontext, vixStr: vixStr });
   const dummy = 'Du bist ein erfahrener Knock-out-Trading-Experte'; // ersetzt durch stratCfg.prompt
 
   try {
@@ -8489,7 +8489,7 @@ const KI_STRAT_CONFIG = {
         + '   a) EMA200-Abstand aus den Daten: Strike-Empfehlung nahe/unter EMA200 in $\n'
         + '   b) Strike-Bereich in $ und % OTM vom aktuellen Kurs\n'
         + '   c) Laufzeit (bevorzugt 30-45 DTE)\n'
-        + '   d) Prämien-SCHÄTZUNG (⚠️ IV-Rank NICHT im Scanner — nur VIX als Proxy!): Bei VIX ' + vixStr + ' grobe Näherung möglich — IMMER mit "→ exakt in IBKR Option Chain prüfen" kennzeichnen\n'
+        + '   d) Prämien-SCHÄTZUNG (⚠️ IV-Rank NICHT im Scanner — nur VIX als Proxy!): Bei VIX ' + ctx.vixStr + ' grobe Näherung möglich — IMMER mit "→ exakt in IBKR Option Chain prüfen" kennzeichnen\n'
         + '   e) PFLICHT-CHECKS (immer einzeln auflisten):\n'
         + '      - "IV Rank in IBKR prüfen → Ziel: >30%"\n'
         + '      - "OI am Strike $XX prüfen → Ziel: >500 Kontrakte"\n'
@@ -8589,7 +8589,7 @@ const KI_STRAT_CONFIG = {
         + '   a) Ludwig-Eignung: Aktueller Kurs = "Kurs:$XX" aus den Scandaten (NICHT den EMA200-Kurs verwenden!). Kurs im $15-80 Bereich? EMA200-Abstand (Ludwig bevorzugt nahe 200d)\n'
         + '   b) ATM-Strike Empfehlung in $ (nahe aktuellem Kurs)\n'
         + '   c) Laufzeit: nächster 3. Freitag des Monats (~30 DTE)\n'
-        + '   d) Prämien-SCHÄTZUNG (⚠️ NUR Näherung — IV-Rank nicht im Scanner!): Bei VIX ' + vixStr + ' und ATM-Strike etwa X% des Kurses — IMMER als Schätzung kennzeichnen und "→ exakt in IBKR Option Chain prüfen" hinzufügen. 70%-Gewinn-Ziel = 0.30 × Prämie.\n'
+        + '   d) Prämien-SCHÄTZUNG (⚠️ NUR Näherung — IV-Rank nicht im Scanner!): Bei VIX ' + ctx.vixStr + ' und ATM-Strike etwa X% des Kurses — IMMER als Schätzung kennzeichnen und "→ exakt in IBKR Option Chain prüfen" hinzufügen. 70%-Gewinn-Ziel = 0.30 × Prämie.\n'
         + '   e) Roll-Szenario (⚠️ SCHÄTZUNG — exakte Strikes nur in IBKR sichtbar!): Stufe-1-Roll ≈ Kurs − 2.5% des aktuellen Kurses aus "Kurs:$"-Feld. Nur Kurs aus Scandaten verwenden, keine Kursziele erfinden.\n'
         + '   f) PFLICHT-CHECKS:\n'
         + '      - "Strike-Staffelung in IBKR prüfen → Ziel: ≤2.5%"\n'
