@@ -8415,30 +8415,7 @@ let _kiStrat = 'ko';
 // ══════════════════════════════════════════════════════════════════════════════
 // ANTI-HALLUZINATIONS-DIREKTIVE — wird jedem KI-Prompt vorangestellt
 // ══════════════════════════════════════════════════════════════════════════════
-const KI_ANTI_HALLUZINATION = `
-⛔ STRENGE DATENDISZIPLIN — KEINE AUSNAHMEN:
-
-Du erhältst unten EXAKTE Scanner-Daten. Diese Daten sind die EINZIGE Wahrheit.
-
-VERBOTEN:
-• Kurse, Strikes, Prämien oder Prozentzahlen erfinden oder schätzen
-• Den EMA200-Kurs (Feld "EMA200-Kurs:$XX") als aktuellen Handelskurs verwenden
-• Historische Preise aus deinem Training verwenden
-• Aussagen wie "typischerweise", "ca.", "ungefähr" bei Kursen — nur Scandaten verwenden
-
-PFLICHTREGELN:
-• Aktueller Kurs = NUR der Wert nach "Kurs:$" im Datensatz
-• EMA200-Kurs = NUR der Wert nach "EMA200-Kurs:$" — ist der gleitende 200-Tage-Durchschnitt, NICHT der Handelskurs
-• Wenn ein Feld fehlt (z.B. "?" statt Zahl): explizit schreiben "Kurs nicht verfügbar — in IBKR prüfen"
-• Strike-Empfehlungen NUR auf Basis des "Kurs:$"-Feldes berechnen
-• Prämien-Schätzungen NUR als Näherung kennzeichnen: "(Schätzung — in IBKR prüfen)"
-
-SELBSTKONTROLLE vor jeder Empfehlung:
-→ Habe ich den Kurs aus "Kurs:$XX" verwendet? ✓
-→ Habe ich EMA200-Kurs und Handelskurs nicht verwechselt? ✓
-→ Habe ich keine Zahl aus meinem Training-Wissen eingesetzt? ✓
-
-`;
+const KI_ANTI_HALLUZINATION = '\n'  + '⛔ STRENGE DATENDISZIPLIN — KEINE AUSNAHMEN:\n\n'  + 'Du erhältst unten EXAKTE Scanner-Daten. Diese Daten sind die EINZIGE Wahrheit.\n\n'  + 'VERBOTEN:\n'  + '• Kurse, Strikes, Prämien oder Prozentzahlen erfinden oder schätzen\n'  + '• Den EMA200-Kurs (Feld "EMA200-Kurs:$XX") als aktuellen Handelskurs verwenden\n'  + '• Historische Preise aus deinem Training verwenden\n'  + '• Aussagen wie "typischerweise" oder "ungefähr" bei Kursen\n\n'  + 'PFLICHTREGELN:\n'  + '• Aktueller Kurs = NUR der Wert nach "Kurs:$" im Datensatz\n'  + '• EMA200-Kurs = NUR nach "EMA200-Kurs:$" — NICHT der Handelskurs\n'  + '• Fehlende Felder: "Kurs nicht verfügbar — in IBKR prüfen" schreiben\n'  + '• Prämien-Schätzungen immer als "(Schätzung — in IBKR prüfen)" kennzeichnen\n\n'  + 'SELBSTKONTROLLE: Kurs aus "Kurs:$XX"? EMA200 nicht mit Handelskurs verwechselt? Keine Trainingsdaten eingesetzt?\n\n';
 
 const KI_STRAT_CONFIG = {
   ko: {
