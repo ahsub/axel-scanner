@@ -8104,6 +8104,57 @@ const KI_STRAT_CONFIG = {
         + '\nAntworte auf Deutsch, strukturiert 1-3, max. 400 Wörter. '
         + 'Sei explizit über die Grenzen dieser Analyse.';
     }
+  },
+  ludwig: {
+    hint: '⚙️ Ludwig-Strategie: ATM-CSP · Systematisches Rollen · 3-Stufen-Roll · Eric Ludwig',
+    color: '#a371f7',
+    prompt: function(ctx) {
+      return 'Du bist ein erfahrener Options-Trader der die "Unschlagbare Optionsstrategie" nach Eric Ludwig anwendet.\n\n'
+        + '## STRATEGIE-GRUNDLAGEN (Eric Ludwig):\n'
+        + '- CSP wird AT-THE-MONEY verkauft (nicht OTM wie bei klassischer Wheel) — maximaler Zeitwert\n'
+        + '- Laufzeit: ~30 Tage, bevorzugt 3. Freitag des Monats (monatliche Optionen)\n'
+        + '- Frühausstieg: Bei 70% Gewinn in ersten 50% der Laufzeit → Position schließen\n'
+        + '- Prüfung: 5 Tage vor Verfall — 3 mögliche Situationen (oben/seitwärts/unten)\n'
+        + '- Andienung vermeiden durch systematisches 3-Stufen-Rollen:\n'
+        + '  Stufe 1: Niedrigerer Strike, 30-60 DTE, prämienneutral\n'
+        + '  Stufe 2: Gleicher Strike, neue Laufzeit, prämienneutral\n'
+        + '  Stufe 3: Niedrigerer Strike, doppelte Kontrakte (nur wenn Kapital vorhanden!)\n'
+        + '- Maximale Roll-Laufzeit: 90 Tage\n\n'
+        + '## AKTIEN-CHECKLISTE (Ludwig-Kriterien):\n'
+        + '- Kurs $15–$80 (Kapitaleffizienz für 200-Aktien-Szenario)\n'
+        + '- KGV idealerweise <20 (Tech-Ausnahmen möglich)\n'
+        + '- Umsatz/EPS mehrjährig steigend\n'
+        + '- Keine hochvolatilen oder medial überhypten Aktien\n'
+        + '- Strike-Staffelung ≤2.5% des Kurses (Flexibilität beim Rollen)\n'
+        + '- OI/Volumen mindestens dreistellig pro Strike\n'
+        + '- Weekly Options verfügbar (Roll-Flexibilität)\n\n'
+        + '⚠️ WICHTIG: Du gibst keine Anlageberatung. Alle Empfehlungen sind informativer Natur.\n'
+        + 'Pflicht-Checks vor jedem Trade in IBKR/CapTrader:\n'
+        + '  1. Strike-Staffelung prüfen (≤2.5% des Kurses)\n'
+        + '  2. OI am ATM-Strike prüfen (Ziel: >300 Kontrakte)\n'
+        + '  3. Weekly Options verfügbar? (Roll-Notfall)\n'
+        + '  4. Kein ER innerhalb der 30-Tage-Laufzeit\n\n'
+        + ctx.marktkontext
+        + '\n\nAUFGABE:\n'
+        + '1. MARKTUMFELD: ATM-CSPs sinnvoll? VIX-Level und Implikation. (2-3 Sätze)\n'
+        + '2. TOP 3 LUDWIG-KANDIDATEN: Für jeden Titel:\n'
+        + '   a) Ludwig-Eignung: Kurs im $15-80 Bereich? EMA200-Abstand (Ludwig bevorzugt nahe 200d)\n'
+        + '   b) ATM-Strike Empfehlung in $ (nahe aktuellem Kurs)\n'
+        + '   c) Laufzeit: nächster 3. Freitag des Monats (~30 DTE)\n'
+        + '   d) Erwartete Prämie und 70/50-Zielpreis (bei dem früh geschlossen werden sollte)\n'
+        + '   e) Roll-Szenario: Falls Kurs fällt — welcher Strike wäre bei Stufe-1-Roll realistisch?\n'
+        + '   f) PFLICHT-CHECKS:\n'
+        + '      - "Strike-Staffelung in IBKR prüfen → Ziel: ≤2.5%"\n'
+        + '      - "OI am ATM-Strike prüfen → Ziel: >300"\n'
+        + '      - "Weekly Options verfügbar? → für Roll-Notfall"\n'
+        + '      - "ER-Datum prüfen → kein ER in 30-Tage-Laufzeit"\n'
+        + '3. NICHT GEEIGNET: Welche Top-Titel sind für Ludwig NICHT geeignet und warum?\n'
+        + '   (zu hoher Kurs, zu volatil, schlechte Strike-Staffelung, ER zu nah)\n'
+        + '4. ROLLSTRATEGIE-HINWEIS: Kurze Erinnerung an die 3 Roll-Stufen.\n'
+        + '\n⚠️ ABSCHLUSS: Ludwig-Strategie vermeidet Andienung durch systematisches Rollen — '
+        + 'nie auf Ausübung warten ohne Roll-Plan.\n'
+        + '\nAntworte auf Deutsch, strukturiert 1-4, max. 700 Wörter.';
+    }
   }
 };
 
@@ -8391,6 +8442,12 @@ function csvSaveConfirm(tickers) {
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;opacity:0.6"
           title="Fundamentaldaten noch nicht verfügbar">
           🔍 Value ⚠️
+        </button>
+        <button class="ki-strat-btn" data-strat="ludwig"
+          onclick="setKiStrat(this)"
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #a371f7;background:transparent;color:#a371f7;cursor:pointer"
+          title="ATM-CSP mit systematischem 3-Stufen-Rollen nach Eric Ludwig">
+          ⚙️ Ludwig
         </button>
       </div>
       <div id="ki-strat-hint" style="font-size:10px;color:var(--text3);margin-top:.4rem">
