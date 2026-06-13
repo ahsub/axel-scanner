@@ -1457,9 +1457,9 @@ const KoSync = {
   pull: async function(key) {
     try {
       const r = await fetch(this.BASE + '/sync/' + key);
-      if (!r.ok) return null;
+      if (!r.ok) return null; // 404 = key not yet written, silent
       return await r.json();
-    } catch(e) { console.warn('KoSync.pull failed:', key, e); return null; }
+    } catch(e) { return null; } // silent - worker may not be ready
   },
 
   // Status aller Keys
@@ -8327,7 +8327,8 @@ async function openKiBriefing() {
 
   // Strategie-spezifischen Prompt holen
   const stratCfg = KI_STRAT_CONFIG[_kiStrat] || KI_STRAT_CONFIG.ko;
-  const prompt = stratCfg.prompt({ marktkontext: marktkontext, vixStr: vixStr });
+  const vixForPrompt = (typeof vixStr !== 'undefined' && vixStr) ? vixStr : (_vixLevel ? _vixLevel.toFixed(1) : 'unbekannt');
+  const prompt = stratCfg.prompt({ marktkontext: marktkontext, vixStr: vixForPrompt });
   const dummy = 'Du bist ein erfahrener Knock-out-Trading-Experte'; // ersetzt durch stratCfg.prompt
 
   try {
