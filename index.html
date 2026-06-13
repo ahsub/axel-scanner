@@ -285,29 +285,29 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <span style="font-size:11px;color:var(--text3)" id="tf-label">Tageschart · MACD (12/26/9)</span>
       </div>
       <div id="custom-wrap" style="display:block;margin-bottom:.75rem"><div style="display:flex;gap:6px;align-items:center"><input type="text" id="custom-input" placeholder="AAPL, MSFT, NVDA (kommagetrennt)" style="flex:1"><button class="btn btn-sm" onclick="saveCurrentAsWatchlist()" title="Als neue Watchlist speichern" style="white-space:nowrap;font-size:11px;flex-shrink:0"><i class="ti ti-bookmark-plus"></i> Speichern</button><button class="btn btn-sm" id="update-wl-btn" onclick="updateExistingWatchlist()" title="Aktuelle Watchlist aktualisieren" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)"><i class="ti ti-refresh"></i> WL aktualisieren</button></div></div>
+
+      <!-- Kursrahmen-Filter: immer sichtbar direkt unter Ticker-Eingabe -->
+      <div id="price-filter-bar" style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem;padding:6px 10px;background:var(--bg2);border-radius:8px;border:0.5px solid var(--border);flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text3);white-space:nowrap"><i class="ti ti-filter"></i> Kursfilter:</span>
+        <span style="font-size:11px;color:var(--text3)">$</span>
+        <input type="number" id="price-min" min="0" placeholder="min"
+          style="width:58px;font-size:12px;padding:3px 6px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px;text-align:right"
+          onchange="savePriceFilter()" oninput="savePriceFilter()">
+        <span style="font-size:11px;color:var(--text3)">–</span>
+        <input type="number" id="price-max" min="0" placeholder="max"
+          style="width:58px;font-size:12px;padding:3px 6px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px;text-align:right"
+          onchange="savePriceFilter()" oninput="savePriceFilter()">
+        <span style="font-size:11px;color:var(--text3)">$</span>
+        <button onclick="clearPriceFilter()" id="price-filter-clear"
+          style="display:none;background:none;border:0.5px solid var(--red);color:var(--red);cursor:pointer;font-size:10px;padding:2px 7px;border-radius:5px"
+          title="Filter aufheben">✕ Reset</button>
+        <span id="price-filter-hint" style="font-size:10px;color:var(--text3);margin-left:2px;flex:1;text-align:right"></span>
+      </div>
       <div id="qqq-regime-banner" style="display:none;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;margin:6px 1rem 0" title="Markov-Regime des NASDAQ100"></div>
       <div id="vix-ampel" style="display:none;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;margin:8px 1rem 0;cursor:default" title="VIX = CBOE Volatility Index"></div>
       <div id="scan-progress" style="display:none;margin-bottom:.75rem">
         <div style="font-size:12px;color:var(--text2)" id="scan-label">Analysiere…</div>
         <div class="progress"><div class="progress-fill" id="scan-bar" style="width:0%"></div></div>
-      </div>
-
-      <!-- Kursrahmen-Filter -->
-      <div id="price-filter-bar" style="display:flex;align-items:center;gap:6px;margin-bottom:.6rem;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--text3);white-space:nowrap"><i class="ti ti-filter"></i> Kurs:</span>
-        <span style="font-size:11px;color:var(--text3)">$</span>
-        <input type="number" id="price-min" min="0" placeholder="min"
-          style="width:60px;font-size:11px;padding:3px 6px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px;text-align:right"
-          onchange="savePriceFilter()" oninput="savePriceFilter()">
-        <span style="font-size:11px;color:var(--text3)">–</span>
-        <input type="number" id="price-max" min="0" placeholder="max"
-          style="width:60px;font-size:11px;padding:3px 6px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px;text-align:right"
-          onchange="savePriceFilter()" oninput="savePriceFilter()">
-        <span style="font-size:11px;color:var(--text3)">$</span>
-        <button onclick="clearPriceFilter()" id="price-filter-clear"
-          style="display:none;background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 5px"
-          title="Filter aufheben">✕</button>
-        <span id="price-filter-hint" style="font-size:10px;color:var(--text3);margin-left:2px"></span>
       </div>
 
       <div id="scan-container"></div>
@@ -726,6 +726,86 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="panel-admin" class="panel">
       <div class="admin-warn">
         <i class="ti ti-lock"></i> Admin-Bereich — Konfiguration &amp; Datenverwaltung
+      </div>
+
+      <!-- ═══ AUTO-TOP + SCHEDULER ═════════════════════════════════════════ -->
+      <div class="sec"><i class="ti ti-robot"></i> Auto-Scan &amp; Auto-Top-Liste</div>
+      <div class="card" style="margin-bottom:1rem">
+
+        <!-- Auto-Top Einstellungen -->
+        <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:.65rem">
+          <i class="ti ti-chart-bar"></i> 📊 Auto-Top Masterliste
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;line-height:1.5">
+          Nach jedem Scan werden die besten Titel automatisch in <strong style="color:var(--text)">📊 Auto-Top [Datum]</strong> gesammelt.
+          Mehrere Scans des gleichen Tages ergänzen die Liste — neue beste ersetzen schwächere.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Max. Titel</div>
+            <input type="number" id="autotop-n" value="15" min="5" max="30"
+              style="width:100%;font-size:12px;padding:4px 7px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="autoTopSaveCfgUI()">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Min. Score</div>
+            <input type="number" id="autotop-minscore" value="50" min="0" max="100"
+              style="width:100%;font-size:12px;padding:4px 7px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="autoTopSaveCfgUI()">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Min. Bullish</div>
+            <select id="autotop-minbull"
+              style="width:100%;font-size:12px;padding:4px 7px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="autoTopSaveCfgUI()">
+              <option value="2">≥ 2/3</option>
+              <option value="3">3/3 only</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem">
+          <button class="btn btn-sm" onclick="autoTopClearToday()"
+            style="font-size:11px;color:var(--amber);border-color:var(--amber)">
+            <i class="ti ti-refresh"></i> Heute zurücksetzen
+          </button>
+          <button class="btn btn-sm" onclick="autoTopClearAll()"
+            style="font-size:11px;color:var(--red);border-color:var(--red)">
+            <i class="ti ti-trash"></i> Alle Auto-Top löschen
+          </button>
+        </div>
+
+        <div style="height:0.5px;background:var(--border);margin-bottom:.75rem"></div>
+
+        <!-- Scheduler -->
+        <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:.65rem">
+          <i class="ti ti-clock"></i> Auto-Scan Zeitplan
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:.65rem;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
+            <input type="checkbox" id="scheduler-toggle" onchange="schedulerToggle(this.checked)"
+              style="width:15px;height:15px;accent-color:var(--green)">
+            Automatischer Scan aktiviert
+          </label>
+          <input type="time" id="scheduler-time" value="15:25"
+            style="font-size:12px;padding:3px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+            onchange="schedulerSaveTime(this.value)">
+          <span style="font-size:10px;color:var(--text3)">Uhr (täglich)</span>
+        </div>
+        <div style="font-size:11px;margin-bottom:.65rem">
+          <div style="color:var(--text3);margin-bottom:4px">Listen für Auto-Scan:</div>
+          <div style="display:flex;flex-direction:column;gap:4px" id="scheduler-lists">
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+              <input type="checkbox" value="fixed:SP500" onchange="schedulerSaveLists()" style="accent-color:var(--accent)"> 🇺🇸 S&amp;P 500
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+              <input type="checkbox" value="fixed:NASDAQ" onchange="schedulerSaveLists()" style="accent-color:var(--accent)"> 💻 NASDAQ 100
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+              <input type="checkbox" value="fixed:PICKS" onchange="schedulerSaveLists()" style="accent-color:var(--accent)"> ⛏ Picks &amp; Shovels
+            </label>
+          </div>
+        </div>
+        <div id="scheduler-status" style="font-size:10px;color:var(--text3);margin-top:4px">— inaktiv</div>
       </div>
 
       <!-- ═══ LISTEN-EDITOR ═══════════════════════════════════════════════ -->
@@ -1743,6 +1823,8 @@ function unlockApp(){
   try{ loadCustomLists(); }catch(e){ console.warn('loadCustomLists:',e); }
   // Kursrahmen-Filter wiederherstellen
   try{ loadPriceFilterUI(); }catch(e){ console.warn('loadPriceFilterUI:',e); }
+  // Auto-Scan Scheduler starten
+  try{ schedulerStart(); }catch(e){ console.warn('schedulerStart:',e); }
   // Cloud-Sync beim Start: neuere Daten vom Worker ziehen
   setTimeout(function(){ try{ koSyncOnStart(); }catch(e){ console.warn('koSyncOnStart:',e); } }, 1500);
 }
@@ -1789,6 +1871,8 @@ function showPanel(id){
     if(antInp&&getAnthropicKey()) antInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
     loadPortfolioSettings();
     renderAdminWLList();
+    try{ schedulerLoadUI(); }catch(e){}
+    try{ autoTopLoadUI(); }catch(e){}
   }
   if(id==='ibd'){
     updateSessionBar();
@@ -8847,7 +8931,243 @@ function autoSaveShortlist() {
     existing.unshift(entry);
     localStorage.setItem('ko_auto_shortlist', JSON.stringify(existing.slice(0,30)));
   } catch(e) {}
+
+  // ── Auto-Top Masterliste aktualisieren ──
+  autoTopMerge(allScored);
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTO-TOP MASTERLISTE
+// Nach jedem Scan wird die tägliche "📊 Auto-Top [Datum]"-Watchlist aktualisiert.
+// Neue Tops werden hinzugefügt, schwächere Einträge ersetzt wenn Score besser.
+// ══════════════════════════════════════════════════════════════════════════════
+var AUTO_TOP_KEY = 'ko_auto_top';
+var AUTO_TOP_N = 15;        // Wie viele Titel max. in der Liste
+var AUTO_TOP_MIN_SCORE = 50; // Mindestscore für Aufnahme
+var AUTO_TOP_MIN_BULL = 2;   // Mindestens 2/3 bullisch
+
+function autoTopGetTodayKey() {
+  return new Date().toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
+function autoTopListName() {
+  return '📊 Auto-Top ' + autoTopGetTodayKey();
+}
+
+function autoTopMerge(allScored) {
+  try {
+    var cfg = JSON.parse(localStorage.getItem(AUTO_TOP_KEY + '_cfg') || '{}');
+    var n = cfg.n || AUTO_TOP_N;
+    var minScore = cfg.minScore !== undefined ? cfg.minScore : AUTO_TOP_MIN_SCORE;
+    var minBull = cfg.minBull !== undefined ? cfg.minBull : AUTO_TOP_MIN_BULL;
+
+    // Kandidaten aus diesem Scan filtern
+    var candidates = allScored.filter(function(r) {
+      return r.score >= minScore && r.bullCount >= minBull;
+    });
+    if (!candidates.length) return;
+
+    // Bestehende Auto-Top-Liste für heute laden
+    var wls = getWatchlists();
+    var listName = autoTopListName();
+    var existing = [];
+    if (wls[listName]) {
+      existing = wls[listName].split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    }
+
+    // Bestehende Scores aus tickerData laden
+    var scoreMap = {};
+    existing.forEach(function(sym) {
+      var d = tickerData[sym];
+      if (d) {
+        var s = processData ? processData(d) : d;
+        scoreMap[sym] = s ? (s.compositeScore || 0) : 0;
+      } else {
+        scoreMap[sym] = 0;
+      }
+    });
+
+    // Neue Kandidaten einfügen oder bestehende ersetzen wenn Score besser
+    candidates.forEach(function(c) {
+      if (scoreMap[c.sym] !== undefined) {
+        // Bereits drin: Score aktualisieren
+        scoreMap[c.sym] = Math.max(scoreMap[c.sym], c.score);
+      } else {
+        // Neu: hinzufügen
+        scoreMap[c.sym] = c.score;
+      }
+    });
+
+    // Nach Score sortieren, Top-N behalten
+    var merged = Object.keys(scoreMap)
+      .map(function(sym){ return { sym: sym, score: scoreMap[sym] }; })
+      .sort(function(a,b){ return b.score - a.score; })
+      .slice(0, n)
+      .map(function(x){ return x.sym; });
+
+    if (!merged.length) return;
+
+    wls[listName] = merged.join(', ');
+    saveWatchlistsWithSync(wls);
+    updateWatchlistDropdown();
+    showKoToast('📊 Auto-Top aktualisiert · ' + merged.length + ' Titel');
+  } catch(e) { console.warn('autoTopMerge:', e); }
+}
+
+// Auto-Top Konfiguration lesen/schreiben
+function autoTopGetCfg() {
+  try { return JSON.parse(localStorage.getItem(AUTO_TOP_KEY + '_cfg') || '{}'); } catch(e) { return {}; }
+}
+function autoTopSaveCfg(cfg) {
+  localStorage.setItem(AUTO_TOP_KEY + '_cfg', JSON.stringify(cfg));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTO-SCAN SCHEDULER
+// Führt einen automatischen Scan zur konfigurierten Uhrzeit durch.
+// Standard: 15:25 Uhr, konfigurierbare Listen.
+// ══════════════════════════════════════════════════════════════════════════════
+var _schedulerInterval = null;
+var SCHEDULER_KEY = 'ko_scheduler';
+
+function schedulerGetCfg() {
+  try {
+    var d = JSON.parse(localStorage.getItem(SCHEDULER_KEY) || '{}');
+    return {
+      enabled: d.enabled || false,
+      time: d.time || '15:25',
+      lists: d.lists || ['fixed:SP500'],
+      lastRun: d.lastRun || null
+    };
+  } catch(e) { return { enabled: false, time: '15:25', lists: ['fixed:SP500'], lastRun: null }; }
+}
+
+function schedulerSaveCfg(cfg) {
+  localStorage.setItem(SCHEDULER_KEY, JSON.stringify(cfg));
+}
+
+function schedulerStart() {
+  if (_schedulerInterval) clearInterval(_schedulerInterval);
+  _schedulerInterval = setInterval(function() {
+    var cfg = schedulerGetCfg();
+    if (!cfg.enabled) return;
+    var now = new Date();
+    var hhmm = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+    var today = now.toLocaleDateString('de-DE');
+    if (hhmm === cfg.time && cfg.lastRun !== today) {
+      // Zeit erreicht, heute noch nicht gelaufen
+      cfg.lastRun = today;
+      schedulerSaveCfg(cfg);
+      schedulerRunLists(cfg.lists);
+    }
+  }, 30000); // alle 30 Sekunden prüfen
+}
+
+async function schedulerRunLists(lists) {
+  showKoToast('⏰ Auto-Scan startet (' + lists.length + ' Listen)…');
+  var preset = document.getElementById('ticker-preset');
+  for (var i = 0; i < lists.length; i++) {
+    preset.value = lists[i];
+    onPresetChange && onPresetChange();
+    await new Promise(function(r){ setTimeout(r, 1000); });
+    await runScan();
+    // Kurze Pause zwischen Listen
+    await new Promise(function(r){ setTimeout(r, 3000); });
+  }
+  showKoToast('✅ Auto-Scan abgeschlossen · Auto-Top aktualisiert');
+}
+
+// Scheduler UI-Helpers
+function schedulerToggle(enabled) {
+  var cfg = schedulerGetCfg();
+  cfg.enabled = enabled;
+  schedulerSaveCfg(cfg);
+  schedulerUpdateUI();
+  if (enabled) showKoToast('⏰ Auto-Scan aktiviert · ' + cfg.time + ' Uhr');
+  else showKoToast('Auto-Scan deaktiviert');
+}
+
+function schedulerSaveTime(t) {
+  var cfg = schedulerGetCfg();
+  cfg.time = t;
+  schedulerSaveCfg(cfg);
+  schedulerUpdateUI();
+}
+
+function schedulerSaveLists() {
+  var cfg = schedulerGetCfg();
+  var checks = document.querySelectorAll('#scheduler-lists input[type=checkbox]');
+  cfg.lists = [];
+  checks.forEach(function(cb){ if(cb.checked) cfg.lists.push(cb.value); });
+  schedulerSaveCfg(cfg);
+}
+
+function schedulerLoadUI() {
+  var cfg = schedulerGetCfg();
+  var toggle = document.getElementById('scheduler-toggle');
+  var timeEl = document.getElementById('scheduler-time');
+  if (toggle) toggle.checked = cfg.enabled;
+  if (timeEl) timeEl.value = cfg.time;
+  // Checkboxen
+  var checks = document.querySelectorAll('#scheduler-lists input[type=checkbox]');
+  checks.forEach(function(cb){
+    cb.checked = cfg.lists.indexOf(cb.value) >= 0;
+  });
+  schedulerUpdateUI();
+}
+
+function autoTopSaveCfgUI() {
+  var n = parseInt(document.getElementById('autotop-n').value) || 15;
+  var minScore = parseInt(document.getElementById('autotop-minscore').value) || 50;
+  var minBull = parseInt(document.getElementById('autotop-minbull').value) || 2;
+  autoTopSaveCfg({ n: n, minScore: minScore, minBull: minBull });
+}
+
+function autoTopLoadUI() {
+  var cfg = autoTopGetCfg();
+  var nEl = document.getElementById('autotop-n');
+  var msEl = document.getElementById('autotop-minscore');
+  var mbEl = document.getElementById('autotop-minbull');
+  if (nEl) nEl.value = cfg.n || 15;
+  if (msEl) msEl.value = cfg.minScore !== undefined ? cfg.minScore : 50;
+  if (mbEl) mbEl.value = cfg.minBull || 2;
+}
+
+function autoTopClearToday() {
+  if (!confirm('Heutige Auto-Top-Liste löschen?')) return;
+  var wls = getWatchlists();
+  delete wls[autoTopListName()];
+  saveWatchlistsWithSync(wls);
+  updateWatchlistDropdown();
+  showKoToast('📊 Auto-Top heute gelöscht');
+}
+
+function autoTopClearAll() {
+  if (!confirm('Alle Auto-Top-Listen löschen?')) return;
+  var wls = getWatchlists();
+  Object.keys(wls).forEach(function(k){
+    if (k.indexOf('📊 Auto-Top') === 0) delete wls[k];
+  });
+  saveWatchlistsWithSync(wls);
+  updateWatchlistDropdown();
+  showKoToast('📊 Alle Auto-Top-Listen gelöscht');
+}
+
+function schedulerUpdateUI() {
+  var cfg = schedulerGetCfg();
+  var toggle = document.getElementById('scheduler-toggle');
+  var timeEl = document.getElementById('scheduler-time');
+  var statusEl = document.getElementById('scheduler-status');
+  if (toggle) toggle.checked = cfg.enabled;
+  if (timeEl) timeEl.value = cfg.time;
+  if (statusEl) {
+    statusEl.textContent = cfg.enabled
+      ? ('⏰ Aktiv · tägl. ' + cfg.time + ' Uhr' + (cfg.lastRun ? ' · letzter Run: ' + cfg.lastRun : ''))
+      : '— inaktiv';
+    statusEl.style.color = cfg.enabled ? 'var(--green)' : 'var(--text3)';
+  }
+}
+
 
 // ── Top-20 aus aktuellem Scan speichern ──
 function saveTop20ToBacklog() {
