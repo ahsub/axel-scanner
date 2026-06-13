@@ -7954,16 +7954,28 @@ async function openKiBriefing() {
 
     // Text formatieren: Nummern als Abschnitte
     const formatted = text
-      .replace(/^(\d\. [A-Z\-ÜÄÖWATCHLIST ]+:?)/gm, '<div style="font-weight:600;color:var(--accent);margin-top:1rem;margin-bottom:.3rem">$1</div>')
-      .replace(/^(TOP \d[.:] .*)/gm, '<div style="font-weight:600;color:var(--green);margin-top:.5rem">$1</div>')
+      // Überschriften ##
+      .replace(/^### (.+)$/gm, '<div style="font-weight:700;color:var(--green);margin-top:1rem;margin-bottom:.3rem;font-size:13px">$1</div>')
+      .replace(/^## (.+)$/gm, '<div style="font-weight:700;color:var(--accent);margin-top:1.2rem;margin-bottom:.4rem;font-size:13px;border-bottom:1px solid var(--border);padding-bottom:4px">$1</div>')
+      .replace(/^# (.+)$/gm, '<div style="font-weight:800;color:var(--text);margin-top:1rem;margin-bottom:.5rem;font-size:14px">$1</div>')
+      // Bold **text**
+      .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
+      // Pflicht-Check Zeilen hervorheben
+      .replace(/(.*(?:Pflicht|prüfen|IV Rank|Open Interest|OI|Bid-Ask|IBKR|CapTrader).*)/gi,
+        '<div style="background:rgba(210,153,34,0.10);border-left:3px solid var(--warn);padding:4px 8px;margin:3px 0;font-size:11px;color:var(--warn)">⚠️ $1</div>')
+      // Horizontale Linie
+      .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:.75rem 0">')
+      // Bullet points
+      .replace(/^[-–] (.+)$/gm, '<div style="padding:2px 0 2px 12px;border-left:2px solid var(--border2);margin:2px 0;font-size:12px">$1</div>')
+      // Zeilenumbrüche
       .replace(/\n/g, '<br>');
 
     // Zeitstempel
     const ts = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     content.innerHTML = '<div style="font-size:10px;color:var(--text3);margin-bottom:.75rem">'
-      + 'Generiert: ' + ts + ' · ' + top25.length + ' Titel analysiert · Modell: Claude Haiku'
+      + 'Generiert: ' + ts + ' · ' + top10.length + ' Titel analysiert · Modell: Claude Haiku'
       + '</div>'
-      + '<div>' + formatted + '</div>';
+      + '<div style="font-size:12px;line-height:1.6">' + formatted + '</div>';
 
     // ── KI-Tracking: Top-3 Empfehlungen automatisch speichern ──
     // Extrahiere die Top-3 Symbole aus dem generierten Text (erste 3 der sortierten Liste)
@@ -8025,12 +8037,14 @@ const KI_STRAT_CONFIG = {
         + '\n\nAUFGABE:\n'
         + '1. MARKTUMFELD: Günstig für neue CSPs? VIX-Niveau und Implikation für Prämien. (2-3 Sätze)\n'
         + '2. TOP 3 OPTIONS-KANDIDATEN: Für jeden Titel:\n'
-        + '   a) 200d EMA Abstand und Strike-Empfehlung (Strike nahe oder leicht unter 200d EMA)\n'
-        + '   b) Empfohlener Strike-Bereich in $ und % OTM\n'
-        + '   c) Optimale Laufzeit (bevorzugt 30-45 DTE)\n'
-        + '   d) Mindest-Prämienerwartung\n'
-        + '   e) ⚠️ Pflicht-Checks vor Einstieg: "IV Rank in IBKR prüfen (Ziel >30%), '
-        + 'OI am Strike prüfen (Ziel >500), Bid-Ask-Spread prüfen"\n'
+        + '   a) EMA200-Abstand aus den Daten: Strike-Empfehlung nahe/unter EMA200 in $\n'
+        + '   b) Strike-Bereich in $ und % OTM vom aktuellen Kurs\n'
+        + '   c) Laufzeit (bevorzugt 30-45 DTE)\n'
+        + '   d) Mindest-Prämienerwartung in %\n'
+        + '   e) PFLICHT-CHECKS (immer einzeln auflisten):\n'
+        + '      - "IV Rank in IBKR prüfen → Ziel: >30%"\n'
+        + '      - "OI am Strike $XX prüfen → Ziel: >500 Kontrakte"\n'
+        + '      - "Bid-Ask-Spread prüfen → Ziel: <10% der Prämie"\n'
         + '3. WATCHLIST: Titel die nach dem nächsten ER oder bei höherem IV interessant werden.\n'
         + '4. RISIKEN: IV-Crush, ER-Überraschungen, Titel unter 200d EMA (kein CSP empfohlen).\n'
         + '\n⚠️ ABSCHLUSS-HINWEIS: Immer mit Pflicht-Checks in IBKR/CapTrader abschließen bevor eine Position eröffnet wird.\n'
