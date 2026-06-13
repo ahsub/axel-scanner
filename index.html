@@ -2817,7 +2817,7 @@ function renderCard(t,state){
   var s='<div class="ticker-head">'+
     '<span class="ticker-sym">'+t.sym+'</span>'+
     '<span class="ticker-name" style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.name+'</span>'+
-    (state.rs?'<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:'+(state.rs>=80?'rgba(52,194,110,0.2)':state.rs>=60?'rgba(79,142,247,0.2)':state.rs<40?'rgba(240,86,86,0.2)':'rgba(255,255,255,0.08)')+';color:'+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--text3)')+'">RS '+state.rs+'</span>':'')+
+
     '<span class="ticker-price">$'+price.toFixed(2)+'</span>'+
     '<span style="font-size:13px;font-weight:700;padding:2px 8px;border-radius:6px;background:'+(state.scoreColor||'var(--text3)')+';color:#fff;margin-left:6px">'+
       (state.scoreLabel||'?')+' '+(state.compositeScore||0)+
@@ -2825,9 +2825,10 @@ function renderCard(t,state){
     (state.sessionNote?'<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,0.08);color:var(--text3);margin-left:4px">'+state.sessionNote+'</span>':'')+
     earningsBadgeHtml(state._er||null)+
     (state._fromTdCache ? '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(120,120,128,0.15);color:var(--text3);margin-left:4px" title="Daten aus lokalem Cache"><i class="ti ti-database" style="font-size:9px"></i> Cache</span>' : '')+
-    '<span style="margin-left:auto;display:flex;align-items:center;gap:4px">'+
-    '<select onchange="rescanTickerTF(\''+state.sym+'\',this.value);this.value=\'\'" onclick="event.stopPropagation()"'+
-      ' style="font-size:10px;padding:2px 4px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text3);border-radius:5px;cursor:pointer">'+
+    '<span style="margin-left:auto;display:flex;align-items:center;gap:5px">'+
+    (state.rs ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:.03em;background:'+(state.rs>=80?'rgba(52,194,110,0.18)':state.rs>=60?'rgba(79,142,247,0.18)':state.rs<40?'rgba(240,86,86,0.18)':'rgba(255,255,255,0.08)')+';color:'+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--text3)')+';border:0.5px solid '+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--border2)')+'">RS '+state.rs+'</span>' : '')+
+    '<select id="tf-sel-'+state.sym+'" onchange="rescanTickerTF(this.dataset.sym,this.value);this.value=\'\'" onclick="event.stopPropagation()" data-sym="'+state.sym+'"'+
+      ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--border2);color:var(--text2);border-radius:6px;cursor:pointer">'+
       '<option value="">TF</option>'+
       '<option value="15m">15m</option>'+
       '<option value="30m">30m</option>'+
@@ -2835,7 +2836,10 @@ function renderCard(t,state){
       '<option value="4h">4h</option>'+
       '<option value="1d">1T</option>'+
     '</select>'+
-    '<button onclick="event.stopPropagation();rescanTicker(\''+state.sym+'\')" style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg3);color:var(--text3);border:0.5px solid var(--border2);cursor:pointer" title="Neu laden"><i class="ti ti-refresh" style="font-size:9px"></i></button>'+
+    '<button id="rescan-btn-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation();rescanTicker(this.dataset.sym)" '+
+      'style="font-size:11px;padding:3px 10px;border-radius:8px;background:var(--blue-bg);color:var(--accent);border:0.5px solid var(--accent);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:4px" title="Neu laden">'+
+      '<i class="ti ti-refresh" style="font-size:11px"></i> Neu'+
+    '</button>'+
     '</span>'+
     '</div>'+
     '<div class="sig-grid">'+
