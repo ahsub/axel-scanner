@@ -803,6 +803,19 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
               <input type="checkbox" value="fixed:PICKS" onchange="schedulerSaveLists()" style="accent-color:var(--accent)"> ⛏ Picks &amp; Shovels
             </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+              <input type="checkbox" value="fixed:IBD" onchange="schedulerSaveLists()" style="accent-color:var(--accent)"> 🏆 IBD Top 50
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+              <input type="checkbox" value="fixed:DEFENSE" onchange="schedulerSaveLists()" style="accent-color:var(--accent)"> 🛡️ Defense &amp; Aerospace
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+              <input type="checkbox" value="fixed:HEALTH" onchange="schedulerSaveLists()" style="accent-color:var(--accent)"> 🏥 Healthcare &amp; Biotech
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+              <input type="checkbox" value="fixed:ENERGY" onchange="schedulerSaveLists()" style="accent-color:var(--accent)"> ⚡ Energy &amp; Oil
+            </label>
+            <div id="scheduler-wl-list" style="margin-top:4px;display:flex;flex-direction:column;gap:4px"></div>
           </div>
         </div>
         <div id="scheduler-status" style="font-size:10px;color:var(--text3);margin-top:4px">— inaktiv</div>
@@ -2113,83 +2126,70 @@ async function runScan(){
       }
 
       const intervalMapTD={'15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'};
-      const outputMap={'15m':78,'30m':60,'1h':90,'4h':120,'1d':220}; // 220 for SMA200
+      const outputMap={'15m':78,'30m':60,'1h':90,'4h':120,'1d':220};
       const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':130};
       let closes=[],volumes=[],timestamps=[],dates=[];
       let dataSource='';
       let sessionNote = usOpen?'🔔 US Live':dePreMarket?'🌙 Pre-Market':'📊 Tageschart';
 
-      // Source 1: Twelve Data via CORS Proxy
       const tdKey=getTwelveKey();
-      // For DE market: Twelve Data Free Plan hat keine EU-Boersen -> DE direkt via Yahoo
       const isDeMarket = window.currentMarket==='de';
       const tdSym = isDeMarket ? null : t.sym;
       const yfSym = isDeMarket ? t.sym+'.DE' : t.sym;
-      if(tdKey && !isDeMarket){
-        try{
-          const interval=intervalMapTD[effectiveTF]||'1day';
-          const outputsize=outputMap[effectiveTF]||130;
+      const interval=intervalMapTD[effectiveTF]||'1day';
+      const outputsize=outputMap[effectiveTF]||220;
+      var _pdhlFromScan = null;
+      var _tdFromCache = false;
+
+      // ── Yahoo primär für 1T (kein Rate Limit), TD primär für Intraday ──
+      const isIntraday = effectiveTF !== '1d';
+
+      if (isIntraday && tdKey && !isDeMarket) {
+        // INTRADAY: TD bleibt primär
+        try {
           const tdUrl='https://api.twelvedata.com/time_series?symbol='+tdSym
             +'&interval='+interval+'&outputsize='+outputsize+'&apikey='+tdKey;
           const proxyUrl='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(tdUrl);
           const cacheKey=tdSym+'_'+interval+'_'+outputsize;
           const tdResult=await tdThrottledFetch(proxyUrl,cacheKey);
-          const j=tdResult.data;
-          const _tdFromCache = tdResult.fromCache; // gespeichert bis raw definiert ist
-          // PDH/PDL direkt hier extrahieren solange j im Scope ist
-          var _pdhlFromScan = null;
-          // PDH/PDL aus 1day Daten — funktioniert bei jedem interval
-          // Bei 1h/intraday: separaten 1day Cache-Eintrag prüfen
-          var _pdhlSource = (interval === '1day') ? j : null;
-          if(!_pdhlSource){
-            // Versuche 1day Cache-Eintrag zu lesen
-            var _dayEntry = getTdCacheEntry(tdSym + '_1day_220') || getTdCacheEntry(tdSym + '_1day_130');
-            if(_dayEntry && _dayEntry.values) _pdhlSource = _dayEntry;
-          }
-          if(_pdhlSource && _pdhlSource.values && _pdhlSource.values.length >= 3){
-            try {
-              const yd = _pdhlSource.values[1];
-              const wb = _pdhlSource.values.slice(2, 7);
-              _pdhlFromScan = {
-                pdh: parseFloat(yd.high),
-                pdl: parseFloat(yd.low),
-                pwh: wb.length > 0 ? Math.max.apply(null, wb.map(function(b){ return parseFloat(b.high); })) : null,
-                pwl: wb.length > 0 ? Math.min.apply(null, wb.map(function(b){ return parseFloat(b.low);  })) : null
-              };
-            } catch(e){ }
-          }
-          if(true){
-            if(j.values&&j.values.length>=20){
-              const rev=[...j.values].reverse();
-              closes=rev.map(function(v){return parseFloat(v.close)||0;});
-              volumes=rev.map(function(v){return parseFloat(v.volume)||0;});
-              timestamps=rev.map(function(v){return new Date(v.datetime).getTime()/1000;});
-              dates=rev.map(function(v){
-                const d=new Date(v.datetime);
-                const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
-                const hh=String(d.getHours()).padStart(2,'0'),mn=String(d.getMinutes()).padStart(2,'0');
-                return interval==='1day'?dd+'.'+mm:dd+'.'+mm+' '+hh+':'+mn;
-              });
-              dataSource='Twelve Data';
+          const j=tdResult.data; _tdFromCache=tdResult.fromCache;
+          if(j.values&&j.values.length>=20){
+            const rev=[...j.values].reverse();
+            closes=rev.map(function(v){return parseFloat(v.close)||0;});
+            volumes=rev.map(function(v){return parseFloat(v.volume)||0;});
+            timestamps=rev.map(function(v){return new Date(v.datetime).getTime()/1000;});
+            dates=rev.map(function(v){
+              const d=new Date(v.datetime);
+              const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
+              const hh=String(d.getHours()).padStart(2,'0'),mn=String(d.getMinutes()).padStart(2,'0');
+              return dd+'.'+mm+' '+hh+':'+mn;
+            });
+            dataSource='Twelve Data';
+            var _dayEntry=getTdCacheEntry(tdSym+'_1day_220')||getTdCacheEntry(tdSym+'_1day_130');
+            if(_dayEntry&&_dayEntry.values&&_dayEntry.values.length>=3){
+              try{
+                const yd=_dayEntry.values[1]; const wb=_dayEntry.values.slice(2,7);
+                _pdhlFromScan={pdh:parseFloat(yd.high),pdl:parseFloat(yd.low),
+                  pwh:wb.length>0?Math.max.apply(null,wb.map(function(b){return parseFloat(b.high);})):null,
+                  pwl:wb.length>0?Math.min.apply(null,wb.map(function(b){return parseFloat(b.low);})):null};
+              }catch(e){}
             }
           }
         }catch(e2){
-          if(e2.message==='TD_RATE_LIMIT'){
-            console.warn('TD Rate-Limit bei '+tdSym+' - warte...');
-          } else { console.log('TD error:',e2.message); }
+          if(e2.message==='TD_RATE_LIMIT') console.warn('TD Rate-Limit bei '+tdSym);
+          else console.log('TD error:',e2.message);
         }
       }
 
-      // Source 2: Yahoo Finance via CORS Proxy (fallback)
-      if(closes.length<20){
-        try{
+      // TAGESCHART oder Fallback: Yahoo Finance — kein Rate Limit, schnell
+      if (closes.length < 20) {
+        try {
           const to=Math.floor(Date.now()/1000);
           const from=to-60*60*24*(daysMap[effectiveTF]||130);
           const yInterval={'15m':'15m','30m':'30m','1h':'60m','4h':'1d','1d':'1d'}[effectiveTF]||'1d';
           const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+yfSym
             +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
-          const url='https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl);
-          const r=await fetch(url);
+          const r=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl));
           if(r.ok){
             const j=await r.json();
             const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
@@ -2205,6 +2205,17 @@ async function runScan(){
                 return yInterval==='1d'?dd+'.'+mm:dd+'.'+mm+' '+hh+':'+mn;
               });
               dataSource='Yahoo Finance';
+              // PDH/PDL aus Yahoo OHLC
+              if(yInterval==='1d'&&q.high&&timestamps.length>=3){
+                try{
+                  const hi=q.high; const lo=q.low; const n=hi.length;
+                  const wb=[];
+                  for(var wi=Math.max(0,n-6);wi<n-1;wi++) wb.push({h:hi[wi],l:lo[wi]});
+                  _pdhlFromScan={pdh:hi[n-2],pdl:lo[n-2],
+                    pwh:wb.length>0?Math.max.apply(null,wb.map(function(x){return x.h;})):null,
+                    pwl:wb.length>0?Math.min.apply(null,wb.map(function(x){return x.l;})):null};
+                }catch(e){}
+              }
             }
           }
         }catch(e3){ console.log('YF error:',e3.message); }
@@ -2814,7 +2825,18 @@ function renderCard(t,state){
     (state.sessionNote?'<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,0.08);color:var(--text3);margin-left:4px">'+state.sessionNote+'</span>':'')+
     earningsBadgeHtml(state._er||null)+
     (state._fromTdCache ? '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(120,120,128,0.15);color:var(--text3);margin-left:4px" title="Daten aus lokalem Cache"><i class="ti ti-database" style="font-size:9px"></i> Cache</span>' : '')+
-    (state._fromTdCache ? '<button onclick="event.stopPropagation();rescanTicker(\'' + state.sym + '\')" style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg3);color:var(--text3);border:0.5px solid var(--border2);cursor:pointer;margin-left:4px" title="Frische Kursdaten laden"><i class="ti ti-refresh" style="font-size:9px"></i> Neu</button>' : '')+
+    '<span style="margin-left:auto;display:flex;align-items:center;gap:4px">'+
+    '<select onchange="rescanTickerTF(\''+state.sym+'\',this.value);this.value=\'\'" onclick="event.stopPropagation()"'+
+      ' style="font-size:10px;padding:2px 4px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text3);border-radius:5px;cursor:pointer">'+
+      '<option value="">TF</option>'+
+      '<option value="15m">15m</option>'+
+      '<option value="30m">30m</option>'+
+      '<option value="1h">1h</option>'+
+      '<option value="4h">4h</option>'+
+      '<option value="1d">1T</option>'+
+    '</select>'+
+    '<button onclick="event.stopPropagation();rescanTicker(\''+state.sym+'\')" style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg3);color:var(--text3);border:0.5px solid var(--border2);cursor:pointer" title="Neu laden"><i class="ti ti-refresh" style="font-size:9px"></i></button>'+
+    '</span>'+
     '</div>'+
     '<div class="sig-grid">'+
     '<div class="sig-box"><div class="sig-label">50d MA $'+ma50.toFixed(0)+'</div>'+
@@ -7952,35 +7974,74 @@ function clearScanRegistry() {
 
 // Einzelnen Ticker neu scannen
 async function rescanTicker(sym) {
+  rescanTickerTF(sym, window.currentTF || '1d');
+}
+
+async function rescanTickerTF(sym, tf) {
   const card = document.getElementById('card-' + sym);
+  const tfLabel = {'15m':'15m','30m':'30m','1h':'1h','4h':'4h','1d':'1T'}[tf]||tf;
   if (card) {
     card.style.opacity = '0.5';
     card.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:12px">'
       + '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i>'
-      + ' ' + sym + ' wird neu gescannt...</div>';
+      + ' ' + sym + ' · ' + tfLabel + ' wird geladen…</div>';
   }
-  // TD-Cache fuer diesen Ticker loeschen damit frische Daten kommen
+  // Cache für diesen Ticker löschen
   const tdCache = getTdCache();
-  const keysToDelete = Object.keys(tdCache).filter(function(k) { return k.startsWith(sym + '_'); });
-  keysToDelete.forEach(function(k) { delete tdCache[k]; });
+  Object.keys(tdCache).filter(function(k){ return k.startsWith(sym+'_'); }).forEach(function(k){ delete tdCache[k]; });
   setTdCache(tdCache);
-  // Ticker-Info finden
-  const tInfo = activeTickers.find(function(t) { return t.sym === sym; }) || { sym: sym, name: sym };
+
+  const tInfo = activeTickers.find(function(t){ return t.sym===sym; }) || {sym:sym,name:sym};
+  const isDeMarket = window.currentMarket==='de';
+  const yfSym = isDeMarket ? sym+'.DE' : sym;
+  const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':130};
+  const yIntervalMap={'15m':'15m','30m':'30m','1h':'60m','4h':'1d','1d':'1d'};
+
   try {
-    const raw = await fetchTickerData(tInfo);
-    if (raw) {
-      tickerData[sym] = raw;
-      const erData = await fetchEarningsDate(sym);
-      raw._er = erData;
-      if (raw.closes_full && raw.closes_full.length >= 25) {
-        raw._markov = calcMarkovRegime(raw.closes_full);
+    let closes=[],volumes=[],timestamps=[],dates=[];
+    let dataSource='';
+    const yInterval=yIntervalMap[tf]||'1d';
+    const to=Math.floor(Date.now()/1000);
+    const from=to-60*60*24*(daysMap[tf]||130);
+    const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+yfSym
+      +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
+    const r=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl));
+    if(r.ok){
+      const j=await r.json();
+      const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
+      if(res){
+        const q=res.indicators.quote[0];
+        closes=q.close.map(function(v){return v||0;});
+        volumes=q.volume.map(function(v){return v||0;});
+        timestamps=res.timestamp;
+        dates=timestamps.map(function(ts){
+          const d=new Date(ts*1000);
+          const dd=String(d.getDate()).padStart(2,'0'),mm=String(d.getMonth()+1).padStart(2,'0');
+          const hh=String(d.getHours()).padStart(2,'0'),mn=String(d.getMinutes()).padStart(2,'0');
+          return yInterval==='1d'?dd+'.'+mm:dd+'.'+mm+' '+hh+':'+mn;
+        });
+        dataSource='Yahoo · '+tfLabel;
       }
-      markScanned(sym, false);
-      renderCard(tInfo, processData(raw));
     }
+    if(closes.length<20) throw new Error('Keine Daten');
+    const raw=computeFromRaw(closes,volumes,timestamps);
+    raw.dates_20d=dates.slice(-20);
+    raw.dataSource=dataSource;
+    raw.sessionNote=tfLabel;
+    raw.effectiveTF=tf;
+    raw._fromTdCache=false;
+    if(closes.length>=100) raw.backtest=calcBacktest(closes,volumes,timestamps);
+    if(spyData&&closes.length>=63){ const rs=calcRS(closes,spyData); if(rs){raw.rs=rs.rs;raw.rsData=rs;} }
+    const erData=await fetchEarningsDate(sym);
+    raw._er=erData;
+    if(raw.closes_full&&raw.closes_full.length>=25) raw._markov=calcMarkovRegime(raw.closes_full);
+    tickerData[sym]=raw;
+    markScanned(sym,false);
+    renderCard(tInfo,processData(raw));
+    if(card) card.style.opacity='1';
   } catch(e) {
-    console.log('Rescan error:', sym, e.message);
-    if (card) { card.style.opacity = '1'; }
+    console.log('rescanTickerTF error:',sym,e.message);
+    if(card){ card.style.opacity='1'; card.innerHTML='<div style="padding:1rem;color:var(--red);font-size:12px">⚠ '+sym+': '+e.message+'</div>'; }
   }
 }
 
@@ -9067,12 +9128,25 @@ async function schedulerRunLists(lists) {
   showKoToast('⏰ Auto-Scan startet (' + lists.length + ' Listen)…');
   var preset = document.getElementById('ticker-preset');
   for (var i = 0; i < lists.length; i++) {
-    preset.value = lists[i];
-    onPresetChange && onPresetChange();
-    await new Promise(function(r){ setTimeout(r, 1000); });
+    var listVal = lists[i];
+    if (listVal.startsWith('wl:')) {
+      var wlName = listVal.slice(3);
+      var wls = getWatchlists();
+      if (!wls[wlName]) continue;
+      preset.value = 'custom';
+      var ci = document.getElementById('custom-input');
+      if (ci) ci.value = wls[wlName];
+      onPresetChange && onPresetChange();
+    } else if (listVal === 'fixed:IBD') {
+      preset.value = 'top50-us';
+      onPresetChange && onPresetChange();
+    } else {
+      preset.value = listVal;
+      onPresetChange && onPresetChange();
+    }
+    await new Promise(function(r){ setTimeout(r, 800); });
     await runScan();
-    // Kurze Pause zwischen Listen
-    await new Promise(function(r){ setTimeout(r, 3000); });
+    await new Promise(function(r){ setTimeout(r, 2000); });
   }
   showKoToast('✅ Auto-Scan abgeschlossen · Auto-Top aktualisiert');
 }
@@ -9096,7 +9170,7 @@ function schedulerSaveTime(t) {
 
 function schedulerSaveLists() {
   var cfg = schedulerGetCfg();
-  var checks = document.querySelectorAll('#scheduler-lists input[type=checkbox]');
+  var checks = document.querySelectorAll('#scheduler-lists input[type=checkbox], #scheduler-wl-list input[type=checkbox]');
   cfg.lists = [];
   checks.forEach(function(cb){ if(cb.checked) cfg.lists.push(cb.value); });
   schedulerSaveCfg(cfg);
@@ -9108,11 +9182,26 @@ function schedulerLoadUI() {
   var timeEl = document.getElementById('scheduler-time');
   if (toggle) toggle.checked = cfg.enabled;
   if (timeEl) timeEl.value = cfg.time;
-  // Checkboxen
+  // Feste Listen-Checkboxen
   var checks = document.querySelectorAll('#scheduler-lists input[type=checkbox]');
   checks.forEach(function(cb){
     cb.checked = cfg.lists.indexOf(cb.value) >= 0;
   });
+  // Dynamische Watchlist-Checkboxen
+  var wlDiv = document.getElementById('scheduler-wl-list');
+  if (wlDiv) {
+    var wls = getWatchlists();
+    var wlHtml = '';
+    Object.keys(wls).forEach(function(name) {
+      if (name.indexOf('📊 Auto-Top') === 0) return; // Auto-Top nicht als Quelle
+      var val = 'wl:' + name;
+      var checked = cfg.lists.indexOf(val) >= 0 ? 'checked' : '';
+      wlHtml += '<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">'
+        + '<input type="checkbox" value="'+val+'" onchange="schedulerSaveLists()" style="accent-color:var(--green)" '+checked+'>'
+        + '⭐ '+name+'</label>';
+    });
+    wlDiv.innerHTML = wlHtml || '<span style="font-size:10px;color:var(--text3)">Keine eigenen Watchlisten</span>';
+  }
   schedulerUpdateUI();
 }
 
