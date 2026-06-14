@@ -8610,7 +8610,7 @@ const KI_STRAT_CONFIG = {
         + ctx.marktkontext
         + '\n\nAUFGABE:\n'
         + '1. MARKTUMFELD: Ist jetzt ein günstiger Zeitpunkt für neue KO-Long-Positionen? (2-3 Sätze)\n'
-        + '2. TOP 3 KO-KANDIDATEN: Welche 3 Titel wählst du? Für jeden: Begründung, Hebel (3-8x), '
+        + '2. TOP 3 KO-KANDIDATEN: (HVP-Wert irrelevant für KO-Zertifikate — ignorieren). Welche 3 Titel wählst du? Für jeden: Begründung, Hebel (3-8x), '
         + 'KO-Abstand in %, Positionsgröße (Starter/Aufstockung, max. €2.000 gesamt), Stop-Loss-Kriterium.\n'
         + '3. WATCHLIST: Welche Titel haben Potenzial aber brauchen besseres Timing?\n'
         + '4. HAUPTRISIKEN: Was könnte die Long-These gefährden?\n'
@@ -8626,7 +8626,7 @@ const KI_STRAT_CONFIG = {
         + '\n\nAUFGABE:\n'
         + '1. MARKTPHASE: Ist jetzt ein günstiger Zeitpunkt für neue Momentum-Positionen? (2-3 Sätze)\n'
         + '2. TOP 3 MOMENTUM-KANDIDATEN: Welche 3 Titel zeigen das stärkste Stage-2-Setup? '
-        + 'Für jeden: SEPA-Bewertung aus Scandaten, Buy-Point NUR aus "Kurs:$" und "52W-H:"-Feldern ableiten (kein Kursziel erfinden), Stop-Loss als % unter Kurs angeben.\n'
+        + 'Für jeden: SEPA-Bewertung aus Scandaten, Buy-Point NUR aus "Kurs:$" und "52W-H:"-Feldern ableiten. Stop-Loss als % unter Kurs. HVP aus Scandaten: bei HVP>50% erhöhte Vola → engerer Stop empfohlen. Kein Kursziel erfinden.\n'
         + '3. WATCHLIST: Titel mit Potenzial aber noch nicht kaufbar.\n'
         + '4. RISIKEN: Sektoren oder Makro-Faktoren die Momentum gefährden.\n'
         + '\nAntworte auf Deutsch, strukturiert 1-4, max. 500 Wörter.';
@@ -8639,7 +8639,7 @@ const KI_STRAT_CONFIG = {
       return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Options-Trader mit Fokus auf Wheel-Strategie (CSP + Covered Calls).\n\n'
         + '⚠️ WICHTIG: Du gibst keine Anlageberatung. Alle Empfehlungen sind informativer Natur.\n'
         + 'Jede Position MUSS vor dem Einstieg auf folgende Kriterien geprüft werden:\n'
-        + '  1. IV Rank / IV Percentile > 30% (Mindest-Prämienqualität) — in IBKR/CapTrader prüfen\n'
+        + '  1. HVP aus Scandaten nutzen (Feld "HVP:XX%"): >50% = erhöhte Vol = gute Prämienqualität; 30-50% = mittel; <30% = CSP vermeiden. Wenn kein HVP: in IBKR IV-Rank prüfen, NIEMALS schätzen.\n'
         + '  2. Open Interest am gewählten Strike > 500 Kontrakte (Slippage-Schutz) — in IBKR/CapTrader prüfen\n'
         + '  3. Bid-Ask-Spread der Option < 10% der Prämie\n'
         + '  4. Kein Earnings-Event innerhalb der Laufzeit\n\n'
@@ -8669,7 +8669,7 @@ const KI_STRAT_CONFIG = {
         + ctx.marktkontext
         + '\n\nAUFGABE:\n'
         + '1. MARKTUMFELD: Günstig für Swing-Trades? Volatilität und Trendqualität. (2-3 Sätze)\n'
-        + '2. TOP 3 SWING-KANDIDATEN: Beste Risk/Reward-Setups für 5-20 Tage. '
+        + '2. TOP 3 SWING-KANDIDATEN: Beste Risk/Reward-Setups für 5-20 Tage. Bei HVP>60% aus Scandaten: erhöhte Vola → kürzere Haltedauer empfehlen. '
         + 'Für jeden: technisches Muster, Einstieg, Kursziel (+%), Stop-Loss, '
         + 'Haltedauer-Erwartung, ER-Risiko im Zeitfenster.\n'
         + '3. WATCHLIST: Titel die einen besseren Einstiegspunkt brauchen.\n'
@@ -8747,7 +8747,7 @@ const KI_STRAT_CONFIG = {
         + '\n\nAUFGABE:\n'
         + '1. MARKTUMFELD: ATM-CSPs sinnvoll? VIX-Level und Implikation. (2-3 Sätze)\n'
         + '2. TOP 3 LUDWIG-KANDIDATEN: Für jeden Titel:\n'
-        + '   a) Ludwig-Eignung: Aktueller Kurs = "Kurs:$XX" aus den Scandaten (NICHT den EMA200-Kurs verwenden!). Kurs im $15-80 Bereich? EMA200-Abstand (Ludwig bevorzugt nahe 200d)\n'
+        + '   a) Ludwig-Eignung: Kurs=$XX aus Scandaten (NICHT EMA200!). Kurs $15-80? EMA200-Abstand? HVP aus Scandaten: >50% = ATM-CSP empfohlen, 30-50% = Prämie prüfen, <30% = CSP vermeiden. Wenn kein HVP: "HVP nicht verfügbar — IV in IBKR prüfen" schreiben.\n'
         + '   b) ATM-Strike Empfehlung in $ (nahe aktuellem Kurs)\n'
         + '   c) Laufzeit: nächster 3. Freitag des Monats (~30 DTE)\n'
         + '   d) Prämien-SCHÄTZUNG: HVP aus Scandaten verwenden falls vorhanden (⚠️ kein echter IV-Rank!). Bei VIX ' + ctx.vixStr + ' und ATM-Strike: IMMER als Schätzung kennzeichnen + "→ exakt in IBKR Option Chain prüfen". 70%-Gewinn-Ziel = 0.30 × Prämie. Wenn kein HVP: NICHT erfinden.\n'
@@ -9645,7 +9645,7 @@ async function runOversoldScan() {
     + candidateStr + '\n\n'
     + 'AUFGABE: Bewerte jeden Titel auf Oversold-Rebound-Potenzial. Antworte NUR mit JSON, kein anderer Text:\n'
     + '{"candidates":[{"sym":"AAPL","oversold_score":75,"rebound_days":"3-7","rationale":"RSI 28, Volume-Spike, MACD dreht","risk":"BEAR-Markt, kein Boden bestätigt"}]}\n'
-    + 'oversold_score: 0-100 (100 = maximale Oversold-Wahrscheinlichkeit mit Rebound-Potenzial)\n'
+    + 'oversold_score: 0-100 (100 = maximale Oversold-Wahrscheinlichkeit). HVP aus Scandaten berücksichtigen: >50% = erhöhte Vola = Rebound-Chance höher aber auch Risiko. Wenn kein HVP: NICHT erfinden.\n'
     + 'Sortiere absteigend nach oversold_score. Nur Titel mit oversold_score >= 40 zurückgeben.';
 
   try {
