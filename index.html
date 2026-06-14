@@ -8717,21 +8717,32 @@ async function openKiBriefing(defaultStrat) {
 
     // Text formatieren: Nummern als Abschnitte
     const formatted = text
+      // Mehrfache Leerzeilen auf max 1 reduzieren
+      .replace(/\n{3,}/g, '\n\n')
       // Überschriften ##
-      .replace(/^### (.+)$/gm, '<div style="font-weight:700;color:var(--green);margin-top:1rem;margin-bottom:.3rem;font-size:13px">$1</div>')
-      .replace(/^## (.+)$/gm, '<div style="font-weight:700;color:var(--accent);margin-top:1.2rem;margin-bottom:.4rem;font-size:13px;border-bottom:1px solid var(--border);padding-bottom:4px">$1</div>')
-      .replace(/^# (.+)$/gm, '<div style="font-weight:800;color:var(--text);margin-top:1rem;margin-bottom:.5rem;font-size:14px">$1</div>')
+      .replace(/^### (.+)$/gm, '<div style="font-weight:700;color:var(--green);margin-top:.6rem;margin-bottom:.2rem;font-size:12px">$1</div>')
+      .replace(/^## (.+)$/gm, '<div style="font-weight:700;color:var(--accent);margin-top:.8rem;margin-bottom:.3rem;font-size:13px;border-bottom:1px solid var(--border);padding-bottom:3px">$1</div>')
+      .replace(/^# (.+)$/gm, '<div style="font-weight:800;color:var(--text);margin-top:.7rem;margin-bottom:.3rem;font-size:14px">$1</div>')
+      // Nummerierte Abschnitte (1. 2. etc am Zeilenanfang)
+      .replace(/^(\d+\. [A-ZÄÖÜ].+)$/gm, '<div style="font-weight:600;color:var(--accent);margin-top:.7rem;margin-bottom:.2rem;font-size:12px">$1</div>')
+      // AUSGESCHLOSSEN hervorheben
+      .replace(/(AUSGESCHLOSSEN|AUSSCHLUSS)/g, '<span style="color:var(--red);font-weight:700">$1</span>')
+      // Rang/Kandidat Zeilen
+      .replace(/(RANG \d+:|KANDIDAT \d+:|🥇|🥈|🥉|⭐ KANDIDAT)/g, '<strong style="color:var(--green)">$1</strong>')
       // Bold **text**
       .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
       // Pflicht-Check Zeilen hervorheben
-      .replace(/(.*(?:Pflicht|prüfen|IV Rank|Open Interest|OI|Bid-Ask|IBKR|CapTrader).*)/gi,
-        '<div style="background:rgba(210,153,34,0.10);border-left:3px solid var(--warn);padding:4px 8px;margin:3px 0;font-size:11px;color:var(--warn)">⚠️ $1</div>')
+      .replace(/(.*(?:Pflicht-Check|in IBKR prüfen|Open Interest|Bid-Ask).*)/gi,
+        '<div style="background:rgba(210,153,34,0.08);border-left:2px solid var(--warn);padding:3px 7px;margin:2px 0;font-size:11px;color:var(--warn)">⚠️ $1</div>')
       // Horizontale Linie
-      .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:.75rem 0">')
-      // Bullet points
-      .replace(/^[-–] (.+)$/gm, '<div style="padding:2px 0 2px 12px;border-left:2px solid var(--border2);margin:2px 0;font-size:12px">$1</div>')
-      // Zeilenumbrüche
-      .replace(/\n/g, '<br>');
+      .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--border);margin:.5rem 0">')
+      // Bullet points • und -
+      .replace(/^[•·] (.+)$/gm, '<div style="padding:1px 0 1px 10px;font-size:12px;margin:1px 0">• $1</div>')
+      .replace(/^[-–] (.+)$/gm, '<div style="padding:1px 0 1px 10px;border-left:2px solid var(--border2);margin:1px 0;font-size:12px">$1</div>')
+      // Doppelte <br> reduzieren
+      .replace(/\n\n/g, '<br>')
+      .replace(/\n/g, '<br>')
+      .replace(/(<br>){3,}/g, '<br><br>');
 
     // Zeitstempel
     const ts = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -8798,7 +8809,7 @@ const KI_STRAT_CONFIG = {
       return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Options-Trader mit Fokus auf Wheel-Strategie (CSP + Covered Calls).\\n\\n'
         + '⚠️ WICHTIG: Du gibst keine Anlageberatung. Alle Empfehlungen sind informativer Natur.\\n\\n'
         + '🚫 SCHRITT 1 — HARTES AUSSCHLUSS-KRITERIUM (ZWINGEND VOR JEDER ANALYSE!):\\n'
-        + '   Diese Titel SOFORT ausschließen — dürfen NICHT als Kandidaten erscheinen:\\n'
+        + '   Diese Titel KOMPLETT IGNORIEREN — weder als Kandidaten noch als ausgeschlossen erwähnen:\\n'
         + '   • Kurs < $' + ctx.optsCfg.minPrice + ' oder > $' + ctx.optsCfg.maxPrice + ': AUSSCHLUSS\\n'
         + '   • HVP < ' + ctx.optsCfg.minHvp + '%: AUSSCHLUSS (Prämien zu niedrig)\\n'
         + '   • ER innerhalb ' + ctx.optsCfg.erDays + ' Tage: AUSSCHLUSS\\n'
@@ -8919,10 +8930,10 @@ const KI_STRAT_CONFIG = {
         + '1. MARKTUMFELD: ATM-CSPs sinnvoll? VIX-Level und Implikation. (2-3 Sätze)\n'
         + '2. TOP 3 LUDWIG-KANDIDATEN — VORAUSWAHL (PFLICHT!):\n'
         + '   SCHRITT 1 — HARTES AUSSCHLUSS-KRITERIUM (vor jeder weiteren Prüfung!):\n'
-        + '   • HVP < ' + ctx.optsCfg.minHvp + '%: Titel SOFORT ausschließen — Prämien zu niedrig für Ludwig-Strategie\n'
-        + '   • Kurs außerhalb $' + ctx.optsCfg.minPrice + '–$' + ctx.optsCfg.maxPrice + ': Titel SOFORT ausschließen\n'
-        + '   • ER innerhalb ' + ctx.optsCfg.erDays + ' Tage: Titel SOFORT ausschließen\n'
-        + '   • Wenn nach Ausschluss weniger als 3 Titel übrig: weniger als 3 empfehlen, NICHT auffüllen!\n'
+        + '   • HVP < ' + ctx.optsCfg.minHvp + '%: Titel IGNORIEREN (Prämien zu niedrig)\n'
+        + '   • Kurs außerhalb $' + ctx.optsCfg.minPrice + '–$' + ctx.optsCfg.maxPrice + ': Titel IGNORIEREN\n'
+        + '   • ER innerhalb ' + ctx.optsCfg.erDays + ' Tage: Titel IGNORIEREN\n'
+        + '   • Weniger als 3 übrig nach Ausschluss: NUR diese empfehlen, NIEMALS mit anderen auffüllen!\n'
         + '   SCHRITT 2 — Für jeden verbleibenden Kandidaten:\n'
         + '   a) Ludwig-Eignung: Kurs=$XX (aus "Kurs:$"-Feld). EMA200-Abstand. HVP-Wert aus Scandaten mit Bewertung:\n'
         + '      HVP ≥ ' + ctx.optsCfg.idealHvp + '%: ⭐ Ideal — hohe Prämien erwartet\n'
