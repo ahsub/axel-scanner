@@ -5069,9 +5069,20 @@ function loadPriceFilterUI() {
 // ── END Kursrahmen-Filter ────────────────────────────────────────────────────
 
 // Watchlists speichern + auto-sync zur Cloud
-function saveWatchlistsWithSync(wls) {
+function saveWatchlistsWithSync(wls, listName) {
   localStorage.setItem(WL_KEY, JSON.stringify(wls));
   localStorage.setItem('ko_watchlists_ts', Date.now());
+  // Per-Liste Timestamp
+  try {
+    var ts = JSON.parse(localStorage.getItem('ko_wl_timestamps') || '{}');
+    if (listName) {
+      ts[listName] = Date.now();
+    } else {
+      // Alle geänderten Listen timestampen
+      Object.keys(wls).forEach(function(k){ if(!ts[k]) ts[k] = Date.now(); });
+    }
+    localStorage.setItem('ko_wl_timestamps', JSON.stringify(ts));
+  } catch(e){}
   if (typeof KoSync !== 'undefined') {
     KoSync.push('watchlist', wls).then(function(ok) {
       koSyncUpdateBadge(ok ? 'ok' : 'err', ok ? '☁ ✓' : '☁ ⚠');
@@ -5093,37 +5104,24 @@ function saveWatchlist(){
 }
 
 function updateWatchlistDropdown(){
-  const wls = getWatchlists();
-  const names = Object.keys(wls);
-  
-  // Update optgroup in preset dropdown
-  const optgroup = document.getElementById('watchlist-options');
-  if(optgroup){
-    optgroup.innerHTML = '';
-    names.forEach(function(name){
-      const opt = document.createElement('option');
-      opt.value = 'wl:'+name;
-      opt.textContent = '⭐ '+name+' ('+((wls[name]||'').split(',').filter(Boolean).length)+')';
-      optgroup.appendChild(opt);
-    });
-    optgroup.label = names.length ? '── ⭐ Meine Watchlisten ──' : '';
+  var sel=document.getElementById('ticker-preset');
+  if(!sel) return;
+  var toRemove=[];
+  for(var i=0;i<sel.options.length;i++){
+    if(sel.options[i].dataset.custom) toRemove.push(sel.options[i]);
   }
-
-  // Update le-wl-select in editor modal if open
-  var sel = document.getElementById('le-wl-select');
-  if(sel && _listEditorMode === 'watchlist'){
-    var activeKey = window._leActiveWatchlist || (names.length ? names[0] : null);
-    var fixedKeys2 = Object.keys(FIXED_LISTS);
-    var fixedOpts2 = fixedKeys2.map(function(k){
-      return '<option value="'+k+'"'+(k===activeKey?' selected':'')+'>'
-        +'🔒 '+k+' ('+FIXED_LISTS[k].length+') — read-only</option>';
-    }).join('');
-    var userOpts2 = names.map(function(n){
-      return '<option value="'+n+'"'+(n===activeKey?' selected':'')+'>⭐ '+n+' ('+((wls[n]||'').split(',').filter(Boolean).length)+')</option>';
-    }).join('');
-    sel.innerHTML = (userOpts2 ? '<optgroup label="── Meine Watchlisten ──">'+userOpts2+'</optgroup>' : '')
-      + '<optgroup label="── 🔒 Fest verdrahtet (read-only) ──">'+fixedOpts2+'</optgroup>';
-  }
+  toRemove.forEach(function(o){ sel.removeChild(o); });
+  var wls=getWatchlists();
+  var wlTs=JSON.parse(localStorage.getItem('ko_wl_timestamps')||'{}');
+  Object.keys(wls).forEach(function(name){
+    var opt=document.createElement('option');
+    opt.value='wl:'+name;
+    var ts=wlTs[name]?new Date(wlTs[name]).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    var isAutoTop=name.indexOf('📊 Auto-Top')===0;
+    opt.textContent=(isAutoTop?'📊 ':'⭐ ')+name+(ts?' · '+ts:'');
+    opt.dataset.custom='1';
+    sel.appendChild(opt);
+  });
 }
 
 function deleteWatchlist(name){
@@ -7189,10 +7187,13 @@ function renderAdminWLList(){
   }
   container.innerHTML = names.map(function(name){
     var tickers = (wls[name]||'').split(',').filter(Boolean);
+    var wlTs = JSON.parse(localStorage.getItem('ko_wl_timestamps') || '{}');
+    var ts = wlTs[name] ? new Date(wlTs[name]).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    var isAutoTop = name.indexOf('\u{1f4ca} Auto-Top') === 0;
     return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border-radius:var(--radius-sm);border:0.5px solid var(--border)">'
-      + '<i class="ti ti-star" style="color:var(--amber);font-size:13px;flex-shrink:0"></i>'
-      + '<span style="flex:1;font-size:13px;font-weight:500">'+name+'</span>'
-      + '<span style="font-size:11px;color:var(--text3)">'+tickers.length+' Titel</span>'
+      + '<i class="ti ti-'+(isAutoTop?'chart-bar':'star')+'" style="color:'+(isAutoTop?'var(--accent)':'var(--amber)')+';font-size:13px;flex-shrink:0"></i>'
+      + '<div style="flex:1"><div style="font-size:12px;font-weight:500">'+name+'</div>'
+      + '<div style="font-size:10px;color:var(--text3)">'+tickers.length+' Titel · '+ts+'</div></div>'
       + '<button onclick="window._leActiveWatchlist=\''+name+'\';openListEditor(\'watchlist\')" class="btn btn-sm" style="font-size:10px;padding:2px 7px"><i class="ti ti-pencil"></i> Bearbeiten</button>'
       + '<button onclick="if(confirm(\'Watchlist &quot;'+name+'&quot; löschen?\')){var wls=getWatchlists();delete wls[\''+name+'\'];localStorage.setItem(\'ko_watchlists\',JSON.stringify(wls));updateWatchlistDropdown();renderAdminWLList();}" class="btn btn-sm" style="font-size:10px;padding:2px 7px;color:var(--red);border-color:var(--red)"><i class="ti ti-trash"></i></button>'
       + '</div>';
@@ -8293,13 +8294,28 @@ async function rescanTickerTF(sym, tf) {
         dataSource='Yahoo · '+tfLabel;
       }
     }
-    if(closes.length<20) throw new Error('Keine Daten');
+    // Null-Filter für sparse Yahoo-Daten
+    var validIdx=closes.map(function(_,i){return i;}).filter(function(i){return closes[i]!=null&&closes[i]>0;});
+    closes=validIdx.map(function(i){return closes[i];});
+    volumes=validIdx.map(function(i){return volumes[i]||0;});
+    timestamps=validIdx.map(function(i){return timestamps[i];});
+    dates=validIdx.map(function(i){return dates[i];});
+
+    if(closes.length<20) throw new Error('Zu wenig Daten (' + closes.length + ' Bars)');
     const raw=computeFromRaw(closes,volumes,timestamps);
     raw.dates_20d=dates.slice(-20);
     raw.dataSource=dataSource;
     raw.sessionNote=tfLabel;
     raw.effectiveTF=tf;
     raw._fromTdCache=false;
+    // HVP für US-Ticker
+    if(!isDeMarket && tf==='1d' && closes.length>=42){
+      try{
+        var hvS=calcHV20Series(closes);
+        var hvp=calcIVPercentile(hvS[hvS.length-1],hvS.slice(0,-1));
+        if(hvp!=null) raw._ivp={ivp:hvp,atmIV:Math.round(hvS[hvS.length-1]*100),isHV:true};
+      }catch(e){}
+    }
     if(closes.length>=100) raw.backtest=calcBacktest(closes,volumes,timestamps);
     if(spyData&&closes.length>=63){ const rs=calcRS(closes,spyData); if(rs){raw.rs=rs.rs;raw.rsData=rs;} }
     const erData=await fetchEarningsDate(sym);
@@ -8309,6 +8325,7 @@ async function rescanTickerTF(sym, tf) {
     markScanned(sym,false);
     renderCard(tInfo,processData(raw));
     if(card) card.style.opacity='1';
+    showKoToast('✓ ' + sym + ' · ' + tfLabel + ' · ' + closes.length + ' Bars · ' + dataSource);
   } catch(e) {
     console.log('rescanTickerTF error:',sym,e.message);
     if(card){ card.style.opacity='1'; card.innerHTML='<div style="padding:1rem;color:var(--red);font-size:12px">⚠ '+sym+': '+e.message+'</div>'; }
@@ -8995,19 +9012,32 @@ const KI_STRAT_CONFIG = {
 };
 
 function setKiStrat(btn) {
-  // Alle Buttons zurücksetzen
+  // Alle Buttons zurücksetzen - Ludwig behält lila, Value bleibt gedimmt
   document.querySelectorAll('.ki-strat-btn').forEach(function(b) {
-    b.style.background = 'transparent';
-    b.style.color = 'var(--text2)';
-    b.style.borderColor = 'var(--border2)';
     b.classList.remove('active-strat');
+    b.style.background = 'transparent';
+    if (b.dataset.strat === 'ludwig') {
+      b.style.color = '#a371f7';
+      b.style.borderColor = '#a371f7';
+      b.style.opacity = '1';
+    } else if (b.dataset.strat === 'value') {
+      b.style.color = 'var(--text3)';
+      b.style.borderColor = 'var(--border2)';
+      b.style.opacity = '0.6';
+    } else {
+      b.style.color = 'var(--text2)';
+      b.style.borderColor = 'var(--border2)';
+      b.style.opacity = '1';
+    }
   });
   // Aktiven Button hervorheben
   const strat = btn.dataset.strat;
   const cfg = KI_STRAT_CONFIG[strat];
-  btn.style.background = 'rgba(99,102,241,0.15)';
-  btn.style.color = cfg ? cfg.color : '#818cf8';
-  btn.style.borderColor = cfg ? cfg.color : '#818cf8';
+  const activeColor = strat === 'ludwig' ? '#a371f7' : '#818cf8';
+  btn.style.background = strat === 'ludwig' ? 'rgba(163,113,247,0.15)' : 'rgba(99,102,241,0.15)';
+  btn.style.color = activeColor;
+  btn.style.borderColor = activeColor;
+  btn.style.opacity = '1';
   btn.classList.add('active-strat');
   _kiStrat = strat;
   // Hint aktualisieren
@@ -9516,7 +9546,7 @@ function autoTopMerge(allScored) {
     if (!merged.length) return;
 
     wls[listName] = merged.join(', ');
-    saveWatchlistsWithSync(wls);
+    saveWatchlistsWithSync(wls, listName);
     updateWatchlistDropdown();
     showKoToast('📊 Auto-Top aktualisiert · ' + merged.length + ' Titel');
   } catch(e) { console.warn('autoTopMerge:', e); }
