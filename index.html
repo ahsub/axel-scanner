@@ -8496,14 +8496,16 @@ async function openKiBriefing(defaultStrat) {
     b.style.background = 'transparent';
     b.style.borderColor = b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--border2)';
     b.style.color = b.dataset.strat === 'value' ? 'var(--text3)' : b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--text2)';
+    b.style.boxShadow = '';
+    b.style.opacity = b.dataset.strat === 'value' ? '0.6' : '1';
   });
-  // Activate only the correct button
+  // Activate only the correct button with accent color
   var activeBtn = document.querySelector('.ki-strat-btn[data-strat="' + startStrat + '"]');
   if (activeBtn) {
     activeBtn.classList.add('active-strat');
-    activeBtn.style.background = 'rgba(99,102,241,0.15)';
-    activeBtn.style.borderColor = '#818cf8';
-    activeBtn.style.color = '#818cf8';
+    activeBtn.style.background = startStrat === 'ludwig' ? 'rgba(163,113,247,0.15)' : 'rgba(99,102,241,0.15)';
+    activeBtn.style.borderColor = startStrat === 'ludwig' ? '#a371f7' : '#818cf8';
+    activeBtn.style.color = startStrat === 'ludwig' ? '#a371f7' : '#818cf8';
   }
   // Hint aktualisieren
   var cfg = KI_STRAT_CONFIG[startStrat];
@@ -9552,12 +9554,30 @@ function schedulerSaveCfg(cfg) {
   localStorage.setItem(SCHEDULER_KEY, JSON.stringify(cfg));
 }
 
+// US-Börsenfeiertage 2025/2026 (yyyy-mm-dd)
+var US_HOLIDAYS = [
+  '2025-01-01','2025-01-20','2025-02-17','2025-04-18','2025-05-26',
+  '2025-06-19','2025-07-04','2025-09-01','2025-11-27','2025-12-25',
+  '2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25',
+  '2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25'
+];
+
+function isTradingDay(date) {
+  var day = date.getDay(); // 0=So, 6=Sa
+  if (day === 0 || day === 6) return false;
+  // ISO-Datum für Feiertagsvergleich
+  var iso = date.toISOString().slice(0, 10);
+  return US_HOLIDAYS.indexOf(iso) === -1;
+}
+
 function schedulerStart() {
   if (_schedulerInterval) clearInterval(_schedulerInterval);
   _schedulerInterval = setInterval(function() {
     var cfg = schedulerGetCfg();
     if (!cfg.enabled) return;
     var now = new Date();
+    // Nur an US-Börsenarbeitstagen
+    if (!isTradingDay(now)) return;
     var hhmm = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
     var today = now.toLocaleDateString('de-DE');
     if (hhmm === cfg.time && cfg.lastRun !== today) {
@@ -9758,10 +9778,12 @@ function schedulerUpdateUI() {
   if (toggle) toggle.checked = cfg.enabled;
   if (timeEl) timeEl.value = cfg.time;
   if (statusEl) {
+    var isToday = isTradingDay(new Date());
+    var dayHint = isToday ? '' : ' · ⏸ Heute kein Börsentag';
     statusEl.textContent = cfg.enabled
-      ? ('⏰ Aktiv · tägl. ' + cfg.time + ' Uhr' + (cfg.lastRun ? ' · letzter Run: ' + cfg.lastRun : ''))
+      ? ('⏰ Aktiv · tägl. ' + cfg.time + ' Uhr (Mo–Fr, Börsentage)' + (cfg.lastRun ? ' · letzter Run: ' + cfg.lastRun : '') + dayHint)
       : '— inaktiv';
-    statusEl.style.color = cfg.enabled ? 'var(--green)' : 'var(--text3)';
+    statusEl.style.color = cfg.enabled ? (isToday ? 'var(--green)' : 'var(--amber)') : 'var(--text3)';
   }
 }
 
