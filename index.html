@@ -8795,13 +8795,16 @@ const KI_STRAT_CONFIG = {
     hint: '🎯 Options-Wheel: CSP / Covered Call · CapTrader/IBKR · Theta-Strategie',
     color: 'var(--amber)',
     prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Options-Trader mit Fokus auf Wheel-Strategie (CSP + Covered Calls).\n\n'
-        + '⚠️ WICHTIG: Du gibst keine Anlageberatung. Alle Empfehlungen sind informativer Natur.\n'
-        + 'Jede Position MUSS vor dem Einstieg auf folgende Kriterien geprüft werden:\n'
-        + '  VORAUSWAHL — HARTES AUSSCHLUSS-KRITERIUM:\n'
-        + '    • HVP < ' + ctx.optsCfg.minHvp + '%: Titel für CSP AUSSCHLIESSEN — Prämien zu niedrig (Näherung via HV)\n'
-        + '    • Kurs außerhalb $' + ctx.optsCfg.minPrice + '–$' + ctx.optsCfg.maxPrice + ': Titel ausschließen\n'
-        + '    • Kein HVP verfügbar: Titel mit Hinweis "IV in IBKR prüfen" separat aufführen\n'
+      return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Options-Trader mit Fokus auf Wheel-Strategie (CSP + Covered Calls).\\n\\n'
+        + '⚠️ WICHTIG: Du gibst keine Anlageberatung. Alle Empfehlungen sind informativer Natur.\\n\\n'
+        + '🚫 SCHRITT 1 — HARTES AUSSCHLUSS-KRITERIUM (ZWINGEND VOR JEDER ANALYSE!):\\n'
+        + '   Diese Titel SOFORT ausschließen — dürfen NICHT als Kandidaten erscheinen:\\n'
+        + '   • Kurs < $' + ctx.optsCfg.minPrice + ' oder > $' + ctx.optsCfg.maxPrice + ': AUSSCHLUSS\\n'
+        + '   • HVP < ' + ctx.optsCfg.minHvp + '%: AUSSCHLUSS (Prämien zu niedrig)\\n'
+        + '   • ER innerhalb ' + ctx.optsCfg.erDays + ' Tage: AUSSCHLUSS\\n'
+        + '   Weniger als 3 übrig: NUR verbleibende empfehlen, NICHT auffüllen!\\n\\n'
+        + '✅ SCHRITT 2 — Verbleibende Kandidaten bewerten:\\n'
+        + '   Kein HVP verfügbar: "IV in IBKR prüfen" schreiben\\n'
         + '  1. HVP-Bewertung (Feld "HVP:XX%" aus Scandaten — kein echter IV-Rank, NUR Näherung!):\n'
         + '     HVP ≥ ' + ctx.optsCfg.idealHvp + '%: ⭐ Ideal für CSP-Verkauf\n'
         + '     HVP ' + ctx.optsCfg.goodHvp + '–' + (ctx.optsCfg.idealHvp-1) + '%: ✅ Gut\n'
