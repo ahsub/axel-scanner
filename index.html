@@ -8614,33 +8614,34 @@ function setCardTF(selectEl) {
   var tf = selectEl.value;
   if (!tf || !sym) return;
   event && event.stopPropagation && event.stopPropagation();
-  // In tickerData speichern
+  // TF direkt am Rescan-Button speichern (überlebt card.innerHTML reset nicht,
+  // aber tickerData könnte überschrieben werden → beide Wege)
   if (tickerData[sym]) tickerData[sym]._cardTF = tf;
-  else window['_cardTF_'+sym] = tf;
+  window['_cardTF_'+sym] = tf; // immer setzen als Fallback
   // Visuelles Feedback: ✓ hinter gewähltem TF
   Array.from(selectEl.options).forEach(function(o){
     o.text = o.text.replace(' ✓','');
     if (o.value === tf) o.text += ' ✓';
   });
-  // Rescan-Button blau hervorheben
+  // Rescan-Button: TF anzeigen + als data-tf speichern
   var btn = document.getElementById('rescan-btn-'+sym);
   if (btn) {
+    btn.dataset.tf = tf; // ← persistent auf DOM-Element
     btn.style.background = 'var(--accent)';
     btn.style.color = '#fff';
-    btn.textContent = '';
-    var icon = document.createElement('i');
-    icon.className = 'ti ti-refresh';
-    icon.style.fontSize = '11px';
-    btn.appendChild(icon);
-    btn.appendChild(document.createTextNode(' ' + tf.toUpperCase()));
+    btn.innerHTML = '<i class="ti ti-refresh" style="font-size:11px"></i> ' + tf.toUpperCase();
   }
 }
 
 // Rescan mit dem für diese Karte gespeicherten TF
 function doRescan(sym) {
-  var tf = (tickerData[sym] && tickerData[sym]._cardTF)
-    ? tickerData[sym]._cardTF
-    : (window['_cardTF_'+sym] || window.currentTF || '1d');
+  // Reihenfolge: button.data-tf → tickerData._cardTF → window._cardTF → currentTF → 1d
+  var btn = document.getElementById('rescan-btn-'+sym);
+  var tf = (btn && btn.dataset.tf)
+    || (tickerData[sym] && tickerData[sym]._cardTF)
+    || window['_cardTF_'+sym]
+    || window.currentTF
+    || '1d';
   setTimeout(function(){ rescanTickerTF(sym, tf); }, 20);
 }
 
