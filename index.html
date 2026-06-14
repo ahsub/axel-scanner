@@ -2125,12 +2125,23 @@ async function searchTickerByName(name, preferDE) {
     if (!r.ok) return null;
     var j = await r.json();
     var quotes = j && j.quotes && j.quotes.filter(function(q) {
-      return q.quoteType === 'EQUITY' && q.symbol && !q.symbol.includes('^');
+      // Nur echte Aktien-Ticker akzeptieren:
+      // - kein ^ (Indizes), kein = (Forex/Futures)
+      // - keine ISINs (12 Zeichen, beginnt mit 2 Großbuchstaben + 10 Zeichen)
+      // - keine langen Symbole (ISIN-artige Strings)
+      if (!q.quoteType || q.quoteType !== 'EQUITY') return false;
+      if (!q.symbol) return false;
+      if (q.symbol.includes('^') || q.symbol.includes('=')) return false;
+      // ISIN-Filter: 12 Zeichen, beginnt mit 2 Buchstaben
+      if (/^[A-Z]{2}[A-Z0-9]{10}$/.test(q.symbol)) return false;
+      // Keine unrealistisch langen Symbole
+      if (q.symbol.replace(/[.\-]/g,'').length > 7) return false;
+      return true;
     });
     if (!quotes || !quotes.length) return null;
 
-    // Für DE/EU: bevorzuge .DE, .F, .SG, .PA, .AS, .L Listings
-    var euSuffixes = ['.DE', '.F', '.SG', '.PA', '.AS', '.MI', '.MC', '.L'];
+    // Für DE/EU: bevorzuge .DE, .SG, .F, .PA, .AS, .MI, .MC, .L Listings
+    var euSuffixes = ['.DE', '.SG', '.F', '.PA', '.AS', '.MI', '.MC', '.L'];
     var best = null;
     if (preferDE) {
       best = quotes.find(function(q) {
