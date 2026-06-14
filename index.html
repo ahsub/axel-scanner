@@ -2079,19 +2079,117 @@ function toggleCustom(){
     document.getElementById('ticker-preset').value==='custom'?'block':'none';
 }
 
+// ══ TICKER LOOKUP: Yahoo Finance Search (keine hardcoded DB) ══════════════
+// Alle Klarnamen werden direkt über Yahoo aufgelöst — immer aktuell, kein Pflegeaufwand
+
+var _yfSearchCache = {};
+
+// Prüft ob ein String ein Ticker-Symbol ist (keine Leerzeichen, kurz, nur Großbuchstaben+Zahlen)
+function looksLikeTicker(s) {
+  var t = s.trim().toUpperCase();
+  // Ticker: 1-6 Zeichen, nur A-Z, 0-9, Bindestriche, Punkte (z.B. BRK-B, HAG.DE)
+  return /^[A-Z0-9]{1,6}([.\-][A-Z0-9]{1,3})?$/.test(t);
+}
+
+// Synchron: gibt Ticker zurück wenn es schon wie ein Ticker aussieht, sonst null
+function resolveTickerInput(raw) {
+  var s = raw.trim();
+  if (!s) return null;
+  if (looksLikeTicker(s)) return { sym: s.toUpperCase(), name: s.toUpperCase() };
+  // Cached?
+  var lower = s.toLowerCase();
+  if (_yfSearchCache[lower]) return _yfSearchCache[lower];
+  // Unbekannt → Platzhalter, async search wird später aufgelöst
+  return { sym: s.toUpperCase(), name: s, _needsSearch: true };
+}
+
+// Yahoo Finance Search: Klarnamen → Ticker (async, kein hardcoded Mapping nötig)
+async function searchTickerByName(name, preferDE) {
+  var lower = name.toLowerCase().trim();
+  var cacheKey = lower + (preferDE ? '_de' : '');
+  if (_yfSearchCache[cacheKey]) return _yfSearchCache[cacheKey];
+  try {
+    // Für DE/EU: erst mit Region suchen für bessere Ergebnisse
+    var lang = preferDE ? 'de&region=DE' : 'en&region=US';
+    var url = 'https://query1.finance.yahoo.com/v1/finance/search?q='
+      + encodeURIComponent(name) + '&lang=' + lang + '&quotesCount=5&newsCount=0';
+    var r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
+    if (!r.ok) return null;
+    var j = await r.json();
+    var quotes = j && j.quotes && j.quotes.filter(function(q) {
+      return q.quoteType === 'EQUITY' && q.symbol && !q.symbol.includes('^');
+    });
+    if (!quotes || !quotes.length) return null;
+
+    // Für DE/EU: bevorzuge .DE, .F, .SG, .PA, .AS, .L Listings
+    var euSuffixes = ['.DE', '.F', '.SG', '.PA', '.AS', '.MI', '.MC', '.L'];
+    var best = null;
+    if (preferDE) {
+      best = quotes.find(function(q) {
+        return euSuffixes.some(function(sfx){ return q.symbol.endsWith(sfx); });
+      });
+    }
+    if (!best) best = quotes[0];
+
+    var result = { sym: best.symbol, name: best.shortname || best.longname || name, exchange: best.exchDisp || '' };
+    _yfSearchCache[cacheKey] = result;
+    return result;
+  } catch(e) { console.log('YF Search error:', e.message); return null; }
+}
+
+// Ticker-Input vorbereiten: Klarnamen via Yahoo auflösen
+async function resolveTickersWithSearch(rawInput) {
+  var isDE = window.currentMarket === 'de';
+  var parts = rawInput.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  var resolved = [];
+  var unknowns = [];
+
+  // Schritt 1: Was sieht schon wie ein Ticker aus?
+  parts.forEach(function(s, idx) {
+    if (looksLikeTicker(s)) {
+      resolved.push({ sym: s.toUpperCase(), name: s.toUpperCase() });
+    } else {
+      // Klarname → Yahoo Search nötig
+      var lower = s.toLowerCase();
+      var cached = _yfSearchCache[lower + (isDE?'_de':'')];
+      if (cached) {
+        resolved.push({ sym: cached.sym, name: cached.name });
+      } else {
+        unknowns.push({ raw: s, idx: resolved.length });
+        resolved.push(null);
+      }
+    }
+  });
+
+  // Schritt 2: Yahoo Search für alle Klarnamen (parallel)
+  if (unknowns.length > 0) {
+    showKoToast('🔍 Suche ' + unknowns.length + ' Unternehmen…');
+    await Promise.all(unknowns.map(async function(u) {
+      var found = await searchTickerByName(u.raw, isDE);
+      if (found) {
+        resolved[u.idx] = { sym: found.sym, name: found.name };
+        showKoToast('✓ ' + u.raw + ' → ' + found.sym + (found.exchange ? ' (' + found.exchange + ')' : ''));
+      } else {
+        resolved[u.idx] = { sym: u.raw.toUpperCase(), name: u.raw };
+        showKoToast('⚠ ' + u.raw + ' nicht gefunden → als Ticker verwendet');
+      }
+    }));
+  }
+
+  return resolved.filter(Boolean);
+}
+
 function getTickers(){
   const preset = document.getElementById('ticker-preset').value;
   const customWrap = document.getElementById('custom-wrap');
   const customInput = document.getElementById('custom-input');
 
   // Wenn custom-input sichtbar und bearbeitet wurde: custom-input hat Vorrang
-  // So kann man bei JEDER Liste noch Ticker ergaenzen oder die Liste direkt bearbeiten
   if(customWrap && customWrap.style.display !== 'none' && customInput && customInput.value.trim()){
     const raw = customInput.value;
     return raw.split(',')
-      .map(function(s){ return s.trim().toUpperCase(); })
-      .filter(Boolean)
-      .map(function(s){ return {sym:s, name:s}; });
+      .map(function(s){ return resolveTickerInput(s); })
+      .filter(Boolean);
   }
 
   // Fallback: Standard-Listen
@@ -2179,7 +2277,17 @@ function setMarket(mkt){
 }
 
 async function runScan(){
-  const tickers=getTickers();
+  // Ticker ermitteln — mit Yahoo Search für Klarnamen
+  var rawInput = document.getElementById('custom-input');
+  var tickers;
+  if (rawInput && rawInput.value.trim() && /[a-zäöüß\s]{3,}/i.test(rawInput.value)) {
+    // Enthält wahrscheinlich Klarnamen → async resolve
+    tickers = await resolveTickersWithSearch(rawInput.value);
+    // Input mit aufgelösten Tickern aktualisieren
+    if (tickers.length) rawInput.value = tickers.map(function(t){return t.sym;}).join(', ');
+  } else {
+    tickers = getTickers();
+  }
   if(!tickers.length) return;
   activeTickers=tickers;
   const btn=document.getElementById('scan-btn');
@@ -2382,6 +2490,13 @@ async function runScan(){
         'RRTL':  {sym:'RTL',   sfx:'DE'},  // RTL Group
         'HAN':   {sym:'HNR1',  sfx:'DE'},  // Hannover Rück
         'CBKG':  {sym:'CBK',   sfx:'DE'},  // Commerzbank
+        // ── Spezielle DE Ticker mit abweichendem Suffix ────────────────────
+        'BOSS':  {sym:'BOSS',  sfx:'SG'},  // Hugo Boss → BOSS.SG (Stuttgart)
+        'HEN3':  {sym:'HAG',   sfx:'DE'},  // Hensoldt → HAG.DE (HEN3=Henkel bei manchen Plattformen!)
+        'SY':    {sym:'SY1',   sfx:'DE'},  // Symrise alt. Ticker → SY1.DE
+        'ADS':   {sym:'ADS',   sfx:'DE'},  // Adidas → ADS.DE (explizit)
+        'SY1':   {sym:'SY1',   sfx:'DE'},  // Symrise → SY1.DE
+        'HAG':   {sym:'HAG',   sfx:'DE'},  // Hensoldt → HAG.DE
       };
 
       // Yahoo-Symbol und Suffix ermitteln
@@ -2405,7 +2520,7 @@ async function runScan(){
         yfSymCandidates = [primary].concat(fallbacks.filter(function(s){ return s !== primary; }));
       } else {
         // Unbekannter DE-Ticker: Standard-Fallback-Kette
-        yfSymCandidates = [t.sym+'.DE', t.sym+'.F', t.sym+'.PA', t.sym+'.AS', t.sym+'.L', t.sym];
+        yfSymCandidates = [t.sym+'.DE', t.sym+'.SG', t.sym+'.F', t.sym+'.PA', t.sym+'.AS', t.sym+'.MI', t.sym+'.MC', t.sym+'.L', t.sym];
       }
       const interval=intervalMapTD[effectiveTF]||'1day';
       const outputsize=outputMap[effectiveTF]||220;
@@ -2487,7 +2602,9 @@ async function runScan(){
               dataSource='Yahoo Finance';
               // Währung aus Yahoo-Meta (zuverlässigste Quelle)
               if (res.meta && res.meta.currency) _yfCurrency = res.meta.currency;
-              else if (_trySym.endsWith('.DE') || _trySym.endsWith('.F')) _yfCurrency = 'EUR';
+              else if (_trySym.endsWith('.DE') || _trySym.endsWith('.F') || _trySym.endsWith('.SG') || 
+                       _trySym.endsWith('.PA') || _trySym.endsWith('.AS') || _trySym.endsWith('.MI') || 
+                       _trySym.endsWith('.MC') || _trySym.endsWith('.L')) _yfCurrency = 'EUR';
               else _yfCurrency = 'USD';
               // PDH/PDL aus Yahoo OHLC
               if(yInterval==='1d'&&q.high&&timestamps.length>=3){
