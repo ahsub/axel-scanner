@@ -2296,6 +2296,16 @@ async function runScan(){
   if (userTyped && hasNames) {
     rawInput.dataset.userTyped = '0'; // Reset
     tickers = await resolveTickersWithSearch(rawInput.value);
+    // Yahoo gibt z.B. "HAG.DE" zurück - .DE Suffix entfernen
+    // Scanner fügt Suffix selbst via EU_TICKER_MAP hinzu
+    var euSfx = ['.DE','.F','.SG','.PA','.AS','.MI','.MC','.L','.BR','.VI','.SW','.HE','.CO','.OL','.ST'];
+    tickers = tickers.map(function(t){
+      var sym = t.sym;
+      for(var i=0;i<euSfx.length;i++){
+        if(sym.endsWith(euSfx[i])){ sym=sym.slice(0,-euSfx[i].length); break; }
+      }
+      return {sym:sym, name:t.name};
+    });
     if (tickers.length) rawInput.value = tickers.map(function(t){return t.sym;}).join(', ');
   } else {
     tickers = getTickers();
