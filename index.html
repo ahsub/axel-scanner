@@ -8560,7 +8560,33 @@ async function openKiBriefing(defaultStrat) {
 
   // Sortierung: Score absteigend
   topResults.sort(function(a, b) { return b.score - a.score; });
-  const top25 = topResults.slice(0, 25);
+
+  // ── Pre-Filter für Options/Ludwig: Kursrahmen + ER-Schutz im JS anwenden ──
+  // So kommt kein ungeeigneter Titel in den Prompt — KI muss nichts ausschließen
+  var filteredForKI = topResults;
+  if (_kiStrat === 'options' || _kiStrat === 'ludwig') {
+    var oCfg = getOptionsCfg();
+    filteredForKI = topResults.filter(function(r) {
+      var price = r.price || 0;
+      // Kursrahmen
+      if (price < oCfg.minPrice || price > oCfg.maxPrice) return false;
+      // ER-Schutz
+      if (r.er && r.er.days != null && r.er.days <= oCfg.erDays) return false;
+      // HVP-Minimum (nur wenn HVP vorhanden)
+      if (r.ivp != null && r.ivp < oCfg.minHvp) return false;
+      return true;
+    });
+    if (filteredForKI.length === 0) {
+      content.innerHTML = '<div style="color:var(--amber);padding:1.25rem;font-size:13px">'
+        + '<strong>Keine geeigneten Kandidaten</strong> für ' + (_kiStrat === 'ludwig' ? 'E. Ludwig-Strategie' : 'Options-Wheel') + ' gefunden.<br><br>'
+        + 'Kriterien: Kurs $' + oCfg.minPrice + '–$' + oCfg.maxPrice
+        + ' · HVP ≥ ' + oCfg.minHvp + '% · Kein ER in ' + oCfg.erDays + ' Tagen<br><br>'
+        + '<span style="color:var(--text3);font-size:11px">Tipp: Konfiguration im Admin-Tab anpassen oder andere Watchlist scannen.</span></div>';
+      return;
+    }
+  }
+
+  const top25 = filteredForKI.slice(0, 25);
 
   if (!top25.length) {
     content.innerHTML = '<div style="color:var(--amber);padding:1rem">Keine Scan-Ergebnisse vorhanden. Bitte zuerst einen Scan durchführen.</div>';
