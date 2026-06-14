@@ -2326,8 +2326,9 @@ async function runScan(){
         }catch(e3){ console.log('YF error:',e3.message); }
       }
 
-      // DE-Ticker Fallback: .DE → .F (Frankfurt Börse)
+      // DE-Ticker Fallback-Kette: .DE → .F → plain (für US-Titel in DE-Liste)
       if(closes.length<20 && isDeMarket){
+        // Schritt 2: .F (Frankfurt)
         try{
           var yfSymF=t.sym+'.F';
           var to2=Math.floor(Date.now()/1000),from2=to2-60*60*24*130;
@@ -2354,6 +2355,34 @@ async function runScan(){
             }
           }
         }catch(e4){ console.log('YF .F error:',e4.message); }
+      }
+      // Schritt 3: Plain US-Symbol (für US-Titel in DE-Watchlist)
+      if(closes.length<20 && isDeMarket){
+        try{
+          var to3=Math.floor(Date.now()/1000),from3=to3-60*60*24*130;
+          var yfUrl3='https://query1.finance.yahoo.com/v8/finance/chart/'+t.sym
+            +'?interval=1d&period1='+from3+'&period2='+to3+'&includePrePost=false';
+          var r3=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl3));
+          if(r3.ok){
+            var j3=await r3.json();
+            var res3=j3&&j3.chart&&j3.chart.result&&j3.chart.result[0];
+            if(res3){
+              var q3=res3.indicators.quote[0];
+              if(q3&&q3.close&&q3.close.length){
+                var rc3=q3.close,rv3=q3.volume||[],rt3=res3.timestamp||[];
+                var vi3=rc3.map(function(_,i){return i;}).filter(function(i){return rc3[i]!=null;});
+                closes=vi3.map(function(i){return rc3[i]||0;});
+                volumes=vi3.map(function(i){return rv3[i]||0;});
+                timestamps=vi3.map(function(i){return rt3[i];});
+                dates=timestamps.map(function(ts){
+                  var d=new Date(ts*1000);
+                  return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');
+                });
+                dataSource='Yahoo (US)';
+              }
+            }
+          }
+        }catch(e5){ console.log('YF plain error:',e5.message); }
       }
 
       if(closes.length<20) throw new Error('Keine Daten verfügbar (TD & YF via Proxy)');
