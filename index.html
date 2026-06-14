@@ -2284,19 +2284,22 @@ async function runScan(){
         const rsResult=calcRS(closes,spyData);
         if(rsResult){ raw.rs=rsResult.rs; raw.rsData=rsResult; }
       }
-      // IV-Percentile (nur US-Aktien, nur 1T-Scan, nicht-blockierend)
+      // IV-Percentile: aus HV-20 Eigenberechnung (Yahoo /v7/options 401 gesperrt)
+      // Wir berechnen HVP (Historical Volatility Percentile) als IV-Näherung
       if(!isDeMarket && effectiveTF==='1d' && closes.length>=42){
-        getIVPercentile(t.sym, closes).then(function(ivResult){
-          if(ivResult && tickerData[t.sym]){
-            tickerData[t.sym]._ivp = ivResult;
-            // Karte neu rendern wenn schon angezeigt
+        try {
+          var hvSeries = calcHV20Series(closes);
+          var currentHV = hvSeries[hvSeries.length-1];
+          var hvp = calcIVPercentile(currentHV, hvSeries.slice(0,-1));
+          if(hvp != null && tickerData[t.sym]){
+            tickerData[t.sym]._ivp = { ivp: hvp, atmIV: Math.round(currentHV*100), contracts: 0, isHV: true };
             var el = document.getElementById('card-'+t.sym);
             if(el && el.querySelector('.ivp-badge')){
-              el.querySelector('.ivp-badge').textContent = 'IVP ' + ivResult.ivp + '%';
-              el.querySelector('.ivp-badge').style.color = ivpColor(ivResult.ivp);
+              el.querySelector('.ivp-badge').textContent = 'HVP ' + hvp + '%';
+              el.querySelector('.ivp-badge').style.color = ivpColor(hvp);
             }
           }
-        }).catch(function(){});
+        } catch(e){}
       }
       tickerData[t.sym]=raw;
       // PDH/PDL aus Scan-Daten übernehmen (bereits im TD-Block extrahiert)
@@ -2989,8 +2992,11 @@ function renderCard(t,state){
       var atmIV = ivpData ? ivpData.atmIV : null;
       var col = ivpColor(ivp);
       var hint = ivpLabel(ivp);
-      var ivpText = ivp != null ? 'IVP\u00A0' + ivp + '%' : '⏳ IVP…';
-      var atmText = atmIV != null ? ' · IV\u00A0' + atmIV + '%' : '';
+      var isHV = ivpData && ivpData.isHV;
+      var label = isHV ? 'HVP' : 'IVP';
+      var ivpText = ivp != null ? label+'\u00A0' + ivp + '%' : '';
+      if (!ivpText) return ''; // Nicht anzeigen wenn kein Wert
+      var atmText = (atmIV != null && !isHV) ? ' · IV\u00A0' + atmIV + '%' : (isHV && atmIV ? ' · HV\u00A0' + atmIV + '%' : '');
       return '<div style="display:flex;justify-content:space-between;align-items:center;'
         +'padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px">'
         +'<span class="ivp-badge" style="font-size:11px;font-weight:600;color:'+col+'">📈 '+ivpText+'</span>'
@@ -8480,7 +8486,7 @@ async function openKiBriefing() {
     // Fibo-Zone (nur wenn vorhanden)
     if(r.fibo) line += ' Fibo:' + r.fibo.zone + '(' + r.fibo.retrace + '%)';
     // IV-Percentile (nur wenn vorhanden)
-    if(r.ivp != null) line += ' IVP:' + r.ivp + '%';
+    if(r.ivp != null) line += ' HVP:' + r.ivp + '% (Historical Vol Percentile)';
     return line;
   }).join('\n');
 
@@ -8495,7 +8501,7 @@ async function openKiBriefing() {
     + '  EMA200-Kurs:$XX= 200-Tage-EMA Kurswert (≠ Handelskurs!)\n'
     + '  RS:XX          = Relative Stärke vs S&P500 (0-100)\n'
     + '  52W-H:X%       = Abstand vom 52-Wochen-Hoch\n'
-    + '  IVP:XX%        = IV-Percentile (>50% = teuer = gut zum CSP-Verkaufen; <30% = billig = CSP meiden)\n'
+    + '  HVP:XX%        = Historical Volatility Percentile (Näherung für IV-Percentile; >50% = erhöhte Vol = gut zum CSP-Verkaufen; <30% = niedrige Vol = CSP meiden)\n'
     + '  Fibo:zone(X%)  = Fibonacci-Zone\n'
     + 'NICHT VERFÜGBAR (niemals erfinden): KGV, EPS, Umsatz, Dividende, Analystenziele\n\n';
 
