@@ -2109,6 +2109,8 @@ function looksLikeTicker(s) {
   var t = s.trim();
   // Hat Leerzeichen → definitiv Klarname
   if (t.indexOf(' ') >= 0) return false;
+  // Hat Kleinbuchstaben → Klarname ("hensoldt", "Symrise" etc.)
+  if (t.length > 1 && t !== t.toUpperCase()) return false;
   var upper = t.toUpperCase();
   // Ticker-Pattern: 1-6 Buchstaben/Zahlen, optional Suffix .XX oder -X
   // Beispiele: AAPL, HAG, BRK-B, HAG.DE, BOSS.SG, SY1, 1U1
@@ -2320,8 +2322,14 @@ async function runScan(){
   // Yahoo Search NUR wenn Benutzer explizit Namen eingetippt hat
   // (data-user-typed Flag wird gesetzt wenn Benutzer im custom-input tippt)
   var userTyped = rawInput && rawInput.dataset.userTyped === '1';
-  var hasNames = rawInput && rawInput.value.trim() &&
-    rawInput.value.split(',').some(function(s){ return s.trim().indexOf(' ') >= 0; });
+  // Yahoo Search wenn:
+  // 1. userTyped Flag gesetzt UND
+  // 2. Eingabe enthält Klarnamen (Leerzeichen IM Token ODER Kleinbuchstaben)
+  var parts = rawInput ? rawInput.value.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+  var hasNames = parts.some(function(s){
+    return s.indexOf(' ') >= 0 || // Leerzeichen im Namen (z.B. "Hugo Boss")
+           (s.length > 1 && s !== s.toUpperCase() && !/^[A-Z0-9]{1,6}([.\-][A-Z]{1,3})?$/.test(s)); // Kleinbuchstaben = Klarname
+  });
   if (userTyped && hasNames) {
     rawInput.dataset.userTyped = '0'; // Reset
     tickers = await resolveTickersWithSearch(rawInput.value);
