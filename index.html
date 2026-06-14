@@ -3309,7 +3309,7 @@ function renderCard(t,state){
     (state._fromTdCache ? '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(120,120,128,0.15);color:var(--text3);margin-left:4px" title="Daten aus lokalem Cache"><i class="ti ti-database" style="font-size:9px"></i> Cache</span>' : '')+
     '<span style="margin-left:auto;display:flex;align-items:center;gap:5px">'+
     (state.rs ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:.03em;background:'+(state.rs>=80?'rgba(52,194,110,0.18)':state.rs>=60?'rgba(79,142,247,0.18)':state.rs<40?'rgba(240,86,86,0.18)':'rgba(255,255,255,0.08)')+';color:'+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--text3)')+';border:0.5px solid '+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--border2)')+'">RS '+state.rs+'</span>' : '')+
-    '<select id="tf-sel-'+state.sym+'" onchange="rescanTickerTF(this.dataset.sym,this.value);this.value=\'\'" onclick="event.stopPropagation()" data-sym="'+state.sym+'"'+
+    '<select id="tf-sel-'+state.sym+'" onchange="var _s=this.dataset.sym,_t=this.value;this.value=\'\';if(_t)rescanTickerTF(_s,_t);" onclick="event.stopPropagation()" data-sym="'+state.sym+'"'+
       ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--border2);color:var(--text2);border-radius:6px;cursor:pointer">'+
       '<option value="">TF</option>'+
       '<option value="15m">15m</option>'+
@@ -5590,6 +5590,12 @@ function saveFromScan(minScore){
     if(processed.bullCount >= minScore) tickers.push(sym);
   });
   if(!tickers.length){ alert('Keine Titel mit diesem Signal'); return; }
+  // Nach Score absteigend sortieren → beste Titel oben, schlechtere unten leicht kürzbar
+  tickers.sort(function(a, b){
+    var sa = tickerData[a] ? (processData(tickerData[a]).compositeScore||0) : 0;
+    var sb = tickerData[b] ? (processData(tickerData[b]).compositeScore||0) : 0;
+    return sb - sa;
+  });
   const label = minScore===3?'Kaufsignal 3/3':minScore===2?'≥2/3 bullisch':'Alle gescannt';
   const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
   const defaultName = label+' · '+today;
@@ -5597,9 +5603,9 @@ function saveFromScan(minScore){
   if(!name) return;
   const wls = getWatchlists();
   wls[name] = tickers.join(', ');
-  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  saveWatchlistsWithSync(wls, name);
   updateWatchlistDropdown();
-  alert('✓ "'+name+'" gespeichert ('+tickers.length+' Titel):\n'+tickers.join(', '));
+  showKoToast('✓ "'+name+'" gespeichert · '+tickers.length+' Titel · Score-sortiert ↓');
 }
 
 // ─── WATCHLIST MODAL FUNCTIONS ────────────────────────────────────────────────
@@ -8581,7 +8587,9 @@ function clearScanRegistry() {
 
 // Einzelnen Ticker neu scannen
 async function rescanTicker(sym) {
-  rescanTickerTF(sym, window.currentTF || '1d');
+  // Default to current scan timeframe, fallback to 1d
+  var tf = window.currentTF || '1d';
+  rescanTickerTF(sym, tf);
 }
 
 async function rescanTickerTF(sym, tf) {
@@ -8601,8 +8609,11 @@ async function rescanTickerTF(sym, tf) {
   const tInfo = activeTickers.find(function(t){ return t.sym===sym; }) || {sym:sym,name:sym};
   const isDeMarket = window.currentMarket==='de';
   const yfSym = isDeMarket ? sym+'.DE' : sym;
-  const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':130};
-  const yIntervalMap={'15m':'15m','30m':'30m','1h':'60m','4h':'1d','1d':'1d'};
+  const daysMap={'15m':5,'30m':7,'1h':59,'4h':59,'1d':130};
+  const yIntervalMap={'15m':'15m','30m':'30m','1h':'60m','4h':'60m','1d':'1d'};
+  // Yahoo Intraday limits: 15m/30m max 60 days, 1h max 730 days
+  // Use range parameter for intraday for better compatibility
+  const yRangeMap={'15m':'5d','30m':'1mo','1h':'3mo','4h':'3mo','1d':'6mo'};
 
   try {
     let closes=[],volumes=[],timestamps=[],dates=[];
@@ -8610,8 +8621,12 @@ async function rescanTickerTF(sym, tf) {
     const yInterval=yIntervalMap[tf]||'1d';
     const to=Math.floor(Date.now()/1000);
     const from=to-60*60*24*(daysMap[tf]||130);
-    const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+yfSym
-      +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
+    // For intraday: use range instead of period for better Yahoo compatibility
+    var yfUrlBase = 'https://query1.finance.yahoo.com/v8/finance/chart/'+yfSym;
+    var yfUrlParams = tf === '1d'
+      ? '?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false'
+      : '?interval='+yInterval+'&range='+yRangeMap[tf]+'&includePrePost=false';
+    const yfUrl = yfUrlBase + yfUrlParams;
     const r=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl));
     if(r.ok){
       const j=await r.json();
