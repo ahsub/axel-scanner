@@ -2286,20 +2286,14 @@ async function runScan(){
       }
       // IV-Percentile: aus HV-20 Eigenberechnung (Yahoo /v7/options 401 gesperrt)
       // Wir berechnen HVP (Historical Volatility Percentile) als IV-Näherung
+      // HVP direkt auf raw speichern (vor renderCard)
       if(!isDeMarket && effectiveTF==='1d' && closes.length>=42){
         try {
           var hvSeries = calcHV20Series(closes);
           var currentHV = hvSeries[hvSeries.length-1];
           var hvp = calcIVPercentile(currentHV, hvSeries.slice(0,-1));
-          if(hvp != null && tickerData[t.sym]){
-            tickerData[t.sym]._ivp = { ivp: hvp, atmIV: Math.round(currentHV*100), contracts: 0, isHV: true };
-            var el = document.getElementById('card-'+t.sym);
-            if(el && el.querySelector('.ivp-badge')){
-              el.querySelector('.ivp-badge').textContent = 'HVP ' + hvp + '%';
-              el.querySelector('.ivp-badge').style.color = ivpColor(hvp);
-            }
-          }
-        } catch(e){}
+          if(hvp != null) raw._ivp = { ivp: hvp, atmIV: Math.round(currentHV*100), contracts: 0, isHV: true };
+        } catch(e){ console.log('HVP error:',e.message); }
       }
       tickerData[t.sym]=raw;
       // PDH/PDL aus Scan-Daten übernehmen (bereits im TD-Block extrahiert)
@@ -4226,6 +4220,7 @@ async function autoMakro(){
     const antBody = JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
+      system: 'Du bist ein Makro-Analyse-Assistent. KRITISCHE REGEL: Verwende NUR die Daten aus dem Prompt. Erfinde KEINE Kurse, Prozentwerte oder Marktdaten. Wenn Daten fehlen: explizit schreiben "Daten nicht verfügbar".',
       messages: [{ role: 'user', content: prompt }]
     });
     // Anthropic immer via Proxy (CORS-Problem bei direktem GitHub Pages Call)
@@ -8501,7 +8496,7 @@ async function openKiBriefing() {
     + '  EMA200-Kurs:$XX= 200-Tage-EMA Kurswert (≠ Handelskurs!)\n'
     + '  RS:XX          = Relative Stärke vs S&P500 (0-100)\n'
     + '  52W-H:X%       = Abstand vom 52-Wochen-Hoch\n'
-    + '  HVP:XX%        = Historical Volatility Percentile (Näherung für IV-Percentile; >50% = erhöhte Vol = gut zum CSP-Verkaufen; <30% = niedrige Vol = CSP meiden)\n'
+    + '  HVP:XX%        = Historical Volatility Percentile (NÄHERUNG — kein echter IV-Rank!). >50%: erhöhte Vola → CSP-Prämien tendenziell höher. <30%: niedrige Vola → CSP meiden. Wenn HVP fehlt: NIEMALS IV-Wert erfinden.\n'
     + '  Fibo:zone(X%)  = Fibonacci-Zone\n'
     + 'NICHT VERFÜGBAR (niemals erfinden): KGV, EPS, Umsatz, Dividende, Analystenziele\n\n';
 
@@ -8604,7 +8599,7 @@ let _kiStrat = 'ko';
 // ══════════════════════════════════════════════════════════════════════════════
 // ANTI-HALLUZINATIONS-DIREKTIVE — wird jedem KI-Prompt vorangestellt
 // ══════════════════════════════════════════════════════════════════════════════
-const KI_ANTI_HALLUZINATION = '\n'  + '⛔ STRENGE DATENDISZIPLIN — KEINE AUSNAHMEN:\n\n'  + 'Du erhältst unten EXAKTE Scanner-Daten. Diese Daten sind die EINZIGE Wahrheit.\n\n'  + 'VERBOTEN:\n'  + '• Kurse, Strikes, Prämien oder Prozentzahlen erfinden oder schätzen\n'  + '• Den EMA200-Kurs (Feld "EMA200-Kurs:$XX") als aktuellen Handelskurs verwenden\n'  + '• Historische Preise aus deinem Training verwenden\n'  + '• Aussagen wie "typischerweise" oder "ungefähr" bei Kursen\n\n'  + 'PFLICHTREGELN:\n'  + '• Aktueller Kurs = NUR der Wert nach "Kurs:$" im Datensatz\n'  + '• EMA200-Kurs = NUR nach "EMA200-Kurs:$" — NICHT der Handelskurs\n'  + '• Fehlende Felder: "Kurs nicht verfügbar — in IBKR prüfen" schreiben\n'  + '• Prämien-Schätzungen immer als "(Schätzung — in IBKR prüfen)" kennzeichnen\n\n'  + 'SELBSTKONTROLLE: Kurs aus "Kurs:$XX"? EMA200 nicht mit Handelskurs verwechselt? Keine Trainingsdaten eingesetzt?\n\n';
+const KI_ANTI_HALLUZINATION = '\n'  + '⛔ STRENGE DATENDISZIPLIN — KEINE AUSNAHMEN:\n\n'  + 'Du erhältst unten EXAKTE Scanner-Daten. Diese Daten sind die EINZIGE Wahrheit.\n\n'  + 'VERBOTEN:\n'  + '• Kurse, Strikes, Prämien oder Prozentzahlen erfinden oder schätzen\n'  + '• Den EMA200-Kurs (Feld "EMA200-Kurs:$XX") als aktuellen Handelskurs verwenden\n'  + '• Historische Preise aus deinem Training verwenden\n'  + '• Aussagen wie "typischerweise" oder "ungefähr" bei Kursen\n\n'  + 'PFLICHTREGELN:\n'  + '• Aktueller Kurs = NUR der Wert nach "Kurs:$" im Datensatz\n'  + '• EMA200-Kurs = NUR nach "EMA200-Kurs:$" — NICHT der Handelskurs\n'  + '• Fehlende Felder: "Kurs nicht verfügbar — in IBKR prüfen" schreiben\n'  + '• Prämien-Schätzungen immer als "(Schätzung — in IBKR prüfen)" kennzeichnen\\n'  + 'HVP = Historical Vol Percentile — kein echter IV-Rank. Wenn kein HVP: NIEMALS IV erfinden.\\n\\n'  + 'SELBSTKONTROLLE: Kurs aus "Kurs:$XX"? EMA200 nicht mit Handelskurs verwechselt? Keine Trainingsdaten eingesetzt?\n\n';
 
 const KI_STRAT_CONFIG = {
   ko: {
@@ -8655,7 +8650,7 @@ const KI_STRAT_CONFIG = {
         + '   a) EMA200-Abstand aus den Daten: Strike-Empfehlung nahe/unter EMA200 in $\n'
         + '   b) Strike-Bereich in $ und % OTM vom aktuellen Kurs\n'
         + '   c) Laufzeit (bevorzugt 30-45 DTE)\n'
-        + '   d) Prämien-SCHÄTZUNG (⚠️ IV-Rank NICHT im Scanner — nur VIX als Proxy!): Bei VIX ' + ctx.vixStr + ' grobe Näherung möglich — IMMER mit "→ exakt in IBKR Option Chain prüfen" kennzeichnen\n'
+        + '   d) Prämien-SCHÄTZUNG: Nutze HVP-Wert aus Scandaten falls vorhanden (⚠️ kein echter IV-Rank — nur HV-Näherung!). Bei VIX ' + ctx.vixStr + ' und HVP aus Daten grobe Einschätzung möglich. IMMER: "→ exakt in IBKR Option Chain prüfen". Wenn kein HVP: NICHT erfinden.\n'
         + '   e) PFLICHT-CHECKS (immer einzeln auflisten):\n'
         + '      - "IV Rank in IBKR prüfen → Ziel: >30%"\n'
         + '      - "OI am Strike $XX prüfen → Ziel: >500 Kontrakte"\n'
@@ -8755,7 +8750,7 @@ const KI_STRAT_CONFIG = {
         + '   a) Ludwig-Eignung: Aktueller Kurs = "Kurs:$XX" aus den Scandaten (NICHT den EMA200-Kurs verwenden!). Kurs im $15-80 Bereich? EMA200-Abstand (Ludwig bevorzugt nahe 200d)\n'
         + '   b) ATM-Strike Empfehlung in $ (nahe aktuellem Kurs)\n'
         + '   c) Laufzeit: nächster 3. Freitag des Monats (~30 DTE)\n'
-        + '   d) Prämien-SCHÄTZUNG (⚠️ NUR Näherung — IV-Rank nicht im Scanner!): Bei VIX ' + ctx.vixStr + ' und ATM-Strike etwa X% des Kurses — IMMER als Schätzung kennzeichnen und "→ exakt in IBKR Option Chain prüfen" hinzufügen. 70%-Gewinn-Ziel = 0.30 × Prämie.\n'
+        + '   d) Prämien-SCHÄTZUNG: HVP aus Scandaten verwenden falls vorhanden (⚠️ kein echter IV-Rank!). Bei VIX ' + ctx.vixStr + ' und ATM-Strike: IMMER als Schätzung kennzeichnen + "→ exakt in IBKR Option Chain prüfen". 70%-Gewinn-Ziel = 0.30 × Prämie. Wenn kein HVP: NICHT erfinden.\n'
         + '   e) Roll-Szenario (⚠️ SCHÄTZUNG — exakte Strikes nur in IBKR sichtbar!): Stufe-1-Roll ≈ Kurs − 2.5% des aktuellen Kurses aus "Kurs:$"-Feld. Nur Kurs aus Scandaten verwenden, keine Kursziele erfinden.\n'
         + '   f) PFLICHT-CHECKS:\n'
         + '      - "Strike-Staffelung in IBKR prüfen → Ziel: ≤2.5%"\n'
@@ -9664,6 +9659,7 @@ async function runOversoldScan() {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
+        system: 'Du bist ein technischer Analyse-Assistent. KRITISCHE REGEL: Berechne oversold_score NUR aus den Scanner-Daten im Prompt (MACD, OBV, Score, bullCount). Erfinde KEINE technischen Indikatoren, Kurse oder Werte die nicht im Prompt stehen. Antworte NUR mit validem JSON.',
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -10255,6 +10251,7 @@ async function runMetaAnalysis() {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
+        system: 'Du bist ein Trading-Performance-Analyst. KRITISCHE REGEL: Analysiere NUR die KI-Tracking-Daten aus dem Prompt. Erfinde KEINE Kurse, Performance-Zahlen oder Empfehlungen die nicht aus den Tracking-Daten ableitbar sind. Bei fehlenden Daten: explizit "Datenbasis zu klein" schreiben.',
         messages: [{ role: 'user', content: prompt }]
       })
     });
