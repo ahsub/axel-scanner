@@ -821,7 +821,77 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="scheduler-status" style="font-size:10px;color:var(--text3);margin-top:4px">— inaktiv</div>
       </div>
 
-      <!-- ═══ LISTEN-EDITOR ═══════════════════════════════════════════════ -->
+      <!-- ═══ OPTIONS-KONFIGURATION ════════════════════════════════════════ -->
+      <div class="sec"><i class="ti ti-adjustments"></i> Options-Strategie Konfiguration</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:.65rem">
+          <i class="ti ti-currency-dollar"></i> Kursrahmen für Options-Kandidaten
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;line-height:1.5">
+          Ludwig & Options-Wheel: Titel außerhalb dieses Kursrahmens werden als ungeeignet ausgeschlossen.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Min. Kurs ($)</div>
+            <input type="number" id="options-min-price" value="15" min="1" max="500"
+              style="width:100%;font-size:13px;padding:4px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="saveOptionsCfg()">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Max. Kurs ($)</div>
+            <input type="number" id="options-max-price" value="150" min="10" max="2000"
+              style="width:100%;font-size:13px;padding:4px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="saveOptionsCfg()">
+          </div>
+        </div>
+
+        <div style="height:0.5px;background:var(--border);margin-bottom:.75rem"></div>
+
+        <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:.65rem">
+          <i class="ti ti-chart-line"></i> HVP-Schwellenwerte
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Min. HVP % (Ausschluss)</div>
+            <input type="number" id="options-min-hvp" value="30" min="0" max="80"
+              style="width:100%;font-size:13px;padding:4px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="saveOptionsCfg()">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Gut ab HVP %</div>
+            <input type="number" id="options-good-hvp" value="50" min="20" max="90"
+              style="width:100%;font-size:13px;padding:4px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="saveOptionsCfg()">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Ideal ab HVP %</div>
+            <input type="number" id="options-ideal-hvp" value="70" min="30" max="99"
+              style="width:100%;font-size:13px;padding:4px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="saveOptionsCfg()">
+          </div>
+        </div>
+
+        <div style="height:0.5px;background:var(--border);margin-bottom:.75rem"></div>
+
+        <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:.65rem">
+          <i class="ti ti-calendar"></i> Earnings-Schutzfenster
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">ER-Ausschluss (Tage)</div>
+            <input type="number" id="options-er-days" value="30" min="7" max="60"
+              style="width:100%;font-size:13px;padding:4px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="saveOptionsCfg()">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Ziel-DTE (Laufzeit)</div>
+            <input type="number" id="options-dte" value="30" min="7" max="60"
+              style="width:100%;font-size:13px;padding:4px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
+              onchange="saveOptionsCfg()">
+          </div>
+        </div>
+        <div id="options-cfg-status" style="font-size:10px;color:var(--text3)">— Standard-Werte</div>
+      </div>
       <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
         <span><i class="ti ti-table"></i> Listen-Editor</span>
         <div style="display:flex;gap:6px">
@@ -1898,6 +1968,7 @@ function showPanel(id){
     renderAdminWLList();
     try{ schedulerLoadUI(); }catch(e){}
     try{ autoTopLoadUI(); }catch(e){}
+    try{ loadOptionsCfgUI(); }catch(e){}
   }
   if(id==='ibd'){
     updateSessionBar();
@@ -8511,7 +8582,8 @@ async function openKiBriefing() {
   // Strategie-spezifischen Prompt holen
   const stratCfg = KI_STRAT_CONFIG[_kiStrat] || KI_STRAT_CONFIG.ko;
   const vixForPrompt = (typeof vixStr !== 'undefined' && vixStr) ? vixStr : (_vixLevel ? _vixLevel.toFixed(1) : 'unbekannt');
-  const prompt = stratCfg.prompt({ marktkontext: marktkontext, vixStr: vixForPrompt });
+  const optsCfg = getOptionsCfg();
+  const prompt = stratCfg.prompt({ marktkontext: marktkontext, vixStr: vixForPrompt, optsCfg: optsCfg });
   const dummy = 'Du bist ein erfahrener Knock-out-Trading-Experte'; // ersetzt durch stratCfg.prompt
 
   try {
@@ -8639,7 +8711,16 @@ const KI_STRAT_CONFIG = {
       return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Options-Trader mit Fokus auf Wheel-Strategie (CSP + Covered Calls).\n\n'
         + '⚠️ WICHTIG: Du gibst keine Anlageberatung. Alle Empfehlungen sind informativer Natur.\n'
         + 'Jede Position MUSS vor dem Einstieg auf folgende Kriterien geprüft werden:\n'
-        + '  1. HVP aus Scandaten nutzen (Feld "HVP:XX%"): >50% = erhöhte Vol = gute Prämienqualität; 30-50% = mittel; <30% = CSP vermeiden. Wenn kein HVP: in IBKR IV-Rank prüfen, NIEMALS schätzen.\n'
+        + '  VORAUSWAHL — HARTES AUSSCHLUSS-KRITERIUM:\n'
+        + '    • HVP < ' + ctx.optsCfg.minHvp + '%: Titel für CSP AUSSCHLIESSEN — Prämien zu niedrig (Näherung via HV)\n'
+        + '    • Kurs außerhalb $' + ctx.optsCfg.minPrice + '–$' + ctx.optsCfg.maxPrice + ': Titel ausschließen\n'
+        + '    • Kein HVP verfügbar: Titel mit Hinweis "IV in IBKR prüfen" separat aufführen\n'
+        + '  1. HVP-Bewertung (Feld "HVP:XX%" aus Scandaten — kein echter IV-Rank, NUR Näherung!):\n'
+        + '     HVP ≥ ' + ctx.optsCfg.idealHvp + '%: ⭐ Ideal für CSP-Verkauf\n'
+        + '     HVP ' + ctx.optsCfg.goodHvp + '–' + (ctx.optsCfg.idealHvp-1) + '%: ✅ Gut\n'
+        + '     HVP ' + ctx.optsCfg.minHvp + '–' + (ctx.optsCfg.goodHvp-1) + '%: ⚠️ Grenzwertig — exakt in IBKR prüfen\n'
+        + '     HVP < ' + ctx.optsCfg.minHvp + '%: ❌ Ausgeschlossen (siehe oben)\n'
+        + '     Kein HVP: ❓ IV in IBKR prüfen — NICHT schätzen\n'
         + '  2. Open Interest am gewählten Strike > 500 Kontrakte (Slippage-Schutz) — in IBKR/CapTrader prüfen\n'
         + '  3. Bid-Ask-Spread der Option < 10% der Prämie\n'
         + '  4. Kein Earnings-Event innerhalb der Laufzeit\n\n'
@@ -8746,10 +8827,21 @@ const KI_STRAT_CONFIG = {
         + ctx.marktkontext
         + '\n\nAUFGABE:\n'
         + '1. MARKTUMFELD: ATM-CSPs sinnvoll? VIX-Level und Implikation. (2-3 Sätze)\n'
-        + '2. TOP 3 LUDWIG-KANDIDATEN: Für jeden Titel:\n'
-        + '   a) Ludwig-Eignung: Kurs=$XX aus Scandaten (NICHT EMA200!). Kurs $15-80? EMA200-Abstand? HVP aus Scandaten: >50% = ATM-CSP empfohlen, 30-50% = Prämie prüfen, <30% = CSP vermeiden. Wenn kein HVP: "HVP nicht verfügbar — IV in IBKR prüfen" schreiben.\n'
+        + '2. TOP 3 LUDWIG-KANDIDATEN — VORAUSWAHL (PFLICHT!):\n'
+        + '   SCHRITT 1 — HARTES AUSSCHLUSS-KRITERIUM (vor jeder weiteren Prüfung!):\n'
+        + '   • HVP < ' + ctx.optsCfg.minHvp + '%: Titel SOFORT ausschließen — Prämien zu niedrig für Ludwig-Strategie\n'
+        + '   • Kurs außerhalb $' + ctx.optsCfg.minPrice + '–$' + ctx.optsCfg.maxPrice + ': Titel SOFORT ausschließen\n'
+        + '   • ER innerhalb ' + ctx.optsCfg.erDays + ' Tage: Titel SOFORT ausschließen\n'
+        + '   • Wenn nach Ausschluss weniger als 3 Titel übrig: weniger als 3 empfehlen, NICHT auffüllen!\n'
+        + '   SCHRITT 2 — Für jeden verbleibenden Kandidaten:\n'
+        + '   a) Ludwig-Eignung: Kurs=$XX (aus "Kurs:$"-Feld). EMA200-Abstand. HVP-Wert aus Scandaten mit Bewertung:\n'
+        + '      HVP ≥ ' + ctx.optsCfg.idealHvp + '%: ⭐ Ideal — hohe Prämien erwartet\n'
+        + '      HVP ' + ctx.optsCfg.goodHvp + '–' + (ctx.optsCfg.idealHvp-1) + '%: ✅ Gut — ausreichende Prämienqualität\n'
+        + '      HVP ' + ctx.optsCfg.minHvp + '–' + (ctx.optsCfg.goodHvp-1) + '%: ⚠️ Grenzwertig — Prämie genau prüfen\n'
+        + '      HVP < ' + ctx.optsCfg.minHvp + '%: ❌ Nicht empfohlen — wurde in Schritt 1 bereits ausgeschlossen\n'
+        + '      Kein HVP: "HVP nicht verfügbar — IV in IBKR prüfen" ZWINGEND schreiben\n'
         + '   b) ATM-Strike Empfehlung in $ (nahe aktuellem Kurs)\n'
-        + '   c) Laufzeit: nächster 3. Freitag des Monats (~30 DTE)\n'
+        + '   c) Laufzeit: nächster 3. Freitag des Monats (~' + ctx.optsCfg.dte + ' DTE)\n'
         + '   d) Prämien-SCHÄTZUNG: HVP aus Scandaten verwenden falls vorhanden (⚠️ kein echter IV-Rank!). Bei VIX ' + ctx.vixStr + ' und ATM-Strike: IMMER als Schätzung kennzeichnen + "→ exakt in IBKR Option Chain prüfen". 70%-Gewinn-Ziel = 0.30 × Prämie. Wenn kein HVP: NICHT erfinden.\n'
         + '   e) Roll-Szenario (⚠️ SCHÄTZUNG — exakte Strikes nur in IBKR sichtbar!): Stufe-1-Roll ≈ Kurs − 2.5% des aktuellen Kurses aus "Kurs:$"-Feld. Nur Kurs aus Scandaten verwenden, keine Kursziele erfinden.\n'
         + '   f) PFLICHT-CHECKS:\n'
@@ -9460,6 +9552,69 @@ function autoTopClearAll() {
   saveWatchlistsWithSync(wls);
   updateWatchlistDropdown();
   showKoToast('📊 Alle Auto-Top-Listen gelöscht');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OPTIONS-KONFIGURATION
+// ══════════════════════════════════════════════════════════════════════════════
+var OPTIONS_CFG_KEY = 'ko_options_cfg';
+
+function getOptionsCfg() {
+  try {
+    var d = JSON.parse(localStorage.getItem(OPTIONS_CFG_KEY) || '{}');
+    return {
+      minPrice: d.minPrice != null ? d.minPrice : 15,
+      maxPrice: d.maxPrice != null ? d.maxPrice : 150,
+      minHvp:   d.minHvp   != null ? d.minHvp   : 30,
+      goodHvp:  d.goodHvp  != null ? d.goodHvp  : 50,
+      idealHvp: d.idealHvp != null ? d.idealHvp : 70,
+      erDays:   d.erDays   != null ? d.erDays   : 30,
+      dte:      d.dte      != null ? d.dte      : 30
+    };
+  } catch(e) {
+    return { minPrice:15, maxPrice:150, minHvp:30, goodHvp:50, idealHvp:70, erDays:30, dte:30 };
+  }
+}
+
+function saveOptionsCfg() {
+  var cfg = {
+    minPrice: parseFloat(document.getElementById('options-min-price').value) || 15,
+    maxPrice: parseFloat(document.getElementById('options-max-price').value) || 150,
+    minHvp:   parseInt(document.getElementById('options-min-hvp').value)   || 30,
+    goodHvp:  parseInt(document.getElementById('options-good-hvp').value)  || 50,
+    idealHvp: parseInt(document.getElementById('options-ideal-hvp').value) || 70,
+    erDays:   parseInt(document.getElementById('options-er-days').value)   || 30,
+    dte:      parseInt(document.getElementById('options-dte').value)       || 30
+  };
+  localStorage.setItem(OPTIONS_CFG_KEY, JSON.stringify(cfg));
+  var st = document.getElementById('options-cfg-status');
+  if (st) {
+    st.textContent = '✓ Gespeichert · $' + cfg.minPrice + '–$' + cfg.maxPrice
+      + ' · HVP min ' + cfg.minHvp + '% · ER-Schutz ' + cfg.erDays + 'T · DTE ' + cfg.dte;
+    st.style.color = 'var(--green)';
+    setTimeout(function(){ st.style.color = 'var(--text3)'; }, 2500);
+  }
+}
+
+function loadOptionsCfgUI() {
+  var cfg = getOptionsCfg();
+  var fields = {
+    'options-min-price': cfg.minPrice,
+    'options-max-price': cfg.maxPrice,
+    'options-min-hvp':   cfg.minHvp,
+    'options-good-hvp':  cfg.goodHvp,
+    'options-ideal-hvp': cfg.idealHvp,
+    'options-er-days':   cfg.erDays,
+    'options-dte':       cfg.dte
+  };
+  Object.keys(fields).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = fields[id];
+  });
+  var st = document.getElementById('options-cfg-status');
+  if (st) st.textContent = '$' + cfg.minPrice + '–$' + cfg.maxPrice
+    + ' · HVP min ' + cfg.minHvp + '% · HVP gut ' + cfg.goodHvp + '% · HVP ideal ' + cfg.idealHvp + '%'
+    + ' · ER-Schutz ' + cfg.erDays + 'T · DTE ' + cfg.dte;
 }
 
 function schedulerUpdateUI() {
