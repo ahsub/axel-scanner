@@ -8490,13 +8490,21 @@ async function openKiBriefing(defaultStrat) {
   // Reset zur Default-Strategie (oder übergebener Strategie)
   var startStrat = defaultStrat || 'ko';
   _kiStrat = startStrat;
+  // Reset ALL buttons to inactive first
   document.querySelectorAll('.ki-strat-btn').forEach(function(b) {
-    var isActive = b.dataset.strat === startStrat;
-    b.style.background = isActive ? 'rgba(99,102,241,0.15)' : 'transparent';
-    b.style.color = isActive ? '#818cf8' : (b.dataset.strat === 'value' ? 'var(--text3)' : b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--text2)');
-    b.style.borderColor = isActive ? '#818cf8' : (b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--border2)');
-    if (isActive) b.classList.add('active-strat'); else b.classList.remove('active-strat');
+    b.classList.remove('active-strat');
+    b.style.background = 'transparent';
+    b.style.borderColor = b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--border2)';
+    b.style.color = b.dataset.strat === 'value' ? 'var(--text3)' : b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--text2)';
   });
+  // Activate only the correct button
+  var activeBtn = document.querySelector('.ki-strat-btn[data-strat="' + startStrat + '"]');
+  if (activeBtn) {
+    activeBtn.classList.add('active-strat');
+    activeBtn.style.background = 'rgba(99,102,241,0.15)';
+    activeBtn.style.borderColor = '#818cf8';
+    activeBtn.style.color = '#818cf8';
+  }
   // Hint aktualisieren
   var cfg = KI_STRAT_CONFIG[startStrat];
   if (cfg) document.getElementById('ki-strat-hint').textContent = cfg.hint || '';
@@ -8523,7 +8531,7 @@ async function openKiBriefing(defaultStrat) {
       sym: sym,
       score: score,
       grade: state.scoreGrade || '?',
-      price: state.price || 0,
+      price: (state.price || raw.price || 0),
       ma200: state.ma200 || null,
       sepa: state.sepaScore || 0,
       bullCount: state.bullCount || 0,
@@ -8553,8 +8561,6 @@ async function openKiBriefing(defaultStrat) {
           : Math.round((price - swing.low) / (swing.high - swing.low) * 100);
         return { zone: zone, retrace: retrace, direction: swing.direction };
       })(),
-      price: raw.price || 0,
-      dist52wHigh: state.dist52wHigh || 0
     });
   });
 
