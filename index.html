@@ -183,6 +183,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .info-box{background:var(--blue-bg);border:0.5px solid rgba(79,142,247,0.25);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--accent);margin-bottom:1rem}
 .warn-box{background:var(--amber-bg);border:0.5px solid rgba(240,169,58,0.25);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--amber);margin-top:8px}
 .danger-box{background:var(--red-bg);border:0.5px solid rgba(240,86,86,0.25);border-radius:var(--radius-sm);padding:.75rem 1rem;font-size:13px;color:var(--red);margin-top:6px}
+.ki-dd-btn{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text2);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;transition:background .15s}
+.ki-dd-btn:hover{background:var(--bg3);color:var(--text)}
 </style>
 </head>
 <body>
@@ -267,11 +269,26 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <button class="btn btn-primary" onclick="runScan()" id="scan-btn">
           <i class="ti ti-player-play"></i> Scan
         </button>
-        <button class="btn" onclick="openKiBriefing()"
-          style="background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.2));border-color:#818cf8;color:#818cf8;font-size:13px"
-          title="KI-Analyse der Scanner-Ergebnisse">
-          <i class="ti ti-brain"></i>
-        </button>
+        <div style="position:relative;display:inline-block" id="ki-dropdown-wrap">
+          <button class="btn" onclick="toggleKiDropdown()"
+            style="background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.2));border-color:#818cf8;color:#818cf8;font-size:13px;display:flex;align-items:center;gap:4px"
+            title="KI-Analyse der Scanner-Ergebnisse">
+            <i class="ti ti-brain"></i>
+            <i class="ti ti-chevron-down" style="font-size:10px"></i>
+          </button>
+          <div id="ki-strat-dropdown" style="display:none;position:absolute;right:0;top:110%;background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:6px;z-index:500;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
+            <div style="font-size:10px;color:var(--text3);padding:2px 6px 6px;border-bottom:0.5px solid var(--border);margin-bottom:4px">KI-ANALYSE STARTEN:</div>
+            <button onclick="openKiBriefing('ko');hideKiDropdown()" class="ki-dd-btn">⚡ KO-Trading</button>
+            <button onclick="openKiBriefing('momentum');hideKiDropdown()" class="ki-dd-btn">📈 Momentum</button>
+            <button onclick="openKiBriefing('options');hideKiDropdown()" class="ki-dd-btn">🎯 Options-Wheel</button>
+            <button onclick="openKiBriefing('swing');hideKiDropdown()" class="ki-dd-btn">🔄 Swing-Trading</button>
+            <button onclick="openKiBriefing('dividend');hideKiDropdown()" class="ki-dd-btn">💰 Dividend Growth</button>
+            <button onclick="openKiBriefing('ludwig');hideKiDropdown()" class="ki-dd-btn" style="color:#a371f7">⚙️ Optionen (E. Ludwig)</button>
+            <div style="border-top:0.5px solid var(--border);margin-top:4px;padding-top:4px">
+              <button onclick="openKiBriefing();hideKiDropdown()" class="ki-dd-btn" style="color:var(--text3);font-size:10px">🧠 Alle Strategien (Modal)</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem">
         <span style="font-size:11px;color:var(--text3);white-space:nowrap">Zeitrahmen:</span>
@@ -2540,7 +2557,7 @@ function sortAndRenderCards(tickers){
         '<i class="ti ti-star"></i> ≥2/3 speichern ('+(bull3+bull2)+')</button>'+
       '<button onclick="saveFromScan(0)" class="btn btn-sm" style="font-size:10px;padding:2px 7px">'+
         '<i class="ti ti-star"></i> Alle ('+filteredResults.length+')</button>'+
-      '<button onclick="openKiBriefing()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.15));border-color:#818cf8;color:#818cf8"><i class=\"ti ti-brain\"></i> KI-Briefing</button>'+
+      '<button onclick="toggleKiDropdown()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.15));border-color:#818cf8;color:#818cf8"><i class=\"ti ti-brain\"></i> KI ▾</button>'+
       
       '<button onclick="showSectorHeatmap()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">'+
         '<i class="ti ti-chart-bar"></i> Sektoren</button>'+
@@ -8409,11 +8426,46 @@ async function scanFiboCustom() {
 // ═══════════════════════════════════════════════════════════════
 //  KI-BRIEFING
 // ═══════════════════════════════════════════════════════════════
-async function openKiBriefing() {
+function toggleKiDropdown() {
+  var dd = document.getElementById('ki-strat-dropdown');
+  if (!dd) return;
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  // Close on outside click
+  if (dd.style.display === 'block') {
+    setTimeout(function() {
+      document.addEventListener('click', function handler(e) {
+        if (!document.getElementById('ki-dropdown-wrap').contains(e.target)) {
+          dd.style.display = 'none';
+          document.removeEventListener('click', handler);
+        }
+      });
+    }, 10);
+  }
+}
+
+function hideKiDropdown() {
+  var dd = document.getElementById('ki-strat-dropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+async function openKiBriefing(defaultStrat) {
   const modal = document.getElementById('ki-briefing-modal');
   const content = document.getElementById('ki-briefing-content');
   if (!modal || !content) return;
   modal.style.display = 'block';
+  // Reset zur Default-Strategie (oder übergebener Strategie)
+  var startStrat = defaultStrat || 'ko';
+  _kiStrat = startStrat;
+  document.querySelectorAll('.ki-strat-btn').forEach(function(b) {
+    var isActive = b.dataset.strat === startStrat;
+    b.style.background = isActive ? 'rgba(99,102,241,0.15)' : 'transparent';
+    b.style.color = isActive ? '#818cf8' : (b.dataset.strat === 'value' ? 'var(--text3)' : b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--text2)');
+    b.style.borderColor = isActive ? '#818cf8' : (b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--border2)');
+    if (isActive) b.classList.add('active-strat'); else b.classList.remove('active-strat');
+  });
+  // Hint aktualisieren
+  var cfg = KI_STRAT_CONFIG[startStrat];
+  if (cfg) document.getElementById('ki-strat-hint').textContent = cfg.hint || '';
 
   const apiKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_anthropic_key');
   if (!apiKey) {
@@ -8798,7 +8850,7 @@ const KI_STRAT_CONFIG = {
     }
   },
   ludwig: {
-    hint: '⚙️ Ludwig-Strategie: ATM-CSP · Systematisches Rollen · 3-Stufen-Roll · Eric Ludwig',
+    hint: '⚙️ Optionen (E. Ludwig)-Strategie: ATM-CSP · Systematisches Rollen · 3-Stufen-Roll · Eric Ludwig',
     color: '#a371f7',
     prompt: function(ctx) {
       return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Options-Trader der die "Unschlagbare Optionsstrategie" nach Eric Ludwig anwendet.\n\n'
@@ -9148,8 +9200,8 @@ function csvSaveConfirm(tickers) {
         <button class="ki-strat-btn" data-strat="ludwig"
           onclick="setKiStrat(this)"
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #a371f7;background:transparent;color:#a371f7;cursor:pointer"
-          title="ATM-CSP mit systematischem 3-Stufen-Rollen nach Eric Ludwig">
-          ⚙️ Ludwig
+          title="Options-Strategie nach Eric Ludwig: ATM-CSP · Systematisches Rollen · 3-Stufen-Roll">
+          ⚙️ Optionen (E. Ludwig)
         </button>
       </div>
       <div id="ki-strat-hint" style="font-size:10px;color:var(--text3);margin-top:.4rem">
