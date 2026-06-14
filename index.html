@@ -2346,7 +2346,7 @@ async function runScan(){
       }
 
       const intervalMapTD={'15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'};
-      const outputMap={'15m':78,'30m':60,'1h':90,'4h':120,'1d':220};
+      const outputMap={'15m':78,'30m':65,'1h':70,'4h':60,'1d':220}; // Bars: MACD braucht min 35, Ziel ~70
       const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':130};
       let closes=[],volumes=[],timestamps=[],dates=[];
       let dataSource='';
@@ -3321,7 +3321,7 @@ function renderCard(t,state){
     (state._fromTdCache ? '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(120,120,128,0.15);color:var(--text3);margin-left:4px" title="Daten aus lokalem Cache"><i class="ti ti-database" style="font-size:9px"></i> Cache</span>' : '')+
     '<span style="margin-left:auto;display:flex;align-items:center;gap:5px">'+
     (state.rs ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:.03em;background:'+(state.rs>=80?'rgba(52,194,110,0.18)':state.rs>=60?'rgba(79,142,247,0.18)':state.rs<40?'rgba(240,86,86,0.18)':'rgba(255,255,255,0.08)')+';color:'+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--text3)')+';border:0.5px solid '+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--border2)')+'">RS '+state.rs+'</span>' : '')+
-    '<select id="tf-sel-'+state.sym+'" onchange="var _s=this.dataset.sym,_t=this.value;this.value=\'\';if(_t)rescanTickerTF(_s,_t);" onclick="event.stopPropagation()" data-sym="'+state.sym+'"'+
+    '<select id="tf-sel-'+state.sym+'" onchange="var _s=this.dataset.sym,_t=this.value;this.value=\'\';if(_t)setTimeout(function(){rescanTickerTF(_s,_t);},10);" onclick="event.stopPropagation()" data-sym="'+state.sym+'"'+
       ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--border2);color:var(--text2);border-radius:6px;cursor:pointer">'+
       '<option value="">TF</option>'+
       '<option value="15m">15m</option>'+
@@ -8620,12 +8620,20 @@ async function rescanTickerTF(sym, tf) {
 
   const tInfo = activeTickers.find(function(t){ return t.sym===sym; }) || {sym:sym,name:sym};
   const isDeMarket = window.currentMarket==='de';
-  const yfSym = isDeMarket ? sym+'.DE' : sym;
+  // Use EU_TICKER_MAP for correct suffix (same as main scan)
+  var _rMap = isDeMarket && typeof EU_TICKER_MAP !== 'undefined' ? EU_TICKER_MAP[sym] : null;
+  var _rBase = _rMap ? _rMap.sym : sym;
+  var _rSfx = _rMap ? _rMap.sfx : (isDeMarket ? 'DE' : null);
+  const yfSym = _rSfx ? (_rBase + '.' + _rSfx) : sym;
   const daysMap={'15m':5,'30m':7,'1h':59,'4h':59,'1d':130};
+  // Yahoo unterstützt kein 4h → wir nutzen 60m und zeigen es als 4h-Näherung
   const yIntervalMap={'15m':'15m','30m':'30m','1h':'60m','4h':'60m','1d':'1d'};
   // Yahoo Intraday limits: 15m/30m max 60 days, 1h max 730 days
   // Use range parameter for intraday for better compatibility
-  const yRangeMap={'15m':'5d','30m':'1mo','1h':'3mo','4h':'3mo','1d':'6mo'};
+  // Optimale Bar-Anzahl pro Timeframe (Ziel: ~60-80 Bars für MACD/OBV)
+  // 15m: 5T×26=130 max → 5d reicht; 30m: 5T×13=65 → 5d
+  // 1h: 10T×7=70 → 10d; 4h: 30T×2=60 → 1mo; 1T: 130 bars → 6mo
+  const yRangeMap={'15m':'5d','30m':'5d','1h':'10d','4h':'1mo','1d':'6mo'};
 
   try {
     let closes=[],volumes=[],timestamps=[],dates=[];
@@ -8688,7 +8696,8 @@ async function rescanTickerTF(sym, tf) {
     markScanned(sym,false);
     renderCard(tInfo,processData(raw));
     if(card) card.style.opacity='1';
-    showKoToast('✓ ' + sym + ' · ' + tfLabel + ' · ' + closes.length + ' Bars · ' + dataSource);
+    var barNote = closes.length < 35 ? ' ⚠️ zu wenig Bars für MACD' : '';
+    showKoToast('✓ ' + sym + ' · ' + tfLabel + ' · ' + closes.length + ' Bars' + barNote + ' · ' + dataSource);
   } catch(e) {
     console.log('rescanTickerTF error:',sym,e.message);
     if(card){ card.style.opacity='1'; card.innerHTML='<div style="padding:1rem;color:var(--red);font-size:12px">⚠ '+sym+': '+e.message+'</div>'; }
