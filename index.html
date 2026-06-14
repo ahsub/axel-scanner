@@ -301,7 +301,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
         <span style="font-size:11px;color:var(--text3)" id="tf-label">Tageschart · MACD (12/26/9)</span>
       </div>
-      <div id="custom-wrap" style="display:block;margin-bottom:.75rem"><div style="display:flex;gap:6px;align-items:center"><input type="text" id="custom-input" placeholder="AAPL, MSFT, NVDA (kommagetrennt)" style="flex:1"><button class="btn btn-sm" onclick="saveCurrentAsWatchlist()" title="Als neue Watchlist speichern" style="white-space:nowrap;font-size:11px;flex-shrink:0"><i class="ti ti-bookmark-plus"></i> Speichern</button><button class="btn btn-sm" id="update-wl-btn" onclick="updateExistingWatchlist()" title="Aktuelle Watchlist aktualisieren" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)"><i class="ti ti-refresh"></i> WL aktualisieren</button></div></div>
+      <div id="custom-wrap" style="display:block;margin-bottom:.75rem"><div style="display:flex;gap:6px;align-items:center"><input type="text" id="custom-input" placeholder="AAPL, MSFT oder 'Hugo Boss, Hensoldt' (Klarnamen möglich)" style="flex:1" oninput="this.dataset.userTyped='1'"><button class="btn btn-sm" onclick="saveCurrentAsWatchlist()" title="Als neue Watchlist speichern" style="white-space:nowrap;font-size:11px;flex-shrink:0"><i class="ti ti-bookmark-plus"></i> Speichern</button><button class="btn btn-sm" id="update-wl-btn" onclick="updateExistingWatchlist()" title="Aktuelle Watchlist aktualisieren" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)"><i class="ti ti-refresh"></i> WL aktualisieren</button></div></div>
 
       <!-- Kursrahmen-Filter: immer sichtbar direkt unter Ticker-Eingabe -->
       <div id="price-filter-bar" style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem;padding:6px 10px;background:var(--bg2);border-radius:8px;border:0.5px solid var(--border);flex-wrap:wrap">
@@ -2288,12 +2288,13 @@ async function runScan(){
   // Ticker ermitteln — mit Yahoo Search für Klarnamen
   var rawInput = document.getElementById('custom-input');
   var tickers;
-  // Nur Yahoo Search wenn Eingabe echte Klarnamen enthält (Leerzeichen im Wort)
-  var needsSearch = rawInput && rawInput.value.trim() &&
-    rawInput.value.split(',').some(function(s){
-      return s.trim().indexOf(' ') >= 0; // Leerzeichen = Klarname
-    });
-  if (needsSearch) {
+  // Yahoo Search NUR wenn Benutzer explizit Namen eingetippt hat
+  // (data-user-typed Flag wird gesetzt wenn Benutzer im custom-input tippt)
+  var userTyped = rawInput && rawInput.dataset.userTyped === '1';
+  var hasNames = rawInput && rawInput.value.trim() &&
+    rawInput.value.split(',').some(function(s){ return s.trim().indexOf(' ') >= 0; });
+  if (userTyped && hasNames) {
+    rawInput.dataset.userTyped = '0'; // Reset
     tickers = await resolveTickersWithSearch(rawInput.value);
     if (tickers.length) rawInput.value = tickers.map(function(t){return t.sym;}).join(', ');
   } else {
