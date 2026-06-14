@@ -1593,12 +1593,24 @@ function setErCache(data) {
   try { data._ts = Date.now(); sessionStorage.setItem(ER_CACHE_KEY, JSON.stringify(data)); } catch(e) {}
 }
 
+// Finnhub rate limiter: max 25 req/min free tier
+var _fhLastCall = 0;
+var _fhMinDelay = 2500; // 2.5s between calls = 24/min
+
+async function fhThrottle() {
+  var now = Date.now();
+  var wait = _fhMinDelay - (now - _fhLastCall);
+  if (wait > 0) await new Promise(function(r){ setTimeout(r, wait); });
+  _fhLastCall = Date.now();
+}
+
 async function fetchEarningsDate(sym) {
   const cache = getErCache();
   if (cache[sym] !== undefined) return cache[sym];
   const key = getFinnhubKey();
   if (!key) return null;
   try {
+    await fhThrottle();
     const today = new Date();
     const from = today.toISOString().split('T')[0];
     const to = new Date(today.getTime() + 45*24*60*60*1000).toISOString().split('T')[0];
@@ -2195,8 +2207,13 @@ async function runScan(){
             const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
             if(res){
               const q=res.indicators.quote[0];
-              closes=q.close.map(function(v){return v||0;});
-              volumes=q.volume.map(function(v){return v||0;});
+              if(!q||!q.close||!q.close.length) { throw new Error('YF: keine Kursdaten'); }
+              // Null-Werte filtern (Yahoo gibt manchmal null für einzelne Bars)
+              var rawClose=q.close, rawVol=q.volume||[], rawTs=res.timestamp||[];
+              var validIdx=rawClose.map(function(_,i){return i;}).filter(function(i){return rawClose[i]!=null;});
+              closes=validIdx.map(function(i){return rawClose[i]||0;});
+              volumes=validIdx.map(function(i){return rawVol[i]||0;});
+              timestamps=validIdx.map(function(i){return rawTs[i];});
               timestamps=res.timestamp;
               dates=timestamps.map(function(ts){
                 const d=new Date(ts*1000);
@@ -2219,6 +2236,36 @@ async function runScan(){
             }
           }
         }catch(e3){ console.log('YF error:',e3.message); }
+      }
+
+      // DE-Ticker Fallback: .DE → .F (Frankfurt Börse)
+      if(closes.length<20 && isDeMarket){
+        try{
+          var yfSymF=t.sym+'.F';
+          var to2=Math.floor(Date.now()/1000),from2=to2-60*60*24*130;
+          var yfUrl2='https://query1.finance.yahoo.com/v8/finance/chart/'+yfSymF
+            +'?interval=1d&period1='+from2+'&period2='+to2+'&includePrePost=false';
+          var r2=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl2));
+          if(r2.ok){
+            var j2=await r2.json();
+            var res2=j2&&j2.chart&&j2.chart.result&&j2.chart.result[0];
+            if(res2){
+              var q2=res2.indicators.quote[0];
+              if(q2&&q2.close&&q2.close.length){
+                var rc2=q2.close,rv2=q2.volume||[],rt2=res2.timestamp||[];
+                var vi2=rc2.map(function(_,i){return i;}).filter(function(i){return rc2[i]!=null;});
+                closes=vi2.map(function(i){return rc2[i]||0;});
+                volumes=vi2.map(function(i){return rv2[i]||0;});
+                timestamps=vi2.map(function(i){return rt2[i];});
+                dates=timestamps.map(function(ts){
+                  var d=new Date(ts*1000);
+                  return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');
+                });
+                dataSource='Yahoo (.F)';
+              }
+            }
+          }
+        }catch(e4){ console.log('YF .F error:',e4.message); }
       }
 
       if(closes.length<20) throw new Error('Keine Daten verfügbar (TD & YF via Proxy)');
