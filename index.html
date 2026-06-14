@@ -270,7 +270,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <i class="ti ti-player-play"></i> Scan
         </button>
         <div style="position:relative;display:inline-block" id="ki-dropdown-wrap">
-          <button class="btn" onclick="toggleKiDropdown()"
+          <button class="btn" onclick="toggleKiDropdown(this)"
             style="background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.2));border-color:#818cf8;color:#818cf8;font-size:13px;display:flex;align-items:center;gap:4px"
             title="KI-Analyse der Scanner-Ergebnisse">
             <i class="ti ti-brain"></i>
@@ -2557,7 +2557,7 @@ function sortAndRenderCards(tickers){
         '<i class="ti ti-star"></i> ≥2/3 speichern ('+(bull3+bull2)+')</button>'+
       '<button onclick="saveFromScan(0)" class="btn btn-sm" style="font-size:10px;padding:2px 7px">'+
         '<i class="ti ti-star"></i> Alle ('+filteredResults.length+')</button>'+
-      '<button onclick="toggleKiDropdown()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.15));border-color:#818cf8;color:#818cf8"><i class=\"ti ti-brain\"></i> KI ▾</button>'+
+      '<button onclick="toggleKiDropdown(this)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.15));border-color:#818cf8;color:#818cf8"><i class=\"ti ti-brain\"></i> KI ▾</button>'+
       
       '<button onclick="showSectorHeatmap()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">'+
         '<i class="ti ti-chart-bar"></i> Sektoren</button>'+
@@ -8426,26 +8426,60 @@ async function scanFiboCustom() {
 // ═══════════════════════════════════════════════════════════════
 //  KI-BRIEFING
 // ═══════════════════════════════════════════════════════════════
-function toggleKiDropdown() {
-  var dd = document.getElementById('ki-strat-dropdown');
-  if (!dd) return;
-  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
-  // Close on outside click
-  if (dd.style.display === 'block') {
-    setTimeout(function() {
-      document.addEventListener('click', function handler(e) {
-        if (!document.getElementById('ki-dropdown-wrap').contains(e.target)) {
-          dd.style.display = 'none';
-          document.removeEventListener('click', handler);
-        }
-      });
-    }, 10);
+function toggleKiDropdown(anchorEl) {
+  // Remove existing popup if open
+  var existing = document.getElementById('ki-float-menu');
+  if (existing) { existing.remove(); return; }
+
+  var menu = document.createElement('div');
+  menu.id = 'ki-float-menu';
+  menu.style.cssText = 'position:fixed;z-index:3000;background:var(--bg2);border:0.5px solid var(--border2);'
+    + 'border-radius:12px;padding:6px;box-shadow:0 8px 32px rgba(0,0,0,0.5);min-width:210px';
+
+  // Position near anchor or center-top
+  if (anchorEl) {
+    var r = anchorEl.getBoundingClientRect();
+    var left = Math.min(r.left, window.innerWidth - 220);
+    menu.style.top = (r.bottom + 6) + 'px';
+    menu.style.left = Math.max(8, left) + 'px';
+  } else {
+    menu.style.top = '80px';
+    menu.style.left = '50%';
+    menu.style.transform = 'translateX(-50%)';
   }
+
+  var strategies = [
+    { strat:'ko',       label:'⚡ KO-Trading' },
+    { strat:'momentum', label:'📈 Momentum' },
+    { strat:'options',  label:'🎯 Options-Wheel' },
+    { strat:'swing',    label:'🔄 Swing-Trading' },
+    { strat:'dividend', label:'💰 Dividend Growth' },
+    { strat:'ludwig',   label:'⚙️ Optionen (E. Ludwig)', color:'#a371f7' },
+  ];
+
+  var html = '<div style="font-size:10px;color:var(--text3);padding:2px 8px 5px;border-bottom:0.5px solid var(--border);margin-bottom:3px">KI-ANALYSE STARTEN:</div>';
+  strategies.forEach(function(s) {
+    html += '<button onclick="hideKiDropdown();openKiBriefing(\'' + s.strat + '\')" '
+      + 'class="ki-dd-btn"' + (s.color ? ' style="color:' + s.color + '"' : '') + '>'
+      + s.label + '</button>';
+  });
+  menu.innerHTML = html;
+  document.body.appendChild(menu);
+
+  // Close on outside click
+  setTimeout(function() {
+    document.addEventListener('click', function handler(e) {
+      if (!menu.contains(e.target) && e.target !== anchorEl) {
+        menu.remove();
+        document.removeEventListener('click', handler);
+      }
+    });
+  }, 50);
 }
 
 function hideKiDropdown() {
-  var dd = document.getElementById('ki-strat-dropdown');
-  if (dd) dd.style.display = 'none';
+  var m = document.getElementById('ki-float-menu');
+  if (m) m.remove();
 }
 
 async function openKiBriefing(defaultStrat) {
