@@ -909,6 +909,24 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
         <div id="options-cfg-status" style="font-size:10px;color:var(--text3)">— Standard-Werte</div>
       </div>
+
+      <!-- ═══ NOTFALL-RESET ════════════════════════════════════════════════ -->
+      <div class="sec"><i class="ti ti-alert-triangle"></i> Notfall-Reset</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:12px;color:var(--text3);margin-bottom:.75rem">
+          Wenn Watchlisten korrupte Daten enthalten (ISINs, falsche Ticker):
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="resetCorruptWL()" 
+            style="color:var(--amber);border-color:var(--amber)">
+            <i class="ti ti-refresh"></i> Alle Watchlisten löschen
+          </button>
+          <button class="btn btn-sm" onclick="resetAllStorage()"
+            style="color:var(--red);border-color:var(--red)">
+            <i class="ti ti-trash"></i> Kompletter Reset (alle Daten)
+          </button>
+        </div>
+      </div>
       <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
         <span><i class="ti ti-table"></i> Listen-Editor</span>
         <div style="display:flex;gap:6px">
@@ -10205,6 +10223,29 @@ function saveOptionsCfg() {
     st.style.color = 'var(--green)';
     setTimeout(function(){ st.style.color = 'var(--text3)'; }, 2500);
   }
+}
+
+function resetCorruptWL() {
+  if (!confirm('Alle Watchlisten löschen? (Scan-Konfigurationen bleiben erhalten)')) return;
+  localStorage.removeItem('ko_watchlists');
+  localStorage.removeItem('ko_wl_timestamps');
+  updateWatchlistDropdown();
+  renderAdminWLList();
+  showKoToast('✓ Alle Watchlisten gelöscht — bitte neu anlegen');
+}
+
+function resetAllStorage() {
+  if (!confirm('ALLE Scanner-Daten löschen? (API-Keys, Watchlisten, Einstellungen)\nDies kann nicht rückgängig gemacht werden!')) return;
+  // Behalte nur API-Keys
+  var td = localStorage.getItem('td_api_key');
+  var ant = localStorage.getItem('ant_api_key');
+  var pin = localStorage.getItem('ko_pin_hash');
+  localStorage.clear();
+  if (td) localStorage.setItem('td_api_key', td);
+  if (ant) localStorage.setItem('ant_api_key', ant);
+  if (pin) localStorage.setItem('ko_pin_hash', pin);
+  showKoToast('✓ Reset abgeschlossen — Seite wird neu geladen');
+  setTimeout(function(){ location.reload(); }, 1500);
 }
 
 function loadOptionsCfgUI() {
