@@ -2237,6 +2237,20 @@ async function runScan(){
         const rsResult=calcRS(closes,spyData);
         if(rsResult){ raw.rs=rsResult.rs; raw.rsData=rsResult; }
       }
+      // IV-Percentile (nur US-Aktien, nur 1T-Scan, nicht-blockierend)
+      if(!isDeMarket && effectiveTF==='1d' && closes.length>=42){
+        getIVPercentile(t.sym, closes).then(function(ivResult){
+          if(ivResult && tickerData[t.sym]){
+            tickerData[t.sym]._ivp = ivResult;
+            // Karte neu rendern wenn schon angezeigt
+            var el = document.getElementById('card-'+t.sym);
+            if(el && el.querySelector('.ivp-badge')){
+              el.querySelector('.ivp-badge').textContent = 'IVP ' + ivResult.ivp + '%';
+              el.querySelector('.ivp-badge').style.color = ivpColor(ivResult.ivp);
+            }
+          }
+        }).catch(function(){});
+      }
       tickerData[t.sym]=raw;
       // PDH/PDL aus Scan-Daten übernehmen (bereits im TD-Block extrahiert)
       if(typeof _pdhlFromScan !== 'undefined' && _pdhlFromScan){
@@ -2919,6 +2933,21 @@ function renderCard(t,state){
         +'padding:5px 8px;border-radius:6px;background:'+bg+';margin-bottom:6px">'
         +'<span style="font-size:11px;font-weight:600;color:'+col+'">📊 '+label+'</span>'
         +'<span style="font-size:10px;color:'+col+'">'+'EMA200: $'+ma200.toFixed(0)+' · '+hint+'</span>'
+        +'</div>';
+    }())+
+    (function(){
+      // IVP-Badge — wird async befüllt, daher Platzhalter mit Klasse
+      var ivpData = state._ivp;
+      var ivp = ivpData ? ivpData.ivp : null;
+      var atmIV = ivpData ? ivpData.atmIV : null;
+      var col = ivpColor(ivp);
+      var hint = ivpLabel(ivp);
+      var ivpText = ivp != null ? 'IVP\u00A0' + ivp + '%' : '⏳ IVP…';
+      var atmText = atmIV != null ? ' · IV\u00A0' + atmIV + '%' : '';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;'
+        +'padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px">'
+        +'<span class="ivp-badge" style="font-size:11px;font-weight:600;color:'+col+'">📈 '+ivpText+'</span>'
+        +'<span style="font-size:10px;color:'+col+'">'+atmText+' · '+hint+'</span>'
         +'</div>';
     }())+
     (state._er?'<div style="font-size:11px;padding:4px 8px;border-radius:6px;margin-bottom:6px;background:'+(state._er.daysUntil<=7?'rgba(240,86,86,0.12)':state._er.daysUntil<=14?'rgba(240,169,58,0.12)':'rgba(255,255,255,0.04)')+';color:'+(state._er.daysUntil<=7?'var(--red)':state._er.daysUntil<=14?'var(--amber)':'var(--text3)')+'"><i class="ti ti-calendar-event"></i> Earnings: '+state._er.date+' (in '+(parseInt(state._er.daysUntil)||'?')+' T) '+(state._er.time&&state._er.time==='amc'?'NC ':'')+(state._er.time&&state._er.time==='bmo'?'VM ':'')+( state._er.daysUntil<=7?'⚠️ Sehr nah — KO-Abstand ≥25%!':state._er.daysUntil<=14?'📅 Bald — erhoehten KO-Abstand waehlen':'📊 Kein sofortiges Risiko')+'</div>':'<div style="font-size:11px;padding:4px 8px;border-radius:6px;margin-bottom:6px;background:rgba(255,255,255,0.03);color:var(--text3)"><i class="ti ti-calendar-event"></i> Kein Earnings in den naechsten 45 Tagen</div>')+
@@ -5414,6 +5443,107 @@ function calcRS(stockCloses, spyCloses){
   const rs=Math.max(1,Math.min(99,Math.round(50+(relPerf/30)*49)));
   return {rs:rs, stockPerf:+stockPerf.toFixed(1), spyPerf:+spyPerf.toFixed(1), relPerf:+relPerf.toFixed(1)};
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// IV-PERCENTILE: ATM-IV aus Yahoo Options-Chain + HV-20 aus Kurshistorie
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Berechnet HV-20 Zeitreihe aus Schlusskursen (annualisiert)
+function calcHV20Series(closes) {
+  var result = [];
+  for (var i = 21; i <= closes.length; i++) {
+    var slice = closes.slice(i - 21, i);
+    var returns = [];
+    for (var j = 1; j < slice.length; j++) {
+      returns.push(Math.log(slice[j] / slice[j-1]));
+    }
+    var mean = returns.reduce(function(a,b){ return a+b; }, 0) / returns.length;
+    var variance = returns.reduce(function(a,b){ return a + Math.pow(b-mean,2); }, 0) / (returns.length-1);
+    result.push(Math.sqrt(variance) * Math.sqrt(252));
+  }
+  return result;
+}
+
+// Berechnet IV-Percentile: Anteil der HV-20-Werte die unter der aktuellen ATM-IV liegen
+function calcIVPercentile(atmIV, hvSeries) {
+  if (!hvSeries || hvSeries.length < 20 || atmIV == null) return null;
+  var below = hvSeries.filter(function(v){ return v < atmIV; }).length;
+  return Math.round(below / hvSeries.length * 100);
+}
+
+// Holt ATM-IV aus Yahoo Finance Options-Chain (nächste Expiry)
+var _ivCache = {};
+var IV_CACHE_TTL = 4 * 60 * 60 * 1000; // 4h
+
+async function fetchIVData(sym) {
+  // Cache prüfen
+  var cached = _ivCache[sym];
+  if (cached && (Date.now() - cached.ts) < IV_CACHE_TTL) return cached;
+
+  try {
+    var url = 'https://query2.finance.yahoo.com/v7/finance/options/' + sym + '?includeExpiredOptions=false';
+    var proxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url);
+    var r = await fetch(proxyUrl);
+    if (!r.ok) return null;
+    var j = await r.json();
+    var chain = j && j.optionChain && j.optionChain.result && j.optionChain.result[0];
+    if (!chain) return null;
+
+    var price = chain.quote && chain.quote.regularMarketPrice;
+    if (!price) return null;
+
+    // ATM-IV: Calls und Puts nahe aktuellem Kurs mitteln
+    var calls = (chain.options && chain.options[0] && chain.options[0].calls) || [];
+    var puts  = (chain.options && chain.options[0] && chain.options[0].puts)  || [];
+    var allContracts = calls.concat(puts);
+
+    // Nur Kontrakte die nahe am Geld sind (Strike ±10% vom Kurs)
+    var atm = allContracts.filter(function(c) {
+      return c.strike && Math.abs(c.strike - price) / price < 0.10 && c.impliedVolatility > 0;
+    });
+
+    if (atm.length === 0) return null;
+
+    var avgIV = atm.reduce(function(s, c){ return s + c.impliedVolatility; }, 0) / atm.length;
+
+    var result = { atmIV: avgIV, price: price, ts: Date.now(), contracts: atm.length };
+    _ivCache[sym] = result;
+    return result;
+  } catch(e) {
+    console.log('fetchIVData error:', sym, e.message);
+    return null;
+  }
+}
+
+// Haupt-Funktion: IV-Percentile für einen Ticker berechnen
+async function getIVPercentile(sym, closesHistory) {
+  var ivData = await fetchIVData(sym);
+  if (!ivData) return null;
+  var hvSeries = calcHV20Series(closesHistory);
+  var ivp = calcIVPercentile(ivData.atmIV, hvSeries);
+  return {
+    ivp: ivp,
+    atmIV: Math.round(ivData.atmIV * 100),  // als %
+    contracts: ivData.contracts
+  };
+}
+
+// IVP-Farbe: grün = teuer (gut zum Verkaufen), gelb = mittel, rot = billig
+function ivpColor(ivp) {
+  if (ivp == null) return 'var(--text3)';
+  if (ivp >= 50) return 'var(--green)';
+  if (ivp >= 30) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function ivpLabel(ivp) {
+  if (ivp == null) return '—';
+  if (ivp >= 70) return 'IV hoch ↑ Prämie verkaufen';
+  if (ivp >= 50) return 'IV erhöht';
+  if (ivp >= 30) return 'IV mittel';
+  return 'IV niedrig — CSP meiden';
+}
+// ══════════════════════════════════════════════════════════════════════════════
 
 
 // ─── MARKTPHASEN-FILTER ───────────────────────────────────────────────────────
@@ -8204,6 +8334,8 @@ async function openKiBriefing() {
       } : null,
       rs: (raw.rs != null) ? Math.round(raw.rs) : null,
       dist52wHigh: state.dist52wHigh || null,
+      ivp: (raw._ivp && raw._ivp.ivp != null) ? raw._ivp.ivp : null,
+      fibo: state.fibo || null,
       fibo: (function() {
         if (!raw.closes_full || raw.closes_full.length < 20) return null;
         const swing = detectSwing(raw.closes_full);
@@ -8300,6 +8432,8 @@ async function openKiBriefing() {
     if(r.dist52wHigh != null) line += ' 52W-H:' + (r.dist52wHigh >= 0 ? '+' : '') + r.dist52wHigh + '%';
     // Fibo-Zone (nur wenn vorhanden)
     if(r.fibo) line += ' Fibo:' + r.fibo.zone + '(' + r.fibo.retrace + '%)';
+    // IV-Percentile (nur wenn vorhanden)
+    if(r.ivp != null) line += ' IVP:' + r.ivp + '%';
     return line;
   }).join('\n');
 
@@ -8314,8 +8448,9 @@ async function openKiBriefing() {
     + '  EMA200-Kurs:$XX= 200-Tage-EMA Kurswert (≠ Handelskurs!)\n'
     + '  RS:XX          = Relative Stärke vs S&P500 (0-100)\n'
     + '  52W-H:X%       = Abstand vom 52-Wochen-Hoch\n'
+    + '  IVP:XX%        = IV-Percentile (>50% = teuer = gut zum CSP-Verkaufen; <30% = billig = CSP meiden)\n'
     + '  Fibo:zone(X%)  = Fibonacci-Zone\n'
-    + 'NICHT VERFÜGBAR (niemals erfinden): IV-Rank, KGV, EPS, Umsatz, Dividende, Analystenziele, Optionsprämien\n\n';
+    + 'NICHT VERFÜGBAR (niemals erfinden): KGV, EPS, Umsatz, Dividende, Analystenziele\n\n';
 
   const marktkontext = DATA_LEGENDE + 'TOP ' + top10.length + ' SCANNER-ERGEBNISSE:\n'
     + tickerList + '\n\n'
