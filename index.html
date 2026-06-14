@@ -2322,16 +2322,15 @@ async function runScan(){
   // Yahoo Search NUR wenn Benutzer explizit Namen eingetippt hat
   // (data-user-typed Flag wird gesetzt wenn Benutzer im custom-input tippt)
   var userTyped = rawInput && rawInput.dataset.userTyped === '1';
-  // Yahoo Search wenn:
-  // 1. userTyped Flag gesetzt UND
-  // 2. Eingabe enthält Klarnamen (Leerzeichen IM Token ODER Kleinbuchstaben)
+  // Klarnamen erkennen: Leerzeichen IM Token ODER Kleinbuchstaben
   var parts = rawInput ? rawInput.value.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
   var hasNames = parts.some(function(s){
-    return s.indexOf(' ') >= 0 || // Leerzeichen im Namen (z.B. "Hugo Boss")
-           (s.length > 1 && s !== s.toUpperCase() && !/^[A-Z0-9]{1,6}([.\-][A-Z]{1,3})?$/.test(s)); // Kleinbuchstaben = Klarname
+    return s.indexOf(' ') >= 0 ||
+           (s.length > 1 && s !== s.toUpperCase() && !/^[A-Z0-9]{1,6}([.][A-Z]{1,3})?$/.test(s));
   });
-  if (userTyped && hasNames) {
-    rawInput.dataset.userTyped = '0'; // Reset
+  // Yahoo Search immer wenn Klarnamen erkannt — egal ob userTyped oder aus WL geladen
+  if (hasNames) {
+    rawInput.dataset.userTyped = '0';
     tickers = await resolveTickersWithSearch(rawInput.value);
     // Yahoo gibt z.B. "HAG.DE" zurück - .DE Suffix entfernen
     // Scanner fügt Suffix selbst via EU_TICKER_MAP hinzu
