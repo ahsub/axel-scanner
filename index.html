@@ -2235,7 +2235,12 @@ async function runScan(){
       const tdKey=getTwelveKey();
       const isDeMarket = window.currentMarket==='de';
       const tdSym = isDeMarket ? null : t.sym;
+      // For DE market: try .DE first, fall back handled in fetch function
       const yfSym = isDeMarket ? t.sym+'.DE' : t.sym;
+      // List of symbols to try in order (DE: .DE → .F → plain, US: plain only)
+      const yfSymCandidates = isDeMarket
+        ? [t.sym+'.DE', t.sym+'.F', t.sym]
+        : [t.sym];
       const interval=intervalMapTD[effectiveTF]||'1day';
       const outputsize=outputMap[effectiveTF]||220;
       var _pdhlFromScan = null;
@@ -2282,21 +2287,24 @@ async function runScan(){
       }
 
       // TAGESCHART oder Fallback: Yahoo Finance — kein Rate Limit, schnell
+      // Probiert alle Kandidaten in Reihe: .DE → .F → plain
       if (closes.length < 20) {
-        try {
-          const to=Math.floor(Date.now()/1000);
-          const from=to-60*60*24*(daysMap[effectiveTF]||130);
-          const yInterval={'15m':'15m','30m':'30m','1h':'60m','4h':'1d','1d':'1d'}[effectiveTF]||'1d';
-          const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+yfSym
-            +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
-          const r=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl));
-          if(r.ok){
+        const yInterval={'15m':'15m','30m':'30m','1h':'60m','4h':'1d','1d':'1d'}[effectiveTF]||'1d';
+        const to=Math.floor(Date.now()/1000);
+        const from=to-60*60*24*(daysMap[effectiveTF]||130);
+        for (var _si=0; _si<yfSymCandidates.length && closes.length<20; _si++) {
+          var _trySym = yfSymCandidates[_si];
+          try {
+            const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+_trySym
+              +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
+            const r=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl));
+            if(!r.ok) continue; // next candidate
             const j=await r.json();
             const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
             if(res){
               const q=res.indicators.quote[0];
-              if(!q||!q.close||!q.close.length) { throw new Error('YF: keine Kursdaten'); }
-              // Null-Werte filtern (Yahoo gibt manchmal null für einzelne Bars)
+              if(!q||!q.close||!q.close.length) continue; // next candidate
+              // Null-Werte filtern
               var rawClose=q.close, rawVol=q.volume||[], rawTs=res.timestamp||[];
               var validIdx=rawClose.map(function(_,i){return i;}).filter(function(i){return rawClose[i]!=null;});
               closes=validIdx.map(function(i){return rawClose[i]||0;});
@@ -2310,6 +2318,8 @@ async function runScan(){
                 return yInterval==='1d'?dd+'.'+mm:dd+'.'+mm+' '+hh+':'+mn;
               });
               dataSource='Yahoo Finance';
+              // Währung aus Yahoo-Meta
+              var _yfCurrency = (res.meta && res.meta.currency) ? res.meta.currency : (isDeMarket && _trySym.includes('.') ? 'EUR' : 'USD');
               // PDH/PDL aus Yahoo OHLC
               if(yInterval==='1d'&&q.high&&timestamps.length>=3){
                 try{
@@ -2322,12 +2332,12 @@ async function runScan(){
                 }catch(e){}
               }
             }
-          }
-        }catch(e3){ console.log('YF error:',e3.message); }
+          } catch(e3){ if(_si===yfSymCandidates.length-1) console.log('YF error:',_trySym,e3.message); }
+        } // end for candidates loop
       }
 
-      // DE-Ticker Fallback-Kette: .DE → .F → plain (für US-Titel in DE-Liste)
-      if(closes.length<20 && isDeMarket){
+      // DE-Ticker Fallback (legacy - now handled by candidate loop above)
+      if(false && closes.length<20 && isDeMarket){
         // Schritt 2: .F (Frankfurt)
         try{
           var yfSymF=t.sym+'.F';
@@ -2390,6 +2400,8 @@ async function runScan(){
       raw._fromTdCache = typeof _tdFromCache !== 'undefined' ? _tdFromCache : false;
       raw.dates_20d=dates.slice(-20);
       raw.dataSource=dataSource;
+      raw._yfSym = (typeof _trySym !== 'undefined') ? _trySym : t.sym;
+      raw._currency = (typeof _yfCurrency !== 'undefined') ? _yfCurrency : (isDeMarket ? 'EUR' : 'USD');
       raw.sessionNote=sessionNote;
       raw.effectiveTF=effectiveTF;
       // Calculate backtesting signal quality
@@ -2993,7 +3005,14 @@ function renderCard(t,state){
     '<span class="ticker-sym">'+t.sym+'</span>'+
     '<span class="ticker-name" style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.name+'</span>'+
 
-    '<span class="ticker-price">$'+price.toFixed(2)+'</span>'+
+    (function(){
+      var cur = state._currency || state.currency || 'USD';
+      var sym = cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : '$';
+      var flag = cur === 'EUR' ? ' <span style="font-size:9px;color:var(--text3)" title="Euro">EUR</span>' :
+                 cur === 'USD' && window.currentMarket === 'de' ? ' <span style="font-size:9px;color:var(--amber)" title="US-Dollar — kein EUR-Listing">🇺🇸 USD</span>' : '';
+      var priceStr = price > 1000 ? sym+Math.round(price).toLocaleString('de-DE') : sym+price.toFixed(2);
+      return '<span class="ticker-price">'+priceStr+flag+'</span>';
+    }())+
     '<span style="font-size:13px;font-weight:700;padding:2px 8px;border-radius:6px;background:'+(state.scoreColor||'var(--text3)')+';color:#fff;margin-left:6px">'+
       (state.scoreLabel||'?')+' '+(state.compositeScore||0)+
     '</span>'+
