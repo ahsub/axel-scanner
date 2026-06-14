@@ -8598,7 +8598,7 @@ async function openKiBriefing() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
+          max_tokens: 2048,
           system: 'Du bist ein Trading-Analyse-Assistent. ' +
             'KRITISCHE REGEL: Verwende AUSSCHLIESSLICH die Daten aus dem Nutzer-Prompt. ' +
             'Erfinde oder schätze NIEMALS Kurse, Strikes, Prämien oder andere Zahlen. ' +
@@ -8671,7 +8671,8 @@ let _kiStrat = 'ko';
 // ══════════════════════════════════════════════════════════════════════════════
 // ANTI-HALLUZINATIONS-DIREKTIVE — wird jedem KI-Prompt vorangestellt
 // ══════════════════════════════════════════════════════════════════════════════
-const KI_ANTI_HALLUZINATION = '\n'  + '⛔ STRENGE DATENDISZIPLIN — KEINE AUSNAHMEN:\n\n'  + 'Du erhältst unten EXAKTE Scanner-Daten. Diese Daten sind die EINZIGE Wahrheit.\n\n'  + 'VERBOTEN:\n'  + '• Kurse, Strikes, Prämien oder Prozentzahlen erfinden oder schätzen\n'  + '• Den EMA200-Kurs (Feld "EMA200-Kurs:$XX") als aktuellen Handelskurs verwenden\n'  + '• Historische Preise aus deinem Training verwenden\n'  + '• Aussagen wie "typischerweise" oder "ungefähr" bei Kursen\n\n'  + 'PFLICHTREGELN:\n'  + '• Aktueller Kurs = NUR der Wert nach "Kurs:$" im Datensatz\n'  + '• EMA200-Kurs = NUR nach "EMA200-Kurs:$" — NICHT der Handelskurs\n'  + '• Fehlende Felder: "Kurs nicht verfügbar — in IBKR prüfen" schreiben\n'  + '• Prämien-Schätzungen immer als "(Schätzung — in IBKR prüfen)" kennzeichnen\\n'  + 'HVP = Historical Vol Percentile — kein echter IV-Rank. Wenn kein HVP: NIEMALS IV erfinden.\\n\\n'  + 'SELBSTKONTROLLE: Kurs aus "Kurs:$XX"? EMA200 nicht mit Handelskurs verwechselt? Keine Trainingsdaten eingesetzt?\n\n';
+const KI_ANTI_HALLUZINATION = '\n'  + '⛔ STRENGE DATENDISZIPLIN — KEINE AUSNAHMEN:\n\n'  + 'Du erhältst unten EXAKTE Scanner-Daten. Diese Daten sind die EINZIGE Wahrheit.\n\n'  + 'VERBOTEN:\n'  + '• Kurse, Strikes, Prämien oder Prozentzahlen erfinden oder schätzen\n'  + '• Den EMA200-Kurs (Feld "EMA200-Kurs:$XX") als aktuellen Handelskurs verwenden\n'  + '• Historische Preise aus deinem Training verwenden\n'  + '• Aussagen wie "typischerweise" oder "ungefähr" bei Kursen\n\n'  + 'PFLICHTREGELN:\n'  + '• Aktueller Kurs = NUR der Wert nach "Kurs:$" im Datensatz\n'  + '• EMA200-Kurs = NUR nach "EMA200-Kurs:$" — NICHT der Handelskurs\n'  + '• Fehlende Felder: "Kurs nicht verfügbar — in IBKR prüfen" schreiben\n'  + '• Prämien-Schätzungen immer als "(Schätzung — in IBKR prüfen)" kennzeichnen\\n'  + 'HVP = Historical Vol Percentile — kein echter IV-Rank. Wenn kein HVP: NIEMALS IV erfinden.\\n\\n'  + 'SELBSTKONTROLLE: Kurs aus "Kurs:$XX"? EMA200 nicht verwechselt? Keine Trainingsdaten?\n'
+  + 'VOLLSTÄNDIGKEIT: Jede Analyse MUSS alle Punkte vollständig abschließen. Niemals mittendrin abbrechen. Lieber kürzer pro Punkt als unvollständig.\n\n';
 
 const KI_STRAT_CONFIG = {
   ko: {
@@ -8686,7 +8687,7 @@ const KI_STRAT_CONFIG = {
         + 'KO-Abstand in %, Positionsgröße (Starter/Aufstockung, max. €2.000 gesamt), Stop-Loss-Kriterium.\n'
         + '3. WATCHLIST: Welche Titel haben Potenzial aber brauchen besseres Timing?\n'
         + '4. HAUPTRISIKEN: Was könnte die Long-These gefährden?\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4, max. 500 Wörter.';
+        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 400 Wörter. Jeden Punkt vollständig abschließen.';
     }
   },
   momentum: {
@@ -8701,7 +8702,7 @@ const KI_STRAT_CONFIG = {
         + 'Für jeden: SEPA-Bewertung aus Scandaten, Buy-Point NUR aus "Kurs:$" und "52W-H:"-Feldern ableiten. Stop-Loss als % unter Kurs. HVP aus Scandaten: bei HVP>50% erhöhte Vola → engerer Stop empfohlen. Kein Kursziel erfinden.\n'
         + '3. WATCHLIST: Titel mit Potenzial aber noch nicht kaufbar.\n'
         + '4. RISIKEN: Sektoren oder Makro-Faktoren die Momentum gefährden.\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4, max. 500 Wörter.';
+        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 400 Wörter. Jeden Punkt vollständig abschließen.';
     }
   },
   options: {
@@ -8739,7 +8740,7 @@ const KI_STRAT_CONFIG = {
         + '3. WATCHLIST: Titel die nach dem nächsten ER oder bei höherem IV interessant werden.\n'
         + '4. RISIKEN: IV-Crush, ER-Überraschungen, Titel unter 200d EMA (kein CSP empfohlen).\n'
         + '\n⚠️ ABSCHLUSS-HINWEIS: Immer mit Pflicht-Checks in IBKR/CapTrader abschließen bevor eine Position eröffnet wird.\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4, max. 600 Wörter.';
+        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 500 Wörter. Vollständig abschließen.';
     }
   },
   swing: {
@@ -8755,7 +8756,7 @@ const KI_STRAT_CONFIG = {
         + 'Haltedauer-Erwartung, ER-Risiko im Zeitfenster.\n'
         + '3. WATCHLIST: Titel die einen besseren Einstiegspunkt brauchen.\n'
         + '4. RISIKEN: Was könnte die Setups invalidieren?\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4, max. 500 Wörter.';
+        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 450 Wörter. Vollständig abschließen.';
     }
   },
   dividend: {
@@ -8774,7 +8775,7 @@ const KI_STRAT_CONFIG = {
         + 'Für jeden: Branchenzugehörigkeit, warum Dividend-Growth-Kandidat, technisches Setup.\n'
         + '3. WATCHLIST: Weitere interessante Titel.\n'
         + '4. HINWEIS: Empfehle explizit Koyfin-Prüfung der Fundamentaldaten vor Kauf.\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4, max. 500 Wörter.';
+        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 450 Wörter. Vollständig abschließen.';
     }
   },
   value: {
@@ -8792,7 +8793,7 @@ const KI_STRAT_CONFIG = {
         + 'Kriterien: stabile Branchen (Health, Finance, Energy, Consumer Staples), '
         + 'solider Trend, keine extreme Überbewertung sichtbar.\n'
         + '3. NÄCHSTE SCHRITTE: Welche Fundamentaldaten sollte man für jeden Kandidaten in Koyfin prüfen?\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-3, max. 400 Wörter. '
+        + '\nAntworte auf Deutsch, strukturiert 1-3. Max. 350 Wörter. Vollständig abschließen.'
         + 'Sei explizit über die Grenzen dieser Analyse.';
     }
   },
@@ -8854,7 +8855,7 @@ const KI_STRAT_CONFIG = {
         + '4. ROLLSTRATEGIE-HINWEIS: Kurze Erinnerung an die 3 Roll-Stufen.\n'
         + '\n⚠️ ABSCHLUSS: Ludwig-Strategie vermeidet Andienung durch systematisches Rollen — '
         + 'nie auf Ausübung warten ohne Roll-Plan.\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4, max. 700 Wörter.';
+        + '\nAntworte auf Deutsch, strukturiert 1-3. Max. 550 Wörter. Vollständig abschließen.';
     }
   }
 };
@@ -9813,7 +9814,7 @@ async function runOversoldScan() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        max_tokens: 1500,
         system: 'Du bist ein technischer Analyse-Assistent. KRITISCHE REGEL: Berechne oversold_score NUR aus den Scanner-Daten im Prompt (MACD, OBV, Score, bullCount). Erfinde KEINE technischen Indikatoren, Kurse oder Werte die nicht im Prompt stehen. Antworte NUR mit validem JSON.',
         messages: [{ role: 'user', content: prompt }]
       })
@@ -10393,7 +10394,7 @@ async function runMetaAnalysis() {
     + '3. KONFIDENZ: Wie belastbar sind die Aussagen bei ' + dp + ' Datenpunkten?\n'
     + '4. EMPFEHLUNG: Konkrete Gewichtungsanpassung (Tech/SEPA/BP/Sticky/Vol, Summe=100) und Begründung.\n'
     + '5. NÄCHSTE SCHRITTE: Was sollte gesammelt werden um die Datenbasis zu verbessern?\n\n'
-    + 'Antworte auf Deutsch, strukturiert 1-5, max. 400 Wörter. Sei ehrlich über Datenlimits.';
+    + 'Antworte auf Deutsch, strukturiert 1-5. Max. 350 Wörter. Vollständig abschließen.';
 
   try {
     const proxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
@@ -10405,7 +10406,7 @@ async function runMetaAnalysis() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        max_tokens: 1500,
         system: 'Du bist ein Trading-Performance-Analyst. KRITISCHE REGEL: Analysiere NUR die KI-Tracking-Daten aus dem Prompt. Erfinde KEINE Kurse, Performance-Zahlen oder Empfehlungen die nicht aus den Tracking-Daten ableitbar sind. Bei fehlenden Daten: explizit "Datenbasis zu klein" schreiben.',
         messages: [{ role: 'user', content: prompt }]
       })
