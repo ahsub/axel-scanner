@@ -2131,8 +2131,34 @@ function resolveTickerInput(raw) {
   return { sym: s.toUpperCase(), name: s, _needsSearch: true };
 }
 
+// Kleine Override-Map für bekannte Yahoo-Search-Fehler
+// (Yahoo gibt manchmal den falschen Ticker zurück)
+var YAHOO_SEARCH_OVERRIDE = {
+  'hensoldt':    {sym:'HAG',  sfx:'DE'},
+  'hensoldt ag': {sym:'HAG',  sfx:'DE'},
+  'hugo boss':   {sym:'BOSS', sfx:'SG'},
+  'boss':        {sym:'BOSS', sfx:'SG'},
+  'symrise':     {sym:'SY1',  sfx:'DE'},
+  'symrise ag':  {sym:'SY1',  sfx:'DE'},
+  'adidas':      {sym:'ADS',  sfx:'DE'},
+  'adidas ag':   {sym:'ADS',  sfx:'DE'},
+  'rheinmetall': {sym:'RHM',  sfx:'DE'},
+  'sartorius':   {sym:'SRT3', sfx:'DE'},
+  'lvmh':        {sym:'MC',   sfx:'PA'},
+  'volkswagen':  {sym:'VOW3', sfx:'DE'},
+  'vw':          {sym:'VOW3', sfx:'DE'},
+};
+
 // Yahoo Finance Search: Klarnamen → Ticker (async, kein hardcoded Mapping nötig)
 async function searchTickerByName(name, preferDE) {
+  // Override-Prüfung zuerst (verhindert falsche Yahoo-Ergebnisse)
+  var lower = name.toLowerCase().trim();
+  if (YAHOO_SEARCH_OVERRIDE[lower]) {
+    var ov = YAHOO_SEARCH_OVERRIDE[lower];
+    var result = {sym: ov.sym, name: name, exchange: ov.sfx};
+    _yfSearchCache[lower + (preferDE?'_de':'')] = result;
+    return result;
+  }
   var lower = name.toLowerCase().trim();
   var cacheKey = lower + (preferDE ? '_de' : '');
   if (_yfSearchCache[cacheKey]) return _yfSearchCache[cacheKey];
@@ -2341,6 +2367,11 @@ async function runScan(){
         if(sym.endsWith(euSfx[i])){ sym=sym.slice(0,-euSfx[i].length); break; }
       }
       return {sym:sym, name:t.name};
+    });
+    // Bekannte Yahoo-Korrekturen (Yahoo gibt manchmal falschen Ticker zurück)
+    var SEARCH_CORRECTIONS = {'HAGO':'HAG','HAGG':'HAG','H4G':'HAG'};
+    tickers = tickers.map(function(t){
+      return {sym: SEARCH_CORRECTIONS[t.sym] || t.sym, name: t.name};
     });
     if (tickers.length) rawInput.value = tickers.map(function(t){return t.sym;}).join(', ');
   } else {
