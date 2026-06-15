@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v54">
+<meta name="app-version" content="20260615-v55">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1703,12 +1703,15 @@ async function refreshSyncStatus() {
   }
 }
 
-function showSyncToast(msg, ok) {
+function showSyncToast(msg, ok, autoClose=false) {
   var t = document.getElementById('sync-toast');
   t.style.display = 'block';
   t.style.color = ok ? 'var(--green)' : 'var(--red)';
   t.textContent = msg;
   setTimeout(function(){ t.style.display = 'none'; }, 3000);
+  if (autoClose && ok) {
+    setTimeout(function(){ closeSyncModal(); }, 2000);
+  }
 }
 
 async function syncPushAll() {
@@ -1727,14 +1730,14 @@ async function syncPushAll() {
   // Admin Settings
   var adm = localStorage.getItem('ko_score_weights');
   if (adm && await KoSync.push('admin_settings', adm)) pushed++;
-  showSyncToast('✅ ' + pushed + ' Bereiche hochgeladen', true);
+  showSyncToast('✅ ' + pushed + ' Bereiche hochgeladen', true, true);
   await refreshSyncStatus();
 }
 
 async function syncPullAll() {
   showSyncToast('⬇ Lade herunter…', true);
   var pulled = await KoSync.pullAll();
-  showSyncToast('✅ ' + pulled + ' Bereiche geladen — App neu laden?', true);
+  showSyncToast('✅ ' + pulled + ' Bereiche geladen', true, true);
   await refreshSyncStatus();
 }
 
@@ -1742,7 +1745,7 @@ async function syncPushWatchlist() {
   var wls = localStorage.getItem('ko_watchlists');
   if (!wls) { showSyncToast('⚠ Keine Watchlist gefunden', false); return; }
   var ok = await KoSync.push('watchlist', wls);
-  showSyncToast(ok ? '✅ Watchlist hochgeladen' : '❌ Fehler', ok);
+  showSyncToast(ok ? '✅ Watchlist hochgeladen' : '❌ Fehler', ok, true);
   await refreshSyncStatus();
 }
 
@@ -1758,7 +1761,7 @@ async function syncPushScanResults() {
     .map(function(t){ return { sym:t.sym, name:t.name, score:tickerData[t.sym].score, ts:Date.now() }; });
   if (!results.length) { showSyncToast('⚠ Keine Scan-Ergebnisse', false); return; }
   var ok = await KoSync.push('scan_results', JSON.stringify(results));
-  showSyncToast(ok ? '✅ ' + results.length + ' Ergebnisse hochgeladen' : '❌ Fehler', ok);
+  showSyncToast(ok ? '✅ ' + results.length + ' Ergebnisse hochgeladen' : '❌ Fehler', ok, true);
   await refreshSyncStatus();
 }
 
