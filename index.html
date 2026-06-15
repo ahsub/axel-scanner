@@ -2681,12 +2681,16 @@ async function runScan(){
             const yfUrl='https://query1.finance.yahoo.com/v7/finance/chart/'+_trySym
               +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
             const r=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl));
-            if(!r.ok) continue; // next candidate
-            const j=await r.json();
+            if(!r.ok){ console.warn('YF HTTP error',r.status,'for',_trySym); continue; }
+            const _rawText = await r.text();
+            let j;
+            try { j = JSON.parse(_rawText); } catch(e){ console.warn('YF parse error for',_trySym,_rawText.slice(0,200)); continue; }
+            if(j && j.error){ console.warn('YF proxy error for',_trySym,JSON.stringify(j)); continue; }
             const res=j&&j.chart&&j.chart.result&&j.chart.result[0];
+            if(!res){ console.warn('YF no result for',_trySym,'keys:',Object.keys(j||{})); continue; }
             if(res){
               const q=res.indicators.quote[0];
-              if(!q||!q.close||!q.close.length) continue; // next candidate
+              if(!q||!q.close||!q.close.length){ console.warn('YF empty quotes for',_trySym); continue; }
               // Null-Werte filtern
               var rawClose=q.close, rawVol=q.volume||[], rawTs=res.timestamp||[];
               var validIdx=rawClose.map(function(_,i){return i;}).filter(function(i){return rawClose[i]!=null;});
