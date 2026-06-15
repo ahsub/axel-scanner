@@ -2676,7 +2676,7 @@ async function runScan(){
         for (var _si=0; _si<yfSymCandidates.length && closes.length<20; _si++) {
           var _trySym = yfSymCandidates[_si];
           try {
-            const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+_trySym
+            const yfUrl='https://query1.finance.yahoo.com/v7/finance/chart/'+_trySym
               +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
             const r=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl));
             if(!r.ok) continue; // next candidate
@@ -2727,7 +2727,7 @@ async function runScan(){
         try{
           var yfSymF=t.sym+'.F';
           var to2=Math.floor(Date.now()/1000),from2=to2-60*60*24*130;
-          var yfUrl2='https://query1.finance.yahoo.com/v8/finance/chart/'+yfSymF
+          var yfUrl2='https://query1.finance.yahoo.com/v7/finance/chart/'+yfSymF
             +'?interval=1d&period1='+from2+'&period2='+to2+'&includePrePost=false';
           var r2=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl2));
           if(r2.ok){
@@ -2755,7 +2755,7 @@ async function runScan(){
       if(closes.length<20 && isDeMarket){
         try{
           var to3=Math.floor(Date.now()/1000),from3=to3-60*60*24*130;
-          var yfUrl3='https://query1.finance.yahoo.com/v8/finance/chart/'+t.sym
+          var yfUrl3='https://query1.finance.yahoo.com/v7/finance/chart/'+t.sym
             +'?interval=1d&period1='+from3+'&period2='+to3+'&includePrePost=false';
           var r3=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl3));
           if(r3.ok){
@@ -4097,7 +4097,7 @@ async function loadMostActive(){
           : Promise.resolve(null);
         return fetchDE.then(function(res){
           if(res) return res;
-          var yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+sym+'.DE?interval=1d&range=2d';
+          var yfUrl='https://query1.finance.yahoo.com/v7/finance/chart/'+sym+'.DE?interval=1d&range=2d';
           return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
             .then(function(r){return r.json();})
             .then(function(j){
@@ -4179,7 +4179,7 @@ async function loadAfterHours(){
           : Promise.resolve(null);
         return fetchAH.then(function(res){
           if(res) return res;
-          var yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+sym+'.DE?interval=1d&range=2d';
+          var yfUrl='https://query1.finance.yahoo.com/v7/finance/chart/'+sym+'.DE?interval=1d&range=2d';
           return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
             .then(function(r){return r.json();})
             .then(function(j){
@@ -4393,7 +4393,7 @@ async function refreshLivePrices(){
       {sym:'^FTSE',    el:'m-ftse',chgEl:'m-ftse-chg',label:'FTSE 100'},
     ];
     const euResults=await Promise.all(euIdxMap.map(function(idx){
-      const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(idx.sym)+'?interval=1d&range=2d';
+      const yfUrl='https://query1.finance.yahoo.com/v7/finance/chart/'+encodeURIComponent(idx.sym)+'?interval=1d&range=2d';
       return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
         .then(function(r){return r.json();})
         .then(function(j){
@@ -4426,7 +4426,7 @@ async function refreshLivePrices(){
       {sym:'LIT',   el:'m-lithium', chgEl:'m-lithium-chg', label:'Lithium ETF'},
     ];
     const commResults = await Promise.all(commMap.map(function(c){
-      const yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(c.sym)+'?interval=1d&range=5d';
+      const yfUrl='https://query1.finance.yahoo.com/v7/finance/chart/'+encodeURIComponent(c.sym)+'?interval=1d&range=5d';
       return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
         .then(function(r){ return r.json(); })
         .then(function(d){ return {c:c, d:d}; })
@@ -5032,7 +5032,7 @@ async function loadTop50Prices(){
   for(let i=0; i<tickers.length; i+=batchSize){
     const batch = tickers.slice(i, i+batchSize);
     await Promise.all(batch.map(function(sym){
-      const yfUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/'+sym+'?interval=1d&range=2d';
+      const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/'+sym+'?interval=1d&range=2d';
       return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl))
         .then(function(r){ return r.json(); })
         .then(function(j){
@@ -6475,7 +6475,7 @@ async function loadWorldIndex(sym) {
   if(resultEl){ resultEl.textContent='⋯'; resultEl.style.color='var(--text3)'; }
   if(chgEl) chgEl.textContent='';
   try {
-    var yfUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'?interval=1d&range=5d';
+    var yfUrl='https://query1.finance.yahoo.com/v7/finance/chart/'+encodeURIComponent(sym)+'?interval=1d&range=5d';
     var r=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl));
     var j=await r.json();
     var res=j&&j.chart&&j.chart.result&&j.chart.result[0];
@@ -6663,7 +6663,7 @@ async function loadMoverModalCards(){
     return fetchFH.then(function(res){
       if(res) return res;
       var yfSym=isDE?sym+'.DE':sym;
-      return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+yfSym+'?interval=1d&range=2d'))
+      return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/chart/'+yfSym+'?interval=1d&range=2d'))
         .then(function(r){return r.json();})
         .then(function(j){
           var res2=j&&j.chart&&j.chart.result&&j.chart.result[0]; if(!res2) return {sym:sym,error:true};
@@ -6849,7 +6849,7 @@ async function loadIndexMovers(){
       if(res) return res;
       // YF fallback
       var yfSym = isDE ? ticker + '.DE' : ticker;
-      return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + yfSym + '?interval=1d&range=2d'))
+      return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/chart/' + yfSym + '?interval=1d&range=2d'))
         .then(function(r){ return r.json(); })
         .then(function(j){
           var res2 = j && j.chart && j.chart.result && j.chart.result[0];
@@ -8229,7 +8229,7 @@ async function fetchVix() {
   if (!key) return null;
   try {
     // VIX via Yahoo Finance (^VIX) - Twelve Data Free Plan hat keinen VIX
-    const yfUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=5d';
+    const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/%5EVIX?interval=1d&range=5d';
     const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(yfUrl);
     const r = await fetch(proxy);
     if (!r.ok) return null;
@@ -8767,7 +8767,7 @@ async function rescanTickerTF(sym, tf) {
     const to=Math.floor(Date.now()/1000);
     const from=to-60*60*24*(daysMap[tf]||130);
     // For intraday: use range instead of period for better Yahoo compatibility
-    var yfUrlBase = 'https://query1.finance.yahoo.com/v8/finance/chart/'+yfSym;
+    var yfUrlBase = 'https://query1.finance.yahoo.com/v7/finance/chart/'+yfSym;
     var yfUrlParams = tf === '1d'
       ? '?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false'
       : '?interval='+yInterval+'&range='+yRangeMap[tf]+'&includePrePost=false';
@@ -10620,7 +10620,7 @@ async function checkTrackingPerformance(entryId) {
   if (!syms.length) return;
 
   const pricePromises = syms.map(function(r) {
-    const yfUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(r.sym) + '?interval=1d&range=2d';
+    const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/' + encodeURIComponent(r.sym) + '?interval=1d&range=2d';
     return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(yfUrl))
       .then(function(res) { return res.json(); })
       .then(function(j) {
