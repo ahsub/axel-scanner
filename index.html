@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v53">
+<meta name="app-version" content="20260615-v54">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1531,7 +1531,40 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <button class="nav-btn" id="nav-admin" onclick="showPanel('admin')">
       <i class="ti ti-settings"></i>Admin
     </button>
+    <button class="nav-btn" id="nav-sync" onclick="showSyncModal()" title="Cloud Sync">
+      <i class="ti ti-cloud" id="sync-icon"></i><span style="font-size:9px" id="sync-label">Sync</span>
+    </button>
   </nav>
+</div>
+
+<!-- ── SYNC MODAL ──────────────────────────────────────────────────── -->
+<div id="sync-modal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.7);align-items:flex-end;justify-content:center">
+  <div style="background:var(--bg2);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:480px;padding:1.5rem;padding-bottom:calc(1.5rem + env(safe-area-inset-bottom))">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <span style="font-size:15px;font-weight:600"><i class="ti ti-cloud"></i> Cloud Sync</span>
+      <button onclick="closeSyncModal()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="sync-status-list" style="margin-bottom:1rem;font-size:12px;color:var(--text2)">
+      <div style="color:var(--text3)"><i class="ti ti-loader"></i> Lade Status…</div>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-bottom:.75rem">
+      <button onclick="syncPushAll()" class="btn btn-primary" style="flex:1;font-size:12px">
+        <i class="ti ti-upload"></i> Alles hochladen
+      </button>
+      <button onclick="syncPullAll()" class="btn" style="flex:1;font-size:12px">
+        <i class="ti ti-download"></i> Alles laden
+      </button>
+    </div>
+    <div style="display:flex;gap:.5rem">
+      <button onclick="syncPushWatchlist()" class="btn" style="flex:1;font-size:11px;color:var(--accent);border-color:var(--accent)">
+        <i class="ti ti-star"></i> Watchlist sync
+      </button>
+      <button onclick="syncPushScanResults()" class="btn" style="flex:1;font-size:11px">
+        <i class="ti ti-radar"></i> Scan-Ergebnisse sync
+      </button>
+    </div>
+    <div id="sync-toast" style="margin-top:.75rem;font-size:12px;color:var(--green);display:none;text-align:center"></div>
+  </div>
 </div>
 
 <script>
@@ -1630,6 +1663,141 @@ const KoSync = {
     return pulled;
   }
 };
+
+// ── SYNC UI FUNKTIONEN ────────────────────────────────────────────────────────
+async function showSyncModal() {
+  document.getElementById('sync-modal').style.display = 'flex';
+  await refreshSyncStatus();
+}
+
+function closeSyncModal() {
+  document.getElementById('sync-modal').style.display = 'none';
+}
+
+async function refreshSyncStatus() {
+  const list = document.getElementById('sync-status-list');
+  list.innerHTML = '<div style="color:var(--text3)"><i class="ti ti-loader"></i> Verbinde…</div>';
+  try {
+    const r = await fetch(KoSync.BASE + '/sync/status');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    const keys = data.keys || [];
+    const icons = {
+      watchlist: '⭐', backlog_winners: '🏆', backlog_oversold: '📉',
+      backlog_tracking: '👁', scan_results: '📊', admin_settings: '⚙️', alert_watchlist: '🔔'
+    };
+    list.innerHTML = keys.map(function(k) {
+      const icon = icons[k.key] || '📁';
+      const ts = k.updated_at ? new Date(k.updated_at * 1000).toLocaleString('de-DE', {
+        day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'
+      }) : '—';
+      const size = k.size > 0 ? (k.size > 1024 ? (k.size/1024).toFixed(1)+'KB' : k.size+'B') : 'leer';
+      const color = k.exists ? 'var(--green)' : 'var(--text3)';
+      return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">'
+        + '<span>' + icon + ' ' + k.key + '</span>'
+        + '<span style="color:' + color + ';font-size:11px">' + size + ' · ' + ts + '</span>'
+        + '</div>';
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--red)">⚠ Sync nicht erreichbar: ' + e.message + '</div>';
+  }
+}
+
+function showSyncToast(msg, ok) {
+  var t = document.getElementById('sync-toast');
+  t.style.display = 'block';
+  t.style.color = ok ? 'var(--green)' : 'var(--red)';
+  t.textContent = msg;
+  setTimeout(function(){ t.style.display = 'none'; }, 3000);
+}
+
+async function syncPushAll() {
+  showSyncToast('⬆ Lade hoch…', true);
+  var pushed = 0;
+  // Watchlist
+  var wls = localStorage.getItem('ko_watchlists');
+  if (wls && await KoSync.push('watchlist', wls)) pushed++;
+  // Backlogs
+  var bw = localStorage.getItem('ko_backlog_winners');
+  if (bw && await KoSync.push('backlog_winners', bw)) pushed++;
+  var bo = localStorage.getItem('ko_backlog_oversold');
+  if (bo && await KoSync.push('backlog_oversold', bo)) pushed++;
+  var bt = localStorage.getItem('ko_backlog_tracking');
+  if (bt && await KoSync.push('backlog_tracking', bt)) pushed++;
+  // Admin Settings
+  var adm = localStorage.getItem('ko_score_weights');
+  if (adm && await KoSync.push('admin_settings', adm)) pushed++;
+  showSyncToast('✅ ' + pushed + ' Bereiche hochgeladen', true);
+  await refreshSyncStatus();
+}
+
+async function syncPullAll() {
+  showSyncToast('⬇ Lade herunter…', true);
+  var pulled = await KoSync.pullAll();
+  showSyncToast('✅ ' + pulled + ' Bereiche geladen — App neu laden?', true);
+  await refreshSyncStatus();
+}
+
+async function syncPushWatchlist() {
+  var wls = localStorage.getItem('ko_watchlists');
+  if (!wls) { showSyncToast('⚠ Keine Watchlist gefunden', false); return; }
+  var ok = await KoSync.push('watchlist', wls);
+  showSyncToast(ok ? '✅ Watchlist hochgeladen' : '❌ Fehler', ok);
+  await refreshSyncStatus();
+}
+
+async function syncPushScanResults() {
+  // Top-20 aus activeTickers + tickerData bauen
+  if (!window.activeTickers || !window.tickerData) {
+    showSyncToast('⚠ Erst einen Scan starten', false); return;
+  }
+  var results = activeTickers
+    .filter(function(t){ return tickerData[t.sym] && tickerData[t.sym].score != null; })
+    .sort(function(a,b){ return (tickerData[b.sym].score||0) - (tickerData[a.sym].score||0); })
+    .slice(0,20)
+    .map(function(t){ return { sym:t.sym, name:t.name, score:tickerData[t.sym].score, ts:Date.now() }; });
+  if (!results.length) { showSyncToast('⚠ Keine Scan-Ergebnisse', false); return; }
+  var ok = await KoSync.push('scan_results', JSON.stringify(results));
+  showSyncToast(ok ? '✅ ' + results.length + ' Ergebnisse hochgeladen' : '❌ Fehler', ok);
+  await refreshSyncStatus();
+}
+
+// Auto-Sync beim App-Start: Cloud-Daten laden falls neuer
+async function autoSyncOnStart() {
+  try {
+    var icon = document.getElementById('sync-icon');
+    var label = document.getElementById('sync-label');
+    if (icon) icon.style.color = 'var(--text3)';
+    const r = await fetch(KoSync.BASE + '/sync/status', { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return;
+    const data = await r.json();
+    const wlKey = (data.keys||[]).find(function(k){ return k.key === 'watchlist'; });
+    if (wlKey && wlKey.exists) {
+      if (icon) { icon.style.color = 'var(--green)'; }
+      if (label) { label.textContent = '✓ Sync'; }
+    }
+  } catch(e) {
+    var icon = document.getElementById('sync-icon');
+    if (icon) icon.style.color = 'var(--red)';
+  }
+}
+
+// Auto-Push nach Scan-Abschluss (Top-Ergebnisse in Cloud)
+async function autoSyncAfterScan() {
+  try {
+    if (!window.activeTickers || !window.tickerData) return;
+    var results = activeTickers
+      .filter(function(t){ return tickerData[t.sym] && tickerData[t.sym].score != null; })
+      .sort(function(a,b){ return (tickerData[b.sym].score||0)-(tickerData[a.sym].score||0); })
+      .slice(0,20)
+      .map(function(t){ return {sym:t.sym,name:t.name,score:tickerData[t.sym].score,ts:Date.now()}; });
+    if (results.length > 0) await KoSync.push('scan_results', JSON.stringify(results));
+  } catch(e) {}
+}
+
+// Start-Sync beim Laden
+window.addEventListener('load', function(){ setTimeout(autoSyncOnStart, 2000); });
+
 
 // KoSync UI-Helfer: Status-Badge im Backlog-Header aktualisieren
 function koSyncUpdateBadge(state, text) {
@@ -2898,6 +3066,7 @@ async function runScan(){
     }
   }
   document.getElementById('scan-bar').style.width='100%';
+  setTimeout(autoSyncAfterScan, 500); // Auto-Sync nach Scan
   document.getElementById('scan-label').textContent='Sortiere Ergebnisse…';
 
   // Sort and re-render all cards: bull first → bear last, by MACD within group
