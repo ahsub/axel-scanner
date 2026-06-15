@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v52">
+<meta name="app-version" content="20260615-v53">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3357,6 +3357,8 @@ function processData(raw){
 function renderCard(t,state){
   var el=document.getElementById('card-'+t.sym);
   if(!el) return;
+  // state.sym aus t befüllen falls processData es nicht setzt
+  if(state && typeof state === 'object' && !state.sym) state.sym = t.sym;
   if(state==='loading'){
     el.innerHTML='<div class="ticker-head"><span class="ticker-sym">'+t.sym+'</span>'+
       '<span class="ticker-name">'+t.name+'</span>'+
