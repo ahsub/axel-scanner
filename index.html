@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v59">
+<meta name="app-version" content="20260615-v62">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -254,6 +254,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <option value="fixed:TECDAX">💻 TecDAX Top 20</option>
           </optgroup>
           <optgroup label="── 🇺🇸 US-Indizes ──">
+            <option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>
             <option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>
             <option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>
           </optgroup>
@@ -5836,7 +5837,7 @@ function onPresetChange(){
     const list = getFixedListTickers(key);
     const labels = {
       DAX40:'DAX 40', MDAX:'MDAX Top 20', TECDAX:'TecDAX Top 20',
-      SP500:'S&P 500 Kern', NDX100:'NASDAQ 100',
+      PICKS_SHOVELS:'Picks & Shovels', SP500:'S&P 500 Kern', NDX100:'NASDAQ 100',
       DEFENSE:'Defense & Aerospace', REIT:'REITs', ENERGY:'Energy',
       HEALTH:'Healthcare', FINANCE:'Financials', CONSUMER:'Consumer'
     };
@@ -8033,6 +8034,28 @@ var DE_LIST_GROUPS = {
 
 // ─── FIXED LISTS: S&P500 Kern, NASDAQ100, Sektoren ────────────────────────────
 var FIXED_LISTS = {
+  'PICKS_SHOVELS': [
+    {sym:'NVDA',name:'NVIDIA Corp.'},
+    {sym:'AMD',name:'Advanced Micro Devices'},
+    {sym:'AVGO',name:'Broadcom Inc.'},
+    {sym:'AMAT',name:'Applied Materials'},
+    {sym:'LRCX',name:'Lam Research'},
+    {sym:'KLAC',name:'KLA Corp.'},
+    {sym:'MRVL',name:'Marvell Technology'},
+    {sym:'ARM',name:'Arm Holdings'},
+    {sym:'TSM',name:'TSMC ADR'},
+    {sym:'SMCI',name:'Super Micro Computer'},
+    {sym:'MSFT',name:'Microsoft Corp.'},
+    {sym:'AMZN',name:'Amazon.com'},
+    {sym:'GOOGL',name:'Alphabet A'},
+    {sym:'META',name:'Meta Platforms'},
+    {sym:'ORCL',name:'Oracle Corp.'},
+    {sym:'VRT',name:'Vertiv Holdings'},
+    {sym:'ETN',name:'Eaton Corp.'},
+    {sym:'PWR',name:'Quanta Services'},
+    {sym:'HUBB',name:'Hubbell Inc.'},
+    {sym:'CEG',name:'Constellation Energy'}
+  ],
   'DAX40': DE_LIST_GROUPS['DAX 40'],
   'MDAX':  DE_LIST_GROUPS['MDAX Top 20'],
   'TECDAX': DE_LIST_GROUPS['TecDAX Top 20'],
@@ -10297,7 +10320,11 @@ function autoTopGetTodayKey() {
 }
 
 function autoTopListName() {
-  return '📊 Auto-Top ' + autoTopGetTodayKey();
+  var mkt = window.currentMarket === 'de' ? 'DE' : 'US';
+  var now = new Date();
+  var date = now.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'});
+  var time = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  return 'Top40-' + mkt + ' · ' + date + ' ' + time;
 }
 
 function autoTopMerge(allScored) {
@@ -10356,7 +10383,7 @@ function autoTopMerge(allScored) {
     wls[listName] = merged.join(', ');
     saveWatchlistsWithSync(wls, listName);
     updateWatchlistDropdown();
-    showKoToast('📊 Auto-Top aktualisiert · ' + merged.length + ' Titel');
+    showKoToast('📊 Top40-' + (window.currentMarket==='de'?'DE':'US') + ' aktualisiert · ' + merged.length + ' Titel');
   } catch(e) { console.warn('autoTopMerge:', e); }
 }
 
