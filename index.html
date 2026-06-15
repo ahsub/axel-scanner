@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v70">
+<meta name="app-version" content="20260615-v71">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -69,6 +69,8 @@ input,select,button,textarea{font-family:var(--font);font-size:14px}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:.5rem;border:none;background:none;color:var(--text3);cursor:pointer;border-radius:var(--radius-sm);transition:all .15s;font-size:10px;font-family:var(--font)}
 .nav-btn.active{color:var(--accent)}
 .tf-btn.active-tf{background:var(--accent);color:#fff;border-color:var(--accent)}
+.iv-dot{animation:ivpulse 2s ease-in-out 3}
+@keyframes ivpulse{0%,100%{opacity:1}50%{opacity:0.3}}
 .nav-btn i{font-size:20px}
 .nav-btn.active i{color:var(--accent)}
 
@@ -3256,6 +3258,8 @@ function sortAndRenderCards(tickers){
         '<i class="ti ti-star"></i> Alle ('+filteredResults.length+')</button>'+
       '<button onclick="enrichTop40WithIV()" class="btn btn-sm" id="iv-enrich-btn" style="font-size:10px;padding:2px 7px;background:rgba(79,142,247,0.12);border-color:var(--accent);color:var(--accent)">'+
         '<i class="ti ti-chart-candle"></i> IV laden (Top40)</button>'+
+      '<span id="iv-status-badge" style="display:none;font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(52,194,110,0.12);color:var(--green);border:0.5px solid var(--green);align-self:center">'+
+        '<i class="ti ti-check"></i> <span id="iv-status-count">0</span> IV geladen</span>'+
       '<button onclick="toggleKiDropdown(this)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.15));border-color:#818cf8;color:#818cf8"><i class=\"ti ti-brain\"></i> KI ▾</button>'+
       
       '<button onclick="showSectorHeatmap()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">'+
@@ -6474,8 +6478,32 @@ async function enrichTop40WithIV() {
 
   if (btn) {
     btn.disabled = false;
-    btn.innerHTML = '<i class="ti ti-chart-candle"></i> IV laden (Top40)';
+    btn.innerHTML = '<i class="ti ti-chart-candle"></i> IV ✓ (' + done + '/' + total + ')';
+    btn.style.background = 'rgba(52,194,110,0.12)';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
   }
+  // Status-Badge anzeigen
+  var badge = document.getElementById('iv-status-badge');
+  var countEl = document.getElementById('iv-status-count');
+  if (badge) badge.style.display = 'inline-flex';
+  if (countEl) countEl.textContent = done;
+  // Karten mit IV-Daten hervorheben: kleiner Punkt im Ticker-Kopf
+  Object.keys(tickerData).forEach(function(sym) {
+    if (tickerData[sym] && tickerData[sym]._ivp) {
+      var card = document.getElementById('card-' + sym);
+      if (card) {
+        var head = card.querySelector('.ticker-sym');
+        if (head && !head.querySelector('.iv-dot')) {
+          var dot = document.createElement('span');
+          dot.className = 'iv-dot';
+          dot.style.cssText = 'display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-left:4px;vertical-align:middle';
+          dot.title = 'IV geladen';
+          head.appendChild(dot);
+        }
+      }
+    }
+  });
   showKoToast('✅ IV geladen: ' + done + '/' + total + ' Titel' + (errors > 0 ? ' (' + errors + ' Fehler)' : ''));
 }
 
