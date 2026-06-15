@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v62">
+<meta name="app-version" content="20260615-v64">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -8592,23 +8592,43 @@ function renderVixAmpel(vix) {
   if (!el) return;
   if (vix === null) { el.style.display = 'none'; return; }
 
-  let color, bg, icon, label, sublabel;
-  if (vix < 15) {
+  let color, bg, icon, label, sublabel, zone;
+  // VIX-Zonen nach klassischer Praxis (Grenzen sind Richtwerte, nicht starr):
+  // <12: Extreme Sorglosigkeit / Complacency – Markt auf KO-Kurs, Wendepunkt möglich
+  // 12-15: Greed / Risk-On – Investoren kaufen ohne Absicherung, Puts billig
+  // 15-25: Normalbereich – gesunde Schwankungen, Markt funktional
+  // 25-30: Fear – deutliche Nervosität, Institutionelle sichern ab
+  // >30: Panik / Extreme Fear – akute Turbulenzen, historisch oft Kaufgelegenheit
+  if (vix < 12) {
+    color = 'var(--amber)'; bg = 'rgba(240,169,58,0.12)';
+    icon = 'ti-mood-happy'; label = 'VIX ' + vix.toFixed(1);
+    zone = 'Extreme Sorglosigkeit';
+    sublabel = 'Complacency – Markt ignoriert Risiken, Wendepunkt möglich';
+  } else if (vix < 15) {
     color = 'var(--green)'; bg = 'rgba(52,199,89,0.12)';
     icon = 'ti-mood-smile'; label = 'VIX ' + vix.toFixed(1);
-    sublabel = 'Niedrig - Risikobereitschaft hoch';
-  } else if (vix < 22) {
-    color = 'var(--amber)'; bg = 'rgba(255,204,0,0.12)';
+    zone = 'Greed – Risk-On';
+    sublabel = 'Risikofreude hoch – Puts günstig, Trend intakt';
+  } else if (vix < 25) {
+    color = 'var(--green)'; bg = 'rgba(52,199,89,0.08)';
     icon = 'ti-mood-neutral'; label = 'VIX ' + vix.toFixed(1);
-    sublabel = 'Erhoehte Vorsicht - Absicherung pruefen';
+    zone = 'Normal – Markt funktional';
+    sublabel = 'Gesunde Schwankungen – Selektiv vorgehen';
   } else if (vix < 30) {
-    color = 'var(--red)'; bg = 'rgba(255,59,48,0.12)';
+    color = 'var(--amber)'; bg = 'rgba(240,169,58,0.15)';
     icon = 'ti-mood-sad'; label = 'VIX ' + vix.toFixed(1);
-    sublabel = 'Hohe Volatilitaet - Keine neuen Longs!';
-  } else {
-    color = 'var(--red)'; bg = 'rgba(255,59,48,0.20)';
+    zone = 'Fear – Absicherungsdruck';
+    sublabel = 'Nervosität steigt – Neue Longs klein halten, Absicherung prüfen';
+  } else if (vix < 40) {
+    color = 'var(--red)'; bg = 'rgba(255,59,48,0.12)';
     icon = 'ti-alert-triangle'; label = 'VIX ' + vix.toFixed(1);
-    sublabel = 'EXTREME Volatilitaet - Put-KOs pruefen';
+    zone = 'Panik – Extreme Fear';
+    sublabel = 'Akute Turbulenzen – Kein aktives Trading, Put-KOs prüfen';
+  } else {
+    color = 'var(--red)'; bg = 'rgba(255,59,48,0.22)';
+    icon = 'ti-skull'; label = 'VIX ' + vix.toFixed(1);
+    zone = 'Crash – Historische Panik';
+    sublabel = 'Blut auf den Straßen – Contrarian-Kaufgelegenheit prüfen';
   }
 
   el.style.display = 'flex';
@@ -8617,8 +8637,8 @@ function renderVixAmpel(vix) {
   el.innerHTML =
     '<i class="ti ' + icon + '" style="font-size:18px;color:' + color + ';flex-shrink:0"></i>' +
     '<div style="flex:1">' +
-      '<div style="font-weight:600;color:' + color + ';font-size:13px">' + label + '</div>' +
-      '<div style="font-size:11px;color:var(--text2)">' + sublabel + '</div>' +
+      '<div style="font-weight:600;color:' + color + ';font-size:13px">' + label + ' <span style="font-weight:400;font-size:11px;opacity:0.85">' + zone + '</span></div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + sublabel + '</div>' +
     '</div>' +
     '<div style="font-size:10px;color:var(--text3)">Markt-Regime</div>';
 }
@@ -10320,11 +10340,9 @@ function autoTopGetTodayKey() {
 }
 
 function autoTopListName() {
+  // Fester Name pro Markt → kumulative Befüllung über mehrere Scans
   var mkt = window.currentMarket === 'de' ? 'DE' : 'US';
-  var now = new Date();
-  var date = now.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'});
-  var time = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
-  return 'Top40-' + mkt + ' · ' + date + ' ' + time;
+  return 'Top40-' + mkt;
 }
 
 function autoTopMerge(allScored) {
@@ -10383,7 +10401,10 @@ function autoTopMerge(allScored) {
     wls[listName] = merged.join(', ');
     saveWatchlistsWithSync(wls, listName);
     updateWatchlistDropdown();
-    showKoToast('📊 Top40-' + (window.currentMarket==='de'?'DE':'US') + ' aktualisiert · ' + merged.length + ' Titel');
+    var _mktLabel = window.currentMarket==='de'?'DE':'US';
+    var _ts = new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    var _dt = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    showKoToast('📊 Top40-' + _mktLabel + ' · ' + merged.length + ' Titel · zuletzt ' + _dt + ' ' + _ts);
   } catch(e) { console.warn('autoTopMerge:', e); }
 }
 
