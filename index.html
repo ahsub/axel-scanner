@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v50">
+<meta name="app-version" content="20260615-v51">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2590,7 +2590,8 @@ async function runScan(){
       const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':130};
       let closes=[],volumes=[],timestamps=[],dates=[];
       let dataSource='';
-      let sessionNote = usOpen?'🔔 US Live':dePreMarket?'🌙 Pre-Market':'📊 Tageschart';
+      const deOpen = typeof isGermanMarketOpen==='function' && isGermanMarketOpen();
+      let sessionNote = usOpen?'🔔 US Live':dePreMarket?'🌙 Pre-Market DE':deOpen?'🇩🇪 DE Live':'📊 Tageschart';
 
       const tdKey=getTwelveKey();
       const isDeMarket = window.currentMarket==='de';
@@ -3426,7 +3427,7 @@ function renderCard(t,state){
        '<option value="1h">1h</option>'+
        '<option value="4h">4h</option>'+
      '</select>'+
-     '<button id="rescan-btn-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation();doRescan(this.dataset.sym)" '+
+     '<button id="rescan-btn-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation();doRescan(this.dataset.sym, this.dataset.tf)" '+
        'style="font-size:11px;padding:3px 10px;border-radius:8px;background:var(--blue-bg);color:var(--accent);border:0.5px solid var(--accent);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:4px" title="Rescan mit gewähltem TF">'+
        '<i class="ti ti-refresh" style="font-size:11px"></i> Neu'+
      '</button>'+
@@ -5315,7 +5316,16 @@ function isGermanPreMarket(){
   const utcMins = now.getUTCHours()*60 + now.getUTCMinutes();
   const dow = now.getUTCDay();
   if(dow===0||dow===6) return false;
-  return utcMins >= 6*60 && utcMins < 13*60+30;
+  // XETRA: 09:00-17:30 MEZ = 07:00-15:30 UTC (MESZ: 07:00 UTC)
+  // Pre-Market: 08:00-09:00 MEZ = 06:00-07:00 UTC
+  return utcMins >= 6*60 && utcMins < 7*60;
+}
+function isGermanMarketOpen(){
+  const now = new Date();
+  const utcMins = now.getUTCHours()*60 + now.getUTCMinutes();
+  const dow = now.getUTCDay();
+  if(dow===0||dow===6) return false;
+  return utcMins >= 7*60 && utcMins < 15*60+30;
 }
 
 function getLastTradingDayLabel(){
@@ -8731,10 +8741,11 @@ function setCardTF(selectEl) {
 }
 
 // Rescan mit dem für diese Karte gespeicherten TF
-function doRescan(sym) {
-  // Reihenfolge: button.data-tf → tickerData._cardTF → window._cardTF → currentTF → 1d
+function doRescan(sym, tfArg) {
+  // tf direkt aus click-event (tfArg) oder Fallback-Kette
   var btn = document.getElementById('rescan-btn-'+sym);
-  var tf = (btn && btn.dataset.tf)
+  var tf = tfArg
+    || (btn && btn.dataset.tf)
     || (tickerData[sym] && tickerData[sym]._cardTF)
     || window['_cardTF_'+sym]
     || window.currentTF
@@ -8841,7 +8852,7 @@ async function rescanTickerTF(sym, tf) {
     var barNote = closes.length < 35 ? ' ⚠️ zu wenig Bars für MACD' : '';
     showKoToast('✓ ' + sym + ' · ' + tfLabel + ' · ' + closes.length + ' Bars' + barNote + ' · ' + dataSource);
   } catch(e) {
-    console.log('rescanTickerTF error:',sym,e.message);
+    console.error('rescanTickerTF error:',sym, e.message, e.stack);
     if(card){ card.style.opacity='1'; card.innerHTML='<div style="padding:1rem;color:var(--red);font-size:12px">⚠ '+sym+': '+e.message+'</div>'; }
   }
 }
