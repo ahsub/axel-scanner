@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v69">
+<meta name="app-version" content="20260615-v70">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3254,6 +3254,8 @@ function sortAndRenderCards(tickers){
         '<i class="ti ti-star"></i> ≥2/3 speichern ('+(bull3+bull2)+')</button>'+
       '<button onclick="saveFromScan(0)" class="btn btn-sm" style="font-size:10px;padding:2px 7px">'+
         '<i class="ti ti-star"></i> Alle ('+filteredResults.length+')</button>'+
+      '<button onclick="enrichTop40WithIV()" class="btn btn-sm" id="iv-enrich-btn" style="font-size:10px;padding:2px 7px;background:rgba(79,142,247,0.12);border-color:var(--accent);color:var(--accent)">'+
+        '<i class="ti ti-chart-candle"></i> IV laden (Top40)</button>'+
       '<button onclick="toggleKiDropdown(this)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.15));border-color:#818cf8;color:#818cf8"><i class=\"ti ti-brain\"></i> KI ▾</button>'+
       
       '<button onclick="showSectorHeatmap()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">'+
@@ -6365,6 +6367,117 @@ renderCard = function(t, state){
 
 // Initialize watchlist dropdown on load
 document.addEventListener('DOMContentLoaded', function(){ updateWatchlistDropdown(); });
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IV-ENRICHMENT FÜR TOP40
+// Lädt IV-Daten nur für die Top40-US bzw Top40-DE Watchlist
+// und aktualisiert die Karten mit IVP-Badge
+// ═══════════════════════════════════════════════════════════════════════════
+async function enrichTop40WithIV() {
+  const btn = document.getElementById('iv-enrich-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> IV lädt…'; }
+
+  // Top40 aus aktuellem Markt holen
+  const mkt = window.currentMarket === 'de' ? 'DE' : 'US';
+  const wlName = 'Top40-' + mkt;
+  const wls = getWatchlists();
+
+  // Kandidaten: Top40-WL ODER aktive Scan-Ergebnisse (Top40 nach Score)
+  let tickers = [];
+  if (wls[wlName]) {
+    tickers = wls[wlName].split(',').map(s => s.trim()).filter(Boolean);
+  } else if (window.activeTickers && window.tickerData) {
+    // Fallback: Top40 aus aktuellem Scan
+    tickers = Object.keys(tickerData)
+      .filter(sym => tickerData[sym] && !tickerData[sym].error)
+      .sort((a,b) => {
+        const sa = tickerData[a] ? (processData(tickerData[a]).compositeScore||0) : 0;
+        const sb = tickerData[b] ? (processData(tickerData[b]).compositeScore||0) : 0;
+        return sb - sa;
+      })
+      .slice(0, 40);
+  }
+
+  if (!tickers.length) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-chart-candle"></i> IV laden (Top40)'; }
+    showKoToast('⚠ Keine Top40-Liste gefunden — erst scannen');
+    return;
+  }
+
+  // DE-Ticker: Yahoo Options nur für US-Ticker verfügbar
+  // DE-Aktien → HV-Näherung verwenden
+  const isDE = mkt === 'DE';
+  let done = 0, errors = 0;
+  const total = tickers.length;
+
+  showKoToast('📈 IV-Daten für ' + total + ' Titel werden geladen…');
+
+  for (const sym of tickers) {
+    try {
+      if (btn) btn.innerHTML = '<i class="ti ti-loader"></i> ' + (done+1) + '/' + total;
+
+      // Historische Closes für HV-Berechnung aus tickerData holen
+      const raw = tickerData[sym];
+      const closes = raw ? (raw.closes || raw.closes_20d || []) : [];
+
+      let ivpResult = null;
+
+      if (!isDE) {
+        // US: echte Yahoo Options
+        ivpResult = await getIVPercentile(sym, closes);
+      }
+
+      // Fallback für DE oder wenn Yahoo Options fehlen: HV-Näherung
+      if (!ivpResult && closes.length >= 20) {
+        const hvSeries = calcHV20Series(closes);
+        if (hvSeries.length > 0) {
+          const currentHV = hvSeries[hvSeries.length - 1];
+          const ivp = calcIVPercentile(currentHV, hvSeries);
+          ivpResult = {
+            ivp: ivp,
+            atmIV: Math.round(currentHV * 100),
+            isHV: true
+          };
+        }
+      }
+
+      if (ivpResult && raw) {
+        // In tickerData speichern
+        raw._ivp = ivpResult;
+        // Karte aktualisieren
+        const card = document.getElementById('card-' + sym);
+        if (card) {
+          // IVP-Badge Element suchen und aktualisieren
+          const badge = card.querySelector('.ivp-badge');
+          if (badge) {
+            const col = ivpColor(ivpResult.ivp);
+            const hint = ivpLabel(ivpResult.ivp);
+            const label = ivpResult.isHV ? 'HVP' : 'IVP';
+            const ivpText = label + ' ' + ivpResult.ivp + '%';
+            const atmText = ivpResult.atmIV ? ' · ' + (ivpResult.isHV?'HV':'IV') + ' ' + ivpResult.atmIV + '%' : '';
+            badge.style.color = col;
+            badge.textContent = '📈 ' + ivpText + atmText;
+            badge.title = hint;
+          }
+        }
+        done++;
+      }
+    } catch(e) {
+      errors++;
+      console.warn('IV enrich error:', sym, e.message);
+    }
+
+    // Rate-Limit: kurze Pause zwischen Requests
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-chart-candle"></i> IV laden (Top40)';
+  }
+  showKoToast('✅ IV geladen: ' + done + '/' + total + ' Titel' + (errors > 0 ? ' (' + errors + ' Fehler)' : ''));
+}
 
 function saveFromScan(minScore){
   const tickers = [];
