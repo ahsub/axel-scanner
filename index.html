@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v56">
+<meta name="app-version" content="20260615-v58">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1273,6 +1273,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="card" style="margin-bottom:1rem">
         <div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">Kursdaten 4h lokal gecacht. Cache leeren erzwingt frische API-Daten.</div>
         <button class="btn btn-sm" onclick="clearScanRegistry();showKoToast('Scan-Registry geleert');" style="font-size:12px"><i class="ti ti-history"></i> Scan-Registry leeren</button>
+            <button class="btn btn-sm" onclick="cleanupJunkWatchlists()" style="font-size:12px;color:var(--red);border-color:var(--red)"><i class="ti ti-trash"></i> Müll-WL bereinigen</button>
         <button class="btn btn-sm" onclick="clearTdCache();this.textContent='✓ Geleert';setTimeout(()=>this.textContent='Cache leeren',2000)" style="font-size:12px"><i class="ti ti-trash"></i> Cache leeren</button>
       </div>
       <div class="sec">PIN ändern</div>
@@ -1786,6 +1787,44 @@ async function autoSyncOnStart() {
 }
 
 // Auto-Push nach Scan-Abschluss (Top-Ergebnisse in Cloud)
+
+// ─── AUTO TOP40 ──────────────────────────────────────────────────────────────
+function autoUpdateTop40() {
+  try {
+    if (!window.tickerData || !Object.keys(tickerData).length) return;
+    const mkt = window.currentMarket === 'de' ? 'DE' : 'US';
+    const wlName = 'Top40-' + mkt;
+
+    // Alle gescannten Ticker mit Score sammeln
+    var scored = [];
+    Object.keys(tickerData).forEach(function(sym) {
+      var raw = tickerData[sym];
+      if (!raw || raw.error) return;
+      var state = processData(raw);
+      if (!state || state.error) return;
+      scored.push({ sym: sym, score: state.compositeScore || 0, bullCount: state.bullCount || 0 });
+    });
+    if (!scored.length) return;
+
+    // Nach Score sortieren, Top 40 nehmen
+    scored.sort(function(a, b) { return b.score - a.score; });
+    var top40 = scored.slice(0, 40).map(function(t) { return t.sym; });
+
+    // In Watchlist speichern (überschreibt vorherige Top40)
+    var wls = getWatchlists();
+    wls[wlName] = top40.join(', ');
+    saveWatchlistsWithSync(wls, wlName);
+    updateWatchlistDropdown();
+
+    // Timestamp im WL-Namen aktualisieren
+    var today = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    var timeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    showKoToast('📊 ' + wlName + ' aktualisiert · ' + top40.length + ' Titel · ' + today + ' ' + timeStr);
+  } catch(e) {
+    console.warn('autoUpdateTop40 error:', e.message);
+  }
+}
+
 async function autoSyncAfterScan() {
   try {
     if (!window.activeTickers || !window.tickerData) return;
@@ -3070,6 +3109,8 @@ async function runScan(){
   }
   document.getElementById('scan-bar').style.width='100%';
   setTimeout(autoSyncAfterScan, 500); // Auto-Sync nach Scan
+  // Auto-Update Top40 Liste für aktuellen Markt
+  autoUpdateTop40();
   document.getElementById('scan-label').textContent='Sortiere Ergebnisse…';
 
   // Sort and re-render all cards: bull first → bear last, by MACD within group
@@ -5894,7 +5935,10 @@ function saveFromScan(minScore){
     var sb = tickerData[b] ? (processData(tickerData[b]).compositeScore||0) : 0;
     return sb - sa;
   });
-  const label = minScore===3?'Kaufsignal 3/3':minScore===2?'>=2/3 bullisch':'Alle gescannt';
+  const mkt = window.currentMarket==='de' ? 'DE' : 'US';
+  const label = minScore===3?'Top-'+tickers.length+'-'+mkt+' 3/3 bullisch'
+    :minScore===2?'Top-'+tickers.length+'-'+mkt+' ≥2/3'
+    :'Alle '+mkt+' gescannt';
   const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
   const defaultName = label+' · '+today;
   // Custom Modal statt prompt() (prompt() auf HTTPS/Mobile oft blockiert)
@@ -7184,6 +7228,31 @@ function openListEditor(mode){
   loadListEditorData();
 }
 
+
+// ─── WATCHLIST CLEANUP ───────────────────────────────────────────────────────
+function cleanupJunkWatchlists() {
+  var wls = getWatchlists();
+  var before = Object.keys(wls).length;
+  var removed = [];
+  Object.keys(wls).forEach(function(name) {
+    // Entfernen wenn: nur Zahl, leer, oder nur 1 Ticker (Fehlklick)
+    var isNumeric = /^\d+$/.test(name.trim());
+    var isEmpty = !wls[name] || !wls[name].trim();
+    var isSingle = wls[name] && wls[name].split(',').filter(Boolean).length <= 1 && isNumeric;
+    if (isNumeric || isEmpty) {
+      removed.push(name);
+      delete wls[name];
+    }
+  });
+  if (removed.length === 0) {
+    showKoToast('Keine Müll-Watchlisten gefunden');
+    return;
+  }
+  localStorage.setItem('ko_watchlists', JSON.stringify(wls));
+  updateWatchlistDropdown();
+  renderAdminWLList && renderAdminWLList();
+  showKoToast('🗑 ' + removed.length + ' Watchlisten entfernt: ' + removed.slice(0,5).join(', ') + (removed.length>5?'...':''));
+}
 function closeListEditor(){
   var modal = document.getElementById('list-editor-modal');
   if(modal) modal.style.display = 'none';
