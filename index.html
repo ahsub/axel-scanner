@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v64">
+<meta name="app-version" content="20260615-v69">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -527,6 +527,43 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
       </div>
       <div id="live-prices-status" style="font-size:11px;color:var(--text3);margin-bottom:.5rem;display:none"></div>
+
+      <!-- ── INTERMARKET ANALYSE ─────────────────────────────────── -->
+      <div id="intermarket-panel" style="background:var(--bg2);border-radius:var(--radius);padding:.75rem;margin-bottom:.75rem;border:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+          <div style="font-size:12px;font-weight:600;color:var(--text)">
+            <i class="ti ti-world" style="color:var(--accent)"></i> Intermarket-Analyse
+          </div>
+          <button class="btn btn-sm" onclick="loadIntermarket()" id="intermarket-btn"
+            style="font-size:10px;padding:3px 8px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">
+            <i class="ti ti-refresh"></i> Laden
+          </button>
+        </div>
+
+        <!-- Risk Appetite Score -->
+        <div id="im-score-bar" style="display:none;margin-bottom:.75rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:11px;color:var(--text2)">Risk Appetite Score</span>
+            <span id="im-score-label" style="font-size:12px;font-weight:700">—</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:4px;height:8px;overflow:hidden">
+            <div id="im-score-fill" style="height:100%;border-radius:4px;transition:width .5s;width:0%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px">
+            <span>Extreme Fear</span><span>Neutral</span><span>Extreme Greed</span>
+          </div>
+        </div>
+
+        <!-- Signale Grid -->
+        <div id="im-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="text-align:center;color:var(--text3);font-size:11px;grid-column:span 2;padding:.5rem">
+            Klicke "Laden" für Intermarket-Signale
+          </div>
+        </div>
+
+        <!-- Gesamt-Einschätzung -->
+        <div id="im-verdict" style="display:none;margin-top:.6rem;padding:.5rem .75rem;border-radius:8px;font-size:12px"></div>
+      </div>
       <div class="mc-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:.5rem">
         <div class="mc"><div class="mcl">S&P 500</div><div class="mcv" id="m-sp">—</div><div style="font-size:10px;margin-top:2px" id="m-sp-chg">—</div></div>
         <div class="mc"><div class="mcl">VIX</div><div class="mcv" id="m-vix">—</div><div style="font-size:10px;margin-top:2px" id="m-vix-chg">—</div></div>
@@ -4855,6 +4892,361 @@ function saveAnthropicKey(){
   setTimeout(function(){ msg.style.display='none'; }, 3000);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// INTERMARKET-ANALYSE
+// Quellen: alle via Yahoo Finance (kostenlos, kein Key nötig)
+// Tickers: ^VVIX, GC=F, HG=F, AUDUSD=X, JPYUSD=X, ^TNX, JNK, LQD, DX-Y.NYB
+// ═══════════════════════════════════════════════════════════════════════
+
+const IM_TICKERS = [
+  // ── Sentiment / Volatilität ──
+  { sym:'^VVIX',    id:'im-vvix',  label:'VVIX',              unit:'',   role:'fear_early' },
+  // ── Währungen ──
+  { sym:'GC=F',     id:'im-gold',  label:'Gold',              unit:'$',  role:'safe_haven' },
+  { sym:'HG=F',     id:'im-cu',    label:'Kupfer',            unit:'$',  role:'risk_on'    },
+  { sym:'AUDUSD=X', id:'im-aud',   label:'AUD/USD',           unit:'',   role:'risk_on'    },
+  { sym:'JPYUSD=X', id:'im-jpy',   label:'JPY/USD',           unit:'',   role:'safe_haven' },
+  { sym:'DX-Y.NYB', id:'im-dxy',   label:'USD Index',         unit:'',   role:'context'    },
+  // ── Zinsen & Yield Curve ──
+  { sym:'^TNX',     id:'im-tnx',   label:'10J Treasury',      unit:'%',  role:'rates'      },
+  { sym:'^FVX',     id:'im-fvx',   label:'2J Treasury',       unit:'%',  role:'rates'      },
+  { sym:'^TYX',     id:'im-tyx',   label:'30J Treasury',      unit:'%',  role:'rates'      },
+  // ── Inflation ──
+  { sym:'TIP',      id:'im-tip',   label:'TIPS (Inflation)',   unit:'$',  role:'inflation'  },
+  // ── Credit Spreads ──
+  { sym:'JNK',      id:'im-jnk',   label:'JNK (HY)',          unit:'$',  role:'risk_on'    },
+  { sym:'LQD',      id:'im-lqd',   label:'LQD (IG)',          unit:'$',  role:'safe_haven' },
+  // ── Housing USA ──
+  { sym:'ITB',      id:'im-itb',   label:'ITB (Homebuilder)', unit:'$',  role:'housing'    },
+  { sym:'MBB',      id:'im-mbb',   label:'MBB (Mortgage)',    unit:'$',  role:'housing'    },
+  { sym:'LBS=F',    id:'im-lbs',   label:'Lumber',            unit:'$',  role:'housing'    },
+,
+  // ── Makro: Inflation ──
+  { sym:'TIP',      id:'im-tip',   label:'TIPS ETF',          unit:'$',  role:'inflation'  },
+  // ── Makro: Zinsstruktur ──
+  { sym:'^FVX',     id:'im-fvx',   label:'5J Treasury',       unit:'%',  role:'rates'      },
+  { sym:'^TYX',     id:'im-tyx',   label:'30J Treasury',      unit:'%',  role:'rates'      },
+  { sym:'^IRX',     id:'im-irx',   label:'3M T-Bill',         unit:'%',  role:'rates'      },
+  // ── Makro: Housing ──
+  { sym:'ITB',      id:'im-itb',   label:'Hausbauer ETF',     unit:'$',  role:'housing'    },
+  { sym:'VNQ',      id:'im-vnq',   label:'REIT ETF',          unit:'$',  role:'housing'    },
+  { sym:'XLU',      id:'im-xlu',   label:'Utilities',         unit:'$',  role:'zinssens'   },
+];
+
+async function fetchYahooSingle(sym) {
+  try {
+    const to   = Math.floor(Date.now() / 1000);
+    const from = to - 60 * 60 * 24 * 10; // 10 Tage
+    const url  = 'https://query1.finance.yahoo.com/v7/finance/chart/' 
+               + encodeURIComponent(sym) 
+               + '?interval=1d&period1=' + from + '&period2=' + to + '&includePrePost=false';
+    const r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
+    if (!r.ok) return null;
+    const j = await r.json();
+    const res = j?.chart?.result?.[0];
+    if (!res) return null;
+    const q      = res.indicators.quote[0];
+    const closes = (q.close || []).filter(v => v != null);
+    if (closes.length < 2) return null;
+    const price  = res.meta.regularMarketPrice || closes[closes.length - 1];
+    const prev   = closes[closes.length - 2];
+    const chgPct = ((price - prev) / prev) * 100;
+    const chg5d  = closes.length >= 6
+      ? ((price - closes[closes.length - 6]) / closes[closes.length - 6]) * 100
+      : chgPct;
+    return { price, prev, chgPct, chg5d, closes };
+  } catch(e) { return null; }
+}
+
+function imSignalCard(id, label, value, unit, chgPct, signal, desc, noScore) {
+  const sigColor = signal === 'risk_on'   ? 'var(--green)'
+                 : signal === 'risk_off'  ? 'var(--red)'
+                 : signal === 'warning'   ? 'var(--amber)'
+                 : 'var(--text3)';
+  const sigIcon  = signal === 'risk_on'   ? 'ti-trending-up'
+                 : signal === 'risk_off'  ? 'ti-trending-down'
+                 : signal === 'warning'   ? 'ti-alert-triangle'
+                 : 'ti-minus';
+  const borderStyle = noScore ? 'dashed' : 'solid';
+  const chgStr   = chgPct != null 
+    ? (chgPct >= 0 ? '+' : '') + chgPct.toFixed(2) + '%'
+    : '—';
+  const chgColor = chgPct > 0 ? 'var(--green)' : chgPct < 0 ? 'var(--red)' : 'var(--text3)';
+  return '<div style="background:var(--bg3);border-radius:8px;padding:6px 8px;border-left:2px solid ' + sigColor + '">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center">'
+    + '<span style="font-size:10px;color:var(--text2)">' + label + '</span>'
+    + '<i class="ti ' + sigIcon + '" style="font-size:12px;color:' + sigColor + '"></i>'
+    + '</div>'
+    + '<div style="font-size:13px;font-weight:700;color:var(--text);margin:2px 0">'
+    + (value != null ? (unit==='$'?unit:'') + value.toFixed(unit==='%'?2:unit==='$'?2:4) + (unit==='%'?'%':unit!=='$'?unit:'') : '—')
+    + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center">'
+    + '<span style="font-size:9px;color:' + chgColor + '">' + chgStr + ' (1T)</span>'
+    + '<span style="font-size:9px;color:var(--text3);max-width:90px;text-align:right">' + (desc||'') + '</span>'
+    + '</div>'
+    + '</div>';
+}
+
+async function loadIntermarket() {
+  const btn   = document.getElementById('intermarket-btn');
+  const grid  = document.getElementById('im-grid');
+  const score_bar = document.getElementById('im-score-bar');
+  const verdict   = document.getElementById('im-verdict');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Lädt…'; }
+  if (grid) grid.innerHTML = '<div style="grid-column:span 2;text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Lade Daten…</div>';
+
+  // Alle Ticker parallel laden
+  const results = await Promise.all(IM_TICKERS.map(async function(t) {
+    const d = await fetchYahooSingle(t.sym);
+    return { ...t, data: d };
+  }));
+
+  // Kupfer/Gold Ratio berechnen
+  const cu   = results.find(r => r.sym === 'HG=F')?.data;
+  const gold = results.find(r => r.sym === 'GC=F')?.data;
+  const cuGoldRatio     = (cu && gold) ? cu.price / gold.price : null;
+  const cuGoldRatioPrev = (cu && gold) ? cu.prev / gold.prev : null;
+  const cuGoldChg       = (cuGoldRatio && cuGoldRatioPrev) 
+    ? ((cuGoldRatio - cuGoldRatioPrev) / cuGoldRatioPrev) * 100 : null;
+
+  // JNK/LQD Spread-Proxy
+  const jnk = results.find(r => r.sym === 'JNK')?.data;
+  const lqd = results.find(r => r.sym === 'LQD')?.data;
+  const jnkLqdRatio     = (jnk && lqd) ? jnk.price / lqd.price : null;
+  const jnkLqdRatioPrev = (jnk && lqd) ? jnk.prev / lqd.prev : null;
+  const jnkLqdChg       = (jnkLqdRatio && jnkLqdRatioPrev)
+    ? ((jnkLqdRatio - jnkLqdRatioPrev) / jnkLqdRatioPrev) * 100 : null;
+
+  // ── Scoring-Logik ──────────────────────────────────────────────
+  // Jedes Signal gibt 0-20 Punkte (Risk-On positiv, Risk-Off negativ)
+  // Gesamt 0-100: <20 Extreme Fear, 20-40 Fear, 40-60 Neutral, 60-80 Risk-On, >80 Greed
+  let scorePoints = 0, scoreCount = 0;
+  const signals = [];
+
+  // VVIX: <90 OK, 90-110 Warnung, >110 Frühwarnung
+  const vvix = results.find(r => r.sym === '^VVIX')?.data;
+  if (vvix) {
+    const v = vvix.price;
+    const sig = v < 90 ? 'risk_on' : v < 110 ? 'warning' : 'risk_off';
+    const pts = v < 90 ? 15 : v < 110 ? 8 : 2;
+    const desc = v < 90 ? 'Kein Stress' : v < 110 ? 'Frühwarnung' : 'Stress steigt';
+    signals.push({ id:'im-vvix', label:'VVIX (Vola d. Vola)', value:v, unit:'', chgPct:vvix.chgPct, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+
+  // AUD/USD: steigend = Risk-On
+  const aud = results.find(r => r.sym === 'AUDUSD=X')?.data;
+  if (aud) {
+    const sig = aud.chg5d > 0.5 ? 'risk_on' : aud.chg5d < -0.5 ? 'risk_off' : 'neutral';
+    const pts = aud.chg5d > 0.5 ? 14 : aud.chg5d < -0.5 ? 5 : 9;
+    const desc = sig === 'risk_on' ? 'Risk-On Währung↑' : sig === 'risk_off' ? 'Flucht in Sicherheit' : 'Neutral';
+    signals.push({ id:'im-aud', label:'AUD/USD', value:aud.price, unit:'', chgPct:aud.chgPct, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+
+  // JPY/USD: steigend = Risk-Off (Safe Haven)
+  const jpy = results.find(r => r.sym === 'JPYUSD=X')?.data;
+  if (jpy) {
+    const sig = jpy.chg5d > 0.3 ? 'risk_off' : jpy.chg5d < -0.3 ? 'risk_on' : 'neutral';
+    const pts = sig === 'risk_on' ? 14 : sig === 'risk_off' ? 5 : 9;
+    const desc = sig === 'risk_off' ? 'Yen als Safe Haven↑' : sig === 'risk_on' ? 'Yen schwächt ab' : 'Neutral';
+    signals.push({ id:'im-jpy', label:'JPY/USD', value:jpy.price, unit:'', chgPct:jpy.chgPct, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+
+  // Cu/Gold Ratio: steigend = Risk-On
+  if (cuGoldRatio != null) {
+    const sig = cuGoldChg > 0.5 ? 'risk_on' : cuGoldChg < -0.5 ? 'risk_off' : 'neutral';
+    const pts = sig === 'risk_on' ? 15 : sig === 'risk_off' ? 4 : 8;
+    const desc = sig === 'risk_on' ? 'Industrie > Gold' : sig === 'risk_off' ? 'Flucht zu Gold' : 'Ausgeglichen';
+    signals.push({ id:'im-cugold', label:'Kupfer/Gold Ratio', value:cuGoldRatio, unit:'', chgPct:cuGoldChg, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+
+  // JNK/LQD Spread-Proxy: steigend = Risk-On (HY gefragt)
+  if (jnkLqdRatio != null) {
+    const sig = jnkLqdChg > 0.2 ? 'risk_on' : jnkLqdChg < -0.2 ? 'risk_off' : 'neutral';
+    const pts = sig === 'risk_on' ? 15 : sig === 'risk_off' ? 4 : 8;
+    const desc = sig === 'risk_on' ? 'HY Bonds gefragt↑' : sig === 'risk_off' ? 'Spreads weiten sich' : 'Stabile Spreads';
+    signals.push({ id:'im-spread', label:'JNK/LQD (Spread)', value:jnkLqdRatio, unit:'', chgPct:jnkLqdChg, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+
+  // 10J Treasury: moderat gut, stark steigend = Druck auf Aktien
+  const tnx = results.find(r => r.sym === '^TNX')?.data;
+  if (tnx) {
+    const v = tnx.price;
+    const sig = v > 5 ? 'risk_off' : v > 4.5 ? 'warning' : v > 3.5 ? 'neutral' : 'risk_on';
+    const pts = v > 5 ? 4 : v > 4.5 ? 7 : v > 3.5 ? 10 : 13;
+    const desc = v > 5 ? 'Starker Zinsdruck' : v > 4.5 ? 'Erhöhter Zinsdruck' : 'Moderat';
+    signals.push({ id:'im-tnx', label:'10J Treasury', value:v, unit:'%', chgPct:tnx.chgPct, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+
+  // USD Index: komplex, nicht linear → NUR als Kontext, kein Score-Beitrag
+  // USD steigt manchmal bei Risk-Off (Safe Haven) und manchmal bei Risk-On (Carry Trades)
+  const dxy = results.find(r => r.sym === 'DX-Y.NYB')?.data;
+  if (dxy) {
+    const desc = dxy.chg5d > 1 ? 'Stark↑ (Kontext: ambivalent)' 
+               : dxy.chg5d < -1 ? 'Schwächt↓ (Kontext: ambivalent)' 
+               : 'Stabil';
+    // signal='neutral' → kein Scoring, nur Anzeige
+    signals.push({ id:'im-dxy', label:'USD Index ⓘ', value:dxy.price, unit:'', chgPct:dxy.chgPct, signal:'neutral', desc, pts:0, noScore:true });
+    // scorePoints und scoreCount werden NICHT erhöht
+  }
+
+  // ── ZINSEN & YIELD CURVE ──────────────────────────────────────────
+  // 2J/10J Yield Curve Spread: Inversion = Rezessionswarnung
+  const fvx = results.find(r => r.sym === '^FVX')?.data;
+  const tyx = results.find(r => r.sym === '^TYX')?.data;
+  if (fvx && tnx) {
+    const spread = tnx.price - fvx.price; // 10J - 2J
+    const sig = spread > 0.5 ? 'risk_on'   // normale Kurve = gesund
+              : spread > 0   ? 'neutral'    // flach = Vorsicht
+              : spread > -0.5 ? 'warning'  // leichte Inversion
+              : 'risk_off';                 // starke Inversion = Rezessionswarnung
+    const pts = spread > 0.5 ? 14 : spread > 0 ? 9 : spread > -0.5 ? 5 : 2;
+    const desc = spread > 0.5 ? 'Normale Kurve↑'
+               : spread > 0   ? 'Kurve flach'
+               : spread > -0.5 ? 'Leichte Inversion!'
+               : 'Starke Inversion! Rezessionsrisiko';
+    signals.push({ id:'im-yc', label:'2J/10J Spread (Yield Curve)',
+      value: spread, unit:'%', chgPct: null, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+  // 30J Treasury: sehr hoch = langfristiger Inflationsdruck
+  if (tyx) {
+    const v = tyx.price;
+    const sig = v > 5.5 ? 'risk_off' : v > 4.8 ? 'warning' : 'neutral';
+    const pts = v > 5.5 ? 4 : v > 4.8 ? 7 : 10;
+    const desc = v > 5.5 ? 'Starker Langfrist-Zinsdruck' : v > 4.8 ? 'Erhöht' : 'Moderat';
+    signals.push({ id:'im-tyx', label:'30J Treasury',
+      value:v, unit:'%', chgPct:tyx.chgPct, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+
+  // ── INFLATION ────────────────────────────────────────────────────────
+  // TIPS ETF (TIP): steigend = Inflationserwartung steigt = Risk-Off für Anleihen
+  const tip = results.find(r => r.sym === 'TIP')?.data;
+  if (tip) {
+    const sig = tip.chg5d > 1 ? 'risk_off'   // TIPS stark steigend = hohe Inflationsangst
+              : tip.chg5d > 0.3 ? 'warning'
+              : tip.chg5d < -0.5 ? 'risk_on'  // TIPS fallen = sinkende Inflationserwartung
+              : 'neutral';
+    const pts = sig === 'risk_on' ? 12 : sig === 'neutral' ? 9 : sig === 'warning' ? 6 : 3;
+    const desc = tip.chg5d > 1 ? 'Inflationsangst steigt↑'
+               : tip.chg5d > 0.3 ? 'Leicht erhöhte Erwartung'
+               : tip.chg5d < -0.5 ? 'Inflationserwartung sinkt'
+               : 'Stabile Inflationserwartung';
+    signals.push({ id:'im-tip', label:'TIPS (Inflationserwartung)',
+      value:tip.price, unit:'$', chgPct:tip.chgPct, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+
+  // ── HOUSING USA ───────────────────────────────────────────────────────
+  // ITB (Homebuilder ETF): steigend = Hausmarkt gesund = Risk-On
+  const itb = results.find(r => r.sym === 'ITB')?.data;
+  if (itb) {
+    const sig = itb.chg5d > 2 ? 'risk_on' : itb.chg5d < -2 ? 'risk_off' : 'neutral';
+    const pts = sig === 'risk_on' ? 12 : sig === 'risk_off' ? 5 : 8;
+    const desc = sig === 'risk_on' ? 'Homebuilder stark↑'
+               : sig === 'risk_off' ? 'Homebuilder unter Druck'
+               : 'Housing stabil';
+    signals.push({ id:'im-itb', label:'ITB (Homebuilder)',
+      value:itb.price, unit:'$', chgPct:itb.chgPct, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+  // MBB (Mortgage ETF): fallend = steigende Hypothekenzinsen = Housing unter Druck
+  const mbb = results.find(r => r.sym === 'MBB')?.data;
+  if (mbb) {
+    const sig = mbb.chg5d > 0.5 ? 'risk_on'   // MBB steigt = Hypothekenzinsen fallen = gut für Housing
+              : mbb.chg5d < -0.5 ? 'risk_off'  // MBB fällt = Hypothekenzinsen steigen
+              : 'neutral';
+    const pts = sig === 'risk_on' ? 11 : sig === 'risk_off' ? 5 : 8;
+    const desc = sig === 'risk_on' ? 'Hypozinsen sinken↓ (positiv)'
+               : sig === 'risk_off' ? 'Hypozinsen steigen↑ (Druck)'
+               : 'Hypothekenzinsen stabil';
+    signals.push({ id:'im-mbb', label:'MBB (Hypothekenzinsen)',
+      value:mbb.price, unit:'$', chgPct:mbb.chgPct, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+  // Lumber: steigend = Bau-Nachfrage hoch = Housing-Boom
+  const lbs = results.find(r => r.sym === 'LBS=F')?.data;
+  if (lbs) {
+    const sig = lbs.chg5d > 3 ? 'risk_on' : lbs.chg5d < -3 ? 'risk_off' : 'neutral';
+    const pts = sig === 'risk_on' ? 11 : sig === 'risk_off' ? 5 : 8;
+    const desc = sig === 'risk_on' ? 'Baunachfrage hoch↑'
+               : sig === 'risk_off' ? 'Baunachfrage schwach↓'
+               : 'Stabile Baunachfrage';
+    signals.push({ id:'im-lbs', label:'Lumber (Bauholz)',
+      value:lbs.price, unit:'$', chgPct:lbs.chgPct, signal:sig, desc, pts });
+    scorePoints += pts; scoreCount++;
+  }
+
+
+  // ── Score berechnen ──────────────────────────────────────────────
+  const maxPossible = scoreCount * 15;
+  const scorePct    = scoreCount > 0 ? Math.round((scorePoints / maxPossible) * 100) : 50;
+
+  // ── Grid rendern ──────────────────────────────────────────────────
+  if (grid) {
+    // Signale in Kategorien aufteilen
+    const cats = [
+      { key: ['im-vvix','im-aud','im-jpy','im-cugold','im-spread','im-dxy'], title: '📊 Sentiment & Währungen' },
+      { key: ['im-tnx','im-yc','im-tyx','im-tip'], title: '📈 Zinsen & Inflation' },
+      { key: ['im-itb','im-mbb','im-lbs','im-vnq'], title: '🏠 Housing & REITs' },
+      { key: ['im-tip','im-fvx','im-tyx','im-irx','im-xlu'], title: '📊 Makro: Inflation & Zinsen' },
+    ];
+    var html = '';
+    cats.forEach(function(cat) {
+      var catSignals = signals.filter(function(s){ return cat.key.indexOf(s.id) >= 0; });
+      if (!catSignals.length) return;
+      html += '<div style="grid-column:span 2;font-size:10px;font-weight:600;color:var(--text3);'
+            + 'text-transform:uppercase;letter-spacing:.06em;margin-top:6px;margin-bottom:2px">'
+            + cat.title + '</div>';
+      html += catSignals.map(function(s){
+        return imSignalCard(s.id, s.label, s.value, s.unit, s.chgPct, s.signal, s.desc, s.noScore);
+      }).join('');
+    });
+    grid.innerHTML = html;
+  }
+
+  // ── Score-Bar ──────────────────────────────────────────────────────
+  if (score_bar) {
+    score_bar.style.display = 'block';
+    const fill  = document.getElementById('im-score-fill');
+    const lbl   = document.getElementById('im-score-label');
+    const scoreColor = scorePct < 30 ? 'var(--red)' : scorePct < 45 ? 'var(--amber)' : scorePct < 65 ? 'var(--green)' : scorePct < 80 ? 'var(--green)' : 'var(--amber)';
+    const scoreTxt   = scorePct < 20 ? 'Extreme Fear' : scorePct < 35 ? 'Fear' : scorePct < 50 ? 'Leicht Risk-Off' : scorePct < 65 ? 'Neutral' : scorePct < 80 ? 'Risk-On' : 'Greed';
+    if (fill) { fill.style.width = scorePct + '%'; fill.style.background = scoreColor; }
+    if (lbl)  { lbl.textContent = scorePct + '/100 — ' + scoreTxt; lbl.style.color = scoreColor; }
+  }
+
+  // ── Gesamt-Verdict ────────────────────────────────────────────────
+  if (verdict) {
+    verdict.style.display = 'block';
+    const riskOnCount  = signals.filter(s => s.signal === 'risk_on').length;
+    const riskOffCount = signals.filter(s => s.signal === 'risk_off').length;
+    const warnCount    = signals.filter(s => s.signal === 'warning').length;
+    const bgColor = scorePct >= 60 ? 'rgba(52,194,110,0.1)' : scorePct >= 45 ? 'rgba(240,169,58,0.1)' : 'rgba(255,59,48,0.1)';
+    const txColor = scorePct >= 60 ? 'var(--green)' : scorePct >= 45 ? 'var(--amber)' : 'var(--red)';
+    const verdictTxt = scorePct >= 65 ? '📈 Intermarket signalisiert Risk-On — Longs bevorzugen'
+      : scorePct >= 50 ? '😐 Gemischte Signale — Selektiv und mit engem Stop'
+      : scorePct >= 35 ? '⚠ Intermarket tendiert Risk-Off — Position klein halten'
+      : '🚨 Starke Risk-Off Signale — Defensiv positionieren';
+    verdict.style.background = bgColor;
+    verdict.style.borderLeft = '3px solid ' + txColor;
+    verdict.style.color = txColor;
+    verdict.innerHTML = '<div style="font-weight:600;margin-bottom:3px">' + verdictTxt + '</div>'
+      + '<div style="font-size:10px;opacity:.85">'
+      + riskOnCount + ' Risk-On · ' + riskOffCount + ' Risk-Off · ' + warnCount + ' Warnung'
+      + ' · Score ' + scorePct + '/100 (USD-Index kein Scoring)</div>';
+  }
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Laden'; }
+}
+
 async function autoMakro(){
   const antKey = getAnthropicKey();
   if(!antKey){
@@ -4951,28 +5343,70 @@ async function autoMakro(){
     consistencyHint = '\n\nPFLICHTHINWEIS: VIX erhöht UND defensive Rotation — verdict sollte "bear" oder mindestens "neu" sein. Vorsichtige Handelsstrategie empfehlen.';
   }
 
-  const prompt = 'Du bist ein erfahrener Trendfolge-Trader und analysierst täglich die Makro-Marktlage für Knock-out Turbo-Zertifikate auf US-Tech-Aktien (Trade Republic).\n\n'+
-    'Heute ist der '+today+'. Aktuelle Live-Marktdaten:\n'+
-    '- S&P 500: '+sp+'\n- Nasdaq: '+nq+'\n- VIX: '+vix+'\n- WTI Öl: '+oil+'\n'+
-    '- Bitcoin: '+btc+'\n- Ethereum: '+eth+'\n- Solana: '+sol+'\n- XRP: '+xrp+'\n'+
-    '- Gold: '+gold+'\n- Silber: '+silver+'\n- Kupfer: '+copper+'\n- Öl (Rohstoff): '+oil2+
-    sektorContext + newsContext + consistencyHint + '\n\n'+
-    'WICHTIG: Die Sektor-Rotation ist das stärkste Marktstruktur-Signal. Berücksichtige es als primären Faktor für das verdict.\n\n'+
-    'Das verdictText muss konkrete Handlungsempfehlungen für KO-Trader enthalten:\n'+
-    '- Bei "bear": welche Sektoren meiden, KO-Abstand erhöhen, Positionsgrößen reduzieren\n'+
-    '- Bei "bull": welche Sektoren bevorzugen, welche Setups bevorzugen\n'+
-    '- Bei "neu": selektive Strategie, welche Signale abwarten\n\n'+
-    'Erstelle eine prägnante Tages-Makroeinschätzung als JSON-Objekt mit exakt dieser Struktur:\n'+
-    '{\n'+
-    '  "verdict": "bull" oder "neu" oder "bear",\n'+
-    '  "verdictText": "2-3 Sätze mit konkreter Handlungsempfehlung auf Deutsch",\n'+
-    '  "factors": [\n'+
-    '    {"icon":"bull","title":"Titel","desc":"Beschreibung"},\n'+
-    '    {"icon":"neu","title":"Titel","desc":"Beschreibung"},\n'+
-    '    {"icon":"bear","title":"Titel","desc":"Beschreibung"}\n'+
-    '  ]\n'+
-    '}\n\n'+
-    'icon muss "bull", "neu" oder "bear" sein. Maximal 5 Faktoren. Ein Faktor MUSS die Sektorrotation benennen. Antworte NUR mit dem JSON, kein weiterer Text.';
+  // Intermarket-Daten für den Prompt sammeln
+  const imVvix   = document.getElementById('im-vvix')?.querySelector('[style*="font-size:13px"]')?.textContent || '—';
+  const imAud    = document.getElementById('im-aud')?.querySelector('[style*="font-size:13px"]')?.textContent || '—';
+  const imJpy    = document.getElementById('im-jpy')?.querySelector('[style*="font-size:13px"]')?.textContent || '—';
+  const imTip    = document.getElementById('im-tip')?.querySelector('[style*="font-size:13px"]')?.textContent || '—';
+  const imItb    = document.getElementById('im-itb')?.querySelector('[style*="font-size:13px"]')?.textContent || '—';
+  const imVnq    = document.getElementById('im-vnq')?.querySelector('[style*="font-size:13px"]')?.textContent || '—';
+  const imSpread = document.getElementById('im-irx')?.querySelector('[style*="font-size:13px"]')?.textContent || '—';
+  const imScore  = document.getElementById('im-score-label')?.textContent || '—';
+
+  const prompt =
+    'Du bist ein professioneller Finanzmarktanalyst der täglich eine Marktlageeinschätzung für einen aktiven Retail-Investor erstellt, der in deutschen und US-amerikanischen Märkten in KO-Turbo-Zertifikate und Aktienoptionen (Wheel-Strategie) investiert.\n\n' +
+    '== MARKTDATEN vom ' + today + ' ==\n' +
+    '\nINDIZES:\n' +
+    '- S&P 500: ' + sp + '\n' +
+    '- Nasdaq 100: ' + nq + '\n' +
+    '- VIX (Angstbarometer): ' + vix + '\n' +
+    '\nINTERMARKET-SIGNALE:\n' +
+    '- VVIX (Vola der Vola, Frühwarnindikator): ' + imVvix + '\n' +
+    '- AUD/USD (Risk-On Währung): ' + imAud + '\n' +
+    '- JPY/USD (Safe-Haven Währung): ' + imJpy + '\n' +
+    '- Intermarket Risk Score: ' + imScore + '\n' +
+    '\nROHSTOFFE & SAFE HAVEN:\n' +
+    '- Gold: ' + gold + '  |  Silber: ' + silver + '  |  Kupfer: ' + copper + '\n' +
+    '- WTI Öl: ' + oil2 + '\n' +
+    '\nMAKRO: INFLATION & ZINSEN:\n' +
+    '- TIPS ETF (Inflationserwartungen): ' + imTip + '\n' +
+    '- 10J-3M Spread (Yield Curve): ' + imSpread + '\n' +
+    '\nMAKRO: HOUSING & IMMOBILIEN:\n' +
+    '- Hausbauer ETF ITB: ' + imItb + '\n' +
+    '- REIT ETF VNQ: ' + imVnq + '\n' +
+    '\nKRYPTO (Risikosentiment):\n' +
+    '- Bitcoin: ' + btc + '  |  Ethereum: ' + eth + '  |  Solana: ' + sol + '\n' +
+    sektorContext + newsContext + consistencyHint + '\n\n' +
+
+    '== AUFGABE ==\n' +
+    'Erstelle eine ausführliche, rein faktenbasierte Marktlageeinschätzung. Verwende AUSSCHLIESSLICH die oben angegebenen Daten. Erfinde KEINE Kurse, Prozentzahlen oder Ereignisse.\n\n' +
+
+    'Analysiere dabei folgende Themenbereiche soweit die Daten es erlauben:\n' +
+    '1. MARKTREGIME: Ist der Markt Risk-On oder Risk-Off? Begründe mit konkreten Intermarket-Signalen.\n' +
+    '2. SEKTORROTATION: Welche Sektoren führen, welche hinken nach? Konkrete Implikationen für Positionierung.\n' +
+    '3. TECHNOLOGIE & WACHSTUM: Lage der Hyperscaler (MSFT, AMZN, GOOGL, META), Halbleiter/Chip-Hersteller (NVDA, AMD, AVGO, AMAT), KI-Infrastruktur, Robotik. Nur wenn Sektor-Daten vorhanden.\n' +
+    '4. ZINSEN & INFLATION: Interpretation der Yield Curve, Inflationserwartungen, Implikationen für zinssensitive Sektoren (Versorger, REITs, Immobilien).\n' +
+    '5. ENERGIE & ROHSTOFFE: Öl, Kupfer, Gold — was signalisieren sie über globales Wachstum?\n' +
+    '6. HOUSING USA: Lage des Immobilienmarkts, Bauaktivität, Implikationen für Zinserwartungen.\n' +
+    '7. CONSUMER & DEFENSIVE: Stärke der Consumer-Aktien als Konjunkturindikator.\n' +
+    '8. KONKRETE HANDLUNGSEMPFEHLUNG: Für KO-Trader und Options-Wheel-Strategie — welche Sektoren bevorzugen, welche meiden, Positionsgröße, KO-Abstand.\n\n' +
+
+    'Erstelle das Ergebnis als JSON mit dieser Struktur:\n' +
+    '{\n' +
+    '  "verdict": "bull" oder "neu" oder "bear",\n' +
+    '  "verdictText": "3-4 Sätze Gesamteinschätzung mit konkreter Handlungsempfehlung auf Deutsch",\n' +
+    '  "factors": [\n' +
+    '    {"icon":"bull","title":"Thema","desc":"Faktenbasierte Analyse 2-3 Sätze mit Implikation für Investor"},\n' +
+    '    ... (5-8 Faktoren, jeder Themenbereich der abgedeckt ist bekommt einen Eintrag)\n' +
+    '  ]\n' +
+    '}\n\n' +
+    'Regeln:\n' +
+    '- icon: nur "bull", "neu" oder "bear"\n' +
+    '- Jeder factor.desc: 2-3 Sätze, faktenbasiert, mit konkreter Implikation\n' +
+    '- Wenn Daten für ein Thema fehlen: diesen Faktor weglassen\n' +
+    '- Kein Faktor ohne Datenbasis aus dem Prompt\n' +
+    '- Antworte NUR mit dem JSON, kein weiterer Text\n' +
+    '- Sprache: Deutsch, professionell aber verständlich';
 
   try {
     // Anthropic API direkt (Browser-Zugriff mit speziellem Header)
