@@ -2378,6 +2378,16 @@ async function runScan(){
     tickers = getTickers();
   }
   if(!tickers.length) return;
+  // Safety: falls fixed:DAX40 direkt per Dropdown gewählt und currentMarket nicht gesetzt
+  {
+    const _preset = document.getElementById('ticker-preset').value;
+    if(_preset && _preset.startsWith('fixed:')){
+      const _k = _preset.substring(6);
+      const _deK = ['DAX40','MDAX','TECDAX','SDAX','HDAX'];
+      if(_deK.indexOf(_k) >= 0 && window.currentMarket !== 'de') setMarket('de');
+      else if(_deK.indexOf(_k) < 0 && window.currentMarket !== 'us') setMarket('us');
+    }
+  }
   activeTickers=tickers;
   const btn=document.getElementById('scan-btn');
   btn.disabled=true;
@@ -5586,6 +5596,9 @@ function onPresetChange(){
       DEFENSE:'Defense & Aerospace', REIT:'REITs', ENERGY:'Energy',
       HEALTH:'Healthcare', FINANCE:'Financials', CONSUMER:'Consumer'
     };
+    // Market automatisch auf DE setzen bei deutschen Indizes
+    const deKeys = ['DAX40','MDAX','TECDAX','SDAX','HDAX'];
+    if(deKeys.indexOf(key) >= 0){ setMarket('de'); } else { setMarket('us'); }
     if(input){
       // Feste Ticker anzeigen - editierbar
       const tickerStr = list.map(function(t){ return t.sym||t; }).join(', ');
