@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v55">
+<meta name="app-version" content="20260615-v56">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -5881,34 +5881,64 @@ renderCard = function(t, state){
 document.addEventListener('DOMContentLoaded', function(){ updateWatchlistDropdown(); });
 
 function saveFromScan(minScore){
-  // Collect tickers from current scan results based on minScore
-  const container = document.getElementById('scan-container');
-  if(!container){ alert('Kein Scan-Ergebnis vorhanden'); return; }
   const tickers = [];
-  // Get from tickerData
   Object.keys(tickerData).forEach(function(sym){
     const d = tickerData[sym];
     if(!d) return;
     const processed = processData(d);
     if(processed.bullCount >= minScore) tickers.push(sym);
   });
-  if(!tickers.length){ alert('Keine Titel mit diesem Signal'); return; }
-  // Nach Score absteigend sortieren → beste Titel oben, schlechtere unten leicht kürzbar
+  if(!tickers.length){ showKoToast('Keine Titel mit diesem Signal'); return; }
   tickers.sort(function(a, b){
     var sa = tickerData[a] ? (processData(tickerData[a]).compositeScore||0) : 0;
     var sb = tickerData[b] ? (processData(tickerData[b]).compositeScore||0) : 0;
     return sb - sa;
   });
-  const label = minScore===3?'Kaufsignal 3/3':minScore===2?'≥2/3 bullisch':'Alle gescannt';
+  const label = minScore===3?'Kaufsignal 3/3':minScore===2?'>=2/3 bullisch':'Alle gescannt';
   const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
   const defaultName = label+' · '+today;
-  const name = prompt('Watchlist-Name:', defaultName);
+  // Custom Modal statt prompt() (prompt() auf HTTPS/Mobile oft blockiert)
+  showSaveFromScanModal(defaultName, tickers);
+}
+
+function showSaveFromScanModal(defaultName, tickers) {
+  // Bestehendes Modal entfernen falls vorhanden
+  var old = document.getElementById('save-scan-modal');
+  if(old) old.remove();
+  var modal = document.createElement('div');
+  modal.id = 'save-scan-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML = '<div style="background:var(--bg2);border-radius:var(--radius);padding:1.25rem;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.4)">'
+    + '<div style="font-size:14px;font-weight:600;margin-bottom:.75rem;color:var(--text)"><i class="ti ti-star"></i> Watchlist speichern</div>'
+    + '<div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">' + tickers.length + ' Titel · Score-sortiert</div>'
+    + '<input id="save-scan-name" type="text" value="' + defaultName + '" '
+    + 'style="width:100%;box-sizing:border-box;padding:8px 10px;font-size:13px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;margin-bottom:.75rem">'
+    + '<div style="display:flex;gap:.5rem">'
+    + '<button onclick="confirmSaveFromScan()" class="btn btn-primary" style="flex:1;font-size:13px"><i class="ti ti-check"></i> Speichern</button>'
+    + '<button onclick="closeSaveModal()" class="btn" style="flex:1;font-size:13px"><i class="ti ti-x"></i> Abbrechen</button>'
+    + '</div></div>';
+  modal.dataset.tickers = tickers.join(',');
+  document.body.appendChild(modal);
+  setTimeout(function(){ var inp=document.getElementById('save-scan-name'); if(inp){inp.focus();inp.select();} }, 100);
+}
+
+function closeSaveModal() {
+  var m = document.getElementById('save-scan-modal');
+  if(m) m.remove();
+}
+
+function confirmSaveFromScan() {
+  var modal = document.getElementById('save-scan-modal');
+  if(!modal) return;
+  var name = document.getElementById('save-scan-name').value.trim();
   if(!name) return;
+  var tickers = modal.dataset.tickers.split(',').filter(Boolean);
+  modal.remove();
   const wls = getWatchlists();
   wls[name] = tickers.join(', ');
   saveWatchlistsWithSync(wls, name);
   updateWatchlistDropdown();
-  showKoToast('✓ "'+name+'" gespeichert · '+tickers.length+' Titel · Score-sortiert ↓');
+  showKoToast('✓ "'+name+'" gespeichert · '+tickers.length+' Titel');
 }
 
 // ─── WATCHLIST MODAL FUNCTIONS ────────────────────────────────────────────────
