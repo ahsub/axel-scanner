@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v58">
+<meta name="app-version" content="20260615-v59">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2487,6 +2487,7 @@ function setMarket(mkt){
     if(usBtn){ usBtn.style.background='var(--accent)'; usBtn.style.color='#fff'; }
     if(deBtn){ deBtn.style.background='var(--bg3)'; deBtn.style.color='var(--text2)'; }
     if(preset){
+      const _savedVal = preset.value; // aktuellen Wert merken
       const wls=getWatchlists();
       const wlOpts=Object.keys(wls).map(function(n){
         return '<option value="wl:'+n+'">⭐ '+n+' ('+wls[n].split(',').filter(Boolean).length+')</option>';
@@ -2514,11 +2515,16 @@ function setMarket(mkt){
         '</optgroup>'+
         (wlOpts?'<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options">'+wlOpts+'</optgroup>':
           '<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options"></optgroup>');
+      // Selektion wiederherstellen falls Option noch existiert
+      if(_savedVal && Array.from(preset.options).some(function(o){return o.value===_savedVal;})){
+        preset.value = _savedVal;
+      }
     }
   } else {
     if(deBtn){ deBtn.style.background='var(--accent)'; deBtn.style.color='#fff'; }
     if(usBtn){ usBtn.style.background='var(--bg3)'; usBtn.style.color='var(--text2)'; }
     if(preset){
+      const _savedVal2 = preset.value; // aktuellen Wert merken
       const wls2=getWatchlists();
       const wlOpts2=Object.keys(wls2).map(function(n){
         return '<option value="wl:'+n+'">⭐ '+n+' ('+wls2[n].split(',').filter(Boolean).length+')</option>';
@@ -2545,6 +2551,10 @@ function setMarket(mkt){
         '</optgroup>'+
         (wlOpts2?'<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options">'+wlOpts2+'</optgroup>':
           '<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options"></optgroup>');
+      // Selektion wiederherstellen
+      if(_savedVal2 && Array.from(preset.options).some(function(o){return o.value===_savedVal2;})){
+        preset.value = _savedVal2;
+      }
     }
   }
   document.getElementById('scan-container').innerHTML='';
