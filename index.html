@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v51">
+<meta name="app-version" content="20260615-v52">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3427,9 +3427,9 @@ function renderCard(t,state){
        '<option value="1h">1h</option>'+
        '<option value="4h">4h</option>'+
      '</select>'+
-     '<button id="rescan-btn-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation();doRescan(this.dataset.sym, this.dataset.tf)" '+
+     '<button id="rescan-btn-'+state.sym+'" data-sym="'+state.sym+'" data-tf="'+(window['_cardTF_'+state.sym]||window.currentTF||'1d')+'" onclick="event.stopPropagation();doRescan(this.dataset.sym, this.dataset.tf)" '+
        'style="font-size:11px;padding:3px 10px;border-radius:8px;background:var(--blue-bg);color:var(--accent);border:0.5px solid var(--accent);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:4px" title="Rescan mit gewähltem TF">'+
-       '<i class="ti ti-refresh" style="font-size:11px"></i> Neu'+
+       '<i class="ti ti-refresh" style="font-size:11px"></i> '+(window['_cardTF_'+state.sym]||window.currentTF||'1T').toUpperCase()+
      '</button>'+
     '</span>'+
     '</div>'+
