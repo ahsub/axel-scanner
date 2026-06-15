@@ -2378,17 +2378,19 @@ async function runScan(){
     tickers = getTickers();
   }
   if(!tickers.length) return;
-  // Safety: falls fixed:DAX40 direkt per Dropdown gewählt und currentMarket nicht gesetzt
+  // Safety: Market aus Preset ableiten falls nicht korrekt gesetzt
   {
-    const _preset = document.getElementById('ticker-preset').value;
-    if(_preset && _preset.startsWith('fixed:')){
-      const _k = _preset.substring(6);
-      const _deK = ['DAX40','MDAX','TECDAX','SDAX','HDAX'];
-      if(_deK.indexOf(_k) >= 0 && window.currentMarket !== 'de') setMarket('de');
-      else if(_deK.indexOf(_k) < 0 && window.currentMarket !== 'us') setMarket('us');
+    const _preset2 = document.getElementById('ticker-preset').value;
+    if(_preset2 === 'default-de' && window.currentMarket !== 'de') setMarket('de');
+    else if(_preset2 === 'default' && window.currentMarket !== 'us') setMarket('us');
+    else if(_preset2 && _preset2.startsWith('fixed:')){
+      const _k2 = _preset2.substring(6);
+      const _deK2 = ['DAX40','MDAX','TECDAX','SDAX','HDAX'];
+      if(_deK2.indexOf(_k2) >= 0 && window.currentMarket !== 'de') setMarket('de');
+      else if(_deK2.indexOf(_k2) < 0 && window.currentMarket !== 'us') setMarket('us');
     }
   }
-  activeTickers=tickers;
+    activeTickers=tickers;
   const btn=document.getElementById('scan-btn');
   btn.disabled=true;
   document.getElementById('scan-progress').style.display='block';
@@ -5610,12 +5612,20 @@ function onPresetChange(){
       + ' Titel &middot; Bearbeiten und Scan starten';
 
   } else if(val === 'custom'){
-    // Eigene Ticker - leeres Feld
+    // Eigene Ticker - leeres Feld (Market bleibt wie gesetzt)
     if(input){ input.value = ''; input.placeholder = 'AAPL, MSFT, NVDA (kommagetrennt)'; }
     if(hint) hint.innerHTML = '<i class="ti ti-pencil"></i> Eigene Ticker eingeben und Scan starten';
 
+  } else if(val === 'default-de'){
+    // 50 DE-Aktien
+    setMarket('de');
+    if(input){ input.value = ''; input.placeholder = 'SAP, SIE, ALV ... (DE-Liste)'; }
+    if(hint) hint.innerHTML = '<i class="ti ti-flag"></i> 50 DE-Aktien &middot; '
+      + DEFAULT_TICKERS_DE.length + ' Titel';
+
   } else {
     // Default (50 US-Aktien)
+    setMarket('us');
     if(input){
       const defaultStr = DEFAULT_TICKERS.map(function(t){ return t.sym; }).join(', ');
       input.value = defaultStr;
