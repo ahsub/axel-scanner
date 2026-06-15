@@ -2606,8 +2606,7 @@ async function runScan(){
       var yfBaseSfx = _euMap ? _euMap.sfx : (isDeMarket ? 'DE' : null);
 
       // EU_TICKER_MAP covers all (DAX, MDAX, SDAX, TecDAX, CAC40, EuroStoxx, FTSE100)
-      // Yahoo-Symbol ermitteln: Mapping → sonst gleicher Ticker
-      var yfBaseSym = (isDeMarket && DE_TICKER_MAP[t.sym]) ? DE_TICKER_MAP[t.sym] : t.sym;
+      // yfBaseSym bereits korrekt via EU_TICKER_MAP gesetzt (siehe oben)
 
       // Kandidaten-Liste in Reihenfolge
       var yfSymCandidates;
