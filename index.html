@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260606-1200">
+<meta name="app-version" content="20260615-v49">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -68,6 +68,7 @@ input,select,button,textarea{font-family:var(--font);font-size:14px}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(13,15,18,0.97);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:0.5px solid var(--border);display:flex;padding:.5rem .5rem calc(.5rem + env(safe-area-inset-bottom));z-index:100}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:.5rem;border:none;background:none;color:var(--text3);cursor:pointer;border-radius:var(--radius-sm);transition:all .15s;font-size:10px;font-family:var(--font)}
 .nav-btn.active{color:var(--accent)}
+.tf-btn.active-tf{background:var(--accent);color:#fff;border-color:var(--accent)}
 .nav-btn i{font-size:20px}
 .nav-btn.active i{color:var(--accent)}
 
@@ -2341,6 +2342,156 @@ function setMarket(mkt){
   if(hint) hint.innerHTML='<i class="ti ti-info-circle"></i> '+(mkt==='us'?'🔔 US-Markt · 50 Titel':'🇩🇪 DE-Markt · 50 Titel · <button onclick="openDEListSelector()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;text-decoration:underline;padding:0">DAX/MDAX/TecDAX auswählen</button>')+' · Kaufsignal = alle 3 bullisch';
 }
 
+// ── Globale EU_TICKER_MAP (auch für Rescan verfügbar) ──
+window._EU_TICKER_MAP = {
+  // ── FRANKREICH (CAC 40 + EuroStoxx) → .PA ──────────────────────────
+  'AI':    {sym:'AI',    sfx:'PA'},  // Air Liquide
+  'AIR':   {sym:'AIR',   sfx:'PA'},  // Airbus (auch .DE möglich)
+  'AXA':   {sym:'CS',    sfx:'PA'},  // AXA → CS.PA auf Euronext
+  'BNP':   {sym:'BNP',   sfx:'PA'},  // BNP Paribas
+  'CA':    {sym:'CA',    sfx:'PA'},  // Carrefour
+  'CAP':   {sym:'CAP',   sfx:'PA'},  // Capgemini
+  'DSY':   {sym:'DSY',   sfx:'PA'},  // Dassault Systèmes
+  'EN':    {sym:'EN',    sfx:'PA'},  // Bouygues
+  'ENGI':  {sym:'ENGI',  sfx:'PA'},  // Engie
+  'GLE':   {sym:'GLE',   sfx:'PA'},  // Société Générale
+  'KER':   {sym:'KER',   sfx:'PA'},  // Kering
+  'LR':    {sym:'LR',    sfx:'PA'},  // Legrand
+  'LVMH':  {sym:'MC',    sfx:'PA'},  // LVMH → MC.PA!
+  'MC':    {sym:'MC',    sfx:'PA'},  // LVMH
+  'ML':    {sym:'ML',    sfx:'PA'},  // Michelin
+  'OR':    {sym:'OR',    sfx:'PA'},  // L'Oréal
+  'ORA':   {sym:'ORA',   sfx:'PA'},  // Orange
+  'PUB':   {sym:'PUB',   sfx:'PA'},  // Publicis
+  'RI':    {sym:'RI',    sfx:'PA'},  // Pernod Ricard
+  'SAF':   {sym:'SAF',   sfx:'PA'},  // Safran
+  'SAN':   {sym:'SAN',   sfx:'PA'},  // Sanofi
+  'SGO':   {sym:'SGO',   sfx:'PA'},  // Saint-Gobain
+  'SU':    {sym:'SU',    sfx:'PA'},  // Schneider Electric
+  'TTE':   {sym:'TTE',   sfx:'PA'},  // TotalEnergies
+  'VIE':   {sym:'DG',    sfx:'PA'},  // Vinci → DG.PA
+  'DG':    {sym:'DG',    sfx:'PA'},  // Vinci
+  'VIV':   {sym:'VIV',   sfx:'PA'},  // Vivendi
+  'WLN':   {sym:'WLN',   sfx:'PA'},  // Worldline
+  'HO':    {sym:'HO',    sfx:'PA'},  // Thales
+  'RMS':   {sym:'RMS',   sfx:'PA'},  // Hermès
+  'EL':    {sym:'EL',    sfx:'PA'},  // EssilorLuxottica (Achtung: US=Estée Lauder)
+  'STM':   {sym:'STM',   sfx:'PA'},  // STMicroelectronics (auch .MI)
+  // ── NIEDERLANDE (EuroStoxx) → .AS ───────────────────────────────────
+  'ADYEN': {sym:'ADYEN', sfx:'AS'},  // Adyen
+  'ASML':  {sym:'ASML',  sfx:'AS'},  // ASML
+  'HEIA':  {sym:'HEIA',  sfx:'AS'},  // Heineken
+  'INGA':  {sym:'INGA',  sfx:'AS'},  // ING Group
+  'NN':    {sym:'NN',    sfx:'AS'},  // NN Group
+  'PHIA':  {sym:'PHIA',  sfx:'AS'},  // Philips
+  'PRX':   {sym:'PRX',   sfx:'AS'},  // Prosus
+  'RAND':  {sym:'RAND',  sfx:'AS'},  // Randstad
+  'REN':   {sym:'REN',   sfx:'AS'},  // RELX
+  'RDSA':  {sym:'SHELL', sfx:'AS'},  // Shell → SHELL.AS
+  'SHEL':  {sym:'SHELL', sfx:'AS'},  // Shell
+  'WKL':   {sym:'WKL',   sfx:'AS'},  // Wolters Kluwer
+  'AKZA':  {sym:'AKZA',  sfx:'AS'},  // Akzo Nobel
+  'UMG':   {sym:'UMG',   sfx:'AS'},  // Universal Music
+  'MT':    {sym:'MT',    sfx:'AS'},  // ArcelorMittal
+  // ── SPANIEN (IBEX 35) → .MC ─────────────────────────────────────────
+  'BBVA':  {sym:'BBVA',  sfx:'MC'},  // BBVA
+  'IBE':   {sym:'IBE',   sfx:'MC'},  // Iberdrola
+  'ITX':   {sym:'ITX',   sfx:'MC'},  // Inditex (Zara)
+  'REP':   {sym:'REP',   sfx:'MC'},  // Repsol
+  'SAN_ES':{sym:'SAN',   sfx:'MC'},  // Santander → SAN.MC
+  'ACS':   {sym:'ACS',   sfx:'MC'},  // ACS
+  'AENA':  {sym:'AENA',  sfx:'MC'},  // Aena
+  'AMS':   {sym:'AMS',   sfx:'MC'},  // Amadeus IT
+  'ENG':   {sym:'ENG',   sfx:'MC'},  // Enagás
+  'FER':   {sym:'FER',   sfx:'MC'},  // Ferrovial
+  'MEL':   {sym:'MEL',   sfx:'MC'},  // Meliá Hotels
+  'MTS':   {sym:'MTS',   sfx:'MC'},  // Mapfre
+  'RED':   {sym:'RED',   sfx:'MC'},  // Red Eléctrica
+  'TEF':   {sym:'TEF',   sfx:'MC'},  // Telefónica
+  // ── ITALIEN → .MI ────────────────────────────────────────────────────
+  'ENEL':  {sym:'ENEL',  sfx:'MI'},  // Enel
+  'ENI':   {sym:'ENI',   sfx:'MI'},  // ENI
+  'FCA':   {sym:'STLA',  sfx:'MI'},  // Stellantis → STLA.MI
+  'STLA':  {sym:'STLA',  sfx:'MI'},  // Stellantis
+  'ISP':   {sym:'ISP',   sfx:'MI'},  // Intesa Sanpaolo
+  'LDO':   {sym:'LDO',   sfx:'MI'},  // Leonardo
+  'MB':    {sym:'MB',    sfx:'MI'},  // Mediobanca
+  'RACE':  {sym:'RACE',  sfx:'MI'},  // Ferrari → auch NYSE
+  'TIT':   {sym:'TIT',   sfx:'MI'},  // Telecom Italia
+  'UCG':   {sym:'UCG',   sfx:'MI'},  // UniCredit
+  // ── GROSSBRITANNIEN (FTSE 100) → .L ──────────────────────────────────
+  'AAL':   {sym:'AAL',   sfx:'L'},   // Anglo American
+  'ABF':   {sym:'ABF',   sfx:'L'},   // Associated British Foods
+  'AHT':   {sym:'AHT',   sfx:'L'},   // Ashtead
+  'AV':    {sym:'AV',    sfx:'L'},   // Aviva
+  'AZN':   {sym:'AZN',   sfx:'L'},   // AstraZeneca (auch NASDAQ)
+  'BA':    {sym:'BA',    sfx:'L'},   // BAE Systems (Achtung: Boeing=BA in US!)
+  'BARC':  {sym:'BARC',  sfx:'L'},   // Barclays
+  'BHP':   {sym:'BHP',   sfx:'L'},   // BHP Group
+  'BP':    {sym:'BP',    sfx:'L'},   // BP (Achtung: BP auch NYSE)
+  'BT':    {sym:'BT-A',  sfx:'L'},   // BT Group → BT-A.L
+  'CCL':   {sym:'CCL',   sfx:'L'},   // Carnival (auch NYSE)
+  'CPG':   {sym:'CPG',   sfx:'L'},   // Compass Group
+  'DGE':   {sym:'DGE',   sfx:'L'},   // Diageo
+  'EZJ':   {sym:'EZJ',   sfx:'L'},   // easyJet
+  'GLEN':  {sym:'GLEN',  sfx:'L'},   // Glencore
+  'GSK':   {sym:'GSK',   sfx:'L'},   // GSK (auch NYSE)
+  'HSBA':  {sym:'HSBA',  sfx:'L'},   // HSBC → HSBA.L
+  'HSBC':  {sym:'HSBA',  sfx:'L'},   // HSBC
+  'IMB':   {sym:'IMB',   sfx:'L'},   // Imperial Brands
+  'INF':   {sym:'INF',   sfx:'L'},   // Informa
+  'ITV':   {sym:'ITV',   sfx:'L'},   // ITV
+  'KGF':   {sym:'KGF',   sfx:'L'},   // Kingfisher
+  'LAND':  {sym:'LAND',  sfx:'L'},   // Land Securities
+  'LGEN':  {sym:'LGEN',  sfx:'L'},   // Legal & General
+  'LLOY':  {sym:'LLOY',  sfx:'L'},   // Lloyds Banking
+  'LSE':   {sym:'LSEG',  sfx:'L'},   // London Stock Exchange → LSEG.L
+  'MKS':   {sym:'MKS',   sfx:'L'},   // Marks & Spencer
+  'MNG':   {sym:'MNG',   sfx:'L'},   // M&G
+  'MNDI':  {sym:'MNDI',  sfx:'L'},   // Mondi
+  'NG':    {sym:'NG',    sfx:'L'},   // National Grid
+  'NWG':   {sym:'NWG',   sfx:'L'},   // NatWest
+  'PSON':  {sym:'PSON',  sfx:'L'},   // Pearson
+  'PSN':   {sym:'PSN',   sfx:'L'},   // Persimmon
+  'RDSA':  {sym:'SHELL', sfx:'L'},   // Shell (London listing)
+  'REL':   {sym:'REL',   sfx:'L'},   // RELX (London)
+  'RIO':   {sym:'RIO',   sfx:'L'},   // Rio Tinto
+  'RKT':   {sym:'RKT',   sfx:'L'},   // Reckitt
+  'RMV':   {sym:'RMV',   sfx:'L'},   // Rightmove
+  'RR':    {sym:'RR',    sfx:'L'},   // Rolls-Royce
+  'RS1':   {sym:'RS1',   sfx:'L'},   // RS Group
+  'SGE':   {sym:'SGE',   sfx:'L'},   // Sage Group
+  'SHEL':  {sym:'SHEL',  sfx:'L'},   // Shell (London)
+  'SKG':   {sym:'SKG',   sfx:'L'},   // Smurfit Kappa
+  'SMT':   {sym:'SMT',   sfx:'L'},   // Scottish Mortgage
+  'SN':    {sym:'SN',    sfx:'L'},   // Smith & Nephew
+  'SPX':   {sym:'SPX',   sfx:'L'},   // Spirax-Sarco
+  'SSE':   {sym:'SSE',   sfx:'L'},   // SSE
+  'STAN':  {sym:'STAN',  sfx:'L'},   // Standard Chartered
+  'SVT':   {sym:'SVT',   sfx:'L'},   // Severn Trent
+  'TSCO':  {sym:'TSCO',  sfx:'L'},   // Tesco
+  'TW':    {sym:'TW',    sfx:'L'},   // Taylor Wimpey
+  'ULVR':  {sym:'ULVR',  sfx:'L'},   // Unilever (London)
+  'UU':    {sym:'UU',    sfx:'L'},   // United Utilities
+  'VOD':   {sym:'VOD',   sfx:'L'},   // Vodafone (London)
+  'WPP':   {sym:'WPP',   sfx:'L'},   // WPP
+  'WTB':   {sym:'WTB',   sfx:'L'},   // Whitbread
+  // ── DEUTSCHLAND → .DE (nur Sonder-Mappings) ──────────────────────────
+  'SRT':   {sym:'SRT3',  sfx:'DE'},  // Sartorius Vz
+  'DB':    {sym:'DBK',   sfx:'DE'},  // Deutsche Bank (DB=Deere bei US!)
+  'K+S':   {sym:'SDF',   sfx:'DE'},  // K+S AG
+  'RRTL':  {sym:'RTL',   sfx:'DE'},  // RTL Group
+  'HAN':   {sym:'HNR1',  sfx:'DE'},  // Hannover Rück
+  'CBKG':  {sym:'CBK',   sfx:'DE'},  // Commerzbank
+  // ── Spezielle DE Ticker mit abweichendem Suffix ────────────────────
+  'BOSS':  {sym:'BOSS',  sfx:'SG'},  // Hugo Boss → BOSS.SG (Stuttgart)
+  'HEN3':  {sym:'HAG',   sfx:'DE'},  // Hensoldt → HAG.DE (HEN3=Henkel bei manchen Plattformen!)
+  'SY':    {sym:'SY1',   sfx:'DE'},  // Symrise alt. Ticker → SY1.DE
+  'ADS':   {sym:'ADS',   sfx:'DE'},  // Adidas → ADS.DE (explizit)
+  'SY1':   {sym:'SY1',   sfx:'DE'},  // Symrise → SY1.DE
+  'HAG':   {sym:'HAG',   sfx:'DE'},  // Hensoldt → HAG.DE
+};
+
 async function runScan(){
   // Ticker ermitteln — mit Yahoo Search für Klarnamen
   var rawInput = document.getElementById('custom-input');
@@ -2451,154 +2602,7 @@ async function runScan(){
       // ══ EUROPÄISCHES TICKER-MAPPING ══════════════════════════════════════════
       // TR/L&S Symbol → {sym: Yahoo-Base, suffix: Yahoo-Suffix}
       // Suffixe: .DE=XETRA, .PA=Paris, .AS=Amsterdam, .MC=Madrid, .MI=Milano, .L=London
-      var EU_TICKER_MAP = {
-        // ── FRANKREICH (CAC 40 + EuroStoxx) → .PA ──────────────────────────
-        'AI':    {sym:'AI',    sfx:'PA'},  // Air Liquide
-        'AIR':   {sym:'AIR',   sfx:'PA'},  // Airbus (auch .DE möglich)
-        'AXA':   {sym:'CS',    sfx:'PA'},  // AXA → CS.PA auf Euronext
-        'BNP':   {sym:'BNP',   sfx:'PA'},  // BNP Paribas
-        'CA':    {sym:'CA',    sfx:'PA'},  // Carrefour
-        'CAP':   {sym:'CAP',   sfx:'PA'},  // Capgemini
-        'DSY':   {sym:'DSY',   sfx:'PA'},  // Dassault Systèmes
-        'EN':    {sym:'EN',    sfx:'PA'},  // Bouygues
-        'ENGI':  {sym:'ENGI',  sfx:'PA'},  // Engie
-        'GLE':   {sym:'GLE',   sfx:'PA'},  // Société Générale
-        'KER':   {sym:'KER',   sfx:'PA'},  // Kering
-        'LR':    {sym:'LR',    sfx:'PA'},  // Legrand
-        'LVMH':  {sym:'MC',    sfx:'PA'},  // LVMH → MC.PA!
-        'MC':    {sym:'MC',    sfx:'PA'},  // LVMH
-        'ML':    {sym:'ML',    sfx:'PA'},  // Michelin
-        'OR':    {sym:'OR',    sfx:'PA'},  // L'Oréal
-        'ORA':   {sym:'ORA',   sfx:'PA'},  // Orange
-        'PUB':   {sym:'PUB',   sfx:'PA'},  // Publicis
-        'RI':    {sym:'RI',    sfx:'PA'},  // Pernod Ricard
-        'SAF':   {sym:'SAF',   sfx:'PA'},  // Safran
-        'SAN':   {sym:'SAN',   sfx:'PA'},  // Sanofi
-        'SGO':   {sym:'SGO',   sfx:'PA'},  // Saint-Gobain
-        'SU':    {sym:'SU',    sfx:'PA'},  // Schneider Electric
-        'TTE':   {sym:'TTE',   sfx:'PA'},  // TotalEnergies
-        'VIE':   {sym:'DG',    sfx:'PA'},  // Vinci → DG.PA
-        'DG':    {sym:'DG',    sfx:'PA'},  // Vinci
-        'VIV':   {sym:'VIV',   sfx:'PA'},  // Vivendi
-        'WLN':   {sym:'WLN',   sfx:'PA'},  // Worldline
-        'HO':    {sym:'HO',    sfx:'PA'},  // Thales
-        'RMS':   {sym:'RMS',   sfx:'PA'},  // Hermès
-        'EL':    {sym:'EL',    sfx:'PA'},  // EssilorLuxottica (Achtung: US=Estée Lauder)
-        'STM':   {sym:'STM',   sfx:'PA'},  // STMicroelectronics (auch .MI)
-        // ── NIEDERLANDE (EuroStoxx) → .AS ───────────────────────────────────
-        'ADYEN': {sym:'ADYEN', sfx:'AS'},  // Adyen
-        'ASML':  {sym:'ASML',  sfx:'AS'},  // ASML
-        'HEIA':  {sym:'HEIA',  sfx:'AS'},  // Heineken
-        'INGA':  {sym:'INGA',  sfx:'AS'},  // ING Group
-        'NN':    {sym:'NN',    sfx:'AS'},  // NN Group
-        'PHIA':  {sym:'PHIA',  sfx:'AS'},  // Philips
-        'PRX':   {sym:'PRX',   sfx:'AS'},  // Prosus
-        'RAND':  {sym:'RAND',  sfx:'AS'},  // Randstad
-        'REN':   {sym:'REN',   sfx:'AS'},  // RELX
-        'RDSA':  {sym:'SHELL', sfx:'AS'},  // Shell → SHELL.AS
-        'SHEL':  {sym:'SHELL', sfx:'AS'},  // Shell
-        'WKL':   {sym:'WKL',   sfx:'AS'},  // Wolters Kluwer
-        'AKZA':  {sym:'AKZA',  sfx:'AS'},  // Akzo Nobel
-        'UMG':   {sym:'UMG',   sfx:'AS'},  // Universal Music
-        'MT':    {sym:'MT',    sfx:'AS'},  // ArcelorMittal
-        // ── SPANIEN (IBEX 35) → .MC ─────────────────────────────────────────
-        'BBVA':  {sym:'BBVA',  sfx:'MC'},  // BBVA
-        'IBE':   {sym:'IBE',   sfx:'MC'},  // Iberdrola
-        'ITX':   {sym:'ITX',   sfx:'MC'},  // Inditex (Zara)
-        'REP':   {sym:'REP',   sfx:'MC'},  // Repsol
-        'SAN_ES':{sym:'SAN',   sfx:'MC'},  // Santander → SAN.MC
-        'ACS':   {sym:'ACS',   sfx:'MC'},  // ACS
-        'AENA':  {sym:'AENA',  sfx:'MC'},  // Aena
-        'AMS':   {sym:'AMS',   sfx:'MC'},  // Amadeus IT
-        'ENG':   {sym:'ENG',   sfx:'MC'},  // Enagás
-        'FER':   {sym:'FER',   sfx:'MC'},  // Ferrovial
-        'MEL':   {sym:'MEL',   sfx:'MC'},  // Meliá Hotels
-        'MTS':   {sym:'MTS',   sfx:'MC'},  // Mapfre
-        'RED':   {sym:'RED',   sfx:'MC'},  // Red Eléctrica
-        'TEF':   {sym:'TEF',   sfx:'MC'},  // Telefónica
-        // ── ITALIEN → .MI ────────────────────────────────────────────────────
-        'ENEL':  {sym:'ENEL',  sfx:'MI'},  // Enel
-        'ENI':   {sym:'ENI',   sfx:'MI'},  // ENI
-        'FCA':   {sym:'STLA',  sfx:'MI'},  // Stellantis → STLA.MI
-        'STLA':  {sym:'STLA',  sfx:'MI'},  // Stellantis
-        'ISP':   {sym:'ISP',   sfx:'MI'},  // Intesa Sanpaolo
-        'LDO':   {sym:'LDO',   sfx:'MI'},  // Leonardo
-        'MB':    {sym:'MB',    sfx:'MI'},  // Mediobanca
-        'RACE':  {sym:'RACE',  sfx:'MI'},  // Ferrari → auch NYSE
-        'TIT':   {sym:'TIT',   sfx:'MI'},  // Telecom Italia
-        'UCG':   {sym:'UCG',   sfx:'MI'},  // UniCredit
-        // ── GROSSBRITANNIEN (FTSE 100) → .L ──────────────────────────────────
-        'AAL':   {sym:'AAL',   sfx:'L'},   // Anglo American
-        'ABF':   {sym:'ABF',   sfx:'L'},   // Associated British Foods
-        'AHT':   {sym:'AHT',   sfx:'L'},   // Ashtead
-        'AV':    {sym:'AV',    sfx:'L'},   // Aviva
-        'AZN':   {sym:'AZN',   sfx:'L'},   // AstraZeneca (auch NASDAQ)
-        'BA':    {sym:'BA',    sfx:'L'},   // BAE Systems (Achtung: Boeing=BA in US!)
-        'BARC':  {sym:'BARC',  sfx:'L'},   // Barclays
-        'BHP':   {sym:'BHP',   sfx:'L'},   // BHP Group
-        'BP':    {sym:'BP',    sfx:'L'},   // BP (Achtung: BP auch NYSE)
-        'BT':    {sym:'BT-A',  sfx:'L'},   // BT Group → BT-A.L
-        'CCL':   {sym:'CCL',   sfx:'L'},   // Carnival (auch NYSE)
-        'CPG':   {sym:'CPG',   sfx:'L'},   // Compass Group
-        'DGE':   {sym:'DGE',   sfx:'L'},   // Diageo
-        'EZJ':   {sym:'EZJ',   sfx:'L'},   // easyJet
-        'GLEN':  {sym:'GLEN',  sfx:'L'},   // Glencore
-        'GSK':   {sym:'GSK',   sfx:'L'},   // GSK (auch NYSE)
-        'HSBA':  {sym:'HSBA',  sfx:'L'},   // HSBC → HSBA.L
-        'HSBC':  {sym:'HSBA',  sfx:'L'},   // HSBC
-        'IMB':   {sym:'IMB',   sfx:'L'},   // Imperial Brands
-        'INF':   {sym:'INF',   sfx:'L'},   // Informa
-        'ITV':   {sym:'ITV',   sfx:'L'},   // ITV
-        'KGF':   {sym:'KGF',   sfx:'L'},   // Kingfisher
-        'LAND':  {sym:'LAND',  sfx:'L'},   // Land Securities
-        'LGEN':  {sym:'LGEN',  sfx:'L'},   // Legal & General
-        'LLOY':  {sym:'LLOY',  sfx:'L'},   // Lloyds Banking
-        'LSE':   {sym:'LSEG',  sfx:'L'},   // London Stock Exchange → LSEG.L
-        'MKS':   {sym:'MKS',   sfx:'L'},   // Marks & Spencer
-        'MNG':   {sym:'MNG',   sfx:'L'},   // M&G
-        'MNDI':  {sym:'MNDI',  sfx:'L'},   // Mondi
-        'NG':    {sym:'NG',    sfx:'L'},   // National Grid
-        'NWG':   {sym:'NWG',   sfx:'L'},   // NatWest
-        'PSON':  {sym:'PSON',  sfx:'L'},   // Pearson
-        'PSN':   {sym:'PSN',   sfx:'L'},   // Persimmon
-        'RDSA':  {sym:'SHELL', sfx:'L'},   // Shell (London listing)
-        'REL':   {sym:'REL',   sfx:'L'},   // RELX (London)
-        'RIO':   {sym:'RIO',   sfx:'L'},   // Rio Tinto
-        'RKT':   {sym:'RKT',   sfx:'L'},   // Reckitt
-        'RMV':   {sym:'RMV',   sfx:'L'},   // Rightmove
-        'RR':    {sym:'RR',    sfx:'L'},   // Rolls-Royce
-        'RS1':   {sym:'RS1',   sfx:'L'},   // RS Group
-        'SGE':   {sym:'SGE',   sfx:'L'},   // Sage Group
-        'SHEL':  {sym:'SHEL',  sfx:'L'},   // Shell (London)
-        'SKG':   {sym:'SKG',   sfx:'L'},   // Smurfit Kappa
-        'SMT':   {sym:'SMT',   sfx:'L'},   // Scottish Mortgage
-        'SN':    {sym:'SN',    sfx:'L'},   // Smith & Nephew
-        'SPX':   {sym:'SPX',   sfx:'L'},   // Spirax-Sarco
-        'SSE':   {sym:'SSE',   sfx:'L'},   // SSE
-        'STAN':  {sym:'STAN',  sfx:'L'},   // Standard Chartered
-        'SVT':   {sym:'SVT',   sfx:'L'},   // Severn Trent
-        'TSCO':  {sym:'TSCO',  sfx:'L'},   // Tesco
-        'TW':    {sym:'TW',    sfx:'L'},   // Taylor Wimpey
-        'ULVR':  {sym:'ULVR',  sfx:'L'},   // Unilever (London)
-        'UU':    {sym:'UU',    sfx:'L'},   // United Utilities
-        'VOD':   {sym:'VOD',   sfx:'L'},   // Vodafone (London)
-        'WPP':   {sym:'WPP',   sfx:'L'},   // WPP
-        'WTB':   {sym:'WTB',   sfx:'L'},   // Whitbread
-        // ── DEUTSCHLAND → .DE (nur Sonder-Mappings) ──────────────────────────
-        'SRT':   {sym:'SRT3',  sfx:'DE'},  // Sartorius Vz
-        'DB':    {sym:'DBK',   sfx:'DE'},  // Deutsche Bank (DB=Deere bei US!)
-        'K+S':   {sym:'SDF',   sfx:'DE'},  // K+S AG
-        'RRTL':  {sym:'RTL',   sfx:'DE'},  // RTL Group
-        'HAN':   {sym:'HNR1',  sfx:'DE'},  // Hannover Rück
-        'CBKG':  {sym:'CBK',   sfx:'DE'},  // Commerzbank
-        // ── Spezielle DE Ticker mit abweichendem Suffix ────────────────────
-        'BOSS':  {sym:'BOSS',  sfx:'SG'},  // Hugo Boss → BOSS.SG (Stuttgart)
-        'HEN3':  {sym:'HAG',   sfx:'DE'},  // Hensoldt → HAG.DE (HEN3=Henkel bei manchen Plattformen!)
-        'SY':    {sym:'SY1',   sfx:'DE'},  // Symrise alt. Ticker → SY1.DE
-        'ADS':   {sym:'ADS',   sfx:'DE'},  // Adidas → ADS.DE (explizit)
-        'SY1':   {sym:'SY1',   sfx:'DE'},  // Symrise → SY1.DE
-        'HAG':   {sym:'HAG',   sfx:'DE'},  // Hensoldt → HAG.DE
-      };
+      var EU_TICKER_MAP = window._EU_TICKER_MAP || {};
 
       // Yahoo-Symbol und Suffix ermitteln
       var _euMap = isDeMarket ? EU_TICKER_MAP[t.sym] : null;
@@ -8759,7 +8763,7 @@ async function rescanTickerTF(sym, tf) {
   const tInfo = activeTickers.find(function(t){ return t.sym===sym; }) || {sym:sym,name:sym};
   const isDeMarket = window.currentMarket==='de';
   // Use EU_TICKER_MAP for correct suffix (same as main scan)
-  var _rMap = isDeMarket && typeof EU_TICKER_MAP !== 'undefined' ? EU_TICKER_MAP[sym] : null;
+  var _rMap = isDeMarket ? (window._EU_TICKER_MAP||{})[sym] : null;
   var _rBase = _rMap ? _rMap.sym : sym;
   var _rSfx = _rMap ? _rMap.sfx : (isDeMarket ? 'DE' : null);
   const yfSym = _rSfx ? (_rBase + '.' + _rSfx) : sym;
