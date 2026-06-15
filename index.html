@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v71">
+<meta name="app-version" content="20260615-v72">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -6409,6 +6409,17 @@ async function enrichTop40WithIV() {
     return;
   }
 
+  // Prüfen ob tickerData Closes enthält (Scan muss vorher gelaufen sein)
+  const hasCloses = tickers.some(sym => {
+    const r = tickerData[sym];
+    return r && (r.closes_full || r.closes || r.closes_20d || []).length >= 20;
+  });
+  if (!hasCloses) {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-chart-candle"></i> IV laden (Top40)'; }
+    showKoToast('⚠ Erst Top40-Liste scannen, dann IV laden');
+    return;
+  }
+
   // DE-Ticker: Yahoo Options nur für US-Ticker verfügbar
   // DE-Aktien → HV-Näherung verwenden
   const isDE = mkt === 'DE';
@@ -6423,7 +6434,7 @@ async function enrichTop40WithIV() {
 
       // Historische Closes für HV-Berechnung aus tickerData holen
       const raw = tickerData[sym];
-      const closes = raw ? (raw.closes || raw.closes_20d || []) : [];
+      const closes = raw ? (raw.closes_full || raw.closes || raw.closes_20d || []) : [];
 
       let ivpResult = null;
 
@@ -6469,7 +6480,7 @@ async function enrichTop40WithIV() {
       }
     } catch(e) {
       errors++;
-      console.warn('IV enrich error:', sym, e.message);
+      console.warn('IV enrich error:', sym, e.message, e.stack);
     }
 
     // Rate-Limit: kurze Pause zwischen Requests
