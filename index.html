@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v86">
+<meta name="app-version" content="20260615-v88">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -557,6 +557,20 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
 
         <!-- Signale Grid -->
+        <!-- CNN Fear & Greed Schnell-Anzeige -->
+        <div id="cnn-fg-card" style="display:none;grid-column:span 2;background:var(--bg3);border-radius:8px;padding:6px 10px;margin-bottom:4px;border-left:2px solid var(--text3)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:11px;font-weight:600;color:var(--text)">🧭 CNN Fear &amp; Greed Index</span>
+            <span id="cnn-fg-score" style="font-size:18px;font-weight:700">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">
+            <span id="cnn-fg-label" style="font-size:11px;color:var(--text2)">—</span>
+            <span style="font-size:9px;color:var(--text3)">0=Extreme Fear · 100=Extreme Greed</span>
+          </div>
+          <div style="background:var(--bg2);border-radius:3px;height:5px;margin-top:5px;overflow:hidden">
+            <div id="cnn-fg-bar" style="height:100%;border-radius:3px;transition:width .5s;width:0%"></div>
+          </div>
+        </div>
         <div id="im-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           <div style="text-align:center;color:var(--text3);font-size:11px;grid-column:span 2;padding:.5rem">
             Klicke "Laden" für Intermarket-Signale
@@ -5320,7 +5334,34 @@ async function calcBullIndicator() {
     }
   }
 
-  // ── SIGNAL 5: VIX-Level als Kontraindikator ───────────────────────────
+  // ── SIGNAL 5: CNN Fear & Greed als Sentiment-Signal ─────────────────────
+  {
+    if (_cnnFearGreed) {
+      const fg = _cnnFearGreed.score;
+      let fgSig, fgPts, fgDesc;
+      if (fg <= 20) {
+        fgSig = 'risk_on'; fgPts = 15;
+        fgDesc = '★ Extreme Fear (' + fg + ') — Kontraindikator: Kaufgelegenheit!';
+      } else if (fg <= 35) {
+        fgSig = 'risk_on'; fgPts = 11;
+        fgDesc = 'Fear (' + fg + ') — Überverkauft, Erholung möglich';
+      } else if (fg >= 80) {
+        fgSig = 'risk_off'; fgPts = 2;
+        fgDesc = 'Extreme Greed (' + fg + ') — Überhitzt, Vorsicht!';
+      } else if (fg >= 65) {
+        fgSig = 'neutral'; fgPts = 7;
+        fgDesc = 'Greed (' + fg + ') — Optimistisch, selektiv bleiben';
+      } else {
+        fgSig = 'neutral'; fgPts = 8;
+        fgDesc = _cnnFearGreed.rating + ' (' + fg + ') — Neutral';
+      }
+      signals.push({ label: 'CNN Fear & Greed', value: fg, unit: '',
+        chgPct: null, signal: fgSig, desc: fgDesc, pts: fgPts });
+      totalScore += fgPts; maxScore += 15;
+    }
+  }
+
+  // ── SIGNAL 6: VIX-Level als Kontraindikator ───────────────────────────
   {
     if (_vixLevel != null) {
       const v = _vixLevel;
@@ -5385,6 +5426,50 @@ async function calcBullIndicator() {
   }
 
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-calculator"></i> Berechnen'; }
+}
+
+
+// ── CNN FEAR & GREED INDEX ────────────────────────────────────────────────
+var _cnnFearGreed = null;
+
+async function fetchCnnFearGreed() {
+  try {
+    const url = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+    const r = await fetch(
+      'https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url)
+    );
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const score  = j?.fear_and_greed?.score;
+    const rating = j?.fear_and_greed?.rating;
+    if (score == null) throw new Error('kein Score');
+    _cnnFearGreed = { score: Math.round(score), rating: rating || '—', ts: Date.now() };
+    renderCnnFearGreed(_cnnFearGreed);
+    return _cnnFearGreed;
+  } catch(e) {
+    console.warn('CNN Fear & Greed:', e.message);
+    return null;
+  }
+}
+
+function renderCnnFearGreed(fg) {
+  if (!fg) return;
+  const card  = document.getElementById('cnn-fg-card');
+  const score = document.getElementById('cnn-fg-score');
+  const label = document.getElementById('cnn-fg-label');
+  const bar   = document.getElementById('cnn-fg-bar');
+  if (!card) return;
+
+  const s = fg.score;
+  const color = s <= 25 ? 'var(--red)' : s <= 45 ? 'var(--amber)' : s <= 55 ? 'var(--text2)'
+              : s <= 75 ? 'var(--green)' : 'var(--amber)';
+  const emoji = s <= 25 ? '😱' : s <= 45 ? '😟' : s <= 55 ? '😐' : s <= 75 ? '😊' : '🤑';
+
+  card.style.display  = 'block';
+  card.style.borderLeftColor = color;
+  if (score) { score.textContent = s; score.style.color = color; }
+  if (label) { label.textContent = emoji + ' ' + fg.rating; label.style.color = color; }
+  if (bar)   { bar.style.width = s + '%'; bar.style.background = color; }
 }
 
 async function loadIntermarket() {
@@ -5644,6 +5729,8 @@ async function loadIntermarket() {
   }
 
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Laden'; }
+  // CNN Fear & Greed parallel laden
+  fetchCnnFearGreed();
 }
 
 async function autoMakro(){
@@ -10921,6 +11008,7 @@ async function openKiBriefing(defaultStrat) {
     + 'MARKTKONTEXT:\n'
     + '- QQQ-Regime: ' + qqqRegime + '\n'
     + qqqMarkovStr
+    + (_cnnFearGreed ? '- CNN Fear & Greed: ' + _cnnFearGreed.score + '/100 (' + _cnnFearGreed.rating + ')\n' : '')
     + (function(){
         // Bull-Market Frühindikator Score
         var scoreFill = document.getElementById('bull-score-fill');
@@ -12641,6 +12729,39 @@ function computeBacktestVariant(variant, winnerEntries) {
         else if (vix > 25) w = BT_VARIANTS.find(function(v){return v.id==='markov'}).w;
         else               w = BT_VARIANTS.find(function(v){return v.id==='default'}).w;
         newScore = calcHypotheticalScore(t, w);
+      } else if (variant.special === 'markov2_filter') {
+        // Markov 2.0 FILTER Mode: nur Titel traden wenn Markov-Signal > 0
+        // Signal wird aus der Stickiness-Näherung berechnet (aus entry.markovRegime)
+        const regime = entry.markovRegime || 0; // 1=Bull, -1=Bear, 0=Side
+        const sticky = entry.markovSticky || 50;
+        // Näherungs-Signal: (sticky - 50) / 50 * regime
+        const approxSignal = regime * Math.max(0, (sticky - 50) / 50);
+        if (approxSignal > 0.1) {
+          // LONG_OK: Standard-Score
+          newScore = calcHypotheticalScore(t, BT_VARIANTS.find(function(v){return v.id==='default'}).w);
+        } else if (approxSignal < -0.1) {
+          // SHORT/FLAT: kein Trade → Score auf 0 setzen
+          newScore = 0; // gefiltert
+        } else {
+          // FLAT: halber Score (reduzierte Position)
+          newScore = calcHypotheticalScore(t, BT_VARIANTS.find(function(v){return v.id==='default'}).w) * 0.5;
+        }
+      } else if (variant.special === 'markov2_walkforward') {
+        // Walk-Forward: Matrix wird aus vergangenen Daten berechnet, nie aus Zukunft
+        // Näherung: verwende entry.markovRegime für Regime-Gewichtung
+        const regime = entry.markovRegime || 0;
+        let wf_w;
+        if (regime === 1) {
+          // Bull-Regime: Tech und SEPA bevorzugen
+          wf_w = { tech:35, sepa:30, bp:15, sticky:10, vol:10 };
+        } else if (regime === -1) {
+          // Bear-Regime: Sticky und BP bevorzugen (defensive Auswahl)
+          wf_w = { tech:20, sepa:20, bp:20, sticky:30, vol:10 };
+        } else {
+          // Sideways: ausgewogen
+          wf_w = BT_VARIANTS.find(function(v){return v.id==='default'}).w;
+        }
+        newScore = calcHypotheticalScore(t, wf_w);
       } else {
         newScore = calcHypotheticalScore(t, variant.w);
       }
