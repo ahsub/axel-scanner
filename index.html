@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v74">
+<meta name="app-version" content="20260615-v79">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1812,7 +1812,7 @@ async function autoSyncOnStart() {
     var icon = document.getElementById('sync-icon');
     var label = document.getElementById('sync-label');
     if (icon) icon.style.color = 'var(--text3)';
-    const r = await fetch(KoSync.BASE + '/sync/status', { signal: AbortSignal.timeout(5000) });
+    const r = await fetch(KoSync.BASE + '/sync/status');
     if (!r.ok) return;
     const data = await r.json();
     const wlKey = (data.keys||[]).find(function(k){ return k.key === 'watchlist'; });
@@ -1878,7 +1878,10 @@ async function autoSyncAfterScan() {
 }
 
 // Start-Sync beim Laden
-window.addEventListener('load', function(){ setTimeout(autoSyncOnStart, 2000); });
+window.addEventListener('load', function(){
+  setTimeout(autoSyncOnStart, 2000);
+  // fetchQqqRegime wird in unlockApp() nach PIN-Login aufgerufen
+});
 
 
 // KoSync UI-Helfer: Status-Badge im Backlog-Header aktualisieren
@@ -2196,6 +2199,9 @@ function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
+  window._appUnlocked = true; // ab jetzt sind externe Fetches erlaubt
+  setTimeout(function(){ fetchQqqRegime(); }, 800);
+  setTimeout(function(){ fetchVix().then(function(v){ if(v) renderVixAmpel(v); }); }, 1200);
   try{ loadIBD(); }catch(e){ console.warn('loadIBD:',e); }
   try{ loadMakro(); }catch(e){ console.warn('loadMakro:',e); }
   try{ loadJournal(); }catch(e){ console.warn('loadJournal:',e); }
@@ -2810,7 +2816,7 @@ async function runScan(){
   // VIX und QQQ nur laden wenn noch nicht geladen (kein API-Spam beim Scan)
   if (_vixLevel === null) fetchVix().then(function(vix){ renderVixAmpel(vix); });
   else renderVixAmpel(_vixLevel);
-  if (!_qqqRegime) fetchQqqRegime();
+  if (!_qqqRegime) { if(window._appUnlocked) fetchQqqRegime(); }
   else renderQqqBanner(_qqqRegime);
   const container=document.getElementById('scan-container');
   container.innerHTML=tickers.map(t=>`<div class="card" id="card-${t.sym}">
@@ -6877,7 +6883,7 @@ async function fetchSPYData(){
     if(j.status==='error'||!j.values) return null;
     spyData=[...j.values].reverse().map(function(v){return parseFloat(v.close);});
     // QQQ-Regime berechnen (nutzt SPY-Logik, aber mit QQQ-Daten)
-    fetchQqqRegime();
+    if(window._appUnlocked) fetchQqqRegime();
     spyLoadTime=Date.now();
     return spyData;
   }catch(e){ return null; }
@@ -9345,7 +9351,7 @@ function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
   bullThresh = bullThresh || 3.0;
   bearThresh = bearThresh || 3.0;
   smoothLen  = smoothLen  || 5;
-  if (!closes || closes.length < lookback * 3) return null;
+  if (!closes || closes.length < lookback * 2 + 5) return null; // mind. 47 Bars
 
   const n = closes.length;
 
@@ -9554,36 +9560,72 @@ function renderQqqBanner(markov) {
 // ═══════════════════════════════════════════════════════════════
 
 async function fetchQqqRegime() {
-  const key = getTwelveKey();
-  if (!key) {
-    // Yahoo-Fallback: QQQ kostenlos via CORS-Proxy → Markov 2.0 ohne TD-Key
-    try {
-      const to = Math.floor(Date.now() / 1000);
-      const from = to - 60 * 60 * 24 * 90;
-      const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/QQQ?interval=1d&period1=' + from + '&period2=' + to;
-      const ry = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(yfUrl));
-      if (!ry.ok) return;
-      const jy  = await ry.json();
-      const rey = jy && jy.chart && jy.chart.result && jy.chart.result[0];
-      if (!rey) return;
-      var qy = rey.indicators.quote[0];
-      var closesY = (qy.close || []).filter(function(v){ return v != null; });
-      if (closesY.length < 25) return;
-      _qqqRegime = calcMarkovRegime(closesY);
-      renderQqqBanner(_qqqRegime);
-    } catch(e) { console.warn('QQQ Yahoo fallback:', e.message); }
-    return;
-  }
-  try {
-    const url = 'https://api.twelvedata.com/time_series?symbol=QQQ&interval=1day&outputsize=60&apikey=' + key;
-    const r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
-    if (!r.ok) return;
+  // Hilfsfunktion: Yahoo-Daten holen mit Retry
+  async function tryYahooQQQ(proxyUrl) {
+    const to   = Math.floor(Date.now() / 1000);
+    const from = to - 60 * 60 * 24 * 180;
+    const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/QQQ?interval=1d&period1=' + from + '&period2=' + to + '&includePrePost=false';
+    const url = proxyUrl
+      ? proxyUrl + '?url=' + encodeURIComponent(yfUrl)
+      : yfUrl;
+    // Kein AbortSignal.timeout() — nicht kompatibel mit PWA/iOS Safari
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
-    if (!j.values || j.values.length < 25) return;
-    const closes = [...j.values].reverse().map(function(v){ return parseFloat(v.close); });
+    const res = j && j.chart && j.chart.result && j.chart.result[0];
+    if (!res) throw new Error('no result');
+    const q = res.indicators.quote[0];
+    return (q.close || []).filter(function(v){ return v != null; });
+  }
+
+  const key = getTwelveKey();
+  if (key) {
+    // Twelve Data primär
+    try {
+      const url = 'https://api.twelvedata.com/time_series?symbol=QQQ&interval=1day&outputsize=90&apikey=' + key;
+      const r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
+      if (!r.ok) throw new Error('TD HTTP ' + r.status);
+      const j = await r.json();
+      if (!j.values || j.values.length < 25) throw new Error('TD zu wenig Daten');
+      const closes = [...j.values].reverse().map(function(v){ return parseFloat(v.close); });
+      _qqqRegime = calcMarkovRegime(closes);
+      renderQqqBanner(_qqqRegime);
+      return;
+    } catch(e) { console.warn('QQQ TD fehlgeschlagen:', e.message, '→ Yahoo Fallback'); }
+  }
+
+  // Versuch 1: via CORS-Proxy
+  try {
+    const closes = await tryYahooQQQ('https://my-cors-proxy.ahildebrand.workers.dev');
+    if (closes.length < 25) throw new Error('zu wenig Daten: ' + closes.length);
     _qqqRegime = calcMarkovRegime(closes);
     renderQqqBanner(_qqqRegime);
-  } catch(e) { console.log('QQQ regime error:', e.message); }
+    return;
+  } catch(e) {
+    console.warn('QQQ Proxy fehlgeschlagen:', e.message, '→ direkter Yahoo-Versuch');
+  }
+
+  // Versuch 2: direkter Yahoo-Call (klappt manchmal ohne Proxy)
+  try {
+    const closes = await tryYahooQQQ(null);
+    if (closes.length < 25) throw new Error('zu wenig Daten: ' + closes.length);
+    _qqqRegime = calcMarkovRegime(closes);
+    renderQqqBanner(_qqqRegime);
+    return;
+  } catch(e) {
+    console.warn('QQQ direkt fehlgeschlagen:', e.message);
+  }
+
+  // Versuch 3: Retry nach 5s (Proxy könnte kurz überlastet gewesen sein)
+  setTimeout(async function() {
+    try {
+      const closes = await tryYahooQQQ('https://my-cors-proxy.ahildebrand.workers.dev');
+      if (closes.length >= 25) {
+        _qqqRegime = calcMarkovRegime(closes);
+        renderQqqBanner(_qqqRegime);
+      }
+    } catch(e) { console.warn('QQQ Retry fehlgeschlagen:', e.message); }
+  }, 5000);
 }
 
 // ===============================================================
