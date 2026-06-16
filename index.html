@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v104">
+<meta name="app-version" content="20260615-v105">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2062,6 +2062,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 
 <script>
+// ── EIC KONSTANTEN (global, früh definiert) ──
+const EIC_KEY     = 'ko_eic_lists';
+const EIC_PIN_KEY = 'ko_eic_pin';
+var _eicPinEntry  = '';
+var _eicUnlocked  = false;
+
 // ─── CONFIG ───────────────────────────────────────────────────────────
 const DEFAULT_PIN = '2409';
 const API_BASE = '/api/scan';
@@ -10155,10 +10161,7 @@ var FIXED_LISTS = {
 // ═══════════════════════════════════════════════════════════════════════════
 // EDITOR IN CHIEF — Komplett
 // ═══════════════════════════════════════════════════════════════════════════
-const EIC_KEY     = 'ko_eic_lists';
-const EIC_PIN_KEY = 'ko_eic_pin';
-var _eicPinEntry  = '';
-var _eicUnlocked  = false;
+// EIC Konstanten → Anfang des Scripts verschoben
 
 // ── Beim Start: gespeicherte Listen in FIXED_LISTS laden ──────────────────
 (function eicApplyOnStart() {
