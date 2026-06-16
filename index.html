@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v79">
+<meta name="app-version" content="20260615-v80">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -10384,7 +10384,19 @@ async function openKiBriefing(defaultStrat) {
       + ' S:' + r.score
       + ' ' + r.bullCount + '/3'
       + ' SEPA:' + r.sepa
-      + (r.markov ? ' ' + r.markov.regime : '')
+      + (r.markov ? (function(){
+          var m = r.markov;
+          var reg = m.regime === 1 ? 'BULL' : m.regime === -1 ? 'BEAR' : 'SIDE';
+          var sticky = m.sticky || m.bullSticky || 0;
+          var sig = m.signal != null ? (m.signal > 0 ? '+' : '') + m.signal.toFixed(2) : null;
+          var filter = m.filterMode || '';
+          var labelOk = m.labelCheck ? m.labelCheck.ok : true;
+          var str = ' Markov2:' + reg + '(' + sticky + '%)';
+          if (sig) str += ' σ' + sig;
+          if (filter) str += ' Filter:' + filter;
+          if (!labelOk) str += ' ⚡LabelWarn';
+          return str;
+        })() : '')
       + (r.er && r.er.days ? ' ER:' + r.er.days + 'd' : '');
     // 200d EMA — klar als EMA200-KURS kennzeichnen, nicht als aktueller Kurs
     if(r.ma200 && r.price){
@@ -10398,8 +10410,25 @@ async function openKiBriefing(defaultStrat) {
     if(r.dist52wHigh != null) line += ' 52W-H:' + (r.dist52wHigh >= 0 ? '+' : '') + r.dist52wHigh + '%';
     // Fibo-Zone (nur wenn vorhanden)
     if(r.fibo) line += ' Fibo:' + r.fibo.zone + '(' + r.fibo.retrace + '%)';
-    // IV-Percentile (nur wenn vorhanden)
-    if(r.ivp != null) line += ' HVP:' + r.ivp + '% (Historical Vol Percentile)';
+    // IV-Percentile mit Markov-Kombination
+    if(r._ivp != null) {
+      var ivpVal = r._ivp.ivp;
+      var ivpLabel = r._ivp.isHV ? 'HVP' : 'IVP';
+      var ivpAtm = r._ivp.atmIV;
+      line += ' ' + ivpLabel + ':' + ivpVal + '%';
+      if(ivpAtm) line += '(IV' + ivpAtm + '%)';
+      // Markov+IVP Kombination: das wertvolle Signal
+      if(r.markov && r.markov.signal != null && ivpVal != null) {
+        var sig = r.markov.signal;
+        var filter = r.markov.filterMode || '';
+        if(sig > 0.15 && ivpVal > 50) line += ' ★CSP-Setup(BullSignal+HohesIV)';
+        else if(sig > 0.15 && ivpVal < 30) line += ' ⚠CSP-Vorsicht(BullSignal+NiedrigesIV)';
+        else if(sig < -0.15 && ivpVal > 60) line += ' ★PutDebit-Setup(BearSignal+HohesIV)';
+        else if(filter === 'FLAT') line += ' →FLAT(keinMarkovSignal)';
+      }
+    } else if(r.ivp != null) {
+      line += ' HVP:' + r.ivp + '% (Historical Vol Percentile)';
+    }
     return line;
   }).join('\n');
 
@@ -10409,7 +10438,11 @@ async function openKiBriefing(defaultStrat) {
     + '  S:XX           = Composite Score 0-100\n'
     + '  X/3            = Bullish-Signale (MACD/OBV/MA50)\n'
     + '  SEPA:X         = Minervini SEPA-Score 0-8\n'
-    + '  BULL/BEAR/SIDE = Markov-Regime\n'
+    + '  Markov2:REG(X%) σ±Y = Markov 2.0 Regime (Stride-sampled, statistisch korrekt). REG=BULL/BEAR/SIDE, X%=Stickiness (Persistenz des Regimes), σ=Signal (-1 bis +1: positiv=bullisch, negativ=bärisch)\n'
+    + '  Filter:LONG_OK/SHORT_OK/FLAT = Markov 2.0 Filter-Mode. LONG_OK: Signal stark genug für Longs. FLAT: kein klares Signal → keine neuen Positionen empfohlen\n'
+    + '  ★CSP-Setup = Markov bullisch UND IV hoch → optimales Prämien-Verkauf Setup\n'
+    + '  ★PutDebit-Setup = Markov bärisch UND IV hoch → Put-Kauf mit Prämienunterstützung\n'
+    + '  ⚡LabelWarn = Markov Label-Verifikation fehlgeschlagen → Regime-Signal mit Vorsicht interpretieren\n'
     + '  ER:Xd          = Earnings in X Tagen\n'
     + '  EMA200-Kurs:$XX= 200-Tage-EMA Kurswert (≠ Handelskurs!)\n'
     + '  RS:XX          = Relative Stärke vs S&P500 (0-100)\n'
@@ -10418,10 +10451,27 @@ async function openKiBriefing(defaultStrat) {
     + '  Fibo:zone(X%)  = Fibonacci-Zone\n'
     + 'NICHT VERFÜGBAR (niemals erfinden): KGV, EPS, Umsatz, Dividende, Analystenziele\n\n';
 
+  // Markov 2.0 Zusammenfassung für QQQ
+  var qqqMarkovStr = '';
+  if (_qqqRegime) {
+    var qm = _qqqRegime;
+    var qReg = qm.regime === 1 ? 'BULL' : qm.regime === -1 ? 'BEAR' : 'SIDEWAYS';
+    var qSig = qm.signal != null ? (qm.signal > 0 ? '+' : '') + qm.signal.toFixed(2) : '—';
+    var qFilter = qm.filterMode || 'FLAT';
+    var qSticky = qm.sticky || qm.bullSticky || 0;
+    var qLegDiff = qm.matrixDivergence
+      ? ' ⚠MATRIX-DIVERGENZ(Legacy≠Stride: Stride-Fix wirkt!)'
+      : ' ✓Matrizen-konsistent';
+    qqqMarkovStr = '- QQQ Markov 2.0: ' + qReg + '(' + qSticky + '% Stickiness)'
+      + ' σ' + qSig + ' → Filter:' + qFilter + qLegDiff + '\n'
+      + '  (Basis: Stride-sampled Matrix, Fix 1: nicht-überlappende Fenster, statistisch korrekt)\n';
+  }
+
   const marktkontext = DATA_LEGENDE + 'TOP ' + top10.length + ' SCANNER-ERGEBNISSE:\n'
     + tickerList + '\n\n'
     + 'MARKTKONTEXT:\n'
     + '- QQQ-Regime: ' + qqqRegime + '\n'
+    + qqqMarkovStr
     + '- VIX: ' + vixStr + (parseFloat(vixStr) > 20 ? ' ⚠️ ERHÖHT — erhöhte Vorsicht geboten' : ' (normal)') + '\n'
     + sektorStr
     + rotationWarning;
@@ -10529,7 +10579,18 @@ let _kiStrat = 'ko';
 // ══════════════════════════════════════════════════════════════════════════════
 // ANTI-HALLUZINATIONS-DIREKTIVE — wird jedem KI-Prompt vorangestellt
 // ══════════════════════════════════════════════════════════════════════════════
-const KI_ANTI_HALLUZINATION = '\n'  + '⛔ STRENGE DATENDISZIPLIN — KEINE AUSNAHMEN:\n\n'  + 'Du erhältst unten EXAKTE Scanner-Daten. Diese Daten sind die EINZIGE Wahrheit.\n\n'  + 'VERBOTEN:\n'  + '• Kurse, Strikes, Prämien oder Prozentzahlen erfinden oder schätzen\n'  + '• Den EMA200-Kurs (Feld "EMA200-Kurs:$XX") als aktuellen Handelskurs verwenden\n'  + '• Historische Preise aus deinem Training verwenden\n'  + '• Aussagen wie "typischerweise" oder "ungefähr" bei Kursen\n\n'  + 'PFLICHTREGELN:\n'  + '• Aktueller Kurs = NUR der Wert nach "Kurs:$" im Datensatz\n'  + '• EMA200-Kurs = NUR nach "EMA200-Kurs:$" — NICHT der Handelskurs\n'  + '• Fehlende Felder: "Kurs nicht verfügbar — in IBKR prüfen" schreiben\n'  + '• Prämien-Schätzungen immer als "(Schätzung — in IBKR prüfen)" kennzeichnen\\n'  + 'HVP = Historical Vol Percentile — kein echter IV-Rank. Wenn kein HVP: NIEMALS IV erfinden.\\n\\n'  + 'SELBSTKONTROLLE: Kurs aus "Kurs:$XX"? EMA200 nicht verwechselt? Keine Trainingsdaten?\n'
+const KI_ANTI_HALLUZINATION = '\n'
+  + '== MARKOV 2.0 & IV-PERCENTILE — PFLICHTREGELN ==\n'
+  + 'Wenn Markov2:REG(X%) σ±Y Filter:MODE in den Ticker-Daten steht:\n'
+  + '  • IMMER explizit in der Analyse erwähnen — das ist ein Premium-Feature\n'
+  + '  • Stickiness X%: Persistenz des Regimes (>65%=sehr stark, 50-65%=mittel, <50%=instabil)\n'
+  + '  • Signal σ: statistisch korrektes Markov-Signal (Stride-sampled). >+0.2=bullisch, <-0.2=bärisch\n'
+  + '  • Filter:LONG_OK + HVP>50% = ★CSP-SETUP → explizit als Kaufgelegenheit für Prämienverkauf nennen\n'
+  + '  • Filter:FLAT = kein klares Signal → keine neuen Direktionaltrades empfehlen\n'
+  + '  • ⚡LabelWarn = Regime-Verifikation unsicher → Vorsicht erwähnen\n'
+  + 'Wenn kein Markov2-Feld: ABSOLUTES SCHWEIGEN. Niemals erfinden.\n'
+  + '== ENDE MARKOV-REGELN ==\n\n'
+  + '⛔ STRENGE DATENDISZIPLIN — KEINE AUSNAHMEN:\n\n'  + 'Du erhältst unten EXAKTE Scanner-Daten. Diese Daten sind die EINZIGE Wahrheit.\n\n'  + 'VERBOTEN:\n'  + '• Kurse, Strikes, Prämien oder Prozentzahlen erfinden oder schätzen\n'  + '• Den EMA200-Kurs (Feld "EMA200-Kurs:$XX") als aktuellen Handelskurs verwenden\n'  + '• Historische Preise aus deinem Training verwenden\n'  + '• Aussagen wie "typischerweise" oder "ungefähr" bei Kursen\n\n'  + 'PFLICHTREGELN:\n'  + '• Aktueller Kurs = NUR der Wert nach "Kurs:$" im Datensatz\n'  + '• EMA200-Kurs = NUR nach "EMA200-Kurs:$" — NICHT der Handelskurs\n'  + '• Fehlende Felder: "Kurs nicht verfügbar — in IBKR prüfen" schreiben\n'  + '• Prämien-Schätzungen immer als "(Schätzung — in IBKR prüfen)" kennzeichnen\\n'  + 'HVP = Historical Vol Percentile — kein echter IV-Rank. Wenn kein HVP: NIEMALS IV erfinden.\\n\\n'  + 'SELBSTKONTROLLE: Kurs aus "Kurs:$XX"? EMA200 nicht verwechselt? Keine Trainingsdaten?\n'
   + 'VOLLSTÄNDIGKEIT: Jede Analyse MUSS alle Punkte vollständig abschließen. Niemals mittendrin abbrechen. Lieber kürzer pro Punkt als unvollständig.\n\n';
 
 const KI_STRAT_CONFIG = {
