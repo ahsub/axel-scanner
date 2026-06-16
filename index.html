@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v96">
+<meta name="app-version" content="20260615-v99">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1252,7 +1252,23 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
 
       <!-- EDITOR IN CHIEF -->
-      <div class="sec">📋 Listen-Editor (Editor in Chief)</div>
+      <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
+        <span>📋 Listen-Editor (Editor in Chief)</span>
+        <div style="display:flex;gap:.4rem">
+          <button id="eic-unlock-btn" class="btn btn-sm" onclick="showEicPinModal()"
+            style="font-size:10px;color:var(--accent);border-color:var(--accent)">
+            <i class="ti ti-lock"></i> Entsperren
+          </button>
+          <button id="eic-lock-btn" class="btn btn-sm" onclick="lockEicEditor()"
+            style="font-size:10px;color:var(--amber);border-color:var(--amber);display:none">
+            <i class="ti ti-lock-open"></i> Sperren
+          </button>
+          <button class="btn btn-sm" onclick="eicChangePin()"
+            style="font-size:10px;color:var(--text3)">
+            <i class="ti ti-key"></i> PIN ändern
+          </button>
+        </div>
+      </div>
       <div class="card" style="margin-bottom:.75rem">
         <div style="font-size:11px;color:var(--text2);margin-bottom:.6rem;line-height:1.5">
           Alle fest verdrahteten Listen hier bearbeiten. Format: <code style="font-family:var(--mono);font-size:10px;background:var(--bg3);padding:1px 4px;border-radius:3px">TICKER,Name</code> — eine Zeile pro Titel.
@@ -1281,6 +1297,40 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             </optgroup>
           </select>
         </div>
+        <!-- EIC PIN Lock -->
+        <div id="eic-pin-wrap" style="display:none;text-align:center;padding:.75rem 0">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:.6rem">
+            <i class="ti ti-lock" style="color:var(--amber)"></i>
+            Editor in Chief — 6-stelligen PIN eingeben
+          </div>
+          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:.6rem" id="eic-pin-dots">
+            <div class="pin-dot" id="eic-pd0"></div>
+            <div class="pin-dot" id="eic-pd1"></div>
+            <div class="pin-dot" id="eic-pd2"></div>
+            <div class="pin-dot" id="eic-pd3"></div>
+            <div class="pin-dot" id="eic-pd4"></div>
+            <div class="pin-dot" id="eic-pd5"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:180px;margin:0 auto">
+            <button class="pin-btn" onclick="eicPinPress('1')">1</button>
+            <button class="pin-btn" onclick="eicPinPress('2')">2</button>
+            <button class="pin-btn" onclick="eicPinPress('3')">3</button>
+            <button class="pin-btn" onclick="eicPinPress('4')">4</button>
+            <button class="pin-btn" onclick="eicPinPress('5')">5</button>
+            <button class="pin-btn" onclick="eicPinPress('6')">6</button>
+            <button class="pin-btn" onclick="eicPinPress('7')">7</button>
+            <button class="pin-btn" onclick="eicPinPress('8')">8</button>
+            <button class="pin-btn" onclick="eicPinPress('9')">9</button>
+            <button class="pin-btn" onclick="eicPinClear()" style="font-size:14px">⌫</button>
+            <button class="pin-btn" onclick="eicPinPress('0')">0</button>
+            <button class="pin-btn" onclick="eicPinCancel()" style="font-size:11px">✕</button>
+          </div>
+          <div id="eic-pin-error" class="pin-error" style="margin-top:.5rem">Falscher PIN</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:.5rem">
+            PIN setzen: Admin → EIC-PIN festlegen
+          </div>
+        </div>
+
         <div id="eic-editor-wrap" style="display:none">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
             <label style="font-size:11px;color:var(--text3)" id="eic-editor-label">—</label>
@@ -1302,6 +1352,26 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           </div>
           <div style="font-size:10px;color:var(--text3);margin-top:.4rem">
             Änderungen in localStorage gespeichert · überschreiben Standard-Liste
+          </div>
+        </div>
+
+        <!-- EIC PIN festlegen -->
+        <div style="border-top:1px solid var(--border);margin-top:.75rem;padding-top:.75rem">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:.4rem">
+            <i class="ti ti-lock"></i> Editor-in-Chief PIN (6-stellig)
+          </div>
+          <div style="display:flex;gap:.4rem">
+            <input type="password" id="eic-pin-input" maxlength="6" placeholder="6-stellig"
+              style="width:100px;font-size:13px;padding:6px 8px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);border-radius:8px;font-family:var(--mono);letter-spacing:.15em;text-align:center">
+            <button class="btn btn-sm" onclick="eicSetPin()" style="font-size:11px">
+              <i class="ti ti-key"></i> PIN setzen
+            </button>
+            <button class="btn btn-sm" onclick="eicClearPin()" style="font-size:11px;color:var(--text3)">
+              ✕ Löschen
+            </button>
+          </div>
+          <div id="eic-pin-set-status" style="font-size:10px;color:var(--text3);margin-top:.3rem">
+            Kein EIC-PIN gesetzt — Editor für alle PIN-Nutzer zugänglich
           </div>
         </div>
       </div>
@@ -1948,6 +2018,47 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
     <div style="font-size:9px;color:var(--text3);text-align:center;margin-top:.5rem">
       Halluzinationsschutz aktiv · Nur Transkript-Inhalte werden verwendet
+    </div>
+  </div>
+</div>
+
+<!-- ── EDITOR IN CHIEF PIN MODAL ──────────────────────────────────── -->
+<div id="eic-pin-modal" style="display:none;position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,0.85);align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border-radius:var(--radius);padding:1.5rem;width:100%;max-width:320px;margin:1rem;text-align:center;border:1px solid var(--border)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:.3rem">📋 Editor in Chief</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:1rem">6-stelliger EIC-PIN eingeben</div>
+
+    <!-- PIN Dots -->
+    <div style="display:flex;justify-content:center;gap:10px;margin-bottom:1.25rem">
+      <div id="eic-pd0" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
+      <div id="eic-pd1" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
+      <div id="eic-pd2" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
+      <div id="eic-pd3" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
+      <div id="eic-pd4" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
+      <div id="eic-pd5" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
+    </div>
+
+    <!-- Numpad -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:220px;margin:0 auto 1rem">
+      <button class="pin-btn" onclick="eicPinPress('1')">1</button>
+      <button class="pin-btn" onclick="eicPinPress('2')">2</button>
+      <button class="pin-btn" onclick="eicPinPress('3')">3</button>
+      <button class="pin-btn" onclick="eicPinPress('4')">4</button>
+      <button class="pin-btn" onclick="eicPinPress('5')">5</button>
+      <button class="pin-btn" onclick="eicPinPress('6')">6</button>
+      <button class="pin-btn" onclick="eicPinPress('7')">7</button>
+      <button class="pin-btn" onclick="eicPinPress('8')">8</button>
+      <button class="pin-btn" onclick="eicPinPress('9')">9</button>
+      <button class="pin-btn" onclick="eicPinClear()" style="font-size:16px">⌫</button>
+      <button class="pin-btn" onclick="eicPinPress('0')">0</button>
+      <button class="pin-btn" onclick="closeEicModal()" style="font-size:12px;color:var(--text3)">✕</button>
+    </div>
+
+    <div id="eic-pin-error" style="font-size:11px;color:var(--red);min-height:16px;opacity:0;transition:opacity .2s"></div>
+
+    <!-- EIC PIN setzen (nur wenn noch kein PIN gesetzt) -->
+    <div id="eic-set-pin-hint" style="font-size:10px;color:var(--text3);margin-top:.5rem;display:none">
+      Noch kein EIC-PIN gesetzt — nach Eingabe wird dieser PIN gespeichert.
     </div>
   </div>
 </div>
@@ -4889,16 +5000,25 @@ const IBD_DATE_KEY='ko_top50_date';
 let ibdData=[];
 let ibdSort={col:'rank',dir:1};
 
+const IBD_VERSION = '2026-06-16'; // Datum der letzten IBD50-Aktualisierung
 function loadIBD(){
   const raw=localStorage.getItem(IBD_STORE_KEY);
-  if(raw){try{ibdData=JSON.parse(raw);}catch(e){ibdData=getDefaultIBD();}}
-  else ibdData=getDefaultIBD();
+  const storedVersion=localStorage.getItem('ko_top50_version');
+  // Wenn Version veraltet oder kein Eintrag → neue Default laden
+  if(raw && storedVersion === IBD_VERSION){
+    try{ibdData=JSON.parse(raw);}catch(e){ibdData=getDefaultIBD();}
+  } else {
+    ibdData=getDefaultIBD();
+    localStorage.setItem(IBD_STORE_KEY, JSON.stringify(ibdData));
+    localStorage.setItem('ko_top50_version', IBD_VERSION);
+    console.log('IBD50: Neue Liste ' + IBD_VERSION + ' geladen');
+  }
   document.getElementById('ibd-date').textContent=localStorage.getItem(IBD_DATE_KEY)||'—';
   renderIBD();
 }
 
 function getDefaultIBD(){
-  return [{"rank": 1, "name": "Micron Tech", "ticker": "MU", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 2, "name": "Rocket Lab", "ticker": "RKLB", "comp": 89, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 3, "name": "Astera Labs", "ticker": "ALAB", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 4, "name": "SiTime", "ticker": "SITM", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 5, "name": "Hut 8", "ticker": "HUT", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 6, "name": "Credo Tech", "ticker": "CRDO", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 7, "name": "Liquidia", "ticker": "LQDA", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 8, "name": "Comfort Systems", "ticker": "FIX", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 9, "name": "Argan", "ticker": "AGX", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 10, "name": "Ionq Inc Cl A", "ticker": "IONQ", "comp": 96, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 11, "name": "Advanced Micro Dvcs", "ticker": "AMD", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 12, "name": "Innodata", "ticker": "INOD", "comp": 90, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 13, "name": "Marvell Technology", "ticker": "MRVL", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 14, "name": "Travere Therapeutics", "ticker": "TVTX", "comp": 77, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 15, "name": "Axsome Therapeutics", "ticker": "AXSM", "comp": 77, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 16, "name": "Bloom Energy", "ticker": "BE", "comp": 89, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "energy"}, {"rank": 17, "name": "Vertiv", "ticker": "VRT", "comp": 97, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 18, "name": "Ouster", "ticker": "OUST", "comp": 95, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 19, "name": "MDA Space", "ticker": "MDA", "comp": 93, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 20, "name": "Skywater Technology", "ticker": "SKYT", "comp": 89, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 21, "name": "Vita Coco", "ticker": "COCO", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 22, "name": "LAM Research", "ticker": "LRCX", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 23, "name": "Celestica", "ticker": "CLC", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 24, "name": "Solaris Energy Infra", "ticker": "SEI", "comp": 90, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "energy"}, {"rank": 25, "name": "Dycom Industries", "ticker": "DY", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 26, "name": "Guardant Health", "ticker": "GH", "comp": 75, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 27, "name": "Vista Energy", "ticker": "VIST", "comp": 82, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "energy"}, {"rank": 28, "name": "Redwire Corporation", "ticker": "RDWR", "comp": 76, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 29, "name": "Alphabet", "ticker": "GOOGL", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 30, "name": "Macom", "ticker": "MTSI", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 31, "name": "Dave", "ticker": "DAVE", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 32, "name": "Arm Holdings", "ticker": "ARM", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 33, "name": "Carpenter Technology", "ticker": "CRS", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 34, "name": "WisdomTree", "ticker": "WT", "comp": 95, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 35, "name": "StoneX", "ticker": "SNEX", "comp": 91, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 36, "name": "Ceco Environmental", "ticker": "CECO", "comp": 87, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 37, "name": "Broadcom", "ticker": "AVGO", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 38, "name": "Krystal Biotech", "ticker": "KRYS", "comp": 90, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "health"}, {"rank": 39, "name": "Teradyne", "ticker": "TER", "comp": 96, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 40, "name": "Monolithic Power", "ticker": "MPWR", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 41, "name": "CrowdStrike", "ticker": "CRWD", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 42, "name": "SSR Mining", "ticker": "SSRM", "comp": 89, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "other"}, {"rank": 43, "name": "Taiwan Semiconductor", "ticker": "TSM", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 44, "name": "Rush Street Interactive", "ticker": "RSI", "comp": 78, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 45, "name": "American Supercondtr", "ticker": "AMSC", "comp": 92, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 46, "name": "Zeta Global", "ticker": "ZETA", "comp": 75, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 47, "name": "Morgan Stanley", "ticker": "MS", "comp": 98, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 48, "name": "NetApp", "ticker": "NTAP", "comp": 99, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}, {"rank": 49, "name": "Interactive Brokers", "ticker": "IBKR", "comp": 95, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "finance"}, {"rank": 50, "name": "AppLovin", "ticker": "APP", "comp": 96, "eps": null, "rs": null, "annEps": null, "lastEps": null, "nextEps": null, "sales": null, "roe": null, "margin": null, "sector": "tech"}];
+  return [{"rank":1,"name":"Micron Tech","ticker":"MU","comp":99,"eps":83,"rs":99,"annEps":627,"lastEps":682,"nextEps":945,"sales":196,"roe":17,"margin":25,"sector":"tech"},{"rank":2,"name":"Astera Labs","ticker":"ALAB","comp":98,"eps":70,"rs":98,"annEps":61,"lastEps":85,"nextEps":57,"sales":93,"roe":19,"margin":25,"sector":"tech"},{"rank":3,"name":"Axsome Therapeutics","ticker":"AXSM","comp":75,"eps":37,"rs":96,"annEps":0,"lastEps":0,"nextEps":0,"sales":56,"roe":0,"margin":0,"sector":"biotech"},{"rank":4,"name":"Liquidia","ticker":"LQDA","comp":95,"eps":69,"rs":98,"annEps":0,"lastEps":216,"nextEps":0,"sales":999,"roe":0,"margin":0,"sector":"biotech"},{"rank":5,"name":"SiTime","ticker":"SITE","comp":97,"eps":99,"rs":98,"annEps":145,"lastEps":454,"nextEps":317,"sales":88,"roe":0,"margin":0,"sector":"tech"},{"rank":6,"name":"Hut 8","ticker":"HUT","comp":89,"eps":68,"rs":99,"annEps":0,"lastEps":0,"nextEps":0,"sales":226,"roe":0,"margin":0,"sector":"tech"},{"rank":7,"name":"Credo Tech","ticker":"CRDO","comp":99,"eps":84,"rs":96,"annEps":244,"lastEps":231,"nextEps":294,"sales":157,"roe":34,"margin":35,"sector":"tech"},{"rank":8,"name":"Comfort Systems","ticker":"FIX","comp":96,"eps":99,"rs":95,"annEps":49,"lastEps":121,"nextEps":60,"sales":56,"roe":49,"margin":14,"sector":"industrial"},{"rank":9,"name":"Travere Therapeutics","ticker":"TVTX","comp":75,"eps":35,"rs":96,"annEps":0,"lastEps":0,"nextEps":0,"sales":68,"roe":0,"margin":0,"sector":"biotech"},{"rank":10,"name":"Advanced Micro Devices","ticker":"AMD","comp":99,"eps":95,"rs":99,"annEps":79,"lastEps":43,"nextEps":233,"sales":38,"roe":7,"margin":11,"sector":"tech"},{"rank":11,"name":"Carpenter Tech","ticker":"CRS","comp":99,"eps":97,"rs":95,"annEps":41,"lastEps":47,"nextEps":39,"sales":12,"roe":21,"margin":16,"sector":"industrial"},{"rank":12,"name":"Ceco Environmental","ticker":"CECO","comp":96,"eps":95,"rs":97,"annEps":101,"lastEps":260,"nextEps":29,"sales":17,"roe":18,"margin":10,"sector":"industrial"},{"rank":13,"name":"Lam Research","ticker":"LRCX","comp":99,"eps":94,"rs":98,"annEps":37,"lastEps":41,"nextEps":26,"sales":24,"roe":58,"margin":32,"sector":"tech"},{"rank":14,"name":"Innodata","ticker":"INOD","comp":80,"eps":36,"rs":97,"annEps":17,"lastEps":91,"nextEps":5,"sales":54,"roe":38,"margin":16,"sector":"tech"},{"rank":15,"name":"Celestica","ticker":"CLS","comp":99,"eps":99,"rs":92,"annEps":69,"lastEps":80,"nextEps":65,"sales":53,"roe":40,"margin":7,"sector":"tech"},{"rank":16,"name":"Lumentum","ticker":"LITE","comp":92,"eps":91,"rs":97,"annEps":299,"lastEps":316,"nextEps":235,"sales":90,"roe":2,"margin":0,"sector":"tech"},{"rank":17,"name":"Bloom Energy","ticker":"BE","comp":79,"eps":65,"rs":98,"annEps":181,"lastEps":999,"nextEps":290,"sales":130,"roe":0,"margin":0,"sector":"energy"},{"rank":18,"name":"Vita Coco","ticker":"COCO","comp":99,"eps":97,"rs":94,"annEps":45,"lastEps":61,"nextEps":45,"sales":37,"roe":24,"margin":15,"sector":"consumer"},{"rank":19,"name":"TG Therapeutics","ticker":"TGTX","comp":92,"eps":57,"rs":91,"annEps":-50,"lastEps":300,"nextEps":112,"sales":70,"roe":99,"margin":17,"sector":"biotech"},{"rank":20,"name":"Solaris Energy Infra","ticker":"SLNA","comp":87,"eps":70,"rs":93,"annEps":113,"lastEps":114,"nextEps":27,"sales":55,"roe":6,"margin":11,"sector":"energy"},{"rank":21,"name":"Oscar Health","ticker":"OSCR","comp":82,"eps":32,"rs":95,"annEps":0,"lastEps":125,"nextEps":0,"sales":53,"roe":0,"margin":0,"sector":"health"},{"rank":22,"name":"Guardant Health","ticker":"GH","comp":73,"eps":19,"rs":93,"annEps":0,"lastEps":0,"nextEps":0,"sales":48,"roe":0,"margin":0,"sector":"health"},{"rank":23,"name":"Skywater Technology","ticker":"SKYT","comp":80,"eps":14,"rs":95,"annEps":0,"lastEps":0,"nextEps":0,"sales":162,"roe":97,"margin":21,"sector":"tech"},{"rank":24,"name":"Teradyne","ticker":"TER","comp":98,"eps":92,"rs":96,"annEps":86,"lastEps":241,"nextEps":261,"sales":87,"roe":20,"margin":20,"sector":"tech"},{"rank":25,"name":"Dycom Industries","ticker":"DY","comp":93,"eps":98,"rs":90,"annEps":60,"lastEps":111,"nextEps":64,"sales":56,"roe":18,"margin":6,"sector":"industrial"},{"rank":26,"name":"StoneX","ticker":"SNEX","comp":98,"eps":96,"rs":96,"annEps":56,"lastEps":120,"nextEps":51,"sales":64,"roe":14,"margin":9,"sector":"finance"},{"rank":27,"name":"Ouster","ticker":"OUST","comp":87,"eps":60,"rs":93,"annEps":0,"lastEps":0,"nextEps":0,"sales":49,"roe":0,"margin":0,"sector":"tech"},{"rank":28,"name":"Macom Technology","ticker":"MTSI","comp":98,"eps":87,"rs":97,"annEps":44,"lastEps":28,"nextEps":50,"sales":23,"roe":0,"margin":0,"sector":"tech"},{"rank":29,"name":"Taiwan Semiconductor","ticker":"TSM","comp":98,"eps":97,"rs":89,"annEps":49,"lastEps":63,"nextEps":45,"sales":39,"roe":36,"margin":54,"sector":"tech"},{"rank":30,"name":"Krystal Biotech","ticker":"KRYS","comp":81,"eps":53,"rs":91,"annEps":13,"lastEps":53,"nextEps":39,"sales":32,"roe":19,"margin":48,"sector":"biotech"},{"rank":31,"name":"Vista Energy","ticker":"VIST","comp":77,"eps":39,"rs":86,"annEps":59,"lastEps":13,"nextEps":571,"sales":59,"roe":35,"margin":40,"sector":"energy"},{"rank":32,"name":"Rush Street Interactive","ticker":"RSI","comp":93,"eps":53,"rs":92,"annEps":62,"lastEps":56,"nextEps":36,"sales":41,"roe":29,"margin":0,"sector":"consumer"},{"rank":33,"name":"IonQ","ticker":"IONQ","comp":87,"eps":66,"rs":86,"annEps":0,"lastEps":999,"nextEps":0,"sales":755,"roe":0,"margin":0,"sector":"tech"},{"rank":34,"name":"Monolithic Power","ticker":"MPWR","comp":98,"eps":90,"rs":94,"annEps":34,"lastEps":26,"nextEps":39,"sales":26,"roe":19,"margin":27,"sector":"tech"},{"rank":35,"name":"Interactive Brokers","ticker":"IBKR","comp":98,"eps":95,"rs":89,"annEps":14,"lastEps":28,"nextEps":20,"sales":17,"roe":20,"margin":76,"sector":"finance"},{"rank":36,"name":"Okeanis Eco Tankers","ticker":"ECO","comp":94,"eps":99,"rs":85,"annEps":200,"lastEps":547,"nextEps":457,"sales":172,"roe":25,"margin":46,"sector":"energy"},{"rank":37,"name":"Sezzle","ticker":"SEZL","comp":93,"eps":97,"rs":87,"annEps":42,"lastEps":43,"nextEps":48,"sales":29,"roe":99,"margin":36,"sector":"finance"},{"rank":38,"name":"WisdomTree","ticker":"WETF","comp":90,"eps":99,"rs":83,"annEps":34,"lastEps":69,"nextEps":44,"sales":48,"roe":27,"margin":28,"sector":"finance"},{"rank":39,"name":"ASML","ticker":"ASML","comp":99,"eps":88,"rs":94,"annEps":26,"lastEps":24,"nextEps":18,"sales":17,"roe":51,"margin":32,"sector":"tech"},{"rank":40,"name":"Indivior","ticker":"INDV","comp":85,"eps":99,"rs":83,"annEps":45,"lastEps":134,"nextEps":73,"sales":19,"roe":0,"margin":19,"sector":"biotech"},{"rank":41,"name":"Morgan Stanley","ticker":"MS","comp":99,"eps":94,"rs":87,"annEps":16,"lastEps":32,"nextEps":30,"sales":16,"roe":16,"margin":31,"sector":"finance"},{"rank":42,"name":"Affiliated Managers","ticker":"AMG","comp":97,"eps":93,"rs":88,"annEps":34,"lastEps":58,"nextEps":44,"sales":10,"roe":22,"margin":57,"sector":"finance"},{"rank":43,"name":"Goldman Sachs","ticker":"GS","comp":98,"eps":94,"rs":87,"annEps":15,"lastEps":24,"nextEps":26,"sales":14,"roe":14,"margin":37,"sector":"finance"},{"rank":44,"name":"Virtu Financial","ticker":"VIRT","comp":99,"eps":98,"rs":90,"annEps":11,"lastEps":72,"nextEps":-3,"sales":58,"roe":31,"margin":51,"sector":"finance"},{"rank":45,"name":"Exelixis","ticker":"EXEL","comp":98,"eps":98,"rs":82,"annEps":14,"lastEps":40,"nextEps":13,"sales":10,"roe":36,"margin":40,"sector":"biotech"},{"rank":46,"name":"Kiniksa Pharma","ticker":"KNSA","comp":77,"eps":79,"rs":81,"annEps":82,"lastEps":145,"nextEps":35,"sales":56,"roe":12,"margin":13,"sector":"biotech"},{"rank":47,"name":"Dave","ticker":"DAVE","comp":93,"eps":81,"rs":83,"annEps":17,"lastEps":104,"nextEps":452,"sales":47,"roe":73,"margin":30,"sector":"finance"},{"rank":48,"name":"Euronav","ticker":"EURN","comp":81,"eps":34,"rs":87,"annEps":190,"lastEps":67,"nextEps":0,"sales":121,"roe":8,"margin":9,"sector":"energy"},{"rank":49,"name":"Establishment Labs","ticker":"ESTA","comp":75,"eps":58,"rs":88,"annEps":0,"lastEps":0,"nextEps":0,"sales":45,"roe":0,"margin":0,"sector":"health"},{"rank":50,"name":"NetApp","ticker":"NTAP","comp":98,"eps":86,"rs":91,"annEps":55,"lastEps":26,"nextEps":40,"sales":12,"roe":99,"margin":23,"sector":"tech"}];
 }
 
 function renderIBD(){
@@ -10034,6 +10154,13 @@ var FIXED_LISTS = {
 };
 
 function getFixedListTickers(key){
+  // EIC-Override: zuerst localStorage prüfen (Editor in Chief Änderungen)
+  try {
+    var eicStored = JSON.parse(localStorage.getItem(EIC_KEY) || '{}');
+    if (eicStored[key] && eicStored[key].length > 0) {
+      return eicStored[key]; // EIC-Version hat Vorrang
+    }
+  } catch(e) {}
   return (FIXED_LISTS[key] || []);
 }
 
