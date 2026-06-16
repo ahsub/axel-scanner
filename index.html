@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v84">
+<meta name="app-version" content="20260615-v86">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1355,6 +1355,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <button class="btn btn-sm" onclick="clearScanRegistry();showKoToast('Scan-Registry geleert');" style="font-size:12px"><i class="ti ti-history"></i> Scan-Registry leeren</button>
             <button class="btn btn-sm" onclick="cleanupJunkWatchlists()" style="font-size:12px;color:var(--red);border-color:var(--red)"><i class="ti ti-trash"></i> Müll-WL bereinigen</button>
             <button class="btn btn-sm" onclick="localStorage.removeItem('ko_iv_cache_v1');_ivCache={};showKoToast('IV-Cache geleert')" style="font-size:12px;color:var(--text2)"><i class="ti ti-rotate"></i> IV-Cache leeren</button>
+            <button class="btn btn-sm" onclick="localStorage.removeItem('ko_workflow_hidden');showKoToast('Workflow-Hinweis reaktiviert')" style="font-size:12px"><i class="ti ti-help"></i> Workflow-Hilfe</button>
         <button class="btn btn-sm" onclick="clearTdCache();this.textContent='✓ Geleert';setTimeout(()=>this.textContent='Cache leeren',2000)" style="font-size:12px"><i class="ti ti-trash"></i> Cache leeren</button>
       </div>
       <div class="sec">PIN ändern</div>
@@ -1649,6 +1650,73 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
 </div>
 
+<!-- ── WORKFLOW ONBOARDING MODAL ──────────────────────────────────────── -->
+<div id="workflow-modal" style="display:none;position:fixed;inset:0;z-index:998;background:rgba(0,0,0,0.75);align-items:flex-end;justify-content:center">
+  <div style="background:var(--bg2);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:480px;padding:1.25rem;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom));max-height:85vh;overflow-y:auto">
+    
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--text)">🚀 KO-Scanner Workflow</div>
+        <div style="font-size:11px;color:var(--text3)">Optimaler Tagesablauf für maximale Analyse-Qualität</div>
+      </div>
+      <button onclick="closeWorkflowModal()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:4px"><i class="ti ti-x"></i></button>
+    </div>
+
+    <!-- Steps -->
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem">
+
+      <div style="background:var(--bg3);border-radius:10px;padding:.75rem;border-left:3px solid var(--accent)">
+        <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:3px">① Scan starten</div>
+        <div style="font-size:11px;color:var(--text2)">Scanner → Markt wählen (DE/US) → Preset wählen → <b>Scan</b></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">→ Top40-DE/US wird automatisch befüllt · QQQ-Banner erscheint</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:10px;padding:.75rem;border-left:3px solid var(--green)">
+        <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:3px">② IV-Daten laden</div>
+        <div style="font-size:11px;color:var(--text2)">Nach Scan: <b>📈 IV laden (Top40)</b> klicken</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">→ HVP/IVP Badge erscheint auf jeder Karte · 24h gecacht</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:10px;padding:.75rem;border-left:3px solid var(--amber)">
+        <div style="font-size:12px;font-weight:600;color:var(--amber);margin-bottom:3px">③ Intermarket & Bull-Indikator</div>
+        <div style="font-size:11px;color:var(--text2)">Makro-Tab → <b>Intermarket: Laden</b> → <b>Bull-Indikator: Berechnen</b></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">→ Risk Appetite Score · HYG/SPY · VVIX · Markt-Breadth · Confluence</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:10px;padding:.75rem;border-left:3px solid #818cf8">
+        <div style="font-size:12px;font-weight:600;color:#818cf8;margin-bottom:3px">④ KI-Analyse</div>
+        <div style="font-size:11px;color:var(--text2)">Karte öffnen → <b>KI ▾</b> → Strategie wählen</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">→ Markov 2.0 · IVP · Bull-Score · Intermarket fließen ein</div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:10px;padding:.75rem;border-left:3px solid var(--text3)">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:3px">⑤ Auto-Makro (optional)</div>
+        <div style="font-size:11px;color:var(--text2)">Makro-Tab → <b>Auto-Makro</b> für tägliche Markteinschätzung</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">→ Benötigt alle vorherigen Schritte für maximale Qualität</div>
+      </div>
+
+    </div>
+
+    <!-- Markov 2.0 Hinweis -->
+    <div style="background:rgba(79,142,247,0.08);border:0.5px solid var(--accent);border-radius:8px;padding:.6rem .75rem;margin-bottom:1rem;font-size:10px;color:var(--text2)">
+      <b style="color:var(--accent)">Markov 2.0:</b> σ-Signal im QQQ-Banner zeigt Regime-Übergangswahrscheinlichkeit.
+      <b>LONG_OK</b> = statistisch stabiles Bull-Regime. <b>FLAT</b> = kein klares Signal → kein Trading.
+    </div>
+
+    <!-- Footer -->
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <button onclick="closeWorkflowModal(true)" class="btn btn-primary" style="flex:1;font-size:13px">
+        <i class="ti ti-check"></i> Verstanden · Los geht's!
+      </button>
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="workflow-no-show" style="accent-color:var(--accent)"> Nicht mehr zeigen
+      </label>
+    </div>
+
+  </div>
+</div>
+
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────
 const DEFAULT_PIN = '2409';
@@ -1845,6 +1913,42 @@ async function syncPushScanResults() {
   var ok = await KoSync.push('scan_results', JSON.stringify(results));
   showSyncToast(ok ? '✅ ' + results.length + ' Ergebnisse hochgeladen' : '❌ Fehler', ok, true);
   await refreshSyncStatus();
+}
+
+
+// ── WORKFLOW ONBOARDING MODAL ─────────────────────────────────────────────
+function showWorkflowModal() {
+  var modal = document.getElementById('workflow-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    // Animation
+    var inner = modal.querySelector('div');
+    if (inner) {
+      inner.style.transform = 'translateY(100%)';
+      inner.style.transition = 'transform .3s ease';
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          inner.style.transform = 'translateY(0)';
+        });
+      });
+    }
+  }
+}
+
+function closeWorkflowModal(permanent) {
+  var modal = document.getElementById('workflow-modal');
+  if (!modal) return;
+  var noShow = document.getElementById('workflow-no-show');
+  if (permanent || (noShow && noShow.checked)) {
+    localStorage.setItem('ko_workflow_hidden', '1');
+  }
+  var inner = modal.querySelector('div');
+  if (inner) {
+    inner.style.transform = 'translateY(100%)';
+    setTimeout(function() { modal.style.display = 'none'; }, 300);
+  } else {
+    modal.style.display = 'none';
+  }
 }
 
 // Auto-Sync beim App-Start: Cloud-Daten laden falls neuer
@@ -2243,6 +2347,12 @@ function unlockApp(){
   window._appUnlocked = true; // ab jetzt sind externe Fetches erlaubt
   document.body.style.cursor = 'default'; // Cursor nach PIN zurücksetzen
   setTimeout(function(){ fetchQqqRegime(); }, 800);
+  // Workflow-Modal zeigen (wenn nicht deaktiviert)
+  setTimeout(function(){
+    if (!localStorage.getItem('ko_workflow_hidden')) {
+      showWorkflowModal();
+    }
+  }, 1200);
   setTimeout(function(){ fetchVix().then(function(v){ if(v) renderVixAmpel(v); }); }, 1200);
   try{ loadIBD(); }catch(e){ console.warn('loadIBD:',e); }
   try{ loadMakro(); }catch(e){ console.warn('loadMakro:',e); }
@@ -10811,6 +10921,21 @@ async function openKiBriefing(defaultStrat) {
     + 'MARKTKONTEXT:\n'
     + '- QQQ-Regime: ' + qqqRegime + '\n'
     + qqqMarkovStr
+    + (function(){
+        // Bull-Market Frühindikator Score
+        var scoreFill = document.getElementById('bull-score-fill');
+        var scoreLbl  = document.getElementById('bull-score-label');
+        var bullGrid  = document.getElementById('bull-grid');
+        if (!scoreLbl || !scoreLbl.textContent || scoreLbl.textContent === '—') return '';
+        var scoreStr = scoreLbl.textContent; // z.B. "72/100 — Bullische Signale"
+        // Einzelsignale aus Grid extrahieren
+        var cards = bullGrid ? Array.from(bullGrid.querySelectorAll('[title]')).map(function(el){
+          return el.getAttribute('title') || '';
+        }).filter(Boolean) : [];
+        var signalStr = cards.length > 0 ? cards.slice(0,6).join(' | ') : '';
+        return '- Bull-Market Frühindikator: ' + scoreStr + '\n'
+          + (signalStr ? '  Signale: ' + signalStr + '\n' : '');
+      })()
     + '- VIX: ' + vixStr + (parseFloat(vixStr) > 20 ? ' ⚠️ ERHÖHT — erhöhte Vorsicht geboten' : ' (normal)') + '\n'
     + sektorStr
     + rotationWarning;
@@ -10919,6 +11044,16 @@ let _kiStrat = 'ko';
 // ANTI-HALLUZINATIONS-DIREKTIVE — wird jedem KI-Prompt vorangestellt
 // ══════════════════════════════════════════════════════════════════════════════
 const KI_ANTI_HALLUZINATION = '\n'
+  + '== BULL-MARKET FRÜHINDIKATOR — PFLICHTREGELN ==\n'
+  + 'Wenn Bull-Market Frühindikator Score in MARKTKONTEXT vorhanden:\n'
+  + '  • Score 0-100: Confluence mehrerer unkorrelierter Frühindikatoren (KEINE Erfindung)\n'
+  + '  • ≥80: STARKES BULL-SIGNAL → explizit als mögliche Trendwende erwähnen\n'
+  + '  • 65-79: Bullische Confluence → selektiv long mit engem Stop empfehlen\n'
+  + '  • 45-64: Gemischt → abwarten, kein klarer Boden\n'
+  + '  • <45: Bärisch → defensiv bleiben\n'
+  + '  • ★ Signale (Breadth Thrust, HYG-Divergenz, Regime-Wechsel): IMMER explizit nennen\n'
+  + '  • Wenn kein Bull-Score in den Daten: ABSOLUTES SCHWEIGEN\n'
+  + '== ENDE BULL-REGELN ==\n\n'
   + '== MARKOV 2.0 & IV-PERCENTILE — PFLICHTREGELN ==\n'
   + 'Wenn Markov2:REG(X%) σ±Y Filter:MODE in den Ticker-Daten steht:\n'
   + '  • IMMER explizit in der Analyse erwähnen — das ist ein Premium-Feature\n'
