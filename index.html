@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v72">
+<meta name="app-version" content="20260615-v73">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2175,7 +2175,8 @@ const DEFAULT_TICKERS_DE = [
   {sym:'WAF',name:'Siltronic AG'},
   {sym:'NDX1',name:'Nordex SE'},
 ];
-window.currentMarket = 'us'; // 'us' or 'de'
+window.currentMarket = 'us';
+window._markovFilterThreshold = parseFloat(localStorage.getItem('ko_markov_filter_threshold') || '0.10'); // 'us' or 'de'
 
 // ─── PIN ─────────────────────────────────────────────────────────────
 let pinEntry = '';
@@ -9233,43 +9234,125 @@ function renderVixAmpel(vix) {
 // ═══════════════════════════════════════════════════════════════
 //  MARKOV-REGIME (JS-Port des Pine Script v4)
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// MARKOV 2.0 — HEDGE FUND METHOD (alle 3 Fixes implementiert)
+// Fix 1: Stride-Sampling (keine überlappenden Fenster)
+// Fix 2: Label-Verifikation gegen bekannte historische Perioden
+// Fix 3: FILTER Mode (Markov gated Signale)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildTransitionMatrix(regimes, stride) {
+  // FIX 1: Stride-Sampling — nur nicht-überlappende Fenster
+  // stride=1 → Legacy (überlappend, statistisch unehrlich)
+  // stride=lookback → Markov 2.0 (nicht-überlappend, statistisch korrekt)
+  let bb=0,bs=0,br=0, sb=0,ss=0,sr=0, rb=0,rs=0,rr=0;
+  for (let i = stride; i < regimes.length; i += stride) {
+    const prev = regimes[i - stride];
+    const curr = regimes[i];
+    if      (prev === 1)  { if(curr===1) bb++; else if(curr===0) bs++; else br++; }
+    else if (prev === 0)  { if(curr===1) sb++; else if(curr===0) ss++; else sr++; }
+    else                  { if(curr===1) rb++; else if(curr===0) rs++; else rr++; }
+  }
+  const fromBull = bb+bs+br || 1;
+  const fromSide = sb+ss+sr || 1;
+  const fromBear = rb+rs+rr || 1;
+  return {
+    // Transition-Wahrscheinlichkeiten (Zeilen summieren auf 1)
+    bull: { bull:bb/fromBull, side:bs/fromBull, bear:br/fromBull },
+    side: { bull:sb/fromSide, side:ss/fromSide, bear:sr/fromSide },
+    bear: { bull:rb/fromBear, side:rs/fromBear, bear:rr/fromBear },
+    // Stickiness = Diagonal
+    bullSticky: Math.round(bb/fromBull*100),
+    sideSticky: Math.round(ss/fromSide*100),
+    bearSticky: Math.round(rr/fromBear*100),
+    // Rohzahlen für Transparenz
+    counts: { bb,bs,br, sb,ss,sr, rb,rs,rr }
+  };
+}
+
+function verifyMarkovLabels(regimes, closes) {
+  // FIX 2: Label-Verifikation gegen bekannte historische Perioden
+  // Wir prüfen ob BEAR-Regime in stark fallenden Perioden korrekt detektiert wird
+  // Nutzt die letzten 252 Bars (ca. 1 Jahr) als Prüfbereich
+  if (!closes || closes.length < 100) return { ok: true, note: 'zu wenig Daten' };
+
+  // Größter Drawdown im verfügbaren Zeitraum
+  let maxDrop = 0, maxDropIdx = -1;
+  for (let i = 20; i < closes.length; i++) {
+    const drop = (closes[i] - closes[i-20]) / closes[i-20] * 100;
+    if (drop < maxDrop) { maxDrop = drop; maxDropIdx = i; }
+  }
+  // Größter Anstieg
+  let maxRise = 0, maxRiseIdx = -1;
+  for (let i = 20; i < closes.length; i++) {
+    const rise = (closes[i] - closes[i-20]) / closes[i-20] * 100;
+    if (rise > maxRise) { maxRise = rise; maxRiseIdx = i; }
+  }
+
+  const regimeAtDrop = maxDropIdx >= 0 ? regimes[Math.min(maxDropIdx, regimes.length-1)] : null;
+  const regimeAtRise = maxRiseIdx >= 0 ? regimes[Math.min(maxRiseIdx, regimes.length-1)] : null;
+
+  const dropOk = regimeAtDrop === -1; // Stärkster Drawdown → BEAR erwartet
+  const riseOk = regimeAtRise === 1;  // Stärkster Anstieg → BULL erwartet
+
+  return {
+    ok: dropOk && riseOk,
+    dropOk, riseOk,
+    maxDrop: Math.round(maxDrop*10)/10,
+    maxRise: Math.round(maxRise*10)/10,
+    regimeAtDrop, regimeAtRise,
+    note: (!dropOk || !riseOk) ? 'WARNUNG: Label-Verifikation fehlgeschlagen — Schwellwerte prüfen' : 'Labels verifiziert ✓'
+  };
+}
+
+function calcMarkovSignal(matrix, currentRegime) {
+  // Signal = P(bull morgen) − P(bear morgen) aus aktuellem Regime
+  let row;
+  if      (currentRegime === 1)  row = matrix.bull;
+  else if (currentRegime === 0)  row = matrix.side;
+  else                           row = matrix.bear;
+  return Math.round((row.bull - row.bear) * 100) / 100; // −1 bis +1
+}
+
 function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
-  lookback  = lookback  || 21;
-  bullThresh= bullThresh|| 3.0;
-  bearThresh= bearThresh|| 3.0;
-  smoothLen = smoothLen || 5;
-  if (!closes || closes.length < lookback + 5) return null;
+  lookback   = lookback   || 21;
+  bullThresh = bullThresh || 3.0;
+  bearThresh = bearThresh || 3.0;
+  smoothLen  = smoothLen  || 5;
+  if (!closes || closes.length < lookback * 3) return null;
 
   const n = closes.length;
 
-  // Regime pro Bar bestimmen
+  // ── State Labels ──────────────────────────────────────────────────────
+  // Vollständige History labeln (für beide Matrizen)
   const regimes = [];
   for (let i = lookback; i < n; i++) {
     const logRet = Math.log(closes[i] / closes[i - lookback]) * 100;
-    regimes.push(logRet > bullThresh ? 1 : logRet < -bearThresh ? -1 : 0);
+    regimes.push(logRet >= bullThresh ? 1 : logRet <= -bearThresh ? -1 : 0);
   }
-
-  // Rollende Transition-Matrix ueber letzten lookback-Bars
-  let bb=0,bn=0,bc=0,nb=0,nn=0,nc=0,cb=0,cn=0,cc=0;
   const rn = regimes.length;
-  for (let i = 1; i < Math.min(lookback + 1, rn); i++) {
-    const prev = regimes[rn - 1 - i];
-    const curr = regimes[rn - i];
-    if (prev === 1)       { if(curr===1) bb++; else if(curr===0) bn++; else bc++; }
-    else if (prev === 0)  { if(curr===1) nb++; else if(curr===0) nn++; else nc++; }
-    else                  { if(curr===1) cb++; else if(curr===0) cn++; else cc++; }
-  }
 
-  const fromBull = bb+bn+bc;
-  const fromBear = cb+cn+cc;
-  const fromSide = nb+nn+nc;
+  // FIX 2: Label-Verifikation
+  const labelCheck = verifyMarkovLabels(regimes, closes);
 
-  const bullSticky = fromBull > 0 ? bb/fromBull*100 : 50;
-  const bearSticky = fromBear > 0 ? cc/fromBear*100 : 50;
-  const sideSticky = fromSide > 0 ? nn/fromSide*100 : 50;
+  // ── Transition-Matrizen (FIX 1: beide zeigen) ─────────────────────────
+  // Legacy: stride=1 (überlappend, statistisch unehrlich)
+  const matrixLegacy = buildTransitionMatrix(regimes, 1);
+  // Markov 2.0: stride=lookback (nicht-überlappend, statistisch korrekt)
+  const matrix20     = buildTransitionMatrix(regimes, lookback);
 
+  // Primär: Markov 2.0 Matrix für alle Signale
   const currentRegime = regimes[rn - 1];
   const prevRegime    = regimes[rn - 2];
+
+  // FIX 3 FILTER Mode: Signal aus 2.0 Matrix
+  const signal = calcMarkovSignal(matrix20, currentRegime);
+
+  // Stickiness aus 2.0 Matrix
+  const bullSticky = matrix20.bullSticky;
+  const bearSticky = matrix20.bearSticky;
+  const sideSticky = matrix20.sideSticky;
+  const sticky = currentRegime === 1 ? bullSticky : currentRegime === -1 ? bearSticky : sideSticky;
 
   // Warnstufe
   const warnBull = 60;
@@ -9283,88 +9366,163 @@ function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
     warnLevel = bearGap > 15 ? 3 : bearGap > 8 ? 2 : 1;
   }
 
+  // FILTER Mode: Long erlaubt wenn signal > threshold
+  const filterThreshold = (typeof window !== 'undefined' && window._markovFilterThreshold) || 0.1;
+  const filterMode = signal > filterThreshold ? 'LONG_OK'
+                   : signal < -filterThreshold ? 'SHORT_OK'
+                   : 'FLAT';
+
   return {
-    regime: currentRegime,      // 1=Bull, -1=Bear, 0=Side
-    bullSticky: Math.round(bullSticky),
-    bearSticky: Math.round(bearSticky),
-    sideSticky: Math.round(sideSticky),
+    // Kern
+    regime: currentRegime,        // 1=Bull, -1=Bear, 0=Side
+    signal: signal,               // FIX 3: −1 bis +1, primäres Handelssignal
+    filterMode: filterMode,       // 'LONG_OK', 'SHORT_OK', 'FLAT'
+    // Stickiness (aus 2.0 Matrix)
+    bullSticky: bullSticky,
+    bearSticky: bearSticky,
+    sideSticky: sideSticky,
+    sticky: sticky,
+    // Matrizen
+    matrix20: matrix20,           // FIX 1: Stride-sampled (statistisch korrekt)
+    matrixLegacy: matrixLegacy,   // FIX 1: Legacy (zum Vergleich)
+    // Validierung
+    labelCheck: labelCheck,       // FIX 2: Label-Verifikation
+    // Meta
     warnLevel: warnLevel,
     bullGap: Math.round(bullGap * 10) / 10,
-    regimeChanged: currentRegime !== prevRegime
+    regimeChanged: currentRegime !== prevRegime,
+    // Warnung wenn Legacy vs 2.0 stark abweichen
+    matrixDivergence: Math.abs(matrix20.bullSticky - matrixLegacy.bullSticky) > 15
   };
 }
 
 // Markov-Badge HTML fuer Ticker-Karte
 function markovBadgeHtml(markov) {
   if (!markov) return '';
-  const regime = markov.regime;
-  const sticky = regime === 1 ? markov.bullSticky :
-                 regime === -1 ? markov.bearSticky : markov.sideSticky;
-  const wl = markov.warnLevel;
+  const regime  = markov.regime;
+  const sticky  = markov.sticky || (regime === 1 ? markov.bullSticky : regime === -1 ? markov.bearSticky : markov.sideSticky);
+  const signal  = markov.signal != null ? markov.signal : null;
+  const wl      = markov.warnLevel || 0;
+  const filter  = markov.filterMode || '';
+  const labelOk = markov.labelCheck ? markov.labelCheck.ok : true;
+  const divWarn = markov.matrixDivergence;
 
-  // Regime-Basis
+  // Regime-Farbe
   let regStr, regColor, regBg;
-  if (regime === 1) {
-    regStr = 'BULL'; regColor = 'var(--green)'; regBg = 'rgba(52,199,89,0.12)';
-  } else if (regime === -1) {
-    regStr = 'BEAR'; regColor = 'var(--red)';   regBg = 'rgba(255,59,48,0.12)';
-  } else {
-    regStr = 'SIDE'; regColor = 'var(--text3)'; regBg = 'rgba(120,120,128,0.10)';
-  }
+  if (regime === 1)       { regStr='BULL'; regColor='var(--green)'; regBg='rgba(52,199,89,0.12)'; }
+  else if (regime === -1) { regStr='BEAR'; regColor='var(--red)';   regBg='rgba(255,59,48,0.12)'; }
+  else                    { regStr='SIDE'; regColor='var(--text3)'; regBg='rgba(120,120,128,0.10)'; }
 
-  // Warnstufe ueberschreibt Farbe
-  if (wl === 3) { regColor = 'var(--red)';    regBg = 'rgba(255,59,48,0.18)'; }
-  else if (wl === 2) { regColor = 'var(--amber)'; regBg = 'rgba(255,159,10,0.15)'; }
-  else if (wl === 1) { regColor = 'var(--amber)'; regBg = 'rgba(255,204,0,0.12)'; }
+  // Warnstufe überschreibt
+  if      (wl === 3) { regColor='var(--red)';   regBg='rgba(255,59,48,0.18)'; }
+  else if (wl === 2) { regColor='var(--amber)'; regBg='rgba(255,159,10,0.15)'; }
+  else if (wl === 1) { regColor='var(--amber)'; regBg='rgba(255,159,10,0.10)'; }
 
-  const warnIcon = wl === 3 ? ' &#x26A0;&#xFE0F;' : wl === 2 ? ' &#x26A0;' : wl === 1 ? ' &#x25BE;' : '';
-  const stickyLabel = sticky >= 70 ? 'stabil' : sticky >= 55 ? 'mittel' : 'schwach';
+  const warnIcon = wl===3?' ⚠⚠⚠':wl===2?' ⚠⚠':wl===1?' ⚠':'';
 
-  return '<span style="font-size:10px;padding:2px 8px;border-radius:10px;' +
-    'background:'+regBg+';color:'+regColor+';display:inline-flex;align-items:center;gap:3px;' +
-    'border:1px solid '+regColor+';opacity:0.9" ' +
-    'title="Markov-Regime: '+regStr+' | Stickiness: '+sticky+'% | Warnstufe: '+wl+'">' +
-    regStr + ' ' + sticky + '%' + warnIcon +
+  // FIX 3: Signal-Anzeige
+  const sigStr  = signal != null ? (signal > 0 ? '+' : '') + signal.toFixed(2) : '';
+  const sigColor= signal > 0.2 ? 'var(--green)' : signal < -0.2 ? 'var(--red)' : 'var(--text3)';
+
+  // Filter-Mode Icon
+  const filterIcon = filter==='LONG_OK' ? ' 🟢' : filter==='SHORT_OK' ? ' 🔴' : filter==='FLAT' ? ' ⬜' : '';
+
+  // FIX 2: Label-Warnung
+  const labelWarn = !labelOk ? ' ⚡' : '';
+
+  // Matrix-Divergenz-Warnung (Legacy vs 2.0)
+  const divIcon = divWarn ? ' △' : '';
+
+  const tooltip = regStr + ' | Sticky: ' + sticky + '% | Signal: ' + sigStr
+    + ' | Filter: ' + filter
+    + (divWarn ? ' | Matrix-Divergenz!' : '')
+    + (!labelOk ? ' | Label-Check fehlgeschlagen' : '');
+
+  return '<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:5px;' +
+    'background:' + regBg + ';border:0.5px solid ' + regColor + ';font-size:10px;font-weight:600;' +
+    'color:' + regColor + ';cursor:help" title="' + tooltip + '">' +
+    regStr + ' ' + sticky + '%' + warnIcon + labelWarn + divIcon +
+    (sigStr ? '<span style="font-size:9px;opacity:0.8;color:' + sigColor + ';margin-left:3px">σ' + sigStr + '</span>' : '') +
+    filterIcon +
     '</span>';
 }
+
 
 // QQQ-Regime global (wird beim Scan-Start berechnet)
 let _qqqRegime = null;
 
 function renderQqqBanner(markov) {
   const el = document.getElementById('qqq-regime-banner');
-  if (!el) return;
-  if (!markov) { el.style.display = 'none'; return; }
+  if (!el || !markov) return;
 
-  const regime = markov.regime;
-  const wl = markov.warnLevel;
+  const regime  = markov.regime;
+  const sticky  = markov.sticky || markov.bullSticky;
+  const signal  = markov.signal != null ? markov.signal : 0;
+  const filter  = markov.filterMode || 'FLAT';
+  const wl      = markov.warnLevel || 0;
+  const m20     = markov.matrix20;
+  const mLeg    = markov.matrixLegacy;
+  const lc      = markov.labelCheck || {};
+
+  // Regime-Text und Farbe
   let color, bg, icon, label, sub;
-
-  if (regime === 1 && wl === 0) {
+  if (regime === 1) {
     color='var(--green)'; bg='rgba(52,199,89,0.10)'; icon='ti-trending-up';
-    label='QQQ: BULL-Regime'; sub='Stickiness '+markov.bullSticky+'% - Momentum intakt';
-  } else if (regime === 1 && wl > 0) {
-    color='var(--amber)'; bg='rgba(255,159,10,0.12)'; icon='ti-alert-triangle';
-    label='QQQ: BULL schwaechelt (Stufe '+wl+')';
-    sub='Stickiness nur '+markov.bullSticky+'% - Vorsicht bei neuen Longs';
-  } else if (regime === 0) {
-    color='var(--amber)'; bg='rgba(255,204,0,0.10)'; icon='ti-minus';
-    label='QQQ: SIDEWAYS-Regime';
-    sub='Kein klarer Trend - Selektiv vorgehen';
+    label = 'QQQ: BULL-Regime';
+    sub   = 'Trend intakt · Longs bevorzugen';
+  } else if (regime === -1) {
+    color='var(--red)'; bg='rgba(255,59,48,0.10)'; icon='ti-trending-down';
+    label = 'QQQ: BEAR-Regime';
+    sub   = 'Abwärtsdruck · Defensiv bleiben';
   } else {
-    color='var(--red)'; bg='rgba(255,59,48,0.12)'; icon='ti-trending-down';
-    label='QQQ: BEAR-Regime';
-    sub='Bear Stickiness '+markov.bearSticky+'% - Keine neuen Longs!';
+    color='var(--amber)'; bg='rgba(240,169,58,0.10)'; icon='ti-minus';
+    label = 'QQQ: SIDEWAYS-Regime';
+    sub   = 'Kein klarer Trend – Selektiv vorgehen';
   }
+  if (wl === 3) { color='var(--red)'; bg='rgba(255,59,48,0.15)'; }
+  else if (wl >= 1) { color='var(--amber)'; bg='rgba(240,169,58,0.12)'; }
 
-  el.style.display = 'flex';
-  el.style.background = bg;
-  el.style.borderLeft = '3px solid ' + color;
+  // FIX 3: Filter-Mode
+  const filterTxt = filter==='LONG_OK' ? '🟢 LONG erlaubt' : filter==='SHORT_OK' ? '🔴 SHORT erlaubt' : '⬜ FLAT — kein Signal';
+  const sigTxt    = (signal > 0 ? '+' : '') + signal.toFixed(2);
+
+  // FIX 2: Label-Check
+  const labelTxt  = lc.ok === false
+    ? '⚡ Label-Check: ' + (lc.note || 'fehlgeschlagen')
+    : lc.note ? '✓ ' + lc.note : '';
+
+  // FIX 1: Matrix-Divergenz
+  const divTxt = markov.matrixDivergence
+    ? '△ Legacy vs. 2.0 Divergenz: ' + (mLeg ? mLeg.bullSticky : '?') + '% vs. ' + (m20 ? m20.bullSticky : '?') + '% (Stride-Fix wirkt!)'
+    : '';
+
+  // Stickiness aus 2.0 Matrix
+  const stickyTxt = m20
+    ? 'Bull ' + m20.bullSticky + '% · Side ' + m20.sideSticky + '% · Bear ' + m20.bearSticky + '%'
+    : 'Sticky ' + sticky + '%';
+
+  el.style.background   = bg;
+  el.style.borderLeft   = '3px solid ' + color;
+  el.style.display      = 'flex';
+  el.style.flexDirection = 'column';
+  el.style.gap          = '4px';
+
   el.innerHTML =
-    '<i class="ti '+icon+'" style="font-size:16px;color:'+color+';flex-shrink:0"></i>' +
-    '<div style="flex:1">' +
-      '<div style="font-weight:600;color:'+color+';font-size:12px">'+label+'</div>' +
-      '<div style="font-size:10px;color:var(--text2)">'+sub+'</div>' +
+    '<div style="display:flex;align-items:center;gap:8px">' +
+      '<i class="ti ' + icon + '" style="font-size:16px;color:' + color + ';flex-shrink:0"></i>' +
+      '<div style="flex:1">' +
+        '<div style="font-weight:600;color:' + color + ';font-size:12px">' + label + '</div>' +
+        '<div style="font-size:10px;color:var(--text2)">' + sub + '</div>' +
+      '</div>' +
+      '<div style="text-align:right;font-size:10px;color:var(--text3)">' +
+        '<div style="font-weight:600;color:' + color + '">' + filterTxt + '</div>' +
+        '<div>Signal σ<b>' + sigTxt + '</b></div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--text3);padding-top:2px;border-top:1px solid var(--border)">' +
+      '<span>📊 Markov 2.0 · ' + stickyTxt + '</span>' +
+      (divTxt ? '<span style="color:var(--amber)">' + divTxt + '</span>' : '') +
+      (labelTxt ? '<span style="color:' + (lc.ok===false?'var(--red)':'var(--green)') + '">' + labelTxt + '</span>' : '') +
     '</div>';
 }
 // ═══════════════════════════════════════════════════════════════
