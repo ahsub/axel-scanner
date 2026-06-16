@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v95">
+<meta name="app-version" content="20260615-v96">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1248,6 +1248,61 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
         <div id="openai-key-status" style="font-size:10px;color:var(--text3);margin-top:.4rem">
           Nicht gesetzt · benötigt für .mp3/.mp4/.m4a/.wav · ~$0.006/Min · max 25MB
+        </div>
+      </div>
+
+      <!-- EDITOR IN CHIEF -->
+      <div class="sec">📋 Listen-Editor (Editor in Chief)</div>
+      <div class="card" style="margin-bottom:.75rem">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:.6rem;line-height:1.5">
+          Alle fest verdrahteten Listen hier bearbeiten. Format: <code style="font-family:var(--mono);font-size:10px;background:var(--bg3);padding:1px 4px;border-radius:3px">TICKER,Name</code> — eine Zeile pro Titel.
+        </div>
+        <div class="field" style="margin-bottom:.5rem">
+          <label>Liste auswählen</label>
+          <select id="eic-list-select" onchange="eicLoadList(this.value)" style="font-size:12px">
+            <option value="">-- Bitte wählen --</option>
+            <optgroup label="🇩🇪 Deutsche Indizes">
+              <option value="DAX40">DAX 40</option>
+              <option value="MDAX">MDAX Top 20</option>
+              <option value="TECDAX">TecDAX Top 20</option>
+            </optgroup>
+            <optgroup label="🇺🇸 US-Indizes">
+              <option value="PICKS_SHOVELS">⛏ Picks &amp; Shovels</option>
+              <option value="SP500">S&amp;P 500 Kern-100</option>
+              <option value="NDX100">NASDAQ 100</option>
+            </optgroup>
+            <optgroup label="📊 Sektoren">
+              <option value="DEFENSE">Defense &amp; Aerospace</option>
+              <option value="REIT">REITs &amp; Real Estate</option>
+              <option value="ENERGY">Energy &amp; Oil</option>
+              <option value="HEALTH">Healthcare &amp; Biotech</option>
+              <option value="FINANCE">Financials &amp; Banks</option>
+              <option value="CONSUMER">Consumer Discretionary</option>
+            </optgroup>
+          </select>
+        </div>
+        <div id="eic-editor-wrap" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+            <label style="font-size:11px;color:var(--text3)" id="eic-editor-label">—</label>
+            <div style="display:flex;gap:.4rem">
+              <button class="btn btn-sm" onclick="eicImportCSV()" style="font-size:10px"><i class="ti ti-upload"></i> CSV</button>
+              <button class="btn btn-sm" onclick="eicExportCSV()" style="font-size:10px"><i class="ti ti-download"></i> CSV</button>
+              <button class="btn btn-sm" onclick="eicReset()" style="font-size:10px;color:var(--text3)"><i class="ti ti-refresh"></i> Reset</button>
+            </div>
+          </div>
+          <input type="file" id="eic-csv-input" accept=".csv,.txt" style="display:none" onchange="eicReadCSV(this)">
+          <textarea id="eic-textarea" rows="10"
+            placeholder="TICKER,Name&#10;NVDA,NVIDIA Corp.&#10;AMD,Advanced Micro Devices&#10;..."
+            style="width:100%;font-size:11px;padding:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;font-family:var(--mono);resize:vertical;line-height:1.6"></textarea>
+          <div style="display:flex;gap:.5rem;margin-top:.5rem;align-items:center">
+            <button class="btn btn-primary" onclick="eicSave()" style="flex:1;font-size:12px">
+              <i class="ti ti-check"></i> Speichern &amp; aktivieren
+            </button>
+            <span id="eic-status" style="font-size:10px;color:var(--text3)"></span>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:.4rem">
+            Änderungen in localStorage gespeichert · überschreiben Standard-Liste
+          </div>
         </div>
       </div>
 
@@ -3361,7 +3416,7 @@ function setMarket(mkt){
           '<option value="fixed:TECDAX">💻 TecDAX Top 20</option>'+
         '</optgroup>'+
         '<optgroup label="── 🇺🇸 US-Indizes ──">'+
-          '<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
+          '<option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>'+'<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
           '<option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>'+
         '</optgroup>'+
         '<optgroup label="── 🏭 Sektoren ──">'+
@@ -3397,7 +3452,7 @@ function setMarket(mkt){
           '<option value="fixed:TECDAX">💻 TecDAX Top 20</option>'+
         '</optgroup>'+
         '<optgroup label="── 🇺🇸 US-Indizes ──">'+
-          '<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
+          '<option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>'+'<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
           '<option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>'+
         '</optgroup>'+
         '<optgroup label="── 🏭 Sektoren ──">'+
@@ -9901,7 +9956,7 @@ var FIXED_LISTS = {
     {sym:'TTD',name:'Trade Desk'},{sym:'DOCU',name:'DocuSign'},{sym:'ZM',name:'Zoom Video'},
     {sym:'AMGN',name:'Amgen Inc.'},{sym:'VRTX',name:'Vertex Pharma'},{sym:'REGN',name:'Regeneron'},
     {sym:'GILD',name:'Gilead Sciences'},{sym:'BIIB',name:'Biogen Inc.'},{sym:'IDXX',name:'IDEXX Labs'},
-    {sym:'GEHC',name:'GE HealthCare'},{sym:'ILMN',name:'Illumina'},{sym:'EXAS',name:'Exact Sciences'},
+    {sym:'GEHC',name:'GE HealthCare'},{sym:'ILMN',name:'Illumina'},{sym:'MRVL',name:'Marvell Technology'},
     {sym:'NXPI',name:'NXP Semiconductors'},{sym:'ON',name:'ON Semiconductor'},{sym:'SWKS',name:'Skyworks'},
     {sym:'MPWR',name:'Monolithic Power'},{sym:'ENPH',name:'Enphase Energy'},{sym:'FSLR',name:'First Solar'},
     {sym:'PCAR',name:'PACCAR Inc.'},{sym:'FAST',name:'Fastenal'},{sym:'CTAS',name:'Cintas Corp.'},
@@ -9909,10 +9964,10 @@ var FIXED_LISTS = {
     {sym:'ORLY',name:'O\'Reilly Auto'},{sym:'ROST',name:'Ross Stores'},{sym:'DLTR',name:'Dollar Tree'},
     {sym:'KDP',name:'Keurig Dr Pepper'},{sym:'MDLZ',name:'Mondelez Int\'l'},{sym:'PDD',name:'PDD Holdings'},
     {sym:'TCOM',name:'Trip.com Group'},{sym:'JD',name:'JD.com'},{sym:'BIDU',name:'Baidu Inc.'},
-    {sym:'SGEN',name:'Seagen Inc.'},{sym:'ALGN',name:'Align Technology'},{sym:'DXCM',name:'DexCom Inc.'},
+    {sym:'DASH',name:'DoorDash Inc.'},{sym:'ALGN',name:'Align Technology'},{sym:'DXCM',name:'DexCom Inc.'},
     {sym:'HON',name:'Honeywell'},{sym:'MNST',name:'Monster Beverage'},{sym:'AEP',name:'AEP'},
     {sym:'XEL',name:'Xcel Energy'},{sym:'EXC',name:'Exelon Corp.'},{sym:'WBD',name:'Warner Bros.'},
-    {sym:'PARA',name:'Paramount Global'},{sym:'FOXA',name:'Fox Corp. A'},
+    {sym:'TTWO',name:'Take-Two Interactive'},{sym:'FOXA',name:'Fox Corp. A'},
     {sym:'ARM',name:'ARM Holdings'},{sym:'ALAB',name:'Astera Labs'},{sym:'CRDO',name:'Credo Tech.'},
     {sym:'CEG',name:'Constellation Energy'},{sym:'VST',name:'Vistra Corp.'},
   ],
