@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v106">
+<meta name="app-version" content="20260615-v107">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -886,39 +886,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
               <option value="CONSUMER">Consumer Discretionary</option>
             </optgroup>
           </select>
-        </div>
-        <!-- EIC PIN Lock -->
-        <div id="eic-pin-wrap" style="display:none;text-align:center;padding:.75rem 0">
-          <div style="font-size:12px;color:var(--text2);margin-bottom:.6rem">
-            <i class="ti ti-lock" style="color:var(--amber)"></i>
-            Editor in Chief — 6-stelligen PIN eingeben
-          </div>
-          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:.6rem" id="eic-pin-dots">
-            <div class="pin-dot" id="eic-pd0"></div>
-            <div class="pin-dot" id="eic-pd1"></div>
-            <div class="pin-dot" id="eic-pd2"></div>
-            <div class="pin-dot" id="eic-pd3"></div>
-            <div class="pin-dot" id="eic-pd4"></div>
-            <div class="pin-dot" id="eic-pd5"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:180px;margin:0 auto">
-            <button class="pin-btn" onclick="eicPinPress('1')">1</button>
-            <button class="pin-btn" onclick="eicPinPress('2')">2</button>
-            <button class="pin-btn" onclick="eicPinPress('3')">3</button>
-            <button class="pin-btn" onclick="eicPinPress('4')">4</button>
-            <button class="pin-btn" onclick="eicPinPress('5')">5</button>
-            <button class="pin-btn" onclick="eicPinPress('6')">6</button>
-            <button class="pin-btn" onclick="eicPinPress('7')">7</button>
-            <button class="pin-btn" onclick="eicPinPress('8')">8</button>
-            <button class="pin-btn" onclick="eicPinPress('9')">9</button>
-            <button class="pin-btn" onclick="eicPinClear()" style="font-size:14px">⌫</button>
-            <button class="pin-btn" onclick="eicPinPress('0')">0</button>
-            <button class="pin-btn" onclick="eicPinCancel()" style="font-size:11px">✕</button>
-          </div>
-          <div id="eic-pin-error" class="pin-error" style="margin-top:.5rem">Falscher PIN</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:.5rem">
-            PIN setzen: Admin → EIC-PIN festlegen
-          </div>
         </div>
 
         <div id="eic-editor-wrap" style="display:none">
@@ -10206,6 +10173,7 @@ function closeEicModal() {
 }
 
 
+function eicPinCancel() { closeEicModal(); }
 function eicSetPin() {
   // Legacy-Funktion → leitet zu Modal weiter
   showEicPinModal();
