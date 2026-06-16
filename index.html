@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v99">
+<meta name="app-version" content="20260615-v100">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -841,6 +841,132 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
 
       <!-- ═══ AUTO-TOP + SCHEDULER ═════════════════════════════════════════ -->
+      <!-- EDITOR IN CHIEF -->
+      <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
+        <span>📋 Listen-Editor (Editor in Chief)</span>
+        <div style="display:flex;gap:.4rem">
+          <button id="eic-unlock-btn" class="btn btn-sm" onclick="showEicPinModal()"
+            style="font-size:10px;color:var(--accent);border-color:var(--accent)">
+            <i class="ti ti-lock"></i> Entsperren
+          </button>
+          <button id="eic-lock-btn" class="btn btn-sm" onclick="lockEicEditor()"
+            style="font-size:10px;color:var(--amber);border-color:var(--amber);display:none">
+            <i class="ti ti-lock-open"></i> Sperren
+          </button>
+          <button class="btn btn-sm" onclick="eicChangePin()"
+            style="font-size:10px;color:var(--text3)">
+            <i class="ti ti-key"></i> PIN ändern
+          </button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:.75rem">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:.6rem;line-height:1.5">
+          Alle fest verdrahteten Listen hier bearbeiten. Format: <code style="font-family:var(--mono);font-size:10px;background:var(--bg3);padding:1px 4px;border-radius:3px">TICKER,Name</code> — eine Zeile pro Titel.
+        </div>
+        <div class="field" style="margin-bottom:.5rem">
+          <label>Liste auswählen</label>
+          <select id="eic-list-select" onchange="eicLoadList(this.value)" style="font-size:12px">
+            <option value="">-- Bitte wählen --</option>
+            <optgroup label="🇩🇪 Deutsche Indizes">
+              <option value="DAX40">DAX 40</option>
+              <option value="MDAX">MDAX Top 20</option>
+              <option value="TECDAX">TecDAX Top 20</option>
+            </optgroup>
+            <optgroup label="🇺🇸 US-Indizes">
+              <option value="PICKS_SHOVELS">⛏ Picks &amp; Shovels</option>
+              <option value="SP500">S&amp;P 500 Kern-100</option>
+              <option value="NDX100">NASDAQ 100</option>
+            </optgroup>
+            <optgroup label="📊 Sektoren">
+              <option value="DEFENSE">Defense &amp; Aerospace</option>
+              <option value="REIT">REITs &amp; Real Estate</option>
+              <option value="ENERGY">Energy &amp; Oil</option>
+              <option value="HEALTH">Healthcare &amp; Biotech</option>
+              <option value="FINANCE">Financials &amp; Banks</option>
+              <option value="CONSUMER">Consumer Discretionary</option>
+            </optgroup>
+          </select>
+        </div>
+        <!-- EIC PIN Lock -->
+        <div id="eic-pin-wrap" style="display:none;text-align:center;padding:.75rem 0">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:.6rem">
+            <i class="ti ti-lock" style="color:var(--amber)"></i>
+            Editor in Chief — 6-stelligen PIN eingeben
+          </div>
+          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:.6rem" id="eic-pin-dots">
+            <div class="pin-dot" id="eic-pd0"></div>
+            <div class="pin-dot" id="eic-pd1"></div>
+            <div class="pin-dot" id="eic-pd2"></div>
+            <div class="pin-dot" id="eic-pd3"></div>
+            <div class="pin-dot" id="eic-pd4"></div>
+            <div class="pin-dot" id="eic-pd5"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:180px;margin:0 auto">
+            <button class="pin-btn" onclick="eicPinPress('1')">1</button>
+            <button class="pin-btn" onclick="eicPinPress('2')">2</button>
+            <button class="pin-btn" onclick="eicPinPress('3')">3</button>
+            <button class="pin-btn" onclick="eicPinPress('4')">4</button>
+            <button class="pin-btn" onclick="eicPinPress('5')">5</button>
+            <button class="pin-btn" onclick="eicPinPress('6')">6</button>
+            <button class="pin-btn" onclick="eicPinPress('7')">7</button>
+            <button class="pin-btn" onclick="eicPinPress('8')">8</button>
+            <button class="pin-btn" onclick="eicPinPress('9')">9</button>
+            <button class="pin-btn" onclick="eicPinClear()" style="font-size:14px">⌫</button>
+            <button class="pin-btn" onclick="eicPinPress('0')">0</button>
+            <button class="pin-btn" onclick="eicPinCancel()" style="font-size:11px">✕</button>
+          </div>
+          <div id="eic-pin-error" class="pin-error" style="margin-top:.5rem">Falscher PIN</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:.5rem">
+            PIN setzen: Admin → EIC-PIN festlegen
+          </div>
+        </div>
+
+        <div id="eic-editor-wrap" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+            <label style="font-size:11px;color:var(--text3)" id="eic-editor-label">—</label>
+            <div style="display:flex;gap:.4rem">
+              <button class="btn btn-sm" onclick="eicImportCSV()" style="font-size:10px"><i class="ti ti-upload"></i> CSV</button>
+              <button class="btn btn-sm" onclick="eicExportCSV()" style="font-size:10px"><i class="ti ti-download"></i> CSV</button>
+              <button class="btn btn-sm" onclick="eicReset()" style="font-size:10px;color:var(--text3)"><i class="ti ti-refresh"></i> Reset</button>
+            </div>
+          </div>
+          <input type="file" id="eic-csv-input" accept=".csv,.txt" style="display:none" onchange="eicReadCSV(this)">
+          <textarea id="eic-textarea" rows="10"
+            placeholder="TICKER,Name&#10;NVDA,NVIDIA Corp.&#10;AMD,Advanced Micro Devices&#10;..."
+            style="width:100%;font-size:11px;padding:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;font-family:var(--mono);resize:vertical;line-height:1.6"></textarea>
+          <div style="display:flex;gap:.5rem;margin-top:.5rem;align-items:center">
+            <button class="btn btn-primary" onclick="eicSave()" style="flex:1;font-size:12px">
+              <i class="ti ti-check"></i> Speichern &amp; aktivieren
+            </button>
+            <span id="eic-status" style="font-size:10px;color:var(--text3)"></span>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:.4rem">
+            Änderungen in localStorage gespeichert · überschreiben Standard-Liste
+          </div>
+        </div>
+
+        <!-- EIC PIN festlegen -->
+        <div style="border-top:1px solid var(--border);margin-top:.75rem;padding-top:.75rem">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:.4rem">
+            <i class="ti ti-lock"></i> Editor-in-Chief PIN (6-stellig)
+          </div>
+          <div style="display:flex;gap:.4rem">
+            <input type="password" id="eic-pin-input" maxlength="6" placeholder="6-stellig"
+              style="width:100px;font-size:13px;padding:6px 8px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);border-radius:8px;font-family:var(--mono);letter-spacing:.15em;text-align:center">
+            <button class="btn btn-sm" onclick="eicSetPin()" style="font-size:11px">
+              <i class="ti ti-key"></i> PIN setzen
+            </button>
+            <button class="btn btn-sm" onclick="eicClearPin()" style="font-size:11px;color:var(--text3)">
+              ✕ Löschen
+            </button>
+          </div>
+          <div id="eic-pin-set-status" style="font-size:10px;color:var(--text3);margin-top:.3rem">
+            Kein EIC-PIN gesetzt — Editor für alle PIN-Nutzer zugänglich
+          </div>
+        </div>
+      </div>
+
+
       <div class="sec"><i class="ti ti-robot"></i> Auto-Scan &amp; Auto-Top-Liste</div>
       <div class="card" style="margin-bottom:1rem">
 
@@ -1251,130 +1377,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
       </div>
 
-      <!-- EDITOR IN CHIEF -->
-      <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
-        <span>📋 Listen-Editor (Editor in Chief)</span>
-        <div style="display:flex;gap:.4rem">
-          <button id="eic-unlock-btn" class="btn btn-sm" onclick="showEicPinModal()"
-            style="font-size:10px;color:var(--accent);border-color:var(--accent)">
-            <i class="ti ti-lock"></i> Entsperren
-          </button>
-          <button id="eic-lock-btn" class="btn btn-sm" onclick="lockEicEditor()"
-            style="font-size:10px;color:var(--amber);border-color:var(--amber);display:none">
-            <i class="ti ti-lock-open"></i> Sperren
-          </button>
-          <button class="btn btn-sm" onclick="eicChangePin()"
-            style="font-size:10px;color:var(--text3)">
-            <i class="ti ti-key"></i> PIN ändern
-          </button>
-        </div>
-      </div>
-      <div class="card" style="margin-bottom:.75rem">
-        <div style="font-size:11px;color:var(--text2);margin-bottom:.6rem;line-height:1.5">
-          Alle fest verdrahteten Listen hier bearbeiten. Format: <code style="font-family:var(--mono);font-size:10px;background:var(--bg3);padding:1px 4px;border-radius:3px">TICKER,Name</code> — eine Zeile pro Titel.
-        </div>
-        <div class="field" style="margin-bottom:.5rem">
-          <label>Liste auswählen</label>
-          <select id="eic-list-select" onchange="eicLoadList(this.value)" style="font-size:12px">
-            <option value="">-- Bitte wählen --</option>
-            <optgroup label="🇩🇪 Deutsche Indizes">
-              <option value="DAX40">DAX 40</option>
-              <option value="MDAX">MDAX Top 20</option>
-              <option value="TECDAX">TecDAX Top 20</option>
-            </optgroup>
-            <optgroup label="🇺🇸 US-Indizes">
-              <option value="PICKS_SHOVELS">⛏ Picks &amp; Shovels</option>
-              <option value="SP500">S&amp;P 500 Kern-100</option>
-              <option value="NDX100">NASDAQ 100</option>
-            </optgroup>
-            <optgroup label="📊 Sektoren">
-              <option value="DEFENSE">Defense &amp; Aerospace</option>
-              <option value="REIT">REITs &amp; Real Estate</option>
-              <option value="ENERGY">Energy &amp; Oil</option>
-              <option value="HEALTH">Healthcare &amp; Biotech</option>
-              <option value="FINANCE">Financials &amp; Banks</option>
-              <option value="CONSUMER">Consumer Discretionary</option>
-            </optgroup>
-          </select>
-        </div>
-        <!-- EIC PIN Lock -->
-        <div id="eic-pin-wrap" style="display:none;text-align:center;padding:.75rem 0">
-          <div style="font-size:12px;color:var(--text2);margin-bottom:.6rem">
-            <i class="ti ti-lock" style="color:var(--amber)"></i>
-            Editor in Chief — 6-stelligen PIN eingeben
-          </div>
-          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:.6rem" id="eic-pin-dots">
-            <div class="pin-dot" id="eic-pd0"></div>
-            <div class="pin-dot" id="eic-pd1"></div>
-            <div class="pin-dot" id="eic-pd2"></div>
-            <div class="pin-dot" id="eic-pd3"></div>
-            <div class="pin-dot" id="eic-pd4"></div>
-            <div class="pin-dot" id="eic-pd5"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:180px;margin:0 auto">
-            <button class="pin-btn" onclick="eicPinPress('1')">1</button>
-            <button class="pin-btn" onclick="eicPinPress('2')">2</button>
-            <button class="pin-btn" onclick="eicPinPress('3')">3</button>
-            <button class="pin-btn" onclick="eicPinPress('4')">4</button>
-            <button class="pin-btn" onclick="eicPinPress('5')">5</button>
-            <button class="pin-btn" onclick="eicPinPress('6')">6</button>
-            <button class="pin-btn" onclick="eicPinPress('7')">7</button>
-            <button class="pin-btn" onclick="eicPinPress('8')">8</button>
-            <button class="pin-btn" onclick="eicPinPress('9')">9</button>
-            <button class="pin-btn" onclick="eicPinClear()" style="font-size:14px">⌫</button>
-            <button class="pin-btn" onclick="eicPinPress('0')">0</button>
-            <button class="pin-btn" onclick="eicPinCancel()" style="font-size:11px">✕</button>
-          </div>
-          <div id="eic-pin-error" class="pin-error" style="margin-top:.5rem">Falscher PIN</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:.5rem">
-            PIN setzen: Admin → EIC-PIN festlegen
-          </div>
-        </div>
-
-        <div id="eic-editor-wrap" style="display:none">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-            <label style="font-size:11px;color:var(--text3)" id="eic-editor-label">—</label>
-            <div style="display:flex;gap:.4rem">
-              <button class="btn btn-sm" onclick="eicImportCSV()" style="font-size:10px"><i class="ti ti-upload"></i> CSV</button>
-              <button class="btn btn-sm" onclick="eicExportCSV()" style="font-size:10px"><i class="ti ti-download"></i> CSV</button>
-              <button class="btn btn-sm" onclick="eicReset()" style="font-size:10px;color:var(--text3)"><i class="ti ti-refresh"></i> Reset</button>
-            </div>
-          </div>
-          <input type="file" id="eic-csv-input" accept=".csv,.txt" style="display:none" onchange="eicReadCSV(this)">
-          <textarea id="eic-textarea" rows="10"
-            placeholder="TICKER,Name&#10;NVDA,NVIDIA Corp.&#10;AMD,Advanced Micro Devices&#10;..."
-            style="width:100%;font-size:11px;padding:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;font-family:var(--mono);resize:vertical;line-height:1.6"></textarea>
-          <div style="display:flex;gap:.5rem;margin-top:.5rem;align-items:center">
-            <button class="btn btn-primary" onclick="eicSave()" style="flex:1;font-size:12px">
-              <i class="ti ti-check"></i> Speichern &amp; aktivieren
-            </button>
-            <span id="eic-status" style="font-size:10px;color:var(--text3)"></span>
-          </div>
-          <div style="font-size:10px;color:var(--text3);margin-top:.4rem">
-            Änderungen in localStorage gespeichert · überschreiben Standard-Liste
-          </div>
-        </div>
-
-        <!-- EIC PIN festlegen -->
-        <div style="border-top:1px solid var(--border);margin-top:.75rem;padding-top:.75rem">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:.4rem">
-            <i class="ti ti-lock"></i> Editor-in-Chief PIN (6-stellig)
-          </div>
-          <div style="display:flex;gap:.4rem">
-            <input type="password" id="eic-pin-input" maxlength="6" placeholder="6-stellig"
-              style="width:100px;font-size:13px;padding:6px 8px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);border-radius:8px;font-family:var(--mono);letter-spacing:.15em;text-align:center">
-            <button class="btn btn-sm" onclick="eicSetPin()" style="font-size:11px">
-              <i class="ti ti-key"></i> PIN setzen
-            </button>
-            <button class="btn btn-sm" onclick="eicClearPin()" style="font-size:11px;color:var(--text3)">
-              ✕ Löschen
-            </button>
-          </div>
-          <div id="eic-pin-set-status" style="font-size:10px;color:var(--text3);margin-top:.3rem">
-            Kein EIC-PIN gesetzt — Editor für alle PIN-Nutzer zugänglich
-          </div>
-        </div>
-      </div>
 
       <div class="sec">Portfolio & Risiko-Einstellungen</div>
       <div class="card" style="margin-bottom:1rem">
