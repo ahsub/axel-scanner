@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v83">
+<meta name="app-version" content="20260615-v84">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -565,6 +565,46 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
         <!-- Gesamt-Einschätzung -->
         <div id="im-verdict" style="display:none;margin-top:.6rem;padding:.5rem .75rem;border-radius:8px;font-size:12px"></div>
+      </div>
+
+      <!-- ── BULL-MARKET FRÜHINDIKATOR ──────────────────────────────── -->
+      <div id="bull-indicator-panel" style="background:var(--bg2);border-radius:var(--radius);padding:.75rem;margin-bottom:.75rem;border:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+          <div style="font-size:12px;font-weight:600;color:var(--text)">
+            <i class="ti ti-rocket" style="color:var(--amber)"></i> Bull-Market Frühindikator
+          </div>
+          <button class="btn btn-sm" onclick="calcBullIndicator()" id="bull-calc-btn"
+            style="font-size:10px;padding:3px 8px;background:rgba(240,169,58,0.1);border-color:var(--amber);color:var(--amber)">
+            <i class="ti ti-calculator"></i> Berechnen
+          </button>
+        </div>
+
+        <!-- Confluence Score Bar -->
+        <div id="bull-score-bar" style="display:none;margin-bottom:.75rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:11px;color:var(--text2)">Confluence Score (Bodenbildungs-Wahrscheinlichkeit)</span>
+            <span id="bull-score-label" style="font-size:13px;font-weight:700">—</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:4px;height:10px;overflow:hidden">
+            <div id="bull-score-fill" style="height:100%;border-radius:4px;transition:width .6s;width:0%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px">
+            <span>Boden unwahrscheinlich</span><span>Neutral</span><span>Trendwende möglich</span>
+          </div>
+        </div>
+
+        <!-- Signal-Grid -->
+        <div id="bull-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="grid-column:span 2;text-align:center;color:var(--text3);font-size:11px;padding:.5rem">
+            Erst Intermarket laden, dann Berechnen
+          </div>
+        </div>
+
+        <!-- Verdict -->
+        <div id="bull-verdict" style="display:none;margin-top:.6rem;padding:.5rem .75rem;border-radius:8px;font-size:12px"></div>
+        <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:right">
+          Methode: Zweig Breadth Näherung · HYG/SPY Divergenz · Markt-Breadth aus Scan
+        </div>
       </div>
       <div class="mc-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:.5rem">
         <div class="mc"><div class="mcl">S&P 500</div><div class="mcv" id="m-sp">—</div><div style="font-size:10px;margin-top:2px" id="m-sp-chg">—</div></div>
@@ -2201,6 +2241,7 @@ function unlockApp(){
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
   window._appUnlocked = true; // ab jetzt sind externe Fetches erlaubt
+  document.body.style.cursor = 'default'; // Cursor nach PIN zurücksetzen
   setTimeout(function(){ fetchQqqRegime(); }, 800);
   setTimeout(function(){ fetchVix().then(function(v){ if(v) renderVixAmpel(v); }); }, 1200);
   try{ loadIBD(); }catch(e){ console.warn('loadIBD:',e); }
@@ -5000,6 +5041,240 @@ function imSignalCard(id, label, value, unit, chgPct, signal, desc, noScore) {
     + '<span style="font-size:9px;color:var(--text3);max-width:90px;text-align:right">' + (desc||'') + '</span>'
     + '</div>'
     + '</div>';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BULL-MARKET FRÜHINDIKATOR
+// Basiert auf: Zweig Breadth Näherung, HYG/SPY Divergenz, Markt-Breadth
+// Methodik: Confluence mehrerer unkorrelierter Frühindikatoren
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function calcBullIndicator() {
+  const btn     = document.getElementById('bull-calc-btn');
+  const grid    = document.getElementById('bull-grid');
+  const scorBar = document.getElementById('bull-score-bar');
+  const verdict = document.getElementById('bull-verdict');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Berechnet…'; }
+  if (grid) grid.innerHTML = '<div style="grid-column:span 2;text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Berechne Signale…</div>';
+
+  const signals = [];
+  let totalScore = 0, maxScore = 0;
+
+  // ── SIGNAL 1: Markt-Breadth aus Scan-Daten ────────────────────────────
+  // % der gescannten Titel über ihrer 50-EMA → Zweig-Näherung
+  {
+    const allSyms = Object.keys(tickerData || {});
+    if (allSyms.length >= 5) {
+      const processed = allSyms.map(sym => {
+        const raw = tickerData[sym];
+        if (!raw || raw.error) return null;
+        const state = processData(raw);
+        return state;
+      }).filter(Boolean);
+
+      const total = processed.length;
+      const above50 = processed.filter(s => s.above50).length;
+      const bullMacd = processed.filter(s => s.macdBull).length;
+      const pctAbove50 = Math.round(above50 / total * 100);
+      const pctBullMacd = Math.round(bullMacd / total * 100);
+
+      // Zweig-Breadth-Näherung: pctBullMacd > 61.5% = starkes Signal
+      const breadthSig = pctBullMacd > 61.5 ? 'risk_on'
+                       : pctBullMacd > 40 ? 'neutral'
+                       : 'risk_off';
+      const breadthPts = pctBullMacd > 61.5 ? 20 : pctBullMacd > 50 ? 12 : pctBullMacd > 40 ? 6 : 2;
+      signals.push({
+        label: 'Markt-Breadth (Zweig-Näherung)',
+        value: pctBullMacd,
+        unit: '%',
+        chgPct: null,
+        signal: breadthSig,
+        desc: pctBullMacd > 61.5 ? '★ Breadth Thrust! ' + pctBullMacd + '% MACD bullisch'
+            : pctBullMacd > 40 ? pctBullMacd + '% Titel MACD bullisch'
+            : 'Nur ' + pctBullMacd + '% bullisch — schwacher Markt',
+        pts: breadthPts
+      });
+      totalScore += breadthPts; maxScore += 20;
+
+      // % über 50-EMA
+      const ema50Sig = pctAbove50 > 65 ? 'risk_on' : pctAbove50 > 40 ? 'neutral' : 'risk_off';
+      const ema50Pts = pctAbove50 > 65 ? 15 : pctAbove50 > 50 ? 9 : pctAbove50 > 35 ? 5 : 1;
+      signals.push({
+        label: '% über 50-EMA',
+        value: pctAbove50,
+        unit: '%',
+        chgPct: null,
+        signal: ema50Sig,
+        desc: pctAbove50 + '% der Titel über 50-EMA' + (pctAbove50 > 65 ? ' — Breite Stärke ✓' : pctAbove50 < 30 ? ' — Überverkauft, Erholung möglich' : ''),
+        pts: ema50Pts
+      });
+      totalScore += ema50Pts; maxScore += 15;
+    } else {
+      signals.push({ label: 'Markt-Breadth', value: null, unit: '%', chgPct: null,
+        signal: 'neutral', desc: 'Erst Scan starten (mind. 5 Titel)', pts: 0 });
+      maxScore += 35;
+    }
+  }
+
+  // ── SIGNAL 2: HYG vs SPY Divergenz ────────────────────────────────────
+  // HYG bereits in Intermarket geladen — SPY neu holen
+  {
+    try {
+      const hygData = results ? results.find(r => r.sym === 'JNK')?.data : null;
+      const spyData = await fetchYahooSingle('SPY');
+      if (hygData && spyData) {
+        // Divergenz: SPY 5d Richtung vs HYG 5d Richtung
+        const spyDir = spyData.chg5d;
+        const hygDir = hygData.chg5d;
+        // Bull-Signal: SPY fällt aber HYG hält oder steigt (Smart Money kauft Anleihen)
+        // oder beide steigen (Risk-On bestätigt)
+        let divSig, divPts, divDesc;
+        if (spyDir < -1 && hygDir > -0.5) {
+          divSig = 'risk_on'; divPts = 18;
+          divDesc = '★ SPY schwach aber HYG stabil — Smart Money kauft Anleihen!';
+        } else if (spyDir > 0 && hygDir > 0) {
+          divSig = 'risk_on'; divPts = 15;
+          divDesc = 'SPY+' + spyDir.toFixed(1) + '% & HYG+' + hygDir.toFixed(1) + '% — Risk-On bestätigt';
+        } else if (spyDir < -2 && hygDir < -1) {
+          divSig = 'risk_off'; divPts = 2;
+          divDesc = 'SPY & HYG beide schwach — kein Boden';
+        } else {
+          divSig = 'neutral'; divPts = 8;
+          divDesc = 'SPY ' + (spyDir >= 0 ? '+' : '') + spyDir.toFixed(1) + '% | HYG ' + (hygDir >= 0 ? '+' : '') + hygDir.toFixed(1) + '%';
+        }
+        signals.push({ label: 'HYG/SPY Divergenz (Smart Money)', value: null, unit: '',
+          chgPct: hygDir, signal: divSig, desc: divDesc, pts: divPts });
+        totalScore += divPts;
+      }
+    } catch(e) { console.warn('Bull HYG/SPY:', e.message); }
+    maxScore += 18;
+  }
+
+  // ── SIGNAL 3: VVIX als Frühwarner ────────────────────────────────────
+  {
+    try {
+      const vvixData = await fetchYahooSingle('^VVIX');
+      if (vvixData) {
+        const v = vvixData.price;
+        const vChg = vvixData.chg5d;
+        // Bull-Signal: VVIX fällt von hohem Niveau (Angst schwindet)
+        let vvixSig, vvixPts, vvixDesc;
+        if (v > 100 && vChg < -5) {
+          vvixSig = 'risk_on'; vvixPts = 15;
+          vvixDesc = '★ VVIX fällt von hohem Niveau (' + v.toFixed(0) + '→) — Angst schwindet!';
+        } else if (v < 90 && vChg < 0) {
+          vvixSig = 'risk_on'; vvixPts = 12;
+          vvixDesc = 'VVIX ' + v.toFixed(0) + ' stabil/fallend — kein Stress';
+        } else if (v > 110) {
+          vvixSig = 'risk_off'; vvixPts = 2;
+          vvixDesc = 'VVIX ' + v.toFixed(0) + ' extrem hoch — Angst dominiert';
+        } else {
+          vvixSig = 'neutral'; vvixPts = 7;
+          vvixDesc = 'VVIX ' + v.toFixed(0) + ' — normal';
+        }
+        signals.push({ label: 'VVIX (Angst-Frühwarner)', value: v, unit: '',
+          chgPct: vvixData.chgPct, signal: vvixSig, desc: vvixDesc, pts: vvixPts });
+        totalScore += vvixPts;
+      }
+    } catch(e) { console.warn('Bull VVIX:', e.message); }
+    maxScore += 15;
+  }
+
+  // ── SIGNAL 4: Markov 2.0 als Trendwende-Bestätigung ──────────────────
+  {
+    if (_qqqRegime) {
+      const sig = _qqqRegime.signal || 0;
+      const sticky = _qqqRegime.sticky || 0;
+      const changed = _qqqRegime.regimeChanged;
+      let mSig, mPts, mDesc;
+      if (sig > 0.3 && sticky > 60) {
+        mSig = 'risk_on'; mPts = 15;
+        mDesc = '★ Markov 2.0: BULL σ+' + sig.toFixed(2) + ' Stickiness ' + sticky + '% — stark!';
+      } else if (sig > 0.1) {
+        mSig = 'risk_on'; mPts = 10;
+        mDesc = 'Markov 2.0 bullisch σ+' + sig.toFixed(2) + ' — Trend aufgebaut';
+      } else if (changed && sig > 0) {
+        mSig = 'risk_on'; mPts = 12;
+        mDesc = '★ Regime-Wechsel zu BULL! σ+' + sig.toFixed(2) + ' — Trendwende!';
+      } else if (sig < -0.2) {
+        mSig = 'risk_off'; mPts = 1;
+        mDesc = 'Markov 2.0 bärisch σ' + sig.toFixed(2) + ' — kein Boden';
+      } else {
+        mSig = 'neutral'; mPts = 5;
+        mDesc = 'Markov 2.0 σ' + sig.toFixed(2) + ' — unklar';
+      }
+      signals.push({ label: 'Markov 2.0 Regime-Signal', value: sig, unit: '',
+        chgPct: null, signal: mSig, desc: mDesc, pts: mPts });
+      totalScore += mPts; maxScore += 15;
+    }
+  }
+
+  // ── SIGNAL 5: VIX-Level als Kontraindikator ───────────────────────────
+  {
+    if (_vixLevel != null) {
+      const v = _vixLevel;
+      let vSig, vPts, vDesc;
+      if (v > 35) {
+        vSig = 'risk_on'; vPts = 12;
+        vDesc = '★ VIX ' + v.toFixed(1) + ' — Panik-Niveau = Kontraindikator kaufen!';
+      } else if (v > 25) {
+        vSig = 'neutral'; vPts = 8;
+        vDesc = 'VIX ' + v.toFixed(1) + ' — Fear-Zone, Erholung möglich';
+      } else if (v < 15) {
+        vSig = 'neutral'; vPts = 6;
+        vDesc = 'VIX ' + v.toFixed(1) + ' — Sorglosigkeit, kein Boden-Signal';
+      } else {
+        vSig = 'neutral'; vPts = 7;
+        vDesc = 'VIX ' + v.toFixed(1) + ' — Normal-Bereich';
+      }
+      signals.push({ label: 'VIX Kontraindikator', value: v, unit: '',
+        chgPct: null, signal: vSig, desc: vDesc, pts: vPts });
+      totalScore += vPts; maxScore += 12;
+    }
+  }
+
+  // ── Score & Rendering ─────────────────────────────────────────────────
+  const scorePct = maxScore > 0 ? Math.round(totalScore / maxScore * 100) : 50;
+  const scoreColor = scorePct >= 70 ? 'var(--green)' : scorePct >= 45 ? 'var(--amber)' : 'var(--red)';
+  const scoreTxt = scorePct >= 80 ? '🚀 STARKES BULL-SIGNAL' : scorePct >= 65 ? '📈 Bullische Signale' :
+                   scorePct >= 45 ? '😐 Gemischt' : scorePct >= 30 ? '⚠ Eher bearish' : '🔴 BEAR-Markt';
+
+  if (grid) {
+    const bullHeader = '<div style="grid-column:span 2;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:2px">Confluence-Signale</div>';
+    grid.innerHTML = bullHeader + signals.map(function(s) {
+      return imSignalCard('', s.label, s.value, s.unit, s.chgPct, s.signal, s.desc, false);
+    }).join('');
+  }
+
+  if (scorBar) {
+    scorBar.style.display = 'block';
+    const fill = document.getElementById('bull-score-fill');
+    const lbl  = document.getElementById('bull-score-label');
+    if (fill) { fill.style.width = scorePct + '%'; fill.style.background = scoreColor; }
+    if (lbl)  { lbl.textContent = scorePct + '/100 — ' + scoreTxt; lbl.style.color = scoreColor; }
+  }
+
+  if (verdict) {
+    verdict.style.display = 'block';
+    const riskOn = signals.filter(s => s.signal === 'risk_on').length;
+    const riskOff = signals.filter(s => s.signal === 'risk_off').length;
+    const bgColor = scorePct >= 65 ? 'rgba(52,194,110,0.1)' : scorePct >= 45 ? 'rgba(240,169,58,0.1)' : 'rgba(255,59,48,0.1)';
+    const verdTxt = scorePct >= 80
+      ? '🚀 Mehrere Frühindikatoren signalisieren Trendwende — schrittweiser Aufbau von Positionen möglich'
+      : scorePct >= 65
+      ? '📈 Bullische Confluence — selektive Long-Positionen mit engem Stop'
+      : scorePct >= 45
+      ? '😐 Gemischte Signale — abwarten, kein klarer Boden erkennbar'
+      : '⚠ Mehrheit der Indikatoren bärisch — kein Boden-Signal';
+    verdict.style.background = bgColor;
+    verdict.style.borderLeft = '3px solid ' + scoreColor;
+    verdict.style.color = scoreColor;
+    verdict.innerHTML = '<div style="font-weight:600;margin-bottom:3px">' + verdTxt + '</div>'
+      + '<div style="font-size:10px;opacity:.85">' + riskOn + ' bullisch · ' + riskOff + ' bärisch · Score ' + scorePct + '/100</div>';
+  }
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-calculator"></i> Berechnen'; }
 }
 
 async function loadIntermarket() {
