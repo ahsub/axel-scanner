@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v88">
+<meta name="app-version" content="20260615-v95">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1233,6 +1233,24 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="ant-key-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Key gespeichert</div>
       </div>
 
+      <!-- OpenAI Key für Whisper -->
+      <div class="card" style="margin-bottom:.75rem">
+        <div class="sec" style="margin-bottom:.5rem">OpenAI Key <span style="font-size:10px;color:var(--text3);font-weight:400">(Whisper Audio-Transkription)</span></div>
+        <div class="field">
+          <label>OpenAI API-Key (sk-...)</label>
+          <input type="password" id="openai-key-input" placeholder="sk-..." autocomplete="off" style="font-family:var(--mono)">
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-primary" onclick="saveOpenAiKey()" style="flex:1">
+            <i class="ti ti-key"></i> Speichern
+          </button>
+          <button class="btn" onclick="clearOpenAiKey()" style="font-size:12px">✕ Löschen</button>
+        </div>
+        <div id="openai-key-status" style="font-size:10px;color:var(--text3);margin-top:.4rem">
+          Nicht gesetzt · benötigt für .mp3/.mp4/.m4a/.wav · ~$0.006/Min · max 25MB
+        </div>
+      </div>
+
       <div class="sec">Portfolio & Risiko-Einstellungen</div>
       <div class="card" style="margin-bottom:1rem">
         <div style="font-size:13px;color:var(--text2);margin-bottom:.75rem">Wird im Hebelrechner für automatische Positionsgrößen-Empfehlung verwendet.</div>
@@ -1385,6 +1403,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
     </div>
   </div>
+
+
 
 
     <!-- JOURNAL PANEL -->
@@ -1628,6 +1648,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <button class="nav-btn" id="nav-admin" onclick="showPanel('admin')">
       <i class="ti ti-settings"></i>Admin
     </button>
+
     <button class="nav-btn" id="nav-sync" onclick="showSyncModal()" title="Cloud Sync">
       <i class="ti ti-cloud" id="sync-icon"></i><span style="font-size:9px" id="sync-label">Sync</span>
     </button>
@@ -1728,6 +1749,151 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </label>
     </div>
 
+  </div>
+</div>
+
+<!-- ── YOUTUBE / TEXT ANALYZER MODAL ──────────────────────────────────── -->
+<div id="yt-modal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.75);align-items:flex-end;justify-content:center">
+  <div style="background:var(--bg2);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:480px;padding:1.25rem;padding-bottom:calc(1.25rem + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div>
+        <div style="font-size:15px;font-weight:700"><i class="ti ti-brand-youtube" style="color:#ef4444"></i> Medien-Analyzer</div>
+        <div style="font-size:11px;color:var(--text3)">YouTube · Podcast · Artikel · Eigener Text</div>
+      </div>
+      <button onclick="closeYtModal()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer"><i class="ti ti-x"></i></button>
+    </div>
+
+    <!-- ── DROP ZONE ──────────────────────────────────────────────── -->
+    <div id="yt-dropzone"
+      ondragover="ytDragOver(event)"
+      ondragleave="ytDragLeave(event)"
+      ondrop="ytDrop(event)"
+      onclick="document.getElementById('yt-file-input').click()"
+      style="border:2px dashed var(--border2);border-radius:12px;padding:1.25rem;text-align:center;cursor:pointer;margin-bottom:.75rem;transition:all .2s;position:relative;min-height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+      <input id="yt-file-input" type="file" accept=".txt,.md,.srt,.vtt,.mp3,.mp4,.m4a,.wav,.webm,.ogg,.mpeg" style="display:none" onchange="ytFileSelected(this)">
+      <i class="ti ti-cloud-upload" style="font-size:28px;color:var(--text3)"></i>
+      <div style="font-size:12px;font-weight:600;color:var(--text2)">Datei hierher ziehen oder klicken</div>
+      <div style="font-size:10px;color:var(--text3)">.txt · .md · .srt · .vtt · .pdf</div>
+      <div id="yt-drop-hint" style="font-size:10px;color:var(--text3)">oder unten einfügen / YouTube-URL eingeben</div>
+    </div>
+
+    <!-- Universelles Eingabefeld: URL oder Text einfügen -->
+    <div style="position:relative;margin-bottom:.75rem">
+      <textarea id="yt-universal-input" rows="3"
+        placeholder="YouTube-URL einfügen  —  oder  —  Text direkt hier einfügen (Artikel, Transkript, Newsletter…)&#10;&#10;Erkennung erfolgt automatisch: https://youtube.com/... → Transkript · Sonstiger Text → Direktanalyse"
+        style="width:100%;box-sizing:border-box;font-size:12px;padding:10px 80px 10px 10px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:10px;resize:vertical;line-height:1.5"
+        onkeydown="if(event.key==='Enter'&&event.ctrlKey)ytAnalyze()"
+        oninput="ytUniversalInputChanged(this)"></textarea>
+      <div style="position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px">
+        <button onclick="ytPasteUniversal()" class="btn btn-sm" title="Aus Zwischenablage einfügen" style="font-size:10px;padding:3px 7px">
+          <i class="ti ti-clipboard"></i>
+        </button>
+        <button onclick="document.getElementById('yt-universal-input').value=''" class="btn btn-sm" title="Leeren" style="font-size:10px;padding:3px 7px">
+          <i class="ti ti-x"></i>
+        </button>
+      </div>
+      <!-- Auto-Erkennung Badge -->
+      <div id="yt-detect-badge" style="display:none;position:absolute;left:8px;bottom:6px;font-size:9px;padding:1px 6px;border-radius:4px;pointer-events:none"></div>
+      <div id="yt-char-count" style="position:absolute;right:8px;bottom:6px;font-size:9px;color:var(--text3)">0 Z.</div>
+    </div>
+
+    <!-- Sprache (nur für YouTube relevant) -->
+    <div id="yt-lang-wrap" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+      <span style="font-size:11px;color:var(--text3)">Sprache:</span>
+      <select id="yt-lang-select" style="font-size:11px;padding:3px 8px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:6px">
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="en">🇺🇸 English</option>
+        <option value="auto">🌐 Auto</option>
+      </select>
+      <span id="yt-input-type-label" style="font-size:10px;color:var(--text3);margin-left:auto"></span>
+    </div>
+
+    <!-- Strategie + Analyse-Button -->
+    <div style="display:flex;gap:.4rem;margin-bottom:.5rem;flex-wrap:wrap">
+      <button onclick="ytSetStrategy(this,'ko')" class="btn btn-sm yt-strat" data-strat="ko"
+        style="font-size:10px;background:rgba(79,142,247,0.15);color:var(--accent);border-color:var(--accent)">⚡ KO</button>
+      <button onclick="ytSetStrategy(this,'options')" class="btn btn-sm yt-strat" data-strat="options"
+        style="font-size:10px">🎯 Options</button>
+      <button onclick="ytSetStrategy(this,'momentum')" class="btn btn-sm yt-strat" data-strat="momentum"
+        style="font-size:10px">📈 Momentum</button>
+      <button onclick="ytSetStrategy(this,'general')" class="btn btn-sm yt-strat" data-strat="general"
+        style="font-size:10px">🔍 Allgemein</button>
+    </div>
+
+    <button onclick="ytAnalyze()" id="yt-analyze-btn" class="btn btn-primary" style="width:100%;font-size:13px;margin-bottom:.75rem">
+      <i class="ti ti-brain"></i> Analysieren
+    </button>
+
+    <!-- Loading -->
+    <div id="yt-loading" style="display:none;text-align:center;padding:1rem;color:var(--text3)">
+      <i class="ti ti-loader" style="font-size:20px;animation:spin 1s linear infinite;display:block;margin-bottom:.4rem"></i>
+      <div id="yt-loading-msg" style="font-size:12px">Laden…</div>
+    </div>
+
+    <!-- Error -->
+    <div id="yt-error" style="display:none;background:rgba(255,59,48,0.1);border:0.5px solid var(--red);border-radius:8px;padding:.75rem;font-size:12px;color:var(--red);margin-bottom:.75rem"></div>
+
+    <!-- Ergebnis -->
+    <div id="yt-result" style="display:none">
+
+      <div id="yt-video-info" style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:.6rem;border-left:3px solid #ef4444">
+        <div style="font-size:12px;font-weight:600" id="yt-title">—</div>
+        <div style="display:flex;gap:.4rem;margin-top:3px;flex-wrap:wrap">
+          <span id="yt-sentiment-badge" style="font-size:10px;padding:1px 6px;border-radius:4px">—</span>
+          <span id="yt-quality-badge" style="font-size:10px;padding:1px 6px;border-radius:4px;background:var(--bg2);color:var(--text3)">—</span>
+          <span id="yt-chars-badge" style="font-size:10px;color:var(--text3)">—</span>
+        </div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:.6rem">
+        <div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:3px">📋 ZUSAMMENFASSUNG</div>
+        <div id="yt-summary" style="font-size:12px;line-height:1.5">—</div>
+      </div>
+
+      <div id="yt-tickers-wrap" style="display:none;background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:.6rem">
+        <div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:.4rem">🎯 GENANNTE TICKER</div>
+        <div id="yt-tickers"></div>
+      </div>
+
+      <div id="yt-signals-wrap" style="display:none;background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:.6rem">
+        <div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:.4rem">📡 KERN-SIGNALE</div>
+        <div id="yt-signals"></div>
+      </div>
+
+      <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:.6rem">
+        <div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:3px">🎯 STRATEGIE-RELEVANZ</div>
+        <div id="yt-strategy-relevance" style="font-size:12px;line-height:1.5">—</div>
+        <div id="yt-actions-wrap" style="display:none;margin-top:.4rem">
+          <div style="font-size:10px;font-weight:600;color:var(--green);margin-bottom:2px">✅ HANDLUNGSEMPFEHLUNGEN</div>
+          <div id="yt-actions" style="font-size:12px"></div>
+        </div>
+        <div id="yt-caution-wrap" style="display:none;margin-top:.4rem">
+          <div style="font-size:10px;font-weight:600;color:var(--amber);margin-bottom:2px">⚠ VORSICHT</div>
+          <div id="yt-caution" style="font-size:12px;color:var(--text2)"></div>
+        </div>
+      </div>
+
+      <div id="yt-scan-wrap" style="display:none;background:rgba(79,142,247,0.08);border:0.5px solid var(--accent);border-radius:8px;padding:.6rem .75rem">
+        <div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:.4rem">🔗 Ticker direkt scannen</div>
+        <div id="yt-scan-tickers" style="font-size:11px;color:var(--text2);margin-bottom:.4rem"></div>
+        <button onclick="ytLoadTickersToScanner();closeYtModal()" class="btn btn-primary" style="font-size:12px;width:100%">
+          <i class="ti ti-radar"></i> In Scanner laden &amp; scannen
+        </button>
+      </div>
+
+    </div>
+
+    <!-- History -->
+    <div id="yt-history" style="display:none;margin-top:.75rem;border-top:1px solid var(--border);padding-top:.6rem">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px">ZULETZT ANALYSIERT</div>
+      <div id="yt-history-list"></div>
+    </div>
+
+    <div style="font-size:9px;color:var(--text3);text-align:center;margin-top:.5rem">
+      Halluzinationsschutz aktiv · Nur Transkript-Inhalte werden verwendet
+    </div>
   </div>
 </div>
 
@@ -1964,6 +2130,486 @@ function closeWorkflowModal(permanent) {
     modal.style.display = 'none';
   }
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MEDIEN-ANALYZER (via ah-media Worker)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── YOUTUBE MODAL STEUERUNG ───────────────────────────────────────────────
+var _ytSource = 'youtube';
+
+function showYtModal() {
+  var modal = document.getElementById('yt-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    ytRenderHistory();
+    // Textarea char-counter
+    var ta = document.getElementById('yt-text-input');
+    if (ta) ta.oninput = function() {
+      var cc = document.getElementById('yt-char-count');
+      if (cc) cc.textContent = ta.value.length + ' / 8000 Zeichen';
+    };
+  }
+}
+
+function closeYtModal() {
+  var modal = document.getElementById('yt-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+
+// ── DROP ZONE & UNIVERSALE EINGABE ───────────────────────────────────────
+var _ytInputType = 'unknown'; // 'youtube' | 'text' | 'url'
+
+function ytDragOver(e) {
+  e.preventDefault();
+  var zone = document.getElementById('yt-dropzone');
+  if (zone) {
+    zone.style.borderColor = 'var(--accent)';
+    zone.style.background  = 'rgba(79,142,247,0.06)';
+  }
+}
+
+function ytDragLeave(e) {
+  var zone = document.getElementById('yt-dropzone');
+  if (zone) {
+    zone.style.borderColor = 'var(--border2)';
+    zone.style.background  = '';
+  }
+}
+
+function ytDrop(e) {
+  e.preventDefault();
+  ytDragLeave(e);
+  var files = e.dataTransfer.files;
+  if (files && files.length > 0) {
+    ytReadFile(files[0]);
+    return;
+  }
+  // Text direkt gedroppt
+  var text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
+  if (text) ytSetUniversalInput(text.trim());
+}
+
+function ytFileSelected(input) {
+  if (input.files && input.files[0]) ytReadFile(input.files[0]);
+}
+
+function ytReadFile(file) {
+  var zone = document.getElementById('yt-dropzone');
+  var hint = document.getElementById('yt-drop-hint');
+
+  // Audio/Video → Whisper
+  var isAV = /[.](mp3|mp4|m4a|wav|webm|ogg|mpeg|aac)$/i.test(file.name);
+  if (isAV) {
+    if (file.size > 25*1024*1024) { showKoToast('Audio/Video max. 25MB (Whisper-Limit)'); return; }
+    if (hint) hint.textContent = '🎙 ' + file.name + ' — Whisper läuft…';
+    if (zone) { zone.style.borderColor = 'var(--accent)'; zone.style.background = 'rgba(79,142,247,0.06)'; }
+    ytWhisperTranscribe(file, zone, hint);
+    return;
+  }
+
+  // Textdateien
+  if (file.size > 500*1024) { showKoToast('Textdatei max. 500KB'); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var text = e.target.result;
+    if (file.name.match(/[.](srt|vtt)$/i)) {
+      text = text.split('\n').filter(function(line) {
+        var l = line.trim();
+        if (!l || /^\d+$/.test(l)) return false;
+        if (/\d{2}:\d{2}:\d{2}/.test(l) && /-->/.test(l)) return false;
+        if (l === 'WEBVTT') return false;
+        return true;
+      }).join(' ').replace(/\s+/g, ' ').trim();
+    }
+    ytSetUniversalInput(text);
+    if (hint) hint.textContent = '📄 ' + file.name + ' (' + Math.round(file.size/1024) + 'KB) geladen';
+    if (zone) { zone.style.borderColor = 'var(--green)'; zone.style.background = 'rgba(52,194,110,0.05)'; }
+  };
+  reader.onerror = function() { showKoToast('Lesefehler'); };
+  reader.readAsText(file, 'UTF-8');
+}
+
+async function ytWhisperTranscribe(file, zone, hint) {
+  var openaiKey = localStorage.getItem('ko_openai_key') || '';
+  if (!openaiKey) {
+    showKoToast('OpenAI-Key fehlt — Admin-Tab → OpenAI Key eintragen');
+    if (hint) hint.textContent = '❌ Kein OpenAI-Key für Whisper';
+    if (zone) zone.style.borderColor = 'var(--red)';
+    return;
+  }
+  var btn = document.getElementById('yt-analyze-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Whisper…'; }
+  try {
+    var lang = document.getElementById('yt-lang-select')?.value || 'de';
+    var fd = new FormData();
+    fd.append('file', file, file.name);
+    fd.append('model', 'whisper-1');
+    if (lang !== 'auto') fd.append('language', lang);
+    fd.append('response_format', 'text');
+    var r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + openaiKey },
+      body: fd
+    });
+    if (r.status === 401) { localStorage.removeItem('ko_openai_key'); throw new Error('OpenAI-Key ungültig'); }
+    if (!r.ok) { var je = await r.json(); throw new Error(je.error?.message || 'HTTP ' + r.status); }
+    var transcript = await r.text();
+    if (!transcript || transcript.length < 10) throw new Error('Kein Transkript erhalten');
+    ytSetUniversalInput(transcript);
+    if (hint) hint.textContent = '✅ ' + file.name + ' · ' + transcript.length + ' Zeichen transkribiert';
+    if (zone) { zone.style.borderColor = 'var(--green)'; zone.style.background = 'rgba(52,194,110,0.05)'; }
+    showKoToast('🎙 Whisper: ' + Math.round(transcript.length/1000) + 'K Zeichen · ~$' + (file.size/1024/1024*0.006).toFixed(3));
+  } catch(e) {
+    if (hint) hint.textContent = '❌ Whisper: ' + e.message;
+    if (zone) { zone.style.borderColor = 'var(--red)'; zone.style.background = ''; }
+    showKoToast('Whisper-Fehler: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-brain"></i> Analysieren'; }
+  }
+}
+
+function ytSetUniversalInput(text) {
+  var inp = document.getElementById('yt-universal-input');
+  if (inp) {
+    inp.value = text;
+    inp.dispatchEvent(new Event('input'));
+    inp.scrollTop = 0;
+  }
+}
+
+function ytUniversalInputChanged(el) {
+  var val = el.value.trim();
+  var countEl = document.getElementById('yt-char-count');
+  var badge   = document.getElementById('yt-detect-badge');
+  var label   = document.getElementById('yt-input-type-label');
+  var langWrap = document.getElementById('yt-lang-wrap');
+
+  if (countEl) countEl.textContent = val.length + ' Z.';
+
+  // Auto-Erkennung
+  var isYtUrl  = /youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\//.test(val);
+  var isWebUrl = /^https?:\/\//.test(val) && !isYtUrl;
+  var isText   = val.length > 100 && !isYtUrl && !isWebUrl;
+
+  if (isYtUrl) {
+    _ytInputType = 'youtube';
+    if (badge) { badge.style.display='block'; badge.style.background='rgba(239,68,68,0.15)'; badge.style.color='#ef4444'; badge.textContent='▶ YouTube erkannt'; }
+    if (label) label.textContent = '▶ YouTube-Transkript';
+    if (langWrap) langWrap.style.opacity = '1';
+  } else if (isWebUrl) {
+    _ytInputType = 'url';
+    if (badge) { badge.style.display='block'; badge.style.background='rgba(79,142,247,0.15)'; badge.style.color='var(--accent)'; badge.textContent='🔗 URL erkannt'; }
+    if (label) label.textContent = '🔗 Artikel-URL';
+    if (langWrap) langWrap.style.opacity = '0.4';
+  } else if (isText) {
+    _ytInputType = 'text';
+    if (badge) { badge.style.display='block'; badge.style.background='rgba(52,194,110,0.12)'; badge.style.color='var(--green)'; badge.textContent='📄 Direkttext'; }
+    if (label) label.textContent = '📄 Direkteingabe';
+    if (langWrap) langWrap.style.opacity = '0.4';
+  } else {
+    _ytInputType = 'unknown';
+    if (badge) badge.style.display = 'none';
+    if (label) label.textContent = '';
+    if (langWrap) langWrap.style.opacity = '1';
+  }
+}
+
+async function ytPasteUniversal() {
+  try {
+    var text = await navigator.clipboard.readText();
+    ytSetUniversalInput(text.trim());
+  } catch(e) { showKoToast('Clipboard: ' + e.message); }
+}
+
+function ytSetSource(btn, src) {
+  _ytSource = src;
+  document.querySelectorAll('.yt-src-btn').forEach(function(b) {
+    b.style.background = '';
+    b.style.color = '';
+    b.style.borderColor = '';
+  });
+  if (btn) {
+    btn.style.background = src === 'youtube' ? 'rgba(239,68,68,0.15)' : 'rgba(79,142,247,0.15)';
+    btn.style.color = src === 'youtube' ? '#ef4444' : 'var(--accent)';
+    btn.style.borderColor = src === 'youtube' ? '#ef4444' : 'var(--accent)';
+  }
+  // Input-Bereiche togglen
+  document.getElementById('yt-input-youtube').style.display = src === 'youtube' ? 'block' : 'none';
+  document.getElementById('yt-input-text').style.display    = src === 'text'    ? 'block' : 'none';
+  document.getElementById('yt-input-url').style.display     = src === 'url'     ? 'block' : 'none';
+}
+
+async function ytPaste(inputId) {
+  try {
+    const text = await navigator.clipboard.readText();
+    var inp = document.getElementById(inputId);
+    if (inp) { inp.value = text.trim(); inp.dispatchEvent(new Event('input')); }
+  } catch(e) { showKoToast('Clipboard: ' + e.message); }
+}
+
+const YT_WORKER = 'https://ah-media.ahildebrand.workers.dev';
+var _ytStrategy = 'ko';
+var _ytHistory  = JSON.parse(localStorage.getItem('ko_yt_history') || '[]');
+var _ytLastTickers = [];
+
+function ytSetStrategy(btn, strat) {
+  _ytStrategy = strat;
+  document.querySelectorAll('.yt-strat').forEach(function(b) {
+    b.style.background = '';
+    b.style.color = '';
+    b.style.borderColor = '';
+  });
+  if (btn) {
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--accent)';
+  }
+}
+
+async function ytPaste() {
+  try {
+    const text = await navigator.clipboard.readText();
+    var inp = document.getElementById('yt-url-input');
+    if (inp) inp.value = text.trim();
+  } catch(e) { showKoToast('Clipboard nicht verfügbar'); }
+}
+
+function ytShowLoading(msg) {
+  document.getElementById('yt-loading').style.display = 'block';
+  document.getElementById('yt-loading-msg').textContent = msg || 'Laden…';
+  document.getElementById('yt-result').style.display  = 'none';
+  document.getElementById('yt-error').style.display   = 'none';
+}
+
+function ytShowError(msg) {
+  document.getElementById('yt-loading').style.display = 'none';
+  document.getElementById('yt-result').style.display  = 'none';
+  var err = document.getElementById('yt-error');
+  err.style.display  = 'block';
+  err.textContent    = '⚠ ' + msg;
+}
+
+function ytRenderResult(data) {
+  document.getElementById('yt-loading').style.display = 'none';
+  document.getElementById('yt-error').style.display   = 'none';
+  document.getElementById('yt-result').style.display  = 'block';
+
+  const a = data.analysis;
+  _ytLastTickers = (a.tickers || []).map(function(t) { return t.sym; }).filter(Boolean);
+
+  // Video Info
+  document.getElementById('yt-title').textContent = data.title || data.url || '—';
+  document.getElementById('yt-chars-badge').textContent =
+    data.transcript_chars ? Math.round(data.transcript_chars/1000) + 'K Zeichen · ' + (data.transcript_lang||'') : '';
+
+  // Sentiment Badge
+  const sentEl = document.getElementById('yt-sentiment-badge');
+  const sent = (a.sentiment || 'neutral').toLowerCase();
+  const sentColor = sent.includes('bull') ? 'var(--green)' : sent.includes('bär') || sent.includes('bear') ? 'var(--red)' : 'var(--amber)';
+  sentEl.textContent = sent === 'bullisch' ? '📈 Bullisch' : sent === 'bärisch' ? '📉 Bärisch' : sent === 'gemischt' ? '😐 Gemischt' : '😐 Neutral';
+  sentEl.style.background = sentColor + '22';
+  sentEl.style.color = sentColor;
+  sentEl.style.border = '0.5px solid ' + sentColor;
+
+  // Quality Badge
+  const qualEl = document.getElementById('yt-quality-badge');
+  const qual = a.video_quality || 'mittel';
+  qualEl.textContent = qual === 'hoch' ? '⭐ Hohe Qualität' : qual === 'niedrig' ? '⚠ Niedrige Qualität' : '📊 Mittlere Qualität';
+  qualEl.title = a.quality_reason || '';
+
+  // Summary
+  document.getElementById('yt-summary').textContent = a.summary || '—';
+
+  // Tickers
+  const tickersWrap = document.getElementById('yt-tickers-wrap');
+  const tickersEl   = document.getElementById('yt-tickers');
+  if (a.tickers && a.tickers.length > 0) {
+    tickersWrap.style.display = 'block';
+    tickersEl.innerHTML = a.tickers.map(function(t) {
+      const sigColor = t.signal === 'bullisch' ? 'var(--green)' : t.signal === 'bärisch' ? 'var(--red)' : 'var(--text3)';
+      return '<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">'
+        + '<span style="font-weight:700;color:var(--accent);min-width:50px;font-size:12px">' + t.sym + '</span>'
+        + '<div style="flex:1">'
+        + '<span style="font-size:10px;color:' + sigColor + ';font-weight:600">' + (t.signal||'erwähnt') + '</span>'
+        + '<div style="font-size:11px;color:var(--text2)">' + (t.context||'') + '</div>'
+        + '</div></div>';
+    }).join('');
+  } else {
+    tickersWrap.style.display = 'none';
+  }
+
+  // Key Signals
+  const signalsWrap = document.getElementById('yt-signals-wrap');
+  const signalsEl   = document.getElementById('yt-signals');
+  if (a.key_signals && a.key_signals.length > 0) {
+    signalsWrap.style.display = 'block';
+    signalsEl.innerHTML = a.key_signals.map(function(s) {
+      const typeColor = s.type === 'technisch' ? 'var(--accent)' : s.type === 'makro' ? 'var(--amber)' : s.type === 'options' ? '#a78bfa' : 'var(--text3)';
+      return '<div style="display:flex;gap:6px;align-items:flex-start;font-size:11px;padding:3px 0">'
+        + '<span style="color:' + typeColor + ';font-size:9px;padding:1px 4px;border:0.5px solid ' + typeColor + ';border-radius:3px;white-space:nowrap;margin-top:1px">' + (s.type||'') + '</span>'
+        + '<span style="color:var(--text)">' + s.signal + '</span>'
+        + '</div>';
+    }).join('');
+  } else {
+    signalsWrap.style.display = 'none';
+  }
+
+  // Strategy Relevance
+  document.getElementById('yt-strategy-relevance').textContent = a.strategy_relevance || '—';
+
+  // Action Items
+  const actionsWrap = document.getElementById('yt-actions-wrap');
+  const actionsEl   = document.getElementById('yt-actions');
+  if (a.action_items && a.action_items.length > 0) {
+    actionsWrap.style.display = 'block';
+    actionsEl.innerHTML = a.action_items.map(function(item) {
+      return '<div style="padding:3px 0;display:flex;gap:6px"><span style="color:var(--green)">→</span><span>' + item + '</span></div>';
+    }).join('');
+  } else {
+    actionsWrap.style.display = 'none';
+  }
+
+  // Caution
+  const cautionWrap = document.getElementById('yt-caution-wrap');
+  const cautionEl   = document.getElementById('yt-caution');
+  if (a.caution) {
+    cautionWrap.style.display = 'block';
+    cautionEl.textContent = a.caution;
+  } else {
+    cautionWrap.style.display = 'none';
+  }
+
+  // Scan Integration
+  const scanWrap = document.getElementById('yt-scan-wrap');
+  scanWrap.style.display = _ytLastTickers.length > 0 ? 'block' : 'none';
+  if (_ytLastTickers.length > 0) {
+    scanWrap.querySelector('div:nth-child(2)').textContent =
+      'Genannte Ticker direkt scannen: ' + _ytLastTickers.join(', ');
+  }
+}
+
+async function ytAnalyze() {
+  // Quelltyp bestimmen
+  // Universale Eingabe lesen
+  const rawInput = (document.getElementById('yt-universal-input')?.value || '').trim();
+  if (!rawInput) { showKoToast('Bitte URL oder Text eingeben / Datei droppen'); return; }
+
+  let url = '', directText = '';
+  const isYtUrl  = /youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\//.test(rawInput);
+  const isWebUrl = /^https?:\/\//.test(rawInput) && !isYtUrl;
+
+  if (isYtUrl) {
+    url = rawInput; _ytSource = 'youtube';
+  } else if (isWebUrl) {
+    url = rawInput; _ytSource = 'url';
+  } else {
+    directText = rawInput.slice(0, 8000); _ytSource = 'text';
+    url = 'text://direct-input';
+  }
+
+  const antKey = getAntKey ? getAntKey() : localStorage.getItem('ko_ant_key');
+  if (!antKey) {
+    ytShowError('Anthropic API-Key fehlt — Admin-Tab → API-Key eintragen');
+    return;
+  }
+
+  const btn = document.getElementById('yt-analyze-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Analysiert…'; }
+
+  ytShowLoading('Schritt 1/3: YouTube Transkript laden…');
+
+  try {
+    let data;
+    document.getElementById('yt-loading-msg').textContent = 'Schritt 2/3: KI analysiert…';
+
+    if (_ytSource === 'text' && directText) {
+      // Direkttext: Worker mit POST
+      const r = await fetch(YT_WORKER + '/analyze-text?strategy=' + _ytStrategy + '&key=' + encodeURIComponent(antKey), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: directText.slice(0, 8000), title: 'Direkteingabe' })
+      });
+      data = await r.json();
+    } else {
+      // YouTube oder Artikel-URL
+      const lang = document.getElementById('yt-lang-select')?.value || 'de';
+      const analyzeUrl = YT_WORKER + '/analyze?url=' + encodeURIComponent(url)
+        + '&strategy=' + _ytStrategy
+        + '&lang=' + lang
+        + '&key=' + encodeURIComponent(antKey);
+      const r = await fetch(analyzeUrl);
+      data = await r.json();
+    }
+
+    if (data.error && !data.analysis) {
+      ytShowError(data.error);
+      return;
+    }
+
+    document.getElementById('yt-loading-msg').textContent = 'Schritt 3/3: Ergebnis aufbereiten…';
+
+    // History speichern
+    _ytHistory = _ytHistory.filter(function(h) { return h.url !== url; });
+    _ytHistory.unshift({
+      url, title: data.title || url,
+      strategy: _ytStrategy,
+      sentiment: data.analysis?.sentiment,
+      ts: Date.now()
+    });
+    _ytHistory = _ytHistory.slice(0, 10);
+    localStorage.setItem('ko_yt_history', JSON.stringify(_ytHistory));
+    ytRenderHistory();
+
+    ytRenderResult(data);
+
+  } catch(e) {
+    ytShowError('Fehler: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-brain"></i> Analysieren'; }
+  }
+}
+
+function ytRenderHistory() {
+  const histWrap = document.getElementById('yt-history');
+  const histList = document.getElementById('yt-history-list');
+  if (!histWrap || !histList || _ytHistory.length === 0) {
+    if (histWrap) histWrap.style.display = 'none';
+    return;
+  }
+  histWrap.style.display = 'block';
+  histList.innerHTML = _ytHistory.slice(0,5).map(function(h) {
+    const sentColor = (h.sentiment||'').includes('bull') ? 'var(--green)' : (h.sentiment||'').includes('bär') ? 'var(--red)' : 'var(--text3)';
+    const dt = h.ts ? new Date(h.ts).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) : '';
+    return '<div style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 0;border-bottom:1px solid var(--border)" onclick="ytLoadFromHistory(' + JSON.stringify(h.url) + ')">'
+      + '<i class="ti ti-brand-youtube" style="color:#ef4444;font-size:12px;flex-shrink:0"></i>'
+      + '<span style="flex:1;font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (h.title||h.url) + '</span>'
+      + '<span style="font-size:9px;color:' + sentColor + '">' + (h.sentiment||'') + '</span>'
+      + '<span style="font-size:9px;color:var(--text3)">' + dt + '</span>'
+      + '</div>';
+  }).join('');
+}
+
+function ytLoadFromHistory(url) {
+  var inp = document.getElementById('yt-url-input');
+  if (inp) { inp.value = url; ytAnalyze(); }
+}
+
+function ytLoadTickersToScanner() {
+  if (!_ytLastTickers.length) return;
+  var inp = document.getElementById('custom-input');
+  var preset = document.getElementById('ticker-preset');
+  if (inp) inp.value = _ytLastTickers.join(', ');
+  if (preset) preset.value = 'custom';
+  setMarket('us');
+  showPanel('scanner');
+  showKoToast('📡 ' + _ytLastTickers.length + ' Ticker geladen — Scan starten!');
+}
+
+// History beim Start laden
+(function() { ytRenderHistory(); })();
 
 // Auto-Sync beim App-Start: Cloud-Daten laden falls neuer
 async function autoSyncOnStart() {
@@ -10726,6 +11372,10 @@ function toggleKiDropdown(anchorEl) {
       + 'class="ki-dd-btn"' + (s.color ? ' style="color:' + s.color + '"' : '') + '>'
       + s.label + '</button>';
   });
+  // YT-Eintrag: öffnet Modal statt KI-Briefing
+  html += '<div style="border-top:1px solid var(--border);margin:4px 0"></div>'
+    + '<button class="ki-dd-btn" style="color:#ef4444" onclick="hideKiDropdown();showYtModal()">'
+    + '<i class=\"ti ti-brand-youtube\"></i> YouTube / Text Analyzer</button>';
   menu.innerHTML = html;
   document.body.appendChild(menu);
 
@@ -11341,7 +11991,16 @@ const KI_STRAT_CONFIG = {
         + 'nie auf Ausübung warten ohne Roll-Plan.\n'
         + '\nAntworte auf Deutsch, strukturiert 1-3. Max. 550 Wörter. Vollständig abschließen.';
     }
+  },
+  // ── Trennlinie + YouTube/Text Analyzer ──
+  '_divider': { label: '──────────────', color: 'var(--border)', prompt: null },
+  'youtube': {
+    label: '▶ YouTube / Text Analyzer',
+    color: '#ef4444',
+    prompt: null, // wird separat behandelt
+    isYt: true
   }
+
 };
 
 function setKiStrat(btn) {
