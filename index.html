@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v100">
+<meta name="app-version" content="20260615-v101">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -10154,6 +10154,244 @@ var FIXED_LISTS = {
     {sym:'LCID',name:'Lucid Group'},{sym:'LVS',name:'Las Vegas Sands'},{sym:'MGM',name:'MGM Resorts'},
   ],
 };
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EDITOR IN CHIEF — Komplett
+// ═══════════════════════════════════════════════════════════════════════════
+const EIC_KEY     = 'ko_eic_lists';
+const EIC_PIN_KEY = 'ko_eic_pin';
+var _eicPinEntry  = '';
+var _eicUnlocked  = false;
+
+// ── Beim Start: gespeicherte Listen in FIXED_LISTS laden ──────────────────
+(function eicApplyOnStart() {
+  try {
+    var stored = JSON.parse(localStorage.getItem(EIC_KEY) || '{}');
+    Object.keys(stored).forEach(function(k) {
+      if (FIXED_LISTS[k]) {
+        FIXED_LISTS[k] = stored[k];
+        console.log('EIC geladen:', k, stored[k].length, 'Titel');
+      }
+    });
+  } catch(e) { console.warn('EIC init:', e.message); }
+})();
+
+// ── PIN Modal ─────────────────────────────────────────────────────────────
+function showEicPinModal() {
+  _eicPinEntry = '';
+  updateEicDots();
+  var modal = document.getElementById('eic-pin-modal');
+  if (modal) modal.style.display = 'flex';
+  var hint = document.getElementById('eic-set-pin-hint');
+  if (hint) hint.style.display = localStorage.getItem(EIC_PIN_KEY) ? 'none' : 'block';
+}
+
+function closeEicModal() {
+  var modal = document.getElementById('eic-pin-modal');
+  if (modal) modal.style.display = 'none';
+  _eicPinEntry = '';
+  updateEicDots();
+}
+
+function eicPinPress(d) {
+  if (_eicPinEntry.length >= 6) return;
+  _eicPinEntry += d;
+  updateEicDots();
+  if (_eicPinEntry.length === 6) setTimeout(eicPinSubmit, 150);
+}
+
+function eicPinClear() {
+  _eicPinEntry = _eicPinEntry.slice(0, -1);
+  updateEicDots();
+}
+
+function updateEicDots() {
+  for (var i = 0; i < 6; i++) {
+    var dot = document.getElementById('eic-pd' + i);
+    if (dot) {
+      dot.style.background   = i < _eicPinEntry.length ? 'var(--accent)' : 'var(--bg3)';
+      dot.style.borderColor  = i < _eicPinEntry.length ? 'var(--accent)' : 'var(--border2)';
+    }
+  }
+}
+
+function eicPinSubmit() {
+  var stored = localStorage.getItem(EIC_PIN_KEY) || '';
+  if (!stored) {
+    // Erster Start — PIN setzen
+    localStorage.setItem(EIC_PIN_KEY, _eicPinEntry);
+    _eicUnlocked = true;
+    closeEicModal();
+    unlockEicEditor();
+    showKoToast('✓ EIC-PIN gesetzt — Editor in Chief aktiv');
+    return;
+  }
+  if (_eicPinEntry === stored) {
+    _eicUnlocked = true;
+    closeEicModal();
+    unlockEicEditor();
+    showKoToast('✓ Editor in Chief entsperrt');
+  } else {
+    var err = document.getElementById('eic-pin-error');
+    if (err) { err.textContent = 'Falscher PIN'; err.style.opacity = '1'; }
+    setTimeout(function() { if(err) err.style.opacity = '0'; }, 2000);
+    _eicPinEntry = '';
+    updateEicDots();
+  }
+}
+
+function unlockEicEditor() {
+  var wrap      = document.getElementById('eic-editor-wrap');
+  var lockBtn   = document.getElementById('eic-lock-btn');
+  var unlockBtn = document.getElementById('eic-unlock-btn');
+  if (wrap)      wrap.style.display      = 'block';
+  if (lockBtn)   lockBtn.style.display   = 'inline-flex';
+  if (unlockBtn) unlockBtn.style.display = 'none';
+  // Auto-Sperre nach 10 Minuten
+  setTimeout(lockEicEditor, 10 * 60 * 1000);
+}
+
+function lockEicEditor() {
+  _eicUnlocked = false;
+  var wrap      = document.getElementById('eic-editor-wrap');
+  var lockBtn   = document.getElementById('eic-lock-btn');
+  var unlockBtn = document.getElementById('eic-unlock-btn');
+  if (wrap)      wrap.style.display      = 'none';
+  if (lockBtn)   lockBtn.style.display   = 'none';
+  if (unlockBtn) unlockBtn.style.display = 'inline-flex';
+  showKoToast('🔒 Editor in Chief gesperrt');
+}
+
+function eicChangePin() {
+  if (!_eicUnlocked) { showEicPinModal(); return; }
+  // Neuen PIN über eigenes Mini-Modal setzen
+  var newPin = '';
+  var ok = false;
+  // Einfaches Prompt als Fallback
+  newPin = window.prompt('Neuer EIC-PIN (genau 6 Ziffern):');
+  if (!newPin) return;
+  newPin = newPin.trim();
+  if (!/^\d{6}$/.test(newPin)) { showKoToast('❌ Ungültig — genau 6 Ziffern'); return; }
+  localStorage.setItem(EIC_PIN_KEY, newPin);
+  showKoToast('✓ EIC-PIN geändert');
+}
+
+// ── Listen-Editor ─────────────────────────────────────────────────────────
+function eicLoadList(listKey) {
+  var wrap  = document.getElementById('eic-editor-wrap');
+  var label = document.getElementById('eic-editor-label');
+  var ta    = document.getElementById('eic-textarea');
+  var st    = document.getElementById('eic-status');
+  if (!listKey) { if(wrap) wrap.style.display = 'none'; return; }
+  // Entsperren prüfen
+  if (!_eicUnlocked) { showEicPinModal(); return; }
+  if (!FIXED_LISTS[listKey] && listKey !== 'IBD50') {
+    showKoToast('Liste nicht gefunden: ' + listKey); return;
+  }
+  wrap.style.display = 'block';
+  var list = listKey === 'IBD50'
+    ? ibdData.map(function(r){ return {sym:r.ticker, name:r.name}; })
+    : FIXED_LISTS[listKey] || [];
+  if (label) label.textContent = listKey + ' — ' + list.length + ' Titel';
+  if (ta) ta.value = list.map(function(t){ return t.sym + ',' + (t.name||t.sym); }).join('\n');
+  var stored = JSON.parse(localStorage.getItem(EIC_KEY) || '{}');
+  if (st) {
+    if (stored[listKey]) { st.textContent = '✏ Angepasst'; st.style.color = 'var(--amber)'; }
+    else                 { st.textContent = 'Standard';    st.style.color = 'var(--text3)'; }
+  }
+}
+
+function eicSave() {
+  var sel     = document.getElementById('eic-list-select');
+  var listKey = sel ? sel.value : '';
+  var ta      = document.getElementById('eic-textarea');
+  var st      = document.getElementById('eic-status');
+  if (!listKey || !ta) return;
+  if (!_eicUnlocked) { showKoToast('⛔ Erst entsperren'); return; }
+
+  var lines  = ta.value.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+  var parsed = []; var errors = 0;
+  lines.forEach(function(line) {
+    var parts = line.split(',');
+    var sym   = parts[0].trim().toUpperCase().replace(/[^A-Z0-9.\-]/g,'');
+    var name  = parts.slice(1).join(',').trim() || sym;
+    if (sym.length >= 1 && sym.length <= 10) parsed.push({sym:sym, name:name});
+    else errors++;
+  });
+
+  if (!parsed.length) { showKoToast('Keine gültigen Ticker'); return; }
+
+  // IBD50 separat speichern
+  if (listKey === 'IBD50') {
+    var newIbd = parsed.map(function(t,i){ return {rank:i+1, ticker:t.sym, name:t.name, comp:0, eps:null, rs:null, annEps:null, lastEps:null, nextEps:null, sales:null, roe:null, margin:null, sector:''}; });
+    ibdData = newIbd;
+    localStorage.setItem('ko_top50', JSON.stringify(newIbd));
+    localStorage.setItem('ko_top50_version', 'eic-' + Date.now());
+    renderIBD && renderIBD();
+  } else {
+    // FIXED_LISTS überschreiben + localStorage
+    FIXED_LISTS[listKey] = parsed;
+    var stored = JSON.parse(localStorage.getItem(EIC_KEY) || '{}');
+    stored[listKey] = parsed;
+    localStorage.setItem(EIC_KEY, JSON.stringify(stored));
+    if (typeof setMarket === 'function') setMarket(window.currentMarket || 'us');
+  }
+
+  var msg = '✓ ' + parsed.length + ' Titel' + (errors ? ' (' + errors + ' übersprungen)' : '');
+  if (st) { st.textContent = msg; st.style.color = 'var(--green)'; }
+  showKoToast('📋 ' + listKey + ': ' + parsed.length + ' Titel gespeichert');
+  var label = document.getElementById('eic-editor-label');
+  if (label) label.textContent = listKey + ' — ' + parsed.length + ' Titel (angepasst)';
+}
+
+function eicReset() {
+  var sel     = document.getElementById('eic-list-select');
+  var listKey = sel ? sel.value : '';
+  if (!listKey) return;
+  if (!_eicUnlocked) { showKoToast('⛔ Erst entsperren'); return; }
+  if (!confirm(listKey + ' auf Standard zurücksetzen?')) return;
+  var stored = JSON.parse(localStorage.getItem(EIC_KEY) || '{}');
+  delete stored[listKey];
+  localStorage.setItem(EIC_KEY, JSON.stringify(stored));
+  showKoToast('↩ ' + listKey + ' zurückgesetzt · Seite neu laden…');
+  setTimeout(function(){ location.reload(); }, 1500);
+}
+
+function eicImportCSV() {
+  if (!_eicUnlocked) { showKoToast('⛔ Erst entsperren'); return; }
+  var inp = document.getElementById('eic-csv-input');
+  if (inp) inp.click();
+}
+
+function eicReadCSV(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var text  = e.target.result.replace(/^\uFEFF/,'');
+    var lines = text.split(/[\r\n]+/).map(function(l){ return l.trim(); }).filter(Boolean);
+    if (lines[0].toLowerCase().match(/ticker|symbol|sym/)) lines = lines.slice(1);
+    var ta = document.getElementById('eic-textarea');
+    if (ta) ta.value = lines.join('\n');
+    showKoToast('📄 CSV: ' + lines.length + ' Zeilen importiert');
+  };
+  reader.readAsText(file, 'UTF-8');
+  input.value = '';
+}
+
+function eicExportCSV() {
+  var sel     = document.getElementById('eic-list-select');
+  var listKey = sel ? sel.value : 'liste';
+  var ta      = document.getElementById('eic-textarea');
+  if (!ta) return;
+  var blob = new Blob(['TICKER,Name\n' + ta.value], {type:'text/csv;charset=utf-8'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href   = url; a.download = listKey + '_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+  showKoToast('⬇ ' + listKey + '.csv exportiert');
+}
 
 function getFixedListTickers(key){
   // EIC-Override: zuerst localStorage prüfen (Editor in Chief Änderungen)
