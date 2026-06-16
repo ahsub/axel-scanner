@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v101">
+<meta name="app-version" content="20260615-v103">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -932,14 +932,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           </div>
           <input type="file" id="eic-csv-input" accept=".csv,.txt" style="display:none" onchange="eicReadCSV(this)">
           <textarea id="eic-textarea" rows="10"
-            placeholder="TICKER,Name&#10;NVDA,NVIDIA Corp.&#10;AMD,Advanced Micro Devices&#10;..."
+            placeholder="Format: TICKER,Name (ein Titel pro Zeile)&#10;Beispiel:&#10;NVDA,NVIDIA Corp.&#10;AMD,Advanced Micro Devices&#10;AVGO,Broadcom Inc.&#10;&#10;Ticker muss 1-6 Zeichen sein (GLW nicht CORNING)"
             style="width:100%;font-size:11px;padding:8px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:8px;font-family:var(--mono);resize:vertical;line-height:1.6"></textarea>
           <div style="display:flex;gap:.5rem;margin-top:.5rem;align-items:center">
+            <button class="btn" onclick="eicPreview()" style="font-size:12px;color:var(--accent);border-color:var(--accent)">
+              <i class="ti ti-eye"></i> Prüfen
+            </button>
             <button class="btn btn-primary" onclick="eicSave()" style="flex:1;font-size:12px">
               <i class="ti ti-check"></i> Speichern &amp; aktivieren
             </button>
-            <span id="eic-status" style="font-size:10px;color:var(--text3)"></span>
           </div>
+          <div id="eic-preview" style="display:none;margin-top:.4rem;font-size:10px;background:var(--bg3);border-radius:6px;padding:.4rem .6rem;max-height:80px;overflow-y:auto;font-family:var(--mono)"></div>
+          <span id="eic-status" style="font-size:10px;color:var(--text3);display:block;margin-top:3px"></span>
           <div style="font-size:10px;color:var(--text3);margin-top:.4rem">
             Änderungen in localStorage gespeichert · überschreiben Standard-Liste
           </div>
@@ -10278,6 +10282,28 @@ function eicChangePin() {
 }
 
 // ── Listen-Editor ─────────────────────────────────────────────────────────
+
+function eicPreview() {
+  var ta  = document.getElementById('eic-textarea');
+  var pre = document.getElementById('eic-preview');
+  if (!ta || !pre) return;
+  var lines   = ta.value.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+  var tickers = []; var bad = [];
+  lines.forEach(function(line) {
+    if (/^ticker|^symbol|^name/i.test(line)) return;
+    var parts = line.split(',');
+    var col0  = parts[0].trim().toUpperCase().replace(/[^A-Z0-9.\-]/g,'');
+    if (col0.length >= 1 && col0.length <= 6) {
+      tickers.push(col0);
+    } else {
+      bad.push(parts[0].trim());
+    }
+  });
+  pre.style.display = 'block';
+  var html = '<span style="color:var(--green)">✓ ' + tickers.length + ' Ticker: ' + tickers.join(', ') + '</span>';
+  if (bad.length > 0) html += '<br><span style="color:var(--red)">⚠ Nicht erkannt (kein Ticker-Symbol): ' + bad.join(', ') + '</span>';
+  pre.innerHTML = html;
+}
 function eicLoadList(listKey) {
   var wrap  = document.getElementById('eic-editor-wrap');
   var label = document.getElementById('eic-editor-label');
@@ -10313,10 +10339,31 @@ function eicSave() {
   var lines  = ta.value.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
   var parsed = []; var errors = 0;
   lines.forEach(function(line) {
+    // Header-Zeilen überspringen
+    if (/^ticker|^symbol|^sym|^name/i.test(line)) return;
     var parts = line.split(',');
-    var sym   = parts[0].trim().toUpperCase().replace(/[^A-Z0-9.\-]/g,'');
-    var name  = parts.slice(1).join(',').trim() || sym;
-    if (sym.length >= 1 && sym.length <= 10) parsed.push({sym:sym, name:name});
+    var col0  = parts[0].trim().toUpperCase().replace(/[^A-Z0-9.\-]/g,'');
+    var col1  = parts.length > 1 ? parts.slice(1).join(',').trim() : '';
+    var sym, name;
+    // Auto-Erkennung: Ticker = kurz (1-6 Zeichen), Name = länger
+    // Wenn col0 kurz (<=6) und nur Großbuchstaben → Ticker
+    if (col0.length >= 1 && col0.length <= 6 && /^[A-Z0-9.\-]+$/.test(col0)) {
+      sym  = col0;
+      name = col1 || col0;
+    } else if (col1) {
+      // col0 ist wahrscheinlich Name, col1 ist Ticker
+      var col1up = col1.trim().toUpperCase().replace(/[^A-Z0-9.\-]/g,'');
+      if (col1up.length >= 1 && col1up.length <= 6) {
+        sym  = col1up;
+        name = col0;
+      } else {
+        // Nur Name ohne Ticker → überspringen mit Warnung
+        errors++; return;
+      }
+    } else {
+      errors++; return;
+    }
+    if (sym && sym.length >= 1) parsed.push({sym:sym, name:name});
     else errors++;
   });
 
@@ -10338,7 +10385,8 @@ function eicSave() {
     if (typeof setMarket === 'function') setMarket(window.currentMarket || 'us');
   }
 
-  var msg = '✓ ' + parsed.length + ' Titel' + (errors ? ' (' + errors + ' übersprungen)' : '');
+  var msg = '✓ ' + parsed.length + ' Titel' + (errors > 0 ? ' · ⚠ ' + errors + ' ungültig (Klarnamen?)' : '');
+  if (errors > 0) showKoToast('⚠ ' + errors + ' Zeilen übersprungen — Ticker-Symbol nötig (z.B. GLW statt CORNING)');
   if (st) { st.textContent = msg; st.style.color = 'var(--green)'; }
   showKoToast('📋 ' + listKey + ': ' + parsed.length + ' Titel gespeichert');
   var label = document.getElementById('eic-editor-label');
@@ -10371,9 +10419,13 @@ function eicReadCSV(input) {
   reader.onload = function(e) {
     var text  = e.target.result.replace(/^\uFEFF/,'');
     var lines = text.split(/[\r\n]+/).map(function(l){ return l.trim(); }).filter(Boolean);
-    if (lines[0].toLowerCase().match(/ticker|symbol|sym/)) lines = lines.slice(1);
+    // Header überspringen
+    if (lines.length > 0 && /ticker|symbol|sym|name/i.test(lines[0])) lines = lines.slice(1);
     var ta = document.getElementById('eic-textarea');
-    if (ta) ta.value = lines.join('\n');
+    if (ta) {
+      ta.value = lines.join('\n');
+      showKoToast('📄 CSV: ' + lines.length + ' Zeilen · Format: TICKER,Name');
+    }
     showKoToast('📄 CSV: ' + lines.length + ' Zeilen importiert');
   };
   reader.readAsText(file, 'UTF-8');
