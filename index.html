@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v103">
+<meta name="app-version" content="20260615-v104">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2029,43 +2029,35 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 
 <!-- ── EDITOR IN CHIEF PIN MODAL ──────────────────────────────────── -->
-<div id="eic-pin-modal" style="display:none;position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,0.85);align-items:center;justify-content:center">
-  <div style="background:var(--bg2);border-radius:var(--radius);padding:1.5rem;width:100%;max-width:320px;margin:1rem;text-align:center;border:1px solid var(--border)">
-    <div style="font-size:16px;font-weight:700;margin-bottom:.3rem">📋 Editor in Chief</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:1rem">6-stelliger EIC-PIN eingeben</div>
-
-    <!-- PIN Dots -->
-    <div style="display:flex;justify-content:center;gap:10px;margin-bottom:1.25rem">
-      <div id="eic-pd0" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
-      <div id="eic-pd1" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
-      <div id="eic-pd2" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
-      <div id="eic-pd3" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
-      <div id="eic-pd4" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
-      <div id="eic-pd5" style="width:12px;height:12px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2)"></div>
+<div id="eic-pin-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.88);align-items:center;justify-content:center;flex-direction:column">
+  <div style="background:#151820;border-radius:16px;padding:2rem 1.5rem;width:300px;text-align:center;border:1px solid #2a2f42;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+    <div style="font-size:18px;font-weight:700;color:#e8eaf0;margin-bottom:.3rem">📋 Editor in Chief</div>
+    <div style="font-size:12px;color:#5a6280;margin-bottom:1.25rem" id="eic-set-pin-hint">6-stelligen PIN eingeben</div>
+    <!-- Dots -->
+    <div style="display:flex;justify-content:center;gap:12px;margin-bottom:1.5rem">
+      <div id="eic-pd0" style="width:14px;height:14px;border-radius:50%;background:#1c2030;border:2px solid #2a2f42;transition:all .15s"></div>
+      <div id="eic-pd1" style="width:14px;height:14px;border-radius:50%;background:#1c2030;border:2px solid #2a2f42;transition:all .15s"></div>
+      <div id="eic-pd2" style="width:14px;height:14px;border-radius:50%;background:#1c2030;border:2px solid #2a2f42;transition:all .15s"></div>
+      <div id="eic-pd3" style="width:14px;height:14px;border-radius:50%;background:#1c2030;border:2px solid #2a2f42;transition:all .15s"></div>
+      <div id="eic-pd4" style="width:14px;height:14px;border-radius:50%;background:#1c2030;border:2px solid #2a2f42;transition:all .15s"></div>
+      <div id="eic-pd5" style="width:14px;height:14px;border-radius:50%;background:#1c2030;border:2px solid #2a2f42;transition:all .15s"></div>
     </div>
-
     <!-- Numpad -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:220px;margin:0 auto 1rem">
-      <button class="pin-btn" onclick="eicPinPress('1')">1</button>
-      <button class="pin-btn" onclick="eicPinPress('2')">2</button>
-      <button class="pin-btn" onclick="eicPinPress('3')">3</button>
-      <button class="pin-btn" onclick="eicPinPress('4')">4</button>
-      <button class="pin-btn" onclick="eicPinPress('5')">5</button>
-      <button class="pin-btn" onclick="eicPinPress('6')">6</button>
-      <button class="pin-btn" onclick="eicPinPress('7')">7</button>
-      <button class="pin-btn" onclick="eicPinPress('8')">8</button>
-      <button class="pin-btn" onclick="eicPinPress('9')">9</button>
-      <button class="pin-btn" onclick="eicPinClear()" style="font-size:16px">⌫</button>
-      <button class="pin-btn" onclick="eicPinPress('0')">0</button>
-      <button class="pin-btn" onclick="closeEicModal()" style="font-size:12px;color:var(--text3)">✕</button>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem">
+      <button onclick="eicPinPress('1')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">1</button>
+      <button onclick="eicPinPress('2')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">2</button>
+      <button onclick="eicPinPress('3')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">3</button>
+      <button onclick="eicPinPress('4')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">4</button>
+      <button onclick="eicPinPress('5')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">5</button>
+      <button onclick="eicPinPress('6')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">6</button>
+      <button onclick="eicPinPress('7')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">7</button>
+      <button onclick="eicPinPress('8')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">8</button>
+      <button onclick="eicPinPress('9')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">9</button>
+      <button onclick="eicPinClear()" style="padding:14px;font-size:18px;background:#1c2030;border:1px solid #2a2f42;color:#9ba3b8;border-radius:10px;cursor:pointer">⌫</button>
+      <button onclick="eicPinPress('0')" style="padding:14px;font-size:18px;font-weight:500;background:#1c2030;border:1px solid #2a2f42;color:#e8eaf0;border-radius:10px;cursor:pointer">0</button>
+      <button onclick="closeEicModal()" style="padding:14px;font-size:14px;background:#1c2030;border:1px solid #2a2f42;color:#5a6280;border-radius:10px;cursor:pointer">✕</button>
     </div>
-
-    <div id="eic-pin-error" style="font-size:11px;color:var(--red);min-height:16px;opacity:0;transition:opacity .2s"></div>
-
-    <!-- EIC PIN setzen (nur wenn noch kein PIN gesetzt) -->
-    <div id="eic-set-pin-hint" style="font-size:10px;color:var(--text3);margin-top:.5rem;display:none">
-      Noch kein EIC-PIN gesetzt — nach Eingabe wird dieser PIN gespeichert.
-    </div>
+    <div id="eic-pin-error" style="font-size:12px;color:#ef4444;min-height:18px;transition:opacity .2s;opacity:0"></div>
   </div>
 </div>
 
