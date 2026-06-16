@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v82">
+<meta name="app-version" content="20260615-v83">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -5426,7 +5426,7 @@ async function autoMakro(){
     // Anthropic API direkt (Browser-Zugriff mit speziellem Header)
     const antBody = JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1000,
+      max_tokens: 3000,
       system: 'Du bist ein Makro-Analyse-Assistent. KRITISCHE REGEL: Verwende NUR die Daten aus dem Prompt. Erfinde KEINE Kurse, Prozentwerte oder Marktdaten. Wenn Daten fehlen: explizit schreiben "Daten nicht verfügbar".',
       messages: [{ role: 'user', content: prompt }]
     });
@@ -5454,9 +5454,30 @@ async function autoMakro(){
     const text = data.content && data.content[0] && data.content[0].text;
     if(!text) throw new Error('Keine Antwort von Claude');
 
-    // Parse JSON from response
-    const clean = text.replace(/```json|```/g,'').trim();
-    const makroJson = JSON.parse(clean);
+    // Parse JSON from response — robust gegen Sonderzeichen und abgeschnittene Antworten
+    let clean = text.replace(/```json|```/g,'').trim();
+    // JSON-Extraktion: ersten { bis letzten } finden
+    const jsonStart = clean.indexOf('{');
+    const jsonEnd   = clean.lastIndexOf('}');
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      clean = clean.slice(jsonStart, jsonEnd + 1);
+    }
+    // Steuerzeichen bereinigen die JSON brechen
+    clean = clean.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ');
+    let makroJson;
+    try {
+      makroJson = JSON.parse(clean);
+    } catch(parseErr) {
+      // Fallback: verdicts aus Text extrahieren
+      console.warn('autoMakro JSON-Parse Fehler:', parseErr.message, '— nutze Fallback');
+      const verdictMatch = clean.match(/"verdict"\s*:\s*"(bull|bear|neu)"/i);
+      const textMatch    = clean.match(/"verdictText"\s*:\s*"([^"]{10,})"/i);
+      makroJson = {
+        verdict: verdictMatch ? verdictMatch[1] : 'neu',
+        verdictText: textMatch ? textMatch[1] : 'Analyse konnte nicht vollständig geparst werden.',
+        factors: []
+      };
+    }
 
     if(status) status.textContent = 'Schritt 3/3: Makro-Dashboard aktualisieren…';
 
