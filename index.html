@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v73">
+<meta name="app-version" content="20260615-v74">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -7420,6 +7420,19 @@ async function loadWorldIndex(sym) {
 }
 
 // ─── SEKTOR HEATMAP IN MAKRO TAB ─────────────────────────────────────────────
+
+// Schnell-Scan aller Sektor-Titel für Sektor-Scores
+async function runQuickSectorScan() {
+  const allSectorSyms = [...new Set(Object.values(SECTORS).flat())];
+  showKoToast('📊 Sektor-Scan startet · ' + allSectorSyms.length + ' Titel…');
+  // Custom-Input mit Sektor-Titeln füllen und Scan starten
+  const input = document.getElementById('custom-input');
+  const preset = document.getElementById('ticker-preset');
+  if(input) input.value = allSectorSyms.join(', ');
+  if(preset) preset.value = 'custom';
+  setMarket('us');
+  await runScan();
+}
 function showMakroSectorHeatmap(){
   var wrap=document.getElementById('makro-sector-wrap');
   var container=document.getElementById('makro-sector-heatmap');
@@ -7428,7 +7441,20 @@ function showMakroSectorHeatmap(){
   var stats=getSectorStats();
   var sectors=Object.keys(stats);
   if(!sectors.length){
-    container.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0">Zuerst einen US-Scan durchführen — Sektor-Scores werden dann hier angezeigt.</div>';
+    // Schauen ob genug Ticker im Scan waren (mind. 5 aus SECTORS)
+    const allSectorSyms = Object.values(SECTORS).flat();
+    const scannedSectorSyms = allSectorSyms.filter(sym => tickerData[sym]);
+    if(scannedSectorSyms.length === 0){
+      container.innerHTML =
+        '<div style="font-size:12px;color:var(--text3);padding:8px 0">' +
+        'Zuerst einen US-Scan durchführen — Sektor-Scores werden dann hier angezeigt.<br>' +
+        '<span style="font-size:11px;opacity:.7">Tipp: Sektor-Scan = Liste mit AI/Semis, Cloud, Growth etc. scannen</span>' +
+        '</div>' +
+        '<button class="btn btn-sm" onclick="runQuickSectorScan()" style="margin-top:6px;font-size:11px;color:var(--accent);border-color:var(--accent)">' +
+        '<i class="ti ti-radar"></i> Sektor-Schnell-Scan starten</button>';
+    } else {
+      container.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0">Sektor-Scores noch nicht berechnet.</div>';
+    }
     return;
   }
   sectors.sort(function(a,b){return (stats[b].avg||0)-(stats[a].avg||0);});
@@ -9469,15 +9495,15 @@ function renderQqqBanner(markov) {
   if (regime === 1) {
     color='var(--green)'; bg='rgba(52,199,89,0.10)'; icon='ti-trending-up';
     label = 'QQQ: BULL-Regime';
-    sub   = 'Trend intakt · Longs bevorzugen';
+    sub   = 'Trend intakt · Longs bevorzugen · Markov 2.0';
   } else if (regime === -1) {
     color='var(--red)'; bg='rgba(255,59,48,0.10)'; icon='ti-trending-down';
     label = 'QQQ: BEAR-Regime';
-    sub   = 'Abwärtsdruck · Defensiv bleiben';
+    sub   = 'Abwärtsdruck · Defensiv bleiben · Markov 2.0';
   } else {
     color='var(--amber)'; bg='rgba(240,169,58,0.10)'; icon='ti-minus';
     label = 'QQQ: SIDEWAYS-Regime';
-    sub   = 'Kein klarer Trend – Selektiv vorgehen';
+    sub   = 'Kein klarer Trend – Selektiv vorgehen · Markov 2.0';
   }
   if (wl === 3) { color='var(--red)'; bg='rgba(255,59,48,0.15)'; }
   else if (wl >= 1) { color='var(--amber)'; bg='rgba(240,169,58,0.12)'; }
@@ -9529,7 +9555,25 @@ function renderQqqBanner(markov) {
 
 async function fetchQqqRegime() {
   const key = getTwelveKey();
-  if (!key) return;
+  if (!key) {
+    // Yahoo-Fallback: QQQ kostenlos via CORS-Proxy → Markov 2.0 ohne TD-Key
+    try {
+      const to = Math.floor(Date.now() / 1000);
+      const from = to - 60 * 60 * 24 * 90;
+      const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/QQQ?interval=1d&period1=' + from + '&period2=' + to;
+      const ry = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(yfUrl));
+      if (!ry.ok) return;
+      const jy  = await ry.json();
+      const rey = jy && jy.chart && jy.chart.result && jy.chart.result[0];
+      if (!rey) return;
+      var qy = rey.indicators.quote[0];
+      var closesY = (qy.close || []).filter(function(v){ return v != null; });
+      if (closesY.length < 25) return;
+      _qqqRegime = calcMarkovRegime(closesY);
+      renderQqqBanner(_qqqRegime);
+    } catch(e) { console.warn('QQQ Yahoo fallback:', e.message); }
+    return;
+  }
   try {
     const url = 'https://api.twelvedata.com/time_series?symbol=QQQ&interval=1day&outputsize=60&apikey=' + key;
     const r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
@@ -9563,9 +9607,38 @@ const SEKTOREN = [
 let _sektorData = [];
 let _sektorLoading = false;
 
+
+async function fetchSektorPerfYahoo(sym) {
+  try {
+    const to   = Math.floor(Date.now() / 1000);
+    const from = to - 60 * 60 * 24 * 12; // 12 Tage für 5T + 1T
+    const url  = 'https://query1.finance.yahoo.com/v7/finance/chart/'
+               + sym + '?interval=1d&period1=' + from + '&period2=' + to;
+    const r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
+    if (!r.ok) return null;
+    const j   = await r.json();
+    const res = j?.chart?.result?.[0];
+    if (!res) return null;
+    const q      = res.indicators.quote[0];
+    const closes = (q.close || []).filter(v => v != null);
+    if (closes.length < 2) return null;
+    const price  = res.meta.regularMarketPrice || closes[closes.length-1];
+    const prev1d = closes[closes.length-2];
+    const prev5d = closes.length >= 6 ? closes[closes.length-6] : closes[0];
+    return {
+      sym,
+      price: Math.round(price*100)/100,
+      perf1d: Math.round((price/prev1d - 1)*10000)/100,
+      perf5d: Math.round((price/prev5d - 1)*10000)/100,
+      source: 'yahoo'
+    };
+  } catch(e) { return null; }
+}
+
 async function fetchSektorPerf(sym) {
   const key = getTwelveKey();
-  if (!key) return null;
+  // Ohne TD-Key: Yahoo Finance als Fallback (kostenlos)
+  if (!key) return await fetchSektorPerfYahoo(sym);
   try {
     // Sektor: separater Cache-Key mit 6h TTL - kein tdThrottledFetch (wuerde Rate-Limit teilen)
     const sektorCacheKey2 = 'sektor_v2_'+sym;
