@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v80">
+<meta name="app-version" content="20260615-v82">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1314,6 +1314,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">Kursdaten 4h lokal gecacht. Cache leeren erzwingt frische API-Daten.</div>
         <button class="btn btn-sm" onclick="clearScanRegistry();showKoToast('Scan-Registry geleert');" style="font-size:12px"><i class="ti ti-history"></i> Scan-Registry leeren</button>
             <button class="btn btn-sm" onclick="cleanupJunkWatchlists()" style="font-size:12px;color:var(--red);border-color:var(--red)"><i class="ti ti-trash"></i> Müll-WL bereinigen</button>
+            <button class="btn btn-sm" onclick="localStorage.removeItem('ko_iv_cache_v1');_ivCache={};showKoToast('IV-Cache geleert')" style="font-size:12px;color:var(--text2)"><i class="ti ti-rotate"></i> IV-Cache leeren</button>
         <button class="btn btn-sm" onclick="clearTdCache();this.textContent='✓ Geleert';setTimeout(()=>this.textContent='Cache leeren',2000)" style="font-size:12px"><i class="ti ti-trash"></i> Cache leeren</button>
       </div>
       <div class="sec">PIN ändern</div>
@@ -6522,7 +6523,9 @@ async function enrichTop40WithIV() {
       }
     }
   });
-  showKoToast('✅ IV geladen: ' + done + '/' + total + ' Titel' + (errors > 0 ? ' (' + errors + ' Fehler)' : ''));
+  // Cache-Statistik
+  var cachedCount = Object.keys(_ivCache).length;
+  showKoToast('✅ IV geladen: ' + done + '/' + total + ' Titel' + (errors > 0 ? ' (' + errors + ' Fehler)' : '') + ' · ' + cachedCount + ' im 24h-Cache');
 }
 
 function saveFromScan(minScore){
@@ -6930,10 +6933,35 @@ function calcIVPercentile(atmIV, hvSeries) {
 
 // Holt ATM-IV aus Yahoo Finance Options-Chain (nächste Expiry)
 var _ivCache = {};
-var IV_CACHE_TTL = 4 * 60 * 60 * 1000; // 4h
+var IV_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h — IV ändert sich tagsüber kaum
+const IV_LS_KEY = 'ko_iv_cache_v1';
+
+// localStorage-Cache beim Start laden
+(function() {
+  try {
+    var stored = localStorage.getItem(IV_LS_KEY);
+    if (stored) {
+      var parsed = JSON.parse(stored);
+      var now = Date.now();
+      // Nur gültige Einträge (< 24h) übernehmen
+      Object.keys(parsed).forEach(function(sym) {
+        if (parsed[sym] && (now - parsed[sym].ts) < IV_CACHE_TTL) {
+          _ivCache[sym] = parsed[sym];
+        }
+      });
+      console.log('IV-Cache geladen: ' + Object.keys(_ivCache).length + ' Titel aus localStorage');
+    }
+  } catch(e) { console.warn('IV-Cache Load:', e.message); }
+})();
+
+function saveIvCacheToStorage() {
+  try {
+    localStorage.setItem(IV_LS_KEY, JSON.stringify(_ivCache));
+  } catch(e) { console.warn('IV-Cache Save:', e.message); }
+}
 
 async function fetchIVData(sym) {
-  // Cache prüfen
+  // 1. In-Memory Cache prüfen
   var cached = _ivCache[sym];
   if (cached && (Date.now() - cached.ts) < IV_CACHE_TTL) return cached;
 
@@ -6965,6 +6993,7 @@ async function fetchIVData(sym) {
 
     var result = { atmIV: avgIV, price: price, ts: Date.now(), contracts: atm.length };
     _ivCache[sym] = result;
+    saveIvCacheToStorage(); // persistent für 24h
     return result;
   } catch(e) {
     console.log('fetchIVData error:', sym, e.message);
@@ -9348,6 +9377,9 @@ function calcMarkovSignal(matrix, currentRegime) {
 
 function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
   lookback   = lookback   || 21;
+  // Adaptiver Lookback: bei wenigen Bars kleineres Lookback
+  if (closes && closes.length < 80 && lookback > 10) lookback = 10;
+  else if (closes && closes.length < 120 && lookback > 15) lookback = 15;
   bullThresh = bullThresh || 3.0;
   bearThresh = bearThresh || 3.0;
   smoothLen  = smoothLen  || 5;
@@ -9370,8 +9402,15 @@ function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
   // ── Transition-Matrizen (FIX 1: beide zeigen) ─────────────────────────
   // Legacy: stride=1 (überlappend, statistisch unehrlich)
   const matrixLegacy = buildTransitionMatrix(regimes, 1);
-  // Markov 2.0: stride=lookback (nicht-überlappend, statistisch korrekt)
-  const matrix20     = buildTransitionMatrix(regimes, lookback);
+  // Markov 2.0: adaptiver Stride
+  // Mindestens 10 nicht-überlappende Übergänge für stabile Matrix
+  // Wenn zu wenige Bars: Stride halbieren bis min. 10 Fenster
+  let stride20 = lookback;
+  while (stride20 > 3 && Math.floor(rn / stride20) < 10) {
+    stride20 = Math.max(3, Math.floor(stride20 / 2));
+  }
+  const strideNote = stride20 < lookback ? ' (adaptiert:' + stride20 + ')' : '';
+  const matrix20     = buildTransitionMatrix(regimes, stride20);
 
   // Primär: Markov 2.0 Matrix für alle Signale
   const currentRegime = regimes[rn - 1];
@@ -9423,8 +9462,10 @@ function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
     warnLevel: warnLevel,
     bullGap: Math.round(bullGap * 10) / 10,
     regimeChanged: currentRegime !== prevRegime,
-    // Warnung wenn Legacy vs 2.0 stark abweichen
-    matrixDivergence: Math.abs(matrix20.bullSticky - matrixLegacy.bullSticky) > 15
+    strideUsed: stride20,
+    strideNote: strideNote,
+    // Warnung wenn Legacy vs 2.0 stark abweichen (nur wenn genug Daten)
+    matrixDivergence: Math.floor(rn / stride20) >= 8 && Math.abs(matrix20.bullSticky - matrixLegacy.bullSticky) > 15
   };
 }
 
@@ -9527,10 +9568,12 @@ function renderQqqBanner(markov) {
   const divTxt = markov.matrixDivergence
     ? '△ Legacy vs. 2.0 Divergenz: ' + (mLeg ? mLeg.bullSticky : '?') + '% vs. ' + (m20 ? m20.bullSticky : '?') + '% (Stride-Fix wirkt!)'
     : '';
+  const strideTxt = markov.strideNote || '';
 
   // Stickiness aus 2.0 Matrix
   const stickyTxt = m20
     ? 'Bull ' + m20.bullSticky + '% · Side ' + m20.sideSticky + '% · Bear ' + m20.bearSticky + '%'
+      + (markov.strideUsed ? ' · Stride:' + markov.strideUsed + (strideTxt ? strideTxt : '') : '')
     : 'Sticky ' + sticky + '%';
 
   el.style.background   = bg;
@@ -9563,7 +9606,7 @@ async function fetchQqqRegime() {
   // Hilfsfunktion: Yahoo-Daten holen mit Retry
   async function tryYahooQQQ(proxyUrl) {
     const to   = Math.floor(Date.now() / 1000);
-    const from = to - 60 * 60 * 24 * 180;
+    const from = to - 60 * 60 * 24 * 400; // 400 Tage
     const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/QQQ?interval=1d&period1=' + from + '&period2=' + to + '&includePrePost=false';
     const url = proxyUrl
       ? proxyUrl + '?url=' + encodeURIComponent(yfUrl)
