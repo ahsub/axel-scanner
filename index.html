@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v118">
+<meta name="app-version" content="20260615-v119">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13168,19 +13168,27 @@ async function openKiBriefing(defaultStrat) {
   // Reset ALL buttons to inactive first
   document.querySelectorAll('.ki-strat-btn').forEach(function(b) {
     b.classList.remove('active-strat');
-    b.style.background = 'transparent';
-    b.style.borderColor = b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--border2)';
-    b.style.color = b.dataset.strat === 'value' ? 'var(--text3)' : b.dataset.strat === 'ludwig' ? '#a371f7' : 'var(--text2)';
-    b.style.boxShadow = '';
-    b.style.opacity = b.dataset.strat === 'value' ? '0.6' : '1';
+    b.style.background  = 'transparent';
+    b.style.borderColor = 'var(--border2)';
+    b.style.color       = b.dataset.strat === 'value' ? 'var(--text3)' : 'var(--text2)';
+    b.style.boxShadow   = '';
+    b.style.opacity     = b.dataset.strat === 'value' ? '0.6' : '1';
   });
   // Activate only the correct button with accent color
   var activeBtn = document.querySelector('.ki-strat-btn[data-strat="' + startStrat + '"]');
   if (activeBtn) {
+    var stratColors = {
+      ludwig:   { bg:'rgba(163,113,247,0.15)', border:'#a371f7', color:'#a371f7' },
+      options:  { bg:'rgba(240,169,58,0.15)',  border:'var(--amber)', color:'var(--amber)' },
+      momentum: { bg:'rgba(52,194,110,0.15)',  border:'var(--green)', color:'var(--green)' },
+      swing:    { bg:'rgba(6,182,212,0.15)',   border:'#06b6d4',      color:'#06b6d4' },
+      dividend: { bg:'rgba(52,194,110,0.15)',  border:'var(--green)', color:'var(--green)' },
+    };
+    var c = stratColors[startStrat] || { bg:'rgba(99,102,241,0.15)', border:'#818cf8', color:'#818cf8' };
     activeBtn.classList.add('active-strat');
-    activeBtn.style.background = startStrat === 'ludwig' ? 'rgba(163,113,247,0.15)' : 'rgba(99,102,241,0.15)';
-    activeBtn.style.borderColor = startStrat === 'ludwig' ? '#a371f7' : '#818cf8';
-    activeBtn.style.color = startStrat === 'ludwig' ? '#a371f7' : '#818cf8';
+    activeBtn.style.background  = c.bg;
+    activeBtn.style.borderColor = c.border;
+    activeBtn.style.color       = c.color;
   }
   // Hint aktualisieren
   var cfg = KI_STRAT_CONFIG[startStrat];
