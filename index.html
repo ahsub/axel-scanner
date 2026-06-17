@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v114">
+<meta name="app-version" content="20260615-v116">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2064,6 +2064,525 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 
 <script>
+// ── KO-WL MODULE v1.0 (embedded) ──
+/**
+ * KO-WL — Watchlist Modul v1.0
+ * ════════════════════════════════════════════════════════════════
+ * Portables, framework-freies Watchlist-Modul für KO-Scanner
+ * und zukünftige Projekte.
+ *
+ * Verwendung:
+ *   const WL = new KoWatchlistManager({ syncUrl: '...' });
+ *   WL.save('Meine Liste', ['AAPL', 'MSFT']);
+ *   WL.updateDropdown('my-select-id');
+ *
+ * ════════════════════════════════════════════════════════════════
+ */
+
+class KoWatchlistManager {
+
+  constructor(cfg = {}) {
+    this.cfg = {
+      storageKey:    cfg.storageKey    || 'ko_watchlists',
+      tsKey:         cfg.tsKey         || 'ko_watchlists_ts',
+      perTsKey:      cfg.perTsKey      || 'ko_wl_timestamps',
+      syncUrl:       cfg.syncUrl       || null,    // ko-sync Worker URL
+      maxWLs:        cfg.maxWLs        || 200,
+      maxTickers:    cfg.maxTickers    || 200,
+      maxNameLen:    cfg.maxNameLen    || 60,
+      autoTopN:      cfg.autoTopN      || 40,
+      onToast:       cfg.onToast       || null,    // fn(msg) für Toast-Nachrichten
+    };
+    this._listeners = { change: [], dropdownChange: [] };
+    this._init();
+  }
+
+  // ── INIT ────────────────────────────────────────────────────────────────
+  _init() {
+    // Startup-Cleanup: wenn zu viele WLs vorhanden
+    try {
+      const raw = JSON.parse(localStorage.getItem(this.cfg.storageKey) || '{}');
+      if (Object.keys(raw).length > 50) {
+        const clean = this._clean(raw);
+        localStorage.setItem(this.cfg.storageKey, JSON.stringify(clean));
+        const diff = Object.keys(raw).length - Object.keys(clean).length;
+        if (diff > 0) console.log(`[KoWL] Startup-Cleanup: ${Object.keys(raw).length} → ${Object.keys(clean).length} WLs (${diff} Junk entfernt)`);
+      }
+    } catch(e) {}
+  }
+
+  // ── BEREINIGUNG ─────────────────────────────────────────────────────────
+  _isValidName(name) {
+    if (!name || typeof name !== 'string') return false;
+    const n = name.trim();
+    if (!n || n.length > this.cfg.maxNameLen)  return false;
+    if (/^\d+$/.test(n))                        return false; // "0","1","21"
+    if (/^\d+\s*\(\d+\)$/.test(n))             return false; // "0 (1)","21 (1)"
+    if (/^\d+\./.test(n))                       return false; // "1. Eintrag"
+    return true;
+  }
+
+  _isValidTicker(sym) {
+    if (!sym || typeof sym !== 'string') return false;
+    const s = sym.trim().toUpperCase();
+    return s.length >= 1 && s.length <= 10 && /^[A-Z0-9.\-]+$/.test(s);
+  }
+
+  _parseTickers(val) {
+    if (!val) return [];
+    return String(val).split(',')
+      .map(s => s.trim().toUpperCase())
+      .filter(s => this._isValidTicker(s));
+  }
+
+  _clean(raw) {
+    if (!raw || typeof raw !== 'object') return {};
+    const clean = {};
+    Object.keys(raw).forEach(name => {
+      if (!this._isValidName(name)) return;
+      const tickers = this._parseTickers(raw[name]);
+      if (tickers.length === 0) return;
+      clean[name.trim()] = tickers.join(', ');
+    });
+    return clean;
+  }
+
+  // ── LESEN ───────────────────────────────────────────────────────────────
+  getAll() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(this.cfg.storageKey) || '{}');
+      return this._clean(raw);
+    } catch(e) { return {}; }
+  }
+
+  get(name) {
+    const all = this.getAll();
+    return all[name] ? this._parseTickers(all[name]) : null;
+  }
+
+  exists(name) {
+    return this.get(name) !== null;
+  }
+
+  // ── SCHREIBEN ───────────────────────────────────────────────────────────
+  save(name, tickers, opts = {}) {
+    if (!this._isValidName(name)) {
+      this._toast('⚠ Ungültiger WL-Name');
+      return false;
+    }
+    const clean = this._parseTickers(
+      Array.isArray(tickers) ? tickers.join(',') : String(tickers)
+    );
+    if (clean.length === 0) {
+      this._toast('⚠ Keine gültigen Ticker');
+      return false;
+    }
+
+    const all  = this.getAll();
+    const isNew = !all[name];
+
+    // Kollision prüfen
+    if (isNew && Object.keys(all).length >= this.cfg.maxWLs) {
+      this._toast('⚠ Max. Anzahl WLs erreicht');
+      return false;
+    }
+
+    all[name] = clean.join(', ');
+    this._persist(all, name);
+    this._emit('change', { action: isNew ? 'create' : 'update', name, tickers: clean });
+    return true;
+  }
+
+  rename(oldName, newName) {
+    if (!this._isValidName(newName)) { this._toast('⚠ Ungültiger Name'); return false; }
+    const all = this.getAll();
+    if (!all[oldName])   { this._toast('WL nicht gefunden'); return false; }
+    if (all[newName])    { this._toast('Name bereits vergeben'); return false; }
+    all[newName] = all[oldName];
+    delete all[oldName];
+    this._persist(all, newName);
+    this._emit('change', { action: 'rename', oldName, newName });
+    return true;
+  }
+
+  delete(name) {
+    const all = this.getAll();
+    if (!all[name]) return false;
+    delete all[name];
+    this._persist(all, null);
+    this._emit('change', { action: 'delete', name });
+    return true;
+  }
+
+  addTicker(wlName, sym) {
+    const tickers = this.get(wlName) || [];
+    const s = sym.trim().toUpperCase();
+    if (!this._isValidTicker(s)) return false;
+    if (tickers.includes(s)) return false;
+    tickers.push(s);
+    return this.save(wlName, tickers);
+  }
+
+  removeTicker(wlName, sym) {
+    const tickers = this.get(wlName) || [];
+    const s = sym.trim().toUpperCase();
+    const filtered = tickers.filter(t => t !== s);
+    if (filtered.length === tickers.length) return false;
+    if (filtered.length === 0) return this.delete(wlName);
+    return this.save(wlName, filtered);
+  }
+
+  // ── PERSISTENZ ──────────────────────────────────────────────────────────
+  _persist(all, changedName) {
+    const now = Date.now();
+    localStorage.setItem(this.cfg.storageKey, JSON.stringify(all));
+    localStorage.setItem(this.cfg.tsKey, now);
+
+    // Per-Liste Timestamps
+    try {
+      const ts = JSON.parse(localStorage.getItem(this.cfg.perTsKey) || '{}');
+      if (changedName) ts[changedName] = now;
+      else Object.keys(all).forEach(k => { if (!ts[k]) ts[k] = now; });
+      localStorage.setItem(this.cfg.perTsKey, JSON.stringify(ts));
+    } catch(e) {}
+
+    // Cloud-Sync (fire-and-forget)
+    this._syncPush();
+  }
+
+  // ── CLOUD-SYNC ──────────────────────────────────────────────────────────
+  async _syncPush() {
+    if (!this.cfg.syncUrl) return;
+    try {
+      const wls = localStorage.getItem(this.cfg.storageKey);
+      if (!wls) return;
+      await fetch(this.cfg.syncUrl + '/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'watchlist', data: wls, ts: Date.now() })
+      });
+    } catch(e) {}
+  }
+
+  async syncPull() {
+    if (!this.cfg.syncUrl) return false;
+    try {
+      const localTs = parseInt(localStorage.getItem(this.cfg.tsKey) || '0');
+      const r = await fetch(this.cfg.syncUrl + '/pull?key=watchlist');
+      if (!r.ok) return false;
+      const d = await r.json();
+      if (!d?.data) return false;
+      if ((d.updated_at || 0) > localTs) {
+        // Server ist neuer → übernehmen (mit Bereinigung!)
+        const raw   = JSON.parse(d.data);
+        const clean = this._clean(raw);
+        localStorage.setItem(this.cfg.storageKey, JSON.stringify(clean));
+        localStorage.setItem(this.cfg.tsKey, d.updated_at || Date.now());
+        this._emit('change', { action: 'sync-pull' });
+        return true;
+      }
+    } catch(e) {}
+    return false;
+  }
+
+  // ── AUTO-TOP ────────────────────────────────────────────────────────────
+  autoTopName(market) {
+    return 'Top40-' + (market === 'de' ? 'DE' : 'US');
+  }
+
+  autoTopMerge(scored, market, n) {
+    n = n || this.cfg.autoTopN;
+    const listName   = this.autoTopName(market);
+    const existing   = this.get(listName) || [];
+    const minScore   = 50;
+    const minBull    = 2;
+
+    // Score-Map aus bestehenden + neuen Kandidaten
+    const scoreMap = {};
+    existing.forEach(sym => { scoreMap[sym] = 0; });
+
+    scored
+      .filter(r => (r.score || 0) >= minScore && (r.bullCount || 0) >= minBull)
+      .forEach(r => {
+        scoreMap[r.sym] = Math.max(scoreMap[r.sym] || 0, r.score || 0);
+      });
+
+    const merged = Object.keys(scoreMap)
+      .map(sym => ({ sym, score: scoreMap[sym] }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, n)
+      .map(x => x.sym);
+
+    if (!merged.length) return false;
+    return this.save(listName, merged);
+  }
+
+  autoTopReset(market) {
+    return this.delete(this.autoTopName(market));
+  }
+
+  // ── UI: DROPDOWN ────────────────────────────────────────────────────────
+  updateDropdown(selectId, activeWL, groups) {
+    const sel = typeof selectId === 'string'
+      ? document.getElementById(selectId)
+      : selectId;
+    if (!sel) return;
+
+    const all     = this.getAll();
+    const wlNames = Object.keys(all);
+    const current = sel.value;
+
+    // Vorhandene WL-Optionen entfernen (feste Optionen erhalten)
+    Array.from(sel.options).forEach(opt => {
+      if (opt.dataset.wl === 'true') opt.remove();
+    });
+
+    if (wlNames.length === 0) return;
+
+    // Trennlinie + WL-Optionen
+    const sep = document.createElement('option');
+    sep.disabled = true;
+    sep.textContent = '── Meine Watchlisten ──';
+    sep.style.color = 'var(--text3)';
+    sep.dataset.wl  = 'true';
+    sel.appendChild(sep);
+
+    wlNames.forEach(name => {
+      const tickers = this._parseTickers(all[name]);
+      const opt     = document.createElement('option');
+      opt.value     = 'wl:' + name;
+      opt.textContent = '⭐ ' + name + ' (' + tickers.length + ')';
+      opt.dataset.wl  = 'true';
+      if (name === activeWL || 'wl:' + name === current) opt.selected = true;
+      sel.appendChild(opt);
+    });
+
+    this._emit('dropdownChange', { selectId, wlNames });
+  }
+
+  // ── UI: SAVE MODAL ──────────────────────────────────────────────────────
+  showSaveModal(tickers, defaultName, onConfirm) {
+    // Cleanup: leere Ticker raus
+    const clean = (Array.isArray(tickers) ? tickers : [tickers])
+      .map(s => (s || '').trim().toUpperCase())
+      .filter(s => this._isValidTicker(s));
+
+    if (!clean.length) {
+      this._toast('⚠ Keine gültigen Ticker zum Speichern');
+      return;
+    }
+
+    // Altes Modal entfernen
+    document.getElementById('ko-wl-save-modal')?.remove();
+
+    const name = defaultName || 'Meine Watchlist';
+    const all  = this.getAll();
+
+    const modal = document.createElement('div');
+    modal.id = 'ko-wl-save-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:1rem';
+
+    modal.innerHTML = `
+      <div style="background:var(--bg2,#151820);border-radius:12px;padding:1.25rem;width:100%;max-width:340px;border:1px solid var(--border,#2a2f42)">
+        <div style="font-size:14px;font-weight:700;color:var(--text,#e8eaf0);margin-bottom:.75rem">
+          💾 Watchlist speichern
+        </div>
+        <div style="font-size:11px;color:var(--text3,#5a6280);margin-bottom:.5rem">
+          ${clean.length} Ticker: ${clean.slice(0,5).join(', ')}${clean.length > 5 ? '…' : ''}
+        </div>
+        <input id="ko-wl-name-input" type="text" value="${name}"
+          placeholder="WL-Name eingeben"
+          style="width:100%;padding:8px 10px;font-size:13px;background:var(--bg3,#1c2030);border:1px solid var(--border2,#3a4060);color:var(--text,#e8eaf0);border-radius:8px;margin-bottom:.5rem;box-sizing:border-box"
+          onkeydown="if(event.key==='Enter')document.getElementById('ko-wl-confirm').click()">
+        <div id="ko-wl-collision" style="display:none;font-size:11px;color:var(--amber,#f0a93a);margin-bottom:.4rem">
+          ⚠ Name bereits vorhanden — wird überschrieben
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem">
+          <button id="ko-wl-confirm" style="flex:1;padding:9px;font-size:13px;font-weight:600;background:var(--accent,#4f8ef7);color:#fff;border:none;border-radius:8px;cursor:pointer">
+            Speichern
+          </button>
+          <button onclick="document.getElementById('ko-wl-save-modal').remove()" 
+            style="padding:9px 16px;font-size:13px;background:var(--bg3,#1c2030);color:var(--text2,#9ba3b8);border:1px solid var(--border,#2a2f42);border-radius:8px;cursor:pointer">
+            Abbrechen
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(modal);
+
+    // Kollisions-Anzeige
+    const inp = document.getElementById('ko-wl-name-input');
+    const col = document.getElementById('ko-wl-collision');
+    inp.addEventListener('input', () => {
+      col.style.display = all[inp.value.trim()] ? 'block' : 'none';
+    });
+    inp.dispatchEvent(new Event('input'));
+
+    // Confirm
+    document.getElementById('ko-wl-confirm').onclick = () => {
+      const wlName = inp.value.trim();
+      if (!wlName) { inp.style.borderColor = 'var(--red,#ff3b30)'; return; }
+      modal.remove();
+      const ok = this.save(wlName, clean);
+      if (ok) {
+        this._toast('✓ ' + wlName + ' gespeichert (' + clean.length + ' Titel)');
+        if (onConfirm) onConfirm(wlName, clean);
+      }
+    };
+
+    // Fokus
+    setTimeout(() => inp.select(), 50);
+  }
+
+  // ── IMPORT / EXPORT ─────────────────────────────────────────────────────
+  importCSV(text, targetWLName) {
+    if (!text) return null;
+
+    // BOM entfernen
+    text = text.replace(/^\uFEFF/, '');
+    const lines = text.split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
+
+    // TradingView-Format: EXCHANGE:TICKER
+    if (lines[0] && /^[A-Z]+:[A-Z0-9]+$/.test(lines[0])) {
+      const tickers = lines.map(l => l.split(':')[1]).filter(s => this._isValidTicker(s));
+      return { tickers, format: 'tradingview', count: tickers.length };
+    }
+
+    // CSV-Format: erste Zeile Header prüfen
+    let dataLines = lines;
+    if (lines[0] && /ticker|symbol|sym|name/i.test(lines[0])) {
+      dataLines = lines.slice(1);
+    }
+
+    const tickers = [];
+    dataLines.forEach(line => {
+      const parts = line.split(',');
+      const col0  = (parts[0] || '').trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, '');
+      const col1  = (parts[1] || '').trim().toUpperCase().replace(/[^A-Z0-9.\-]/g, '');
+
+      // Auto-Erkennung: kurzer String (1-6 Zeichen) = Ticker
+      if (col0.length >= 1 && col0.length <= 6 && this._isValidTicker(col0)) {
+        tickers.push(col0);
+      } else if (col1.length >= 1 && col1.length <= 6 && this._isValidTicker(col1)) {
+        tickers.push(col1);
+      }
+    });
+
+    return { tickers, format: 'csv', count: tickers.length };
+  }
+
+  exportCSV(wlName) {
+    const tickers = this.get(wlName);
+    if (!tickers) return false;
+
+    const csv   = 'TICKER,Name\n' + tickers.map(t => t + ',').join('\n');
+    const date  = new Date().toISOString().slice(0, 10);
+    const fname = wlName.replace(/[^a-zA-Z0-9\-_]/g, '_') + '_' + date + '.csv';
+    const blob  = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href = url; a.download = fname; a.click();
+    URL.revokeObjectURL(url);
+    this._toast('⬇ ' + fname + ' exportiert');
+    return true;
+  }
+
+  // ── SHARE ────────────────────────────────────────────────────────────────
+  share(wlName, method = 'system') {
+    const tickers = this.get(wlName);
+    if (!tickers) return;
+
+    const csv  = 'TICKER\n' + tickers.join('\n');
+    const date = new Date().toLocaleDateString('de-DE');
+
+    if (method === 'download') {
+      return this.exportCSV(wlName);
+    }
+
+    if (method === 'mail') {
+      const subj = encodeURIComponent('Watchlist: ' + wlName);
+      const body = encodeURIComponent(wlName + ' (' + date + '):\n\n' + csv + '\n\nViele Grüße');
+      window.open('mailto:?subject=' + subj + '&body=' + body);
+      return;
+    }
+
+    // System Share / Clipboard
+    const shareData = {
+      title: 'Watchlist: ' + wlName,
+      text:  csv,
+    };
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      navigator.share(shareData).catch(() => this._copyFallback(csv));
+    } else {
+      this._copyFallback(csv);
+    }
+  }
+
+  _copyFallback(text) {
+    navigator.clipboard?.writeText(text)
+      .then(() => this._toast('✓ In Zwischenablage kopiert'))
+      .catch(() => this._toast('⚠ Kopieren fehlgeschlagen'));
+  }
+
+  // ── EVENTS ───────────────────────────────────────────────────────────────
+  on(event, fn) {
+    if (this._listeners[event]) this._listeners[event].push(fn);
+    return this; // Chaining
+  }
+
+  _emit(event, data) {
+    (this._listeners[event] || []).forEach(fn => { try { fn(data); } catch(e) {} });
+  }
+
+  // ── HILFSFUNKTIONEN ──────────────────────────────────────────────────────
+  _toast(msg) {
+    if (this.cfg.onToast) {
+      this.cfg.onToast(msg);
+    } else {
+      console.log('[KoWL]', msg);
+    }
+  }
+
+  // Kompatibilitäts-Alias für bestehenden Scanner-Code
+  getWatchlists()                 { return this.getAll(); }
+  saveWatchlist(name, input)      { return this.save(name, input.split(',').map(s=>s.trim())); }
+  deleteWatchlist(name)           { return this.delete(name); }
+  cleanWatchlists(raw)            { return this._clean(raw); }
+  updateWatchlistDropdown(sid, active) { return this.updateDropdown(sid, active); }
+}
+
+// ── SINGLETON für KO-Scanner ─────────────────────────────────────────────
+// Wird nach DOM-Load initialisiert (syncUrl aus bestehendem KoSync)
+var KoWL = null;
+
+function initKoWL(cfg) {
+  KoWL = new KoWatchlistManager(cfg || {
+    storageKey: 'ko_watchlists',
+    syncUrl:    typeof KoSync !== 'undefined' ? null : null, // KoSync übernimmt Sync
+    onToast:    typeof showKoToast === 'function' ? showKoToast : null,
+    autoTopN:   40,
+  });
+  return KoWL;
+}
+
+
+</script>
+
+<script>
+// ── KO-WL INITIALISIERUNG ──────────────────────────────────────────
+// KoWL Singleton nach DOM verfügbar initialisieren
+window.addEventListener('load', function() {
+  window.KoWL = initKoWL({
+    storageKey: 'ko_watchlists',
+    onToast:    function(msg) { if (typeof showKoToast === 'function') showKoToast(msg); },
+    autoTopN:   40,
+  });
+  // onChange: Dropdown aktualisieren
+  window.KoWL.on('change', function() {
+    if (typeof updateWatchlistDropdown === 'function') updateWatchlistDropdown();
+  });
+});
+
 // ── EIC KONSTANTEN (global, früh definiert) ──
 const EIC_KEY     = 'ko_eic_lists';
 const EIC_PIN_KEY = 'ko_eic_pin';
@@ -2138,8 +2657,16 @@ const KoSync = {
     if (wls && wls.data) {
       const localTs = JSON.parse(localStorage.getItem('ko_watchlists_ts') || '0');
       if ((wls.updated_at || 0) > localTs) {
-        var syncClean = cleanWatchlists(wls.data || {});
-        localStorage.setItem('ko_watchlists', JSON.stringify(syncClean));
+        if (window.KoWL) {
+          // KoWL übernimmt Bereinigung
+          var syncData = typeof wls.data === 'string' ? JSON.parse(wls.data) : (wls.data || {});
+          Object.keys(syncData).forEach(function(name) {
+            if (syncData[name]) window.KoWL.save(name, syncData[name].split(',').map(function(s){return s.trim();}));
+          });
+        } else {
+          var syncClean = cleanWatchlists(wls.data || {});
+          localStorage.setItem('ko_watchlists', JSON.stringify(syncClean));
+        }
         localStorage.setItem('ko_watchlists_ts', wls.updated_at || Date.now());
         if (typeof updateWatchlistDropdown === 'function') updateWatchlistDropdown();
         pulled++;
@@ -3839,7 +4366,7 @@ async function runScan(){
 
       const intervalMapTD={'15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'};
       const outputMap={'15m':78,'30m':65,'1h':70,'4h':60,'1d':220}; // Bars: MACD braucht min 35, Ziel ~70
-      const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':130};
+      const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':260}; // 260 für EMA200+Überhitzung
       let closes=[],volumes=[],timestamps=[],dates=[];
       let dataSource='';
       const deOpen = typeof isGermanMarketOpen==='function' && isGermanMarketOpen();
@@ -4382,6 +4909,7 @@ function computeFromRaw(closes, volumes, timestamps){
     obv_slope_5d:obvSlope!=null?+obvSlope.toFixed(2):null,
     volume_ratio:volRatio,
     closes_full:closes.map(function(v){return +v;}),
+    volumes_full:volumes ? volumes.map(function(v){return +(v||0);}) : [],
     closes_20d:closes.slice(-20).map(function(v){return +v.toFixed(2);}),
     macd_hist_20d:hist.slice(-20).map(function(v){return v!=null?+v.toFixed(4):0;}),
     obv_norm_20d:l20o.map(function(v){return oMax===oMin?0.5:+((v-oMin)/(oMax-oMin)).toFixed(3);}),
@@ -4621,7 +5149,7 @@ function processData(raw){
 
   // Überhitzungs-Score berechnen
   var _overheat = null;
-  try { _overheat = calcOverheatScore(null, raw); } catch(e) {}
+  try { _overheat = calcOverheatScore(null, raw); } catch(e) { console.warn('overheat:', e.message, raw?.closes_full?.length, 'closes'); }
 
   return Object.assign({},raw,{
     markov:raw._markov||null,
@@ -4712,7 +5240,7 @@ function renderCard(t,state){
     earningsBadgeHtml(state._er||null)+
     (function(){
       var oh = state.overheat;
-      if (!oh || oh.score < 25) return '';
+      if (!oh || oh.score < 15) return ''; // Zeige ab 15% Überhitzung
       return '<span title="Überhitzungs-Score '+oh.score+'/100: '+oh.signals.map(function(s){return s.label;}).join(' · ')+'" '
         + 'style="font-size:10px;padding:2px 6px;border-radius:5px;margin-left:4px;cursor:help;'
         + 'background:'+oh.color+'22;color:'+oh.color+';border:0.5px solid '+oh.color+'">'
@@ -7720,10 +8248,9 @@ function saveCleanWatchlists(wls) {
 })();
 
 function getWatchlists(){
-  try {
-    var raw = JSON.parse(localStorage.getItem(WL_KEY) || '{}');
-    return cleanWatchlists(raw);  // Immer bereinigt!
-  } catch(e){ return {}; }
+  return window.KoWL ? window.KoWL.getAll() : (function(){
+    try { return JSON.parse(localStorage.getItem('ko_watchlists')||'{}'); } catch(e){ return {}; }
+  })();
 }
 
 // ── Kursrahmen-Filter ────────────────────────────────────────────────────────
@@ -7797,7 +8324,17 @@ function loadPriceFilterUI() {
 
 // Watchlists speichern + auto-sync zur Cloud
 function saveWatchlistsWithSync(wls, listName) {
-  var clean = saveCleanWatchlists(wls); // Zentrale Bereinigung
+  // KoWL übernimmt Bereinigung + Persistenz
+  if (window.KoWL) {
+    Object.keys(wls).forEach(function(name) {
+      if (wls[name] && wls[name].trim()) {
+        window.KoWL.save(name, wls[name].split(',').map(function(s){return s.trim();}));
+      }
+    });
+    updateWatchlistDropdown();
+    return;
+  }
+  var clean = saveCleanWatchlists(wls); // Fallback
   localStorage.setItem('ko_watchlists_ts', Date.now());
   // Per-Liste Timestamp
   try {
@@ -13696,6 +14233,21 @@ function autoTopListName() {
 }
 
 function autoTopMerge(allScored) {
+  // KoWL übernimmt Auto-Top-Logik
+  if (window.KoWL) {
+    var market = window.currentMarket || 'us';
+    var ok = window.KoWL.autoTopMerge(allScored, market);
+    if (ok) {
+      var listName = window.KoWL.autoTopName(market);
+      var mkt = market === 'de' ? 'DE' : 'US';
+      var ts  = new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+      var dt  = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+      showKoToast('📊 Top40-' + mkt + ' · ' + dt + ' ' + ts);
+      updateWatchlistDropdown();
+    }
+    return;
+  }
+  // Legacy Fallback
   try {
     var cfg = JSON.parse(localStorage.getItem(AUTO_TOP_KEY + '_cfg') || '{}');
     var n = cfg.n || AUTO_TOP_N;
