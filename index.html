@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v107">
+<meta name="app-version" content="20260615-v112">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -529,6 +529,43 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         </div>
       </div>
       <div id="live-prices-status" style="font-size:11px;color:var(--text3);margin-bottom:.5rem;display:none"></div>
+
+      <!-- ── SEKTOR ÜBERHITZUNG ──────────────────────────────────────── -->
+      <div id="sektor-overheat-panel" style="background:var(--bg2);border-radius:var(--radius);padding:.75rem;margin-bottom:.75rem;border:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+          <div style="font-size:12px;font-weight:600;color:var(--text)">
+            <i class="ti ti-flame" style="color:var(--red)"></i> Sektor-Überhitzung
+          </div>
+          <div style="display:flex;gap:.4rem">
+            <button class="btn btn-sm" onclick="loadSektorOverheat()" id="sektor-overheat-btn"
+              style="font-size:10px;padding:3px 8px;background:rgba(255,59,48,0.1);border-color:var(--red);color:var(--red)">
+              <i class="ti ti-refresh"></i> ETF-Scan
+            </button>
+            <button class="btn btn-sm" onclick="loadNasdaqBreadth()" id="breadth-btn"
+              style="font-size:10px;padding:3px 8px;background:rgba(79,142,247,0.1);border-color:var(--accent);color:var(--accent)">
+              <i class="ti ti-chart-bar"></i> NDX Breadth
+            </button>
+          </div>
+        </div>
+        <!-- Breadth Ergebnis -->
+        <div id="breadth-result" style="display:none;background:var(--bg3);border-radius:8px;padding:.6rem .75rem;margin-bottom:.5rem">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:11px;font-weight:600;color:var(--text)">
+              📊 NASDAQ Breadth — %Titel über EMA20
+            </span>
+            <span id="breadth-pct" style="font-size:14px;font-weight:700">—</span>
+          </div>
+          <div id="breadth-detail" style="font-size:10px;color:var(--text3);margin-top:3px">—</div>
+          <div id="breadth-divergence" style="display:none;font-size:11px;color:var(--red);margin-top:4px;font-weight:600">
+            ⚠ Bearishe Divergenz: Index steigt, aber nur wenige Leader tragen noch!
+          </div>
+        </div>
+        <div id="sektor-overheat-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="grid-column:span 2;text-align:center;color:var(--text3);font-size:11px;padding:.5rem">
+            Klicke "Laden" für Sektor-Überhitzungsanalyse
+          </div>
+        </div>
+      </div>
 
       <!-- ── INTERMARKET ANALYSE ─────────────────────────────────── -->
       <div id="intermarket-panel" style="background:var(--bg2);border-radius:var(--radius);padding:.75rem;margin-bottom:.75rem;border:0.5px solid var(--border)">
@@ -4124,6 +4161,28 @@ async function runScan(){
   setTimeout(function(){ document.getElementById('scan-progress').style.display='none'; },2000);
   btn.disabled=false;
   try { autoSaveShortlist(); } catch(e) {}
+
+  // Smart Alert-Routing: Überhitzte Titel melden
+  setTimeout(async function() {
+    try {
+      // Makro-State zuerst updaten
+      await sendMacroState();
+      // Dann Einzeltitel-Alerts
+      var alertCount = 0;
+      for (var ai = 0; ai < activeTickers.length; ai++) {
+        var t    = activeTickers[ai];
+        var data = tickerData[t.sym];
+        if (!data || data.error) continue;
+        var state = processData(data);
+        if (state.overheat && state.overheat.score >= 25) {
+          await sendKoAlert(t.sym, state);
+          alertCount++;
+          if (alertCount >= 10) break; // Max 10 Alerts pro Scan
+          await new Promise(function(r){ setTimeout(r, 300); }); // Rate limit
+        }
+      }
+    } catch(alertErr) { console.warn('Alert dispatch:', alertErr.message); }
+  }, 2000); // 2s nach Scan-Ende
 }
 
 function sortAndRenderCards(tickers){
@@ -4559,8 +4618,20 @@ function processData(raw){
   const scoreColor = compositeScore>=70?'var(--green)':compositeScore>=50?'var(--accent)':
                      compositeScore>=35?'var(--amber)':'var(--red)';
 
+  // Überhitzungs-Score berechnen
+  var _overheat = null;
+  try { _overheat = calcOverheatScore(null, raw); } catch(e) {}
+
   return Object.assign({},raw,{
     markov:raw._markov||null,
+    overheat:_overheat,
+    // Adjustierter Score mit Signal-Qualitäts-Faktor
+    adjustedScore: (function() {
+      if (!_overheat) return null;
+      var oh = _overheat.score || 0;
+      var ohF = oh < 30 ? 1.0 : oh < 50 ? 0.7 : oh < 75 ? 0.4 : 0.1;
+      return Math.round((raw.compositeScore || 0) * ohF);
+    })(),
     _fromTdCache:raw._fromTdCache||false,
     above50:above50,macdBull:macdBull,obvBull:obvBull,bullCount:bullCount,
     histVal:raw.macd_hist,obvSlope:raw.obv_slope_5d,volRatio:raw.volume_ratio,
@@ -4638,6 +4709,14 @@ function renderCard(t,state){
     '</span>'+
     (state.sessionNote?'<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,0.08);color:var(--text3);margin-left:4px">'+state.sessionNote+'</span>':'')+
     earningsBadgeHtml(state._er||null)+
+    (function(){
+      var oh = state.overheat;
+      if (!oh || oh.score < 25) return '';
+      return '<span title="Überhitzungs-Score '+oh.score+'/100: '+oh.signals.map(function(s){return s.label;}).join(' · ')+'" '
+        + 'style="font-size:10px;padding:2px 6px;border-radius:5px;margin-left:4px;cursor:help;'
+        + 'background:'+oh.color+'22;color:'+oh.color+';border:0.5px solid '+oh.color+'">'
+        + oh.icon+' '+oh.score+'%</span>';
+    }())+
     (state._fromTdCache ? '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(120,120,128,0.15);color:var(--text3);margin-left:4px" title="Daten aus lokalem Cache"><i class="ti ti-database" style="font-size:9px"></i> Cache</span>' : '')+
     '<span style="margin-left:auto;display:flex;align-items:center;gap:5px">'+
     (state.rs ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:.03em;background:'+(state.rs>=80?'rgba(52,194,110,0.18)':state.rs>=60?'rgba(79,142,247,0.18)':state.rs<40?'rgba(240,86,86,0.18)':'rgba(255,255,255,0.08)')+';color:'+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--text3)')+';border:0.5px solid '+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--border2)')+'">RS '+state.rs+'</span>' : '')+
@@ -4746,11 +4825,29 @@ function renderCard(t,state){
       var label = isHV ? 'HVP' : 'IVP';
       var ivpText = ivp != null ? label+'\u00A0' + ivp + '%' : '';
       if (!ivpText) return ''; // Nicht anzeigen wenn kein Wert
-      var atmText = (atmIV != null && !isHV) ? ' · IV\u00A0' + atmIV + '%' : (isHV && atmIV ? ' · HV\u00A0' + atmIV + '%' : '');
+      var atmText = (atmIV != null && !isHV) ? ' · IV ' + atmIV + '%' : (isHV && atmIV ? ' · HV ' + atmIV + '%' : '');
+      // Skew-Proxy anzeigen wenn vorhanden
+      var skewData = ivpData ? ivpData.skewProxy : null;
+      var skewLevel = ivpData ? ivpData.skewLevel : null;
+      var skewColor = skewLevel === 'STEIL' ? 'var(--red)' : skewLevel === 'ERHÖHT' ? 'var(--amber)' : 'var(--green)';
+      var skewText  = skewData != null && skewLevel && skewLevel !== 'NORMAL'
+        ? ' · <span style="color:' + skewColor + ';font-weight:600">Skew ' + skewLevel + '</span>'
+        : '';
+      // Call/Put-Ratio Badge
+      var cpr       = ivpData ? ivpData.callPutRatio  : null;
+      var cprLevel  = ivpData ? ivpData.callPutLevel   : null;
+      var cprColor  = cprLevel === 'EXTREM_BULLISH' ? 'var(--red)'
+                    : cprLevel === 'HOCH_BULLISH'   ? 'var(--amber)'
+                    : cprLevel === 'BEARISH'         ? 'var(--green)'
+                    : 'var(--text3)';
+      var cprText   = cpr != null && cprLevel && cprLevel !== 'NEUTRAL'
+        ? ' · <span style="color:' + cprColor + ';font-weight:600">C/P ' + cpr
+          + (cprLevel === 'EXTREM_BULLISH' ? ' ⚠' : '') + '</span>'
+        : '';
       return '<div style="display:flex;justify-content:space-between;align-items:center;'
         +'padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px">'
         +'<span class="ivp-badge" style="font-size:11px;font-weight:600;color:'+col+'">📈 '+ivpText+'</span>'
-        +'<span style="font-size:10px;color:'+col+'">'+atmText+' · '+hint+'</span>'
+        +'<span style="font-size:10px;color:'+col+'">'+atmText+' · '+hint+skewText+cprText+'</span>'
         +'</div>';
     }())+
     (state._er?'<div style="font-size:11px;padding:4px 8px;border-radius:6px;margin-bottom:6px;background:'+(state._er.daysUntil<=7?'rgba(240,86,86,0.12)':state._er.daysUntil<=14?'rgba(240,169,58,0.12)':'rgba(255,255,255,0.04)')+';color:'+(state._er.daysUntil<=7?'var(--red)':state._er.daysUntil<=14?'var(--amber)':'var(--text3)')+'"><i class="ti ti-calendar-event"></i> Earnings: '+state._er.date+' (in '+(parseInt(state._er.daysUntil)||'?')+' T) '+(state._er.time&&state._er.time==='amc'?'NC ':'')+(state._er.time&&state._er.time==='bmo'?'VM ':'')+( state._er.daysUntil<=7?'⚠️ Sehr nah — KO-Abstand ≥25%!':state._er.daysUntil<=14?'📅 Bald — erhoehten KO-Abstand waehlen':'📊 Kein sofortiges Risiko')+'</div>':'<div style="font-size:11px;padding:4px 8px;border-radius:6px;margin-bottom:6px;background:rgba(255,255,255,0.03);color:var(--text3)"><i class="ti ti-calendar-event"></i> Kein Earnings in den naechsten 45 Tagen</div>')+
@@ -6262,6 +6359,163 @@ function renderCnnFearGreed(fg) {
   if (bar)   { bar.style.width = s + '%'; bar.style.background = color; }
 }
 
+
+
+// ── NASDAQ BREADTH: %Titel über EMA20 ─────────────────────────────────────
+// Fängt ab: Index steigt nur noch durch 3-5 Mega-Caps, Rest fällt bereits
+var _nasdaqBreadthCache = null;
+var _nasdaqBreadthTS    = 0;
+
+async function calcNasdaqBreadth() {
+  // Nur alle 2h neu berechnen
+  if (_nasdaqBreadthTS && Date.now() - _nasdaqBreadthTS < 2*60*60*1000) {
+    return _nasdaqBreadthCache;
+  }
+
+  // NDX100 Ticker aus FIXED_LISTS
+  var ndxTickers = getFixedListTickers('NDX100').slice(0, 40); // Top40 für Performance
+  if (!ndxTickers.length) return null;
+
+  var above20 = 0, total = 0, leaders = [], laggards = [];
+
+  for (var i = 0; i < ndxTickers.length; i++) {
+    var sym = ndxTickers[i].sym;
+    try {
+      var to   = Math.floor(Date.now() / 1000);
+      var from = to - 60*60*24*35; // 35 Tage für EMA20
+      var url  = 'https://query1.finance.yahoo.com/v7/finance/chart/'
+               + sym + '?interval=1d&period1=' + from + '&period2=' + to;
+      var r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
+      if (!r.ok) continue;
+      var j   = await r.json();
+      var res = j?.chart?.result?.[0];
+      if (!res) continue;
+      var closes = (res.indicators.quote[0].close || []).filter(function(v){ return v != null; });
+      if (closes.length < 21) continue;
+
+      // EMA20 berechnen
+      var k20 = 2/21;
+      var ema20 = closes[0];
+      for (var ci = 1; ci < closes.length; ci++) ema20 = closes[ci]*k20 + ema20*(1-k20);
+      var price = closes[closes.length-1];
+      var aboveEma = price > ema20;
+      var distPct  = Math.round((price - ema20) / ema20 * 100 * 10) / 10;
+
+      total++;
+      if (aboveEma) {
+        above20++;
+        if (distPct > 5) leaders.push({ sym, dist: distPct });
+      } else {
+        if (distPct < -5) laggards.push({ sym, dist: distPct });
+      }
+    } catch(e) {}
+    if (i % 5 === 4) await new Promise(function(r){ setTimeout(r, 300); });
+  }
+
+  if (!total) return null;
+
+  var pct = Math.round(above20 / total * 100);
+  // Breadth-Bewertung
+  var level, color;
+  if (pct >= 70)      { level = 'STARK';     color = 'var(--green)'; }
+  else if (pct >= 50) { level = 'NEUTRAL';   color = 'var(--text2)'; }
+  else if (pct >= 35) { level = 'SCHWACH';   color = 'var(--amber)'; }
+  else                { level = 'BEARISH';   color = 'var(--red)'; }
+
+  // Bearishe Divergenz: Index nahe Hoch aber Breadth schwach?
+  var divergence = pct < 50 && above20 >= 3; // Wenige Leader ziehen Index
+
+  var result = {
+    pct, level, color, total, above20,
+    leaders:  leaders.sort(function(a,b){return b.dist-a.dist;}).slice(0,5),
+    laggards: laggards.sort(function(a,b){return a.dist-b.dist;}).slice(0,5),
+    divergence,
+    ts: Date.now()
+  };
+
+  _nasdaqBreadthCache = result;
+  _nasdaqBreadthTS    = Date.now();
+  return result;
+}
+
+
+async function loadNasdaqBreadth() {
+  var btn = document.getElementById('breadth-btn');
+  var res = document.getElementById('breadth-result');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Lädt…'; }
+
+  var data = await calcNasdaqBreadth();
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-chart-bar"></i> NDX Breadth'; }
+  if (!data) { showKoToast('Breadth: Keine Daten'); return; }
+
+  if (res) res.style.display = 'block';
+  var pctEl = document.getElementById('breadth-pct');
+  var detEl = document.getElementById('breadth-detail');
+  var divEl = document.getElementById('breadth-divergence');
+
+  if (pctEl) {
+    pctEl.textContent = data.pct + '%';
+    pctEl.style.color = data.color;
+  }
+  if (detEl) {
+    detEl.innerHTML = '<span style="color:' + data.color + ';font-weight:600">' + data.level + '</span>'
+      + ' · ' + data.above20 + '/' + data.total + ' Titel über EMA20'
+      + (data.leaders.length ? ' · Leader: ' + data.leaders.map(function(l){ return l.sym; }).join(', ') : '');
+  }
+  if (divEl) divEl.style.display = data.divergence ? 'block' : 'none';
+
+  // In KI-Kontext speichern
+  window._nasdaqBreadthData = data;
+  showKoToast('📊 NDX Breadth: ' + data.pct + '% über EMA20 — ' + data.level);
+}
+
+async function loadSektorOverheat() {
+  var btn  = document.getElementById('sektor-overheat-btn');
+  var grid = document.getElementById('sektor-overheat-grid');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Lädt…'; }
+  if (grid) grid.innerHTML = '<div style="grid-column:span 2;text-align:center;font-size:11px;color:var(--text3);padding:.5rem">Lade ETF-Daten (10 ETFs × 280 Tage)…</div>';
+
+  var results = await fetchSektorOverheat();
+  var keys    = Object.keys(results);
+
+  if (!keys.length) {
+    if (grid) grid.innerHTML = '<div style="grid-column:span 2;color:var(--red);font-size:11px;padding:.5rem">Fehler beim Laden</div>';
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Laden'; }
+    return;
+  }
+
+  // Nach Überhitzungs-Score sortieren
+  keys.sort(function(a,b) {
+    return (results[b].overheat?.score||0) - (results[a].overheat?.score||0);
+  });
+
+  var html = keys.map(function(sym) {
+    var d  = results[sym];
+    var oh = d.overheat;
+    if (!oh) return '';
+    var color = oh.color;
+    var topSignal = oh.signals.filter(function(s){return s.pts>0;}).slice(0,1)[0];
+    var sigTxt = topSignal ? topSignal.label : 'Kein Warnsignal';
+    var ema200txt = oh.ema200dist != null ? 'EMA200 +'+oh.ema200dist+'%' : '';
+    return '<div style="background:var(--bg3);border-radius:8px;padding:6px 8px;border-left:2px solid '+color+'">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center">'
+      + '<span style="font-size:11px;font-weight:700;color:var(--text)">'+d.icon+' '+d.label+'</span>'
+      + '<span style="font-size:12px;font-weight:700;color:'+color+'">'+oh.icon+' '+oh.score+'%</span>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+sym+'</div>'
+      + '<div style="font-size:10px;color:'+color+';margin-top:2px">'+sigTxt+'</div>'
+      + (ema200txt ? '<div style="font-size:9px;color:var(--text3)">'+ema200txt+'</div>' : '')
+      + '</div>';
+  }).join('');
+
+  if (grid) grid.innerHTML = html;
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Laden'; }
+
+  // In KI-Kontext einspeisen
+  window._sektorOverheatData = results;
+}
+
 async function loadIntermarket() {
   const btn   = document.getElementById('intermarket-btn');
   const grid  = document.getElementById('im-grid');
@@ -7481,6 +7735,10 @@ function loadPriceFilterUI() {
 
 // Watchlists speichern + auto-sync zur Cloud
 function saveWatchlistsWithSync(wls, listName) {
+  // Leere WLs vor dem Speichern entfernen
+  Object.keys(wls).forEach(function(k) {
+    if (!wls[k] || !wls[k].trim()) delete wls[k];
+  });
   localStorage.setItem(WL_KEY, JSON.stringify(wls));
   localStorage.setItem('ko_watchlists_ts', Date.now());
   // Per-Liste Timestamp
@@ -7525,6 +7783,8 @@ function updateWatchlistDropdown(){
   var wls=getWatchlists();
   var wlTs=JSON.parse(localStorage.getItem('ko_wl_timestamps')||'{}');
   Object.keys(wls).forEach(function(name){
+    // Leere WLs nicht anzeigen
+    if(!wls[name] || !wls[name].trim()) return;
     var opt=document.createElement('option');
     opt.value='wl:'+name;
     var ts=wlTs[name]?new Date(wlTs[name]).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
@@ -7748,6 +8008,115 @@ async function enrichTop40WithIV() {
         }
       }
 
+      // ── Skew-Proxy via echte Yahoo Options-IV ──────────────────────
+      // Fix: Kritik-Fix — HV/HV Vergleich mathematisch inkonsistent.
+      // Korrekt: IV(OTM-Put ~90%) / IV(ATM) — rein impliziter Vergleich.
+      // Für US-Titel: echte Options-Chain von Yahoo laden
+      // Für DE-Titel: Fallback auf bereinigten HV-Tail-Proxy
+      if (ivpResult && !ivpResult.isHV) {
+        // US-Titel: Echten Skew aus Options-Chain berechnen
+        try {
+          var optUrl = 'https://query1.finance.yahoo.com/v7/finance/options/' + sym;
+          var optR   = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(optUrl));
+          if (optR.ok) {
+            var optJ  = await optR.json();
+            var chain = optJ?.optionChain?.result?.[0];
+            if (chain) {
+              var spotPrice = chain.quote?.regularMarketPrice || 0;
+              var puts      = chain.options?.[0]?.puts || [];
+              if (spotPrice > 0 && puts.length >= 3) {
+                // ATM-Put: nächster Strike zu Spot
+                var atmPut = puts.reduce(function(best, p) {
+                  return Math.abs(p.strike - spotPrice) < Math.abs(best.strike - spotPrice) ? p : best;
+                }, puts[0]);
+                var atmIV_real = atmPut?.impliedVolatility || 0;
+
+                // OTM-Put ~10% unter Spot (Tail-Absicherung)
+                var targetStrike = spotPrice * 0.90;
+                var otmPut = puts.reduce(function(best, p) {
+                  return p.strike <= spotPrice * 0.95 &&
+                    Math.abs(p.strike - targetStrike) < Math.abs(best.strike - targetStrike) ? p : best;
+                }, puts.find(function(p){ return p.strike < spotPrice * 0.95; }) || puts[0]);
+                var otmIV_real = otmPut?.impliedVolatility || 0;
+
+                if (atmIV_real > 0 && otmIV_real > 0) {
+                  // Echter Skew: IV(OTM-Put) / IV(ATM) - 1
+                  var realSkew  = Math.round((otmIV_real / atmIV_real - 1) * 100) / 100;
+                  var skewLevel = realSkew > 0.35 ? 'STEIL'
+                    : realSkew > 0.15 ? 'ERHÖHT'
+                    : 'NORMAL';
+                  ivpResult.skewProxy  = realSkew;
+                  ivpResult.skewLevel  = skewLevel;
+                  ivpResult.atmIV_real = Math.round(atmIV_real * 100);
+                  ivpResult.otmIV_real = Math.round(otmIV_real * 100);
+                  ivpResult.isHV       = false; // Echte IV-Daten vorhanden
+                }
+              }
+            }
+          }
+        } catch(skewErr) { console.warn('Skew', sym, skewErr.message); }
+      }
+      // DE-Titel oder Fallback: bereinigter HV-Proxy (nur wenn ATR normalisiert)
+      if (ivpResult && ivpResult.isHV && !ivpResult.skewProxy) {
+        try {
+          var closesForSkew = (raw.closes_full || raw.closes_20d || []);
+          if (closesForSkew.length >= 30) {
+            // ATR für Normalisierung
+            var atrVals = [];
+            for (var ski = 1; ski < closesForSkew.length; ski++) {
+              atrVals.push(Math.abs(closesForSkew[ski] - closesForSkew[ski-1]));
+            }
+            var atrSkew = atrVals.slice(-14).reduce(function(a,b){return a+b;},0) / 14;
+            // Tail: nur negative Returns > 1 ATR (echte Schocks, nicht normales Rauschen)
+            var shockReturns = [];
+            for (var ski = 1; ski < closesForSkew.length; ski++) {
+              var ret = closesForSkew[ski-1] - closesForSkew[ski]; // Verlust
+              if (ret > atrSkew * 0.5) shockReturns.push(ret);
+            }
+            if (shockReturns.length >= 3) {
+              var avgShock  = shockReturns.reduce(function(a,b){return a+b;},0) / shockReturns.length;
+              var atmHVnorm = ivpResult.atmIV || 1;
+              // ATR-normalisiert: Schock-Größe relativ zu normaler Tages-Range
+              var skewProxy = atrSkew > 0 ? Math.round((avgShock / atrSkew - 1) * 100) / 100 : 0;
+              ivpResult.skewProxy = skewProxy;
+              ivpResult.skewLevel = skewProxy > 0.5 ? 'STEIL' : skewProxy > 0.2 ? 'ERHÖHT' : 'NORMAL';
+              ivpResult.isFallbackSkew = true;
+            }
+          }
+        } catch(skewFallbackErr) {}
+      }
+
+      // ── Call/Put-Volumen-Ratio ──────────────────────────────────────
+      // Aus Yahoo Options-Chain: Call-Volumen vs Put-Volumen
+      // Extremes Call-Volumen (>95. Pz) bei stagnierendem Preis = Kauf-Erschöpfung
+      if (ivpResult && !ivpResult.isHV) {
+        try {
+          var optUrlCPR = 'https://query1.finance.yahoo.com/v7/finance/options/' + sym;
+          var optRCPR   = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(optUrlCPR));
+          if (optRCPR.ok) {
+            var optJCPR  = await optRCPR.json();
+            var chainCPR = optJCPR?.optionChain?.result?.[0];
+            if (chainCPR && chainCPR.options?.[0]) {
+              var calls = chainCPR.options[0].calls || [];
+              var putsV = chainCPR.options[0].puts  || [];
+              var callVol = calls.reduce(function(s,c){ return s + (c.volume||0); }, 0);
+              var putVol  = putsV.reduce(function(s,p){ return s + (p.volume||0); }, 0);
+              if (callVol + putVol > 0) {
+                var cpr     = Math.round(callVol / Math.max(putVol,1) * 100) / 100;
+                var cprLevel = cpr > 3.0 ? 'EXTREM_BULLISH' // Kauf-Erschöpfungs-Risiko!
+                  : cpr > 2.0 ? 'HOCH_BULLISH'
+                  : cpr < 0.5 ? 'BEARISH'
+                  : 'NEUTRAL';
+                ivpResult.callPutRatio  = cpr;
+                ivpResult.callPutLevel  = cprLevel;
+                ivpResult.callVol       = callVol;
+                ivpResult.putVol        = putVol;
+              }
+            }
+          }
+        } catch(cprErr) { console.warn('CPR', sym, cprErr.message); }
+      }
+
       if (ivpResult && raw) {
         // In tickerData speichern
         raw._ivp = ivpResult;
@@ -7866,7 +8235,13 @@ function confirmSaveFromScan() {
   if(!modal) return;
   var name = document.getElementById('save-scan-name').value.trim();
   if(!name) return;
-  var tickers = modal.dataset.tickers.split(',').filter(Boolean);
+  var tickers = (modal.dataset.tickers || '').split(',').filter(function(s){return s.trim();});
+  if(!tickers.length) {
+    // Neue leere WL → nur anlegen wenn Name sinnvoll
+    modal.remove();
+    showKoToast('⚠ Keine Ticker — leere WL nicht gespeichert');
+    return;
+  }
   modal.remove();
   const wls = getWatchlists();
   wls[name] = tickers.join(', ');
@@ -9179,10 +9554,11 @@ function cleanupJunkWatchlists() {
   Object.keys(wls).forEach(function(name) {
     // Entfernen wenn: nur Zahl, leer, oder nur 1 Ticker (Fehlklick)
     var isNumeric = /^\d+$/.test(name.trim());
-    var isEmpty = !wls[name] || !wls[name].trim();
-    var isSingle = wls[name] && wls[name].split(',').filter(Boolean).length <= 1 && isNumeric;
-    if (isNumeric || isEmpty) {
-      removed.push(name);
+    var isEmpty   = !wls[name] || !wls[name].trim();
+    var tickers   = wls[name] ? wls[name].split(',').filter(function(s){return s.trim();}) : [];
+    var isZero    = tickers.length === 0;
+    if (isNumeric || isEmpty || isZero) {
+      removed.push(name + (isZero && !isEmpty ? ' (0 Einträge)' : ''));
       delete wls[name];
     }
   });
@@ -9452,17 +9828,7 @@ function leWLSwitch(name){
 }
 
 function leWLNew(){
-  var name = prompt('Name der neuen Watchlist:', 'Meine Watchlist');
-  if(!name || !name.trim()) return;
-  name = name.trim();
-  var wls = getWatchlists();
-  if(wls[name]){ alert('Eine Watchlist mit diesem Namen existiert bereits.'); return; }
-  wls[name] = '';
-  localStorage.setItem(WL_KEY, JSON.stringify(wls));
-  updateWatchlistDropdown();
-  window._leActiveWatchlist = name;
-  openListEditor('watchlist');
-  leShowStatus('✓ Watchlist "'+name+'" erstellt', 'var(--green)');
+  showSaveFromScanModal('Neue Watchlist', null);
 }
 
 function leWLRename(){
@@ -10895,6 +11261,294 @@ function renderVixAmpel(vix) {
 // Fix 3: FILTER Mode (Markov gated Signale)
 // ═══════════════════════════════════════════════════════════════════════════
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ÜBERHITZUNGS-ANALYSE
+// Berechnet Trendabriss-Wahrscheinlichkeit aus:
+// 1. EMA200-Abstand (Mean Reversion Risk)
+// 2. RSI-Divergenz (Momentum-Erschöpfung)
+// 3. Distribution Days (institutioneller Abverkauf)
+// 4. Volumen-Trend (fehlende neue Käufer)
+// 5. Bollinger Band Position
+// ═══════════════════════════════════════════════════════════════════════════
+
+function calcRSI(closes, period) {
+  period = period || 14;
+  if (!closes || closes.length < period + 1) return null;
+  var gains = 0, losses = 0;
+  for (var i = 1; i <= period; i++) {
+    var diff = closes[i] - closes[i-1];
+    if (diff > 0) gains += diff; else losses -= diff;
+  }
+  var avgGain = gains / period;
+  var avgLoss = losses / period;
+  for (var i = period + 1; i < closes.length; i++) {
+    var diff = closes[i] - closes[i-1];
+    avgGain = (avgGain * (period-1) + Math.max(0, diff)) / period;
+    avgLoss = (avgLoss * (period-1) + Math.max(0,-diff)) / period;
+  }
+  if (avgLoss === 0) return 100;
+  var rs = avgGain / avgLoss;
+  return Math.round((100 - 100/(1+rs)) * 10) / 10;
+}
+
+function calcRSIDivergence(closes, lookback) {
+  // Bärische Divergenz: Preis macht höheres Hoch, RSI macht tieferes Hoch
+  lookback = lookback || 20;
+  if (!closes || closes.length < lookback + 14) return null;
+  var n = closes.length;
+  var recentCloses  = closes.slice(n - lookback);
+  var earlierCloses = closes.slice(n - lookback*2, n - lookback);
+  if (earlierCloses.length < 14) return null;
+
+  var rsiNow   = calcRSI(closes.slice(n - 14 - lookback));
+  var rsiPrev  = calcRSI(closes.slice(n - 14 - lookback*2, n - lookback));
+  var priceNow = Math.max.apply(null, recentCloses);
+  var pricePrev= Math.max.apply(null, earlierCloses);
+
+  if (rsiNow == null || rsiPrev == null) return null;
+  // Bärische Divergenz: Preis steigt, RSI fällt
+  var priceDiff = (priceNow - pricePrev) / pricePrev * 100;
+  var rsiDiff   = rsiNow - rsiPrev;
+  if (priceDiff > 2 && rsiDiff < -3) {
+    return { bearish: true, priceDiff: Math.round(priceDiff*10)/10, rsiDiff: Math.round(rsiDiff*10)/10 };
+  }
+  return { bearish: false, priceDiff: Math.round(priceDiff*10)/10, rsiDiff: Math.round(rsiDiff*10)/10 };
+}
+
+function calcDistributionDays(closes, volumes, lookback) {
+  // Distribution Day: Kurs fällt ≥0.2% bei Volumen > 20-Tage-Ø
+  lookback = lookback || 25;
+  if (!closes || !volumes || closes.length < lookback) return 0;
+  var n = closes.length;
+  var recentC = closes.slice(n - lookback);
+  var recentV = volumes.slice(n - lookback);
+  var avgVol  = recentV.reduce(function(a,b){return a+(b||0);},0) / recentV.length;
+  var distDays = 0;
+  for (var i = 1; i < recentC.length; i++) {
+    var chg = (recentC[i] - recentC[i-1]) / recentC[i-1];
+    var vol = recentV[i] || 0;
+    if (chg <= -0.002 && vol > avgVol * 1.1) distDays++;
+  }
+  return distDays;
+}
+
+function calcBollingerPosition(closes, period, stdMult) {
+  period  = period  || 20;
+  stdMult = stdMult || 2;
+  if (!closes || closes.length < period) return null;
+  var n   = closes.length;
+  var sma = closes.slice(n-period).reduce(function(a,b){return a+b;},0) / period;
+  var variance = closes.slice(n-period).reduce(function(a,v){return a+(v-sma)*(v-sma);},0) / period;
+  var std = Math.sqrt(variance);
+  var upper = sma + stdMult * std;
+  var lower = sma - stdMult * std;
+  var price = closes[n-1];
+  // Position 0=unteres Band, 0.5=Mitte, 1=oberes Band
+  var pos = std > 0 ? (price - lower) / (upper - lower) : 0.5;
+  return { pos: Math.round(pos*100)/100, upper, lower, mid: sma, price };
+}
+
+function calcADX(closes, period) {
+  // Vereinfachter ADX aus Tagesrenditen
+  period = period || 14;
+  if (!closes || closes.length < period * 2) return null;
+  var n = closes.length;
+  var dms = [];
+  for (var i = 1; i < n; i++) {
+    var up   = closes[i] - closes[i-1];
+    var down = closes[i-1] - closes[i];
+    dms.push({ plus: Math.max(0,up), minus: Math.max(0,down) });
+  }
+  // Smoothed DM
+  var sumP = 0, sumM = 0, sumDX = 0;
+  for (var i = 0; i < period; i++) { sumP += dms[i].plus; sumM += dms[i].minus; }
+  var adxVals = [];
+  for (var i = period; i < dms.length; i++) {
+    sumP = sumP - sumP/period + dms[i].plus;
+    sumM = sumM - sumM/period + dms[i].minus;
+    var diP = sumP > 0 ? sumP/(sumP+sumM)*100 : 0;
+    var diM = sumM > 0 ? sumM/(sumP+sumM)*100 : 0;
+    var dx  = (diP+diM) > 0 ? Math.abs(diP-diM)/(diP+diM)*100 : 0;
+    adxVals.push(dx);
+  }
+  if (adxVals.length < period) return null;
+  var adx = adxVals.slice(-period).reduce(function(a,b){return a+b;},0) / period;
+  var adxPrev = adxVals.slice(-period*2,-period).reduce(function(a,b){return a+b;},0) / period;
+  return { value: Math.round(adx*10)/10, trend: adx > adxPrev ? 'rising' : 'falling', prev: Math.round(adxPrev*10)/10 };
+}
+
+function calcOverheatScore(state, raw) {
+  // raw: {closes_full, volumes, price, ma200 (falls vorhanden)}
+  if (!raw || !raw.closes_full || raw.closes_full.length < 50) return null;
+
+  var closes  = raw.closes_full;
+  var volumes = raw.volumes_full || raw.volumes_20d || [];
+  var n       = closes.length;
+  var price   = closes[n-1];
+  var score   = 0;
+  var maxScore= 0;
+  var signals = [];
+
+  // ── 1. EMA200-Abstand (volatilitäts-adaptiv via ATR) ────────────
+  // Kritik-Fix: Starre Prozentgrenzen ignorieren Volatilität des Titels.
+  // Lösung: Abstand in ATR-Vielfachen messen.
+  // Niedrig-Vola-Titel: 2.0 ATR = überhitzt
+  // Hoch-Vola-AI-Titel: erst 4.0 ATR = echtes Warnsignal
+  var ema200val = state ? state.ma200 : null;
+  if (!ema200val && closes.length >= 200) {
+    var k200 = 2/201;
+    ema200val = closes[0];
+    for (var i = 1; i < closes.length; i++) ema200val = closes[i]*k200 + ema200val*(1-k200);
+  }
+  if (ema200val && ema200val > 0) {
+    var dist200pct = (price - ema200val) / ema200val * 100;
+    // ATR(14) berechnen für Volatilitäts-Normalisierung
+    var atr14 = 0;
+    if (closes.length >= 15) {
+      var trs = [];
+      for (var i = Math.max(1, closes.length-15); i < closes.length; i++) {
+        trs.push(Math.abs(closes[i] - closes[i-1]));
+      }
+      atr14 = trs.reduce(function(a,b){return a+b;},0) / trs.length;
+    }
+    // ATR-normalisierter Abstand: wie viele ATRs liegt Preis über EMA200?
+    var distATR = atr14 > 0 ? (price - ema200val) / atr14 : 0;
+    maxScore += 30;
+    // Schwellen in ATR-Vielfachen (adaptiv):
+    // <2.0 ATR: normal, 2-3: leicht, 3-4: mittel, 4-5: hoch, >5: extrem
+    var riskLabel = 'EMA200 +'+Math.round(dist200pct)+'% ('+Math.round(distATR*10)/10+' ATR)';
+    if (distATR > 5.0)      { score += 30; signals.push({label:riskLabel, risk:'EXTREM', pts:30}); }
+    else if (distATR > 4.0) { score += 22; signals.push({label:riskLabel, risk:'HOCH',   pts:22}); }
+    else if (distATR > 3.0) { score += 12; signals.push({label:riskLabel, risk:'MITTEL', pts:12}); }
+    else if (distATR > 2.0) { score += 5;  signals.push({label:riskLabel, risk:'LEICHT', pts:5}); }
+    else                    { signals.push({label:riskLabel, risk:'OK', pts:0}); }
+  }
+
+  // ── 2. RSI-Divergenz ─────────────────────────────────────────────
+  maxScore += 25;
+  var rsiNow = calcRSI(closes.slice(-28));
+  var div    = calcRSIDivergence(closes);
+  if (div && div.bearish) {
+    score += 25;
+    signals.push({label:'RSI-Divergenz ⚠ Preis+'+div.priceDiff+'% RSI'+div.rsiDiff, risk:'HOCH', pts:25});
+  } else if (rsiNow !== null && rsiNow > 75) {
+    score += 12;
+    signals.push({label:'RSI überkauft '+rsiNow, risk:'MITTEL', pts:12});
+  } else if (rsiNow !== null && rsiNow > 65) {
+    score += 5;
+    signals.push({label:'RSI erhöht '+rsiNow, risk:'LEICHT', pts:5});
+  } else {
+    if (rsiNow) signals.push({label:'RSI '+rsiNow, risk:'OK', pts:0});
+  }
+
+  // ── 3. Distribution Days ──────────────────────────────────────────
+  maxScore += 20;
+  var distDays = calcDistributionDays(closes, volumes);
+  if (distDays >= 5)      { score += 20; signals.push({label:distDays+' Distribution Days', risk:'EXTREM', pts:20}); }
+  else if (distDays >= 3) { score += 12; signals.push({label:distDays+' Distribution Days', risk:'HOCH',   pts:12}); }
+  else if (distDays >= 1) { score += 5;  signals.push({label:distDays+' Distribution Day',  risk:'LEICHT', pts:5}); }
+  else                    { signals.push({label:'0 Distribution Days', risk:'OK', pts:0}); }
+
+  // ── 4. Volumen-Trend (sinkendes Vol bei steigendem Preis) ─────────
+  maxScore += 15;
+  if (closes.length >= 20 && volumes.length >= 20) {
+    var priceChg10 = (closes[n-1] - closes[n-11]) / closes[n-11] * 100;
+    var vol10avg   = volumes.slice(-10).filter(Boolean).reduce(function(a,b){return a+b;},0) / 10;
+    var volPrev10  = volumes.slice(-20,-10).filter(Boolean).reduce(function(a,b){return a+b;},0) / 10;
+    if (priceChg10 > 5 && vol10avg < volPrev10 * 0.8) {
+      score += 15;
+      signals.push({label:'Volumen↓ bei Preis↑ (keine neuen Käufer)', risk:'HOCH', pts:15});
+    } else if (priceChg10 > 3 && vol10avg < volPrev10 * 0.9) {
+      score += 7;
+      signals.push({label:'Volumen leicht rückläufig', risk:'MITTEL', pts:7});
+    }
+  }
+
+  // ── 5. Bollinger Band ──────────────────────────────────────────────
+  maxScore += 10;
+  var bb = calcBollingerPosition(closes);
+  if (bb) {
+    if (bb.pos > 0.95)      { score += 10; signals.push({label:'BB-Oberkante (>95%)', risk:'EXTREM', pts:10}); }
+    else if (bb.pos > 0.85) { score += 6;  signals.push({label:'BB-Oberkante (>85%)', risk:'HOCH',   pts:6}); }
+    else if (bb.pos < 0.2)  { score -= 5;  signals.push({label:'BB-Unterkante (<20%)', risk:'OK',    pts:-5}); }
+  }
+
+  // ── Score normalisieren ────────────────────────────────────────────
+  var pct = maxScore > 0 ? Math.round(Math.max(0, Math.min(100, score/maxScore*100))) : 0;
+
+  // ── Ampel ─────────────────────────────────────────────────────────
+  var level, color, icon;
+  if (pct >= 75)      { level='GEFAHR';   color='var(--red)';   icon='🔴'; }
+  else if (pct >= 50) { level='WARNUNG';  color='var(--amber)'; icon='🟠'; }
+  else if (pct >= 25) { level='VORSICHT'; color='#f59e0b';      icon='🟡'; }
+  else                { level='OK';       color='var(--green)'; icon='🟢'; }
+
+  // ADX als Bonus
+  var adx = calcADX(closes);
+
+  return {
+    score: pct,
+    level: level,
+    color: color,
+    icon:  icon,
+    signals: signals,
+    rsi:   rsiNow,
+    adx:   adx,
+    bb:    bb,
+    distDays: distDays,
+    ema200dist: ema200val ? Math.round((price-ema200val)/ema200val*100*10)/10 : null
+  };
+}
+
+// Sektor-ETF Überhitzungs-Cache
+var _sektorOverheatCache = {};
+var _sektorOverheatTS    = 0;
+const SEKTOR_OVERHEAT_ETFs = [
+  { sym:'QQQ',  label:'NASDAQ 100',     icon:'💻' },
+  { sym:'SMH',  label:'Halbleiter',      icon:'🔬' },
+  { sym:'XLK',  label:'Tech',            icon:'⚡' },
+  { sym:'XBI',  label:'Biotech',         icon:'🧬' },
+  { sym:'XLY',  label:'Consumer',        icon:'🛒' },
+  { sym:'XLF',  label:'Financials',      icon:'🏦' },
+  { sym:'XLE',  label:'Energy',          icon:'🛢' },
+  { sym:'XLV',  label:'Healthcare',      icon:'🏥' },
+  { sym:'XLI',  label:'Industrial',      icon:'🏭' },
+  { sym:'XLU',  label:'Utilities',       icon:'💡' },
+];
+
+async function fetchSektorOverheat() {
+  // Nur alle 4h neu laden
+  if (_sektorOverheatTS && Date.now() - _sektorOverheatTS < 4*60*60*1000) {
+    return _sektorOverheatCache;
+  }
+  var results = {};
+  for (var i = 0; i < SEKTOR_OVERHEAT_ETFs.length; i++) {
+    var etf = SEKTOR_OVERHEAT_ETFs[i];
+    try {
+      var to   = Math.floor(Date.now() / 1000);
+      var from = to - 60*60*24*280; // 280 Tage für EMA200
+      var url  = 'https://query1.finance.yahoo.com/v7/finance/chart/'
+               + etf.sym + '?interval=1d&period1=' + from + '&period2=' + to;
+      var r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
+      if (!r.ok) continue;
+      var j   = await r.json();
+      var res = j?.chart?.result?.[0];
+      if (!res) continue;
+      var q      = res.indicators.quote[0];
+      var closes = (q.close || []).filter(function(v){ return v != null; });
+      var volumes= (q.volume|| []).filter(function(v){ return v != null; });
+      if (closes.length < 50) continue;
+      var oh = calcOverheatScore(null, { closes_full: closes, volumes_full: volumes });
+      results[etf.sym] = { ...etf, overheat: oh, closes: closes };
+    } catch(e) { console.warn('SektorOverheat', etf.sym, e.message); }
+    await new Promise(function(r){ setTimeout(r,200); }); // Rate limit
+  }
+  _sektorOverheatCache = results;
+  _sektorOverheatTS = Date.now();
+  return results;
+}
+
 function buildTransitionMatrix(regimes, stride) {
   // FIX 1: Stride-Sampling — nur nicht-überlappende Fenster
   // stride=1 → Legacy (überlappend, statistisch unehrlich)
@@ -11036,10 +11690,25 @@ function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
                    : signal < -filterThreshold ? 'SHORT_OK'
                    : 'FLAT';
 
+  // Bereinigtes σ-Signal: P(bull)-P(bear) - k×P(Bull→Bear)
+  const pBull2Bear = (matrix20 && matrix20.bull) ? matrix20.bull.bear : 0;
+  const K_TRENDBRUCH = 2.5; // Gewichtungsfaktor für Trendbruch-Risiko
+  const signalBereinigt = Math.max(-1, Math.min(1,
+    signal - K_TRENDBRUCH * pBull2Bear
+  ));
+  // P(Bull→Bear) Alarm: >15% ist Warnung, >25% ist Gefahr
+  const bullBearRisk = pBull2Bear > 0.25 ? 'GEFAHR'
+    : pBull2Bear > 0.15 ? 'WARNUNG'
+    : pBull2Bear > 0.08 ? 'ERHOHT'
+    : 'OK';
+
   return {
     // Kern
-    regime: currentRegime,        // 1=Bull, -1=Bear, 0=Side
-    signal: signal,               // FIX 3: −1 bis +1, primäres Handelssignal
+    regime: currentRegime,
+    signal: signal,               // Rohsignal P(bull)-P(bear)
+    signalBereinigt: signalBereinigt, // Bereinigt um Trendbruch-Risiko
+    pBull2Bear: pBull2Bear,       // Trendbruch-Wahrscheinlichkeit
+    bullBearRisk: bullBearRisk,   // OK/ERHÖHT/WARNUNG/GEFAHR
     filterMode: filterMode,       // 'LONG_OK', 'SHORT_OK', 'FLAT'
     // Stickiness (aus 2.0 Matrix)
     bullSticky: bullSticky,
@@ -11164,6 +11833,16 @@ function renderQqqBanner(markov) {
   const strideTxt = markov.strideNote || '';
 
   // Stickiness aus 2.0 Matrix
+  // P(Bull→Bear) Trendbruch-Frühwarner
+  const pBull2Bear  = markov.pBull2Bear || (m20 ? m20.bull.bear : 0);
+  const bbRisk      = markov.bullBearRisk || 'OK';
+  const bbColor     = bbRisk === 'GEFAHR'  ? 'var(--red)'
+                    : bbRisk === 'WARNUNG' ? 'var(--amber)'
+                    : bbRisk === 'ERHOHT'  ? '#f59e0b'
+                    : 'var(--green)';
+  const bbPct       = Math.round(pBull2Bear * 100);
+  const sigBer      = markov.signalBereinigt != null ? markov.signalBereinigt : signal;
+
   const stickyTxt = m20
     ? 'Bull ' + m20.bullSticky + '% · Side ' + m20.sideSticky + '% · Bear ' + m20.bearSticky + '%'
       + (markov.strideUsed ? ' · Stride:' + markov.strideUsed + (strideTxt ? strideTxt : '') : '')
@@ -11189,6 +11868,10 @@ function renderQqqBanner(markov) {
     '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--text3);padding-top:2px;border-top:1px solid var(--border)">' +
       '<span>📊 Markov 2.0 · ' + stickyTxt + '</span>' +
+      '<span style="color:' + bbColor + ';font-weight:600" title="Trendbruch-Frühwarner: Wahrscheinlichkeit Bull→Bear Übergang">'
+        + '⚠ Bull→Bear: ' + bbPct + '%' + (bbRisk !== 'OK' ? ' — ' + bbRisk : ' — stabil') + '</span>' +
+      '<span style="color:var(--text3)">σ roh: ' + (signal>=0?'+':'') + signal.toFixed(2)
+        + ' · σ★: ' + (sigBer>=0?'+':'') + sigBer.toFixed(2) + '</span>' +
       (divTxt ? '<span style="color:var(--amber)">' + divTxt + '</span>' : '') +
       (labelTxt ? '<span style="color:' + (lc.ok===false?'var(--red)':'var(--green)') + '">' + labelTxt + '</span>' : '') +
     '</div>';
@@ -12112,6 +12795,20 @@ async function openKiBriefing(defaultStrat) {
     + 'MARKTKONTEXT:\n'
     + '- QQQ-Regime: ' + qqqRegime + '\n'
     + qqqMarkovStr
+    + (window._nasdaqBreadthData ? (function(){
+        var b = window._nasdaqBreadthData;
+        var txt = '- NASDAQ Breadth: ' + b.pct + '% über EMA20 — ' + b.level;
+        if (b.divergence) txt += ' ⚠ BEARISHE DIVERGENZ!';
+        return txt + '\n';
+      })() : '')
+    + (window._sektorOverheatData ? (function(){
+        var hot = Object.values(window._sektorOverheatData)
+          .filter(function(d){ return d.overheat && d.overheat.score >= 50; })
+          .sort(function(a,b){ return b.overheat.score - a.overheat.score; })
+          .map(function(d){ return d.label+': '+d.overheat.icon+' '+d.overheat.score+'%'; })
+          .join(', ');
+        return hot ? '- Überhitzte Sektoren: ' + hot + '\n' : '';
+      })() : '')
     + (_cnnFearGreed ? '- CNN Fear & Greed: ' + _cnnFearGreed.score + '/100 (' + _cnnFearGreed.rating + ')\n' : '')
     + (function(){
         // Bull-Market Frühindikator Score
