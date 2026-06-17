@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v117">
+<meta name="app-version" content="20260615-v118">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -8379,15 +8379,13 @@ function saveWatchlist(){
 }
 
 function updateWatchlistDropdown(activeWL) {
-  var sel = document.getElementById('ticker-preset');
-  if (!sel) return;
+  // Nutzt die bestehende <optgroup id="watchlist-options"> im HTML
+  // KEINE neue Trennlinie — verhindert Duplikate
+  var grp = document.getElementById('watchlist-options');
+  if (!grp) return;
 
-  // Alte WL-Optionen entfernen
-  var toRemove = [];
-  for (var i = 0; i < sel.options.length; i++) {
-    if (sel.options[i].dataset.custom) toRemove.push(sel.options[i]);
-  }
-  toRemove.forEach(function(o){ sel.removeChild(o); });
+  // Optgroup leeren
+  grp.innerHTML = '';
 
   // WLs via KoWL (bereinigt)
   var wls = window.KoWL ? window.KoWL.getAll() : getWatchlists();
@@ -8395,29 +8393,23 @@ function updateWatchlistDropdown(activeWL) {
   var names = Object.keys(wls);
   if (!names.length) return;
 
-  // Trennlinie
-  var sep = document.createElement('option');
-  sep.disabled = true;
-  sep.textContent = '── ⭐ Meine Watchlisten ──';
-  sep.style.color = 'var(--text3)';
-  sep.dataset.custom = '1';
-  sel.appendChild(sep);
-
   names.forEach(function(name) {
     if (!wls[name] || !wls[name].trim()) return;
     var tickers = wls[name].split(',').filter(function(s){ return s.trim(); });
     var opt = document.createElement('option');
     opt.value = 'wl:' + name;
     var ts = wlTs[name]
-      ? new Date(wlTs[name]).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})
+      ? new Date(wlTs[name]).toLocaleString('de-DE',{
+          day:'2-digit', month:'2-digit',
+          hour:'2-digit', minute:'2-digit'
+        })
       : '';
     var isAutoTop = /^Top40|^Top-\d/.test(name);
     opt.textContent = (isAutoTop ? '📊 ' : '⭐ ') + name
       + ' (' + tickers.length + ')'
       + (ts ? ' · ' + ts : '');
-    opt.dataset.custom = '1';
     if (name === activeWL) opt.selected = true;
-    sel.appendChild(opt);
+    grp.appendChild(opt);
   });
 }
 
@@ -13145,9 +13137,7 @@ function toggleKiDropdown(anchorEl) {
       + s.label + '</button>';
   });
   // YT-Eintrag: öffnet Modal statt KI-Briefing
-  html += '<div style="border-top:1px solid var(--border);margin:4px 0"></div>'
-    + '<button class="ki-dd-btn" style="color:#ef4444" onclick="hideKiDropdown();showYtModal()">'
-    + '<i class=\"ti ti-brand-youtube\"></i> YouTube / Text Analyzer</button>';
+
   menu.innerHTML = html;
   document.body.appendChild(menu);
 
