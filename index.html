@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v112">
+<meta name="app-version" content="20260615-v114">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2138,7 +2138,8 @@ const KoSync = {
     if (wls && wls.data) {
       const localTs = JSON.parse(localStorage.getItem('ko_watchlists_ts') || '0');
       if ((wls.updated_at || 0) > localTs) {
-        localStorage.setItem('ko_watchlists', JSON.stringify(wls.data));
+        var syncClean = cleanWatchlists(wls.data || {});
+        localStorage.setItem('ko_watchlists', JSON.stringify(syncClean));
         localStorage.setItem('ko_watchlists_ts', wls.updated_at || Date.now());
         if (typeof updateWatchlistDropdown === 'function') updateWatchlistDropdown();
         pulled++;
@@ -7491,7 +7492,8 @@ function importAllData(input){
         imported.push('Makro');
       }
       if(data.watchlists !== undefined && Object.keys(data.watchlists).length > 0){
-        localStorage.setItem('ko_watchlists', JSON.stringify(data.watchlists));
+        var syncClean2 = cleanWatchlists(data.watchlists || {});
+        localStorage.setItem('ko_watchlists', JSON.stringify(syncClean2));
         updateWatchlistDropdown();
         imported.push('Watchlisten ('+Object.keys(data.watchlists).length+')');
       }
@@ -7660,8 +7662,68 @@ async function fetchEarningsDate(sym){
 // ─── WATCHLIST MANAGEMENT ─────────────────────────────────────────────────────
 const WL_KEY = 'ko_watchlists';
 
+
+// ── WL BEREINIGUNG — zentral, wird überall genutzt ──────────────────────
+function cleanWatchlists(wls) {
+  if (!wls || typeof wls !== 'object') return {};
+  var clean = {};
+  Object.keys(wls).forEach(function(name) {
+    // Name-Filter: numerische Namen, leere Namen, etc. ausschließen
+    var n = name.trim();
+    if (!n) return;                          // Leerer Name
+    if (/^\d+$/.test(n)) return;            // Nur Zahlen (0, 1, 2...)
+    if (/^\d+\s*\(\d+\)$/.test(n)) return; // "0 (1)", "21 (1)" etc.
+    if (/^\d+\./.test(n)) return;           // "1. ...", "2. ..."
+    if (n.length > 60) return;              // Zu langer Name
+    // Ticker-Filter: leere oder ungültige Einträge
+    var val = wls[name] || '';
+    if (typeof val !== 'string') return;
+    var tickers = val.split(',').map(function(s){ return s.trim(); })
+                     .filter(function(s){ return s && s.length >= 1 && s.length <= 10; });
+    if (tickers.length === 0) return;       // Keine gültigen Ticker
+    clean[n] = tickers.join(', ');
+  });
+  return clean;
+}
+
+function saveCleanWatchlists(wls) {
+  var clean = cleanWatchlists(wls);
+  localStorage.setItem(WL_KEY, JSON.stringify(clean));
+  return clean;
+}
+
+// ── EINMALIGER WL-CLEANUP BEIM START ──────────────────────────────────────
+(function cleanupWLsOnStart() {
+  try {
+    var raw = JSON.parse(localStorage.getItem('ko_watchlists') || '{}');
+    var keys = Object.keys(raw);
+    if (keys.length > 50) { // Nur wenn offensichtlich zu viele
+      var clean = {};
+      keys.forEach(function(name) {
+        var n = name.trim();
+        if (!n) return;
+        if (/^\d+$/.test(n)) return;            // "0","1","21"
+        if (/^\d+\s*\(\d+\)$/.test(n)) return; // "0 (1)","21 (1)"
+        if (/^\d+\./.test(n)) return;
+        if (n.length > 60) return;
+        var val = (raw[name] || '').toString();
+        var tickers = val.split(',').map(function(s){ return s.trim(); })
+                        .filter(function(s){ return s && s.length >= 1 && s.length <= 10; });
+        if (tickers.length === 0) return;
+        if (tickers.length === 1 && /^\d+$/.test(name)) return; // 1-Ticker-Zahlen-WL
+        clean[n] = tickers.join(', ');
+      });
+      localStorage.setItem('ko_watchlists', JSON.stringify(clean));
+      console.log('WL-Cleanup: ' + keys.length + ' → ' + Object.keys(clean).length + ' WLs');
+    }
+  } catch(e) {}
+})();
+
 function getWatchlists(){
-  try { return JSON.parse(localStorage.getItem(WL_KEY)||'{}'); } catch(e){ return {}; }
+  try {
+    var raw = JSON.parse(localStorage.getItem(WL_KEY) || '{}');
+    return cleanWatchlists(raw);  // Immer bereinigt!
+  } catch(e){ return {}; }
 }
 
 // ── Kursrahmen-Filter ────────────────────────────────────────────────────────
@@ -7735,11 +7797,7 @@ function loadPriceFilterUI() {
 
 // Watchlists speichern + auto-sync zur Cloud
 function saveWatchlistsWithSync(wls, listName) {
-  // Leere WLs vor dem Speichern entfernen
-  Object.keys(wls).forEach(function(k) {
-    if (!wls[k] || !wls[k].trim()) delete wls[k];
-  });
-  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  var clean = saveCleanWatchlists(wls); // Zentrale Bereinigung
   localStorage.setItem('ko_watchlists_ts', Date.now());
   // Per-Liste Timestamp
   try {
@@ -13623,7 +13681,7 @@ function autoSaveShortlist() {
 // Neue Tops werden hinzugefügt, schwächere Einträge ersetzt wenn Score besser.
 // ══════════════════════════════════════════════════════════════════════════════
 var AUTO_TOP_KEY = 'ko_auto_top';
-var AUTO_TOP_N = 15;        // Wie viele Titel max. in der Liste
+var AUTO_TOP_N = 40;        // Wie viele Titel max. in der Liste
 var AUTO_TOP_MIN_SCORE = 50; // Mindestscore für Aufnahme
 var AUTO_TOP_MIN_BULL = 2;   // Mindestens 2/3 bullisch
 
