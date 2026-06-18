@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260618-v136">
+<meta name="app-version" content="20260618-v137">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2084,19 +2084,19 @@ window.pinSubmit = function(){
 </script>
 
 <!-- ko-config.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-config.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-config.js?v=1.2"></script>
 
 <!-- ko-indicators.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-indicators.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-indicators.js?v=1.1"></script>
 
 <!-- ko-scoring.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-scoring.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-scoring.js?v=1.1"></script>
 
 <!-- ko-markov.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-markov.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-markov.js?v=1.1"></script>
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-data.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-data.js?v=1.1"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -2899,6 +2899,7 @@ var _ytInputType = 'unknown'; // 'youtube' | 'text' | 'url'
 
 function ytDragOver(e) {
   e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy'; // verhindert Kreis-Cursor im Browser
   var zone = document.getElementById('yt-dropzone');
   if (zone) {
     zone.style.borderColor = 'var(--accent)';
