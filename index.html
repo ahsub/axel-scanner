@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v122">
+<meta name="app-version" content="20260615-v123">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2072,7 +2072,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
  * Version: 1.0 | ko-scanner v=115+
  */
 
-const KoConfig = {
+var KoConfig = {
 
   version: 'v115',
 
@@ -2221,7 +2221,7 @@ KoConfig.loadOverrides();
  * Version: 1.0
  */
 
-const KoIndicators = {
+var KoIndicators = {
 
   // ── EMA ─────────────────────────────────────────────────────────
   calcEMA(closes, period) {
@@ -2402,6 +2402,138 @@ const KoIndicators = {
       ema10, ema20, ema50, ema200, price,
       bullStack: price > ema10 && ema10 > ema20 && ema20 > ema50,
       ema200dist: ema200 ? Math.round((price - ema200) / ema200 * 1000) / 10 : null,
+    };
+  },
+};
+
+</script>
+
+<script>
+// ── KO-SCORING v1.0 (embedded) ──
+/**
+ * ko-scoring.js — Composite Score & Signal-Qualität
+ * Version: 1.0
+ * Abhängigkeiten: ko-config.js, ko-indicators.js
+ */
+
+var KoScoring = {
+
+  // ── DEFAULT GEWICHTE ─────────────────────────────────────────────
+  defaultWeights: {
+    tech:    30,
+    sepa:    25,
+    bp:      15,
+    sticky:  15,
+    vol:     10,
+    rs:       5,
+  },
+
+  // ── SCORE LABEL / COLOR ──────────────────────────────────────────
+  getLabel(score) {
+    if (score >= 90) return { label: 'A+', color: '#22c55e' };
+    if (score >= 80) return { label: 'A',  color: '#4ade80' };
+    if (score >= 70) return { label: 'B+', color: '#86efac' };
+    if (score >= 60) return { label: 'B',  color: '#fbbf24' };
+    if (score >= 50) return { label: 'C+', color: '#f97316' };
+    if (score >= 40) return { label: 'C',  color: '#ef4444' };
+    return                  { label: 'D',  color: '#991b1b' };
+  },
+
+  // ── SIGNAL-QUALITÄTS-FAKTOR ──────────────────────────────────────
+  // Multiplikativer Faktor: reduziert Score wenn Überhitzung + Trendbruch
+  calcSignalQuality({ overheatScore, pBull2Bear, breadth }) {
+    const oh = overheatScore != null ? overheatScore : 0;
+    const pb = pBull2Bear    != null ? pBull2Bear    : 0;
+    const br = breadth       != null ? breadth       : 60;
+
+    const ohFactor = oh < 30 ? 1.0 : oh < 50 ? 0.7 : oh < 75 ? 0.4 : 0.1;
+    const pbFactor = pb < 0.08 ? 1.0 : pb < 0.15 ? 0.7 : pb < 0.25 ? 0.4 : 0.2;
+    const brFactor = br > 70  ? 1.0 : br > 50  ? 0.8 : br > 35  ? 0.5 : 0.2;
+
+    return Math.round(ohFactor * pbFactor * brFactor * 100) / 100;
+  },
+
+  // ── ADJUSTED SCORE ────────────────────────────────────────────────
+  calcAdjustedScore(compositeScore, overheatScore) {
+    if (!overheatScore) return compositeScore;
+    const oh = overheatScore;
+    const ohF = oh < 30 ? 1.0 : oh < 50 ? 0.7 : oh < 75 ? 0.4 : 0.1;
+    return Math.round(compositeScore * ohF);
+  },
+
+  // ── BULL-COUNT ────────────────────────────────────────────────────
+  // Basis-Bullish-Signale: MA50, MACD, OBV
+  calcBullCount(raw) {
+    const above50  = raw.price > raw.ma50;
+    const macdBull = raw.macd_hist != null && raw.macd_hist_prev != null
+      ? (raw.macd_hist > raw.macd_hist_prev && raw.macd_hist > 0)
+      : null;
+    const obvBull  = raw.obv_slope_5d != null ? raw.obv_slope_5d > 0 : null;
+    return [above50, macdBull, obvBull].filter(v => v === true).length;
+  },
+
+  // ── SEPA SCORE (Minervini) ────────────────────────────────────────
+  calcSEPA(raw) {
+    // Aus computeFromRaw extrahiert
+    if (!raw) return 0;
+    let score = 0;
+    if (raw.price > raw.ma50)   score++;
+    if (raw.price > raw.ma150)  score++;
+    if (raw.price > raw.ma200)  score++;
+    if (raw.ma50  > raw.ma150)  score++;
+    if (raw.ma150 > raw.ma200)  score++;
+    if (raw.ma200_slope > 0)    score++;
+    // 52W Range
+    if (raw.dist52wLow  != null && raw.dist52wLow  >= 25) score++;
+    if (raw.dist52wHigh != null && raw.dist52wHigh >= -25) score++;
+    return score; // 0-8
+  },
+
+  // ── FEATURE-FLAG CHECK ────────────────────────────────────────────
+  isEnabled(feature) {
+    return typeof KoConfig === 'undefined' || KoConfig.isEnabled(feature);
+  },
+
+  // ── VOLLSTÄNDIGER COMPUTE (für neue Projekte) ─────────────────────
+  // Berechnet alle Scores aus rohen Daten
+  compute(raw, markov, overheat) {
+    if (!raw) return null;
+
+    const bullCount = this.calcBullCount(raw);
+    const sepa      = this.calcSEPA(raw);
+    const weights   = (typeof KoConfig !== 'undefined')
+      ? KoConfig.scoring?.weights || this.defaultWeights
+      : this.defaultWeights;
+
+    // Composite Score
+    let score = 0;
+    if (bullCount === 3) score += weights.tech || 30;
+    else if (bullCount === 2) score += (weights.tech || 30) * 0.6;
+    else if (bullCount === 1) score += (weights.tech || 30) * 0.2;
+
+    score += Math.round((sepa / 8) * (weights.sepa || 25));
+
+    if (markov) {
+      const sticky = markov.bullSticky || markov.sticky || 0;
+      score += Math.round((sticky / 100) * (weights.sticky || 15));
+    }
+
+    score = Math.max(0, Math.min(100, Math.round(score)));
+    const { label, color } = this.getLabel(score);
+
+    // Adjusted Score
+    const adjustedScore = overheat
+      ? this.calcAdjustedScore(score, overheat.score)
+      : score;
+
+    return {
+      compositeScore: score,
+      adjustedScore,
+      scoreLabel:  label,
+      scoreColor:  color,
+      scoreGrade:  label,
+      bullCount,
+      sepaScore:   sepa,
     };
   },
 };
@@ -5474,9 +5606,9 @@ function processData(raw){
   const pdhlResult     = computePdhlScore(raw);
   const newFactorPts   = emaStackResult.score + mtfResult.score + pdhlResult.score;
   const compositeScore = Math.max(0,Math.min(100,Math.round((techPts+sepaPts+bpPts+stkPts+volPts+rsPts+newFactorPts)*mktPhase*markovMult)-erMalus));
-  const scoreLabel = compositeScore>=80?'A+':compositeScore>=70?'A':compositeScore>=60?'B+':
-                     compositeScore>=50?'B':compositeScore>=40?'C':compositeScore>=30?'D':'F';
-  const scoreColor = compositeScore>=70?'var(--green)':compositeScore>=50?'var(--accent)':
+  const _si = (typeof KoScoring !== 'undefined') ? KoScoring.getLabel(compositeScore) : null;
+  const scoreLabel = _si ? _si.label : (compositeScore>=80?'A+':compositeScore>=70?'A':compositeScore>=60?'B+':compositeScore>=50?'B':compositeScore>=40?'C':'D');
+  const scoreColor = _si ? _si.color : (compositeScore>=70?'var(--green)':compositeScore>=50?'var(--accent)':'#ef4444');
                      compositeScore>=35?'var(--amber)':'var(--red)';
 
   // Überhitzungs-Score berechnen
@@ -5488,13 +5620,10 @@ function processData(raw){
   return Object.assign({},raw,{
     markov:raw._markov||null,
     overheat:_overheat,
-    // Adjustierter Score mit Signal-Qualitäts-Faktor
-    adjustedScore: (function() {
-      if (!_overheat) return null;
-      var oh = _overheat.score || 0;
-      var ohF = oh < 30 ? 1.0 : oh < 50 ? 0.7 : oh < 75 ? 0.4 : 0.1;
-      return Math.round((raw.compositeScore || 0) * ohF);
-    })(),
+    // Adjustierter Score via KoScoring
+    adjustedScore: (typeof KoScoring !== 'undefined' && _overheat)
+      ? KoScoring.calcAdjustedScore(raw.compositeScore || 0, _overheat.score)
+      : null,
     _fromTdCache:raw._fromTdCache||false,
     above50:above50,macdBull:macdBull,obvBull:obvBull,bullCount:bullCount,
     histVal:raw.macd_hist,obvSlope:raw.obv_slope_5d,volRatio:raw.volume_ratio,
