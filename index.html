@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260618-v140">
+<meta name="app-version" content="20260618-v141">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1781,6 +1781,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <button class="nav-btn" id="nav-backlog" onclick="showPanel('backlog');renderBacklogPanel()">
       <i class="ti ti-archive"></i>Backlog
     </button>
+    <button class="nav-btn" id="nav-darkpool" onclick="showPanel('darkpool');loadDarkPool()">
+      <i class="ti ti-building-bank"></i>Dark Pool
+    </button>
     <button class="nav-btn" id="nav-admin" onclick="showPanel('admin')">
       <i class="ti ti-settings"></i>Admin
     </button>
@@ -1789,6 +1792,121 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <i class="ti ti-cloud" id="sync-icon"></i><span style="font-size:9px" id="sync-label">Sync</span>
     </button>
   </nav>
+</div>
+
+<!-- ── DARK POOL PANEL ────────────────────────────────────────────── -->
+<div id="panel-darkpool" class="panel">
+  <div class="sec"><i class="ti ti-building-bank"></i> Dark Pool & Institutional Flow</div>
+
+  <!-- Score Card -->
+  <div class="card card-accent" id="dp-score-card" style="text-align:center;padding:1.25rem">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.5rem;font-family:var(--mono)">INSTITUTIONAL FLOW SCORE</div>
+    <div id="dp-score-val" style="font-size:48px;font-weight:700;font-family:var(--mono);line-height:1">—</div>
+    <div id="dp-score-label" style="font-size:14px;font-weight:600;margin-top:.4rem">Lädt…</div>
+    <div id="dp-score-desc" style="font-size:11px;color:var(--text3);margin-top:.4rem;line-height:1.5">—</div>
+  </div>
+
+  <!-- Reload Button -->
+  <div style="display:flex;gap:8px;margin-bottom:.75rem">
+    <button class="btn btn-sm" onclick="loadDarkPool(true)" id="dp-reload-btn" style="font-size:12px">
+      <i class="ti ti-refresh"></i> Aktualisieren
+    </button>
+    <div id="dp-timestamp" style="font-size:10px;color:var(--text3);display:flex;align-items:center"></div>
+  </div>
+
+  <!-- DIX / GEX -->
+  <div class="sec">Dark Index (DIX) & Gamma Exposure (GEX)</div>
+  <div class="card" id="dp-dix-card">
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-label">DIX</div>
+        <div class="sig-val" id="dp-dix">—</div>
+        <div class="sig-sub" id="dp-dix-trend" style="color:var(--text3)">—</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">DIX Ø20T</div>
+        <div class="sig-val" id="dp-dix-avg">—</div>
+        <div class="sig-sub" style="color:var(--text3);font-size:10px">20-Tage Basis</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">GEX (Mrd $)</div>
+        <div class="sig-val" id="dp-gex">—</div>
+        <div class="sig-sub" id="dp-gex-trend" style="color:var(--text3)">—</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">GEX Ø20T</div>
+        <div class="sig-val" id="dp-gex-avg">—</div>
+        <div class="sig-sub" style="color:var(--text3);font-size:10px">20-Tage Basis</div>
+      </div>
+    </div>
+    <div id="dp-dix-info" style="font-size:11px;color:var(--text3);margin-top:.5rem;line-height:1.5;padding:6px 8px;background:var(--bg3);border-radius:6px">
+      <b>DIX</b> = Dark Index: Anteil S&P500-Trades über Dark Pools. Hoch (&gt;45%) = Institutionen kaufen verdeckt → <span style="color:var(--green)">bullisch</span>.<br>
+      <b>GEX</b> = Gamma Exposure: Market Maker Hedging. Positiv = stabilisierend, Negativ = destabilisierend.
+    </div>
+  </div>
+
+  <!-- Put/Call Ratio -->
+  <div class="sec">Put/Call Ratio (CBOE)</div>
+  <div class="card" id="dp-pcr-card">
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-label">PCR aktuell</div>
+        <div class="sig-val" id="dp-pcr">—</div>
+        <div class="sig-sub" id="dp-pcr-signal" style="color:var(--text3)">—</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">PCR Ø5T</div>
+        <div class="sig-val" id="dp-pcr-avg">—</div>
+        <div class="sig-sub" id="dp-pcr-trend" style="color:var(--text3)">—</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:.5rem;padding:6px 8px;background:var(--bg3);border-radius:6px;line-height:1.5">
+      <b>PCR Kontraindikator:</b> &lt;0.7 = zu viele Calls → Markt überhitzt. &gt;1.0 = Angst/Puts dominieren → <span style="color:var(--green)">Kaufgelegenheit</span>.
+    </div>
+  </div>
+
+  <!-- VIX Term Structure -->
+  <div class="sec">VIX Term Structure</div>
+  <div class="card" id="dp-vix-card">
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-label">VIX (Spot)</div>
+        <div class="sig-val" id="dp-vix">—</div>
+        <div class="sig-sub" style="color:var(--text3)">kurzfristig</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">VIX 3M</div>
+        <div class="sig-val" id="dp-vix3m">—</div>
+        <div class="sig-sub" style="color:var(--text3)">mittelfristig</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">Spread</div>
+        <div class="sig-val" id="dp-vix-spread">—</div>
+        <div class="sig-sub" style="color:var(--text3)">3M minus Spot</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">Struktur</div>
+        <div class="sig-val" id="dp-vix-structure" style="font-size:11px">—</div>
+        <div class="sig-sub" id="dp-vix-signal" style="color:var(--text3)">—</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:.5rem;padding:6px 8px;background:var(--bg3);border-radius:6px;line-height:1.5">
+      <b>Contango</b> (VIX3M &gt; VIX) = normaler Markt, kein Stress. <b>Backwardation</b> (VIX &gt; VIX3M) = Stress, kurzfristige Angst dominiert → Vorsicht.
+    </div>
+  </div>
+
+  <!-- Score Komponenten -->
+  <div class="sec">Score-Komponenten</div>
+  <div class="card" id="dp-components-card">
+    <div id="dp-components-list">
+      <div style="color:var(--text3);font-size:12px;text-align:center;padding:.75rem">Lädt…</div>
+    </div>
+  </div>
+
+  <div style="font-size:10px;color:var(--text3);text-align:center;padding:.5rem 0 .25rem;line-height:1.6">
+    Quellen: squeezemetrics.com (DIX/GEX) · CBOE via Yahoo Finance (PCR) · Yahoo Finance (VIX)<br>
+    Kein Anlageberatung · Cache 30 Min
+  </div>
 </div>
 
 <!-- ── SYNC MODAL ──────────────────────────────────────────────────── -->
@@ -15642,6 +15760,112 @@ function clearOversoldList() {
   const el = document.getElementById('backlog-oversold-list');
   if (el) el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text3)"><i class="ti ti-trending-down" style="font-size:24px;display:block;margin-bottom:.5rem"></i>Oversold-Liste geleert</div>';
 }
+
+// ── DARK POOL TAB ─────────────────────────────────────────────────────────
+
+async function loadDarkPool(forceReload) {
+  if (typeof KoDarkPool === 'undefined') {
+    document.getElementById('dp-score-label').textContent = 'Modul nicht geladen';
+    return;
+  }
+
+  // Reload-Button deaktivieren
+  var btn = document.getElementById('dp-reload-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Lädt…'; }
+
+  if (forceReload) KoDarkPool.clearCache();
+
+  var data = await KoDarkPool.fetchCached();
+  var scoreObj = KoDarkPool.score(data);
+  var signal   = KoDarkPool.interpret(scoreObj, data);
+
+  // ── Score Card ──────────────────────────────────────────────────
+  var scoreEl = document.getElementById('dp-score-val');
+  var labelEl = document.getElementById('dp-score-label');
+  var descEl  = document.getElementById('dp-score-desc');
+  if (scoreEl) { scoreEl.textContent = scoreObj ? scoreObj.total : '—'; scoreEl.style.color = signal.color; }
+  if (labelEl) { labelEl.textContent = signal.emoji + ' ' + signal.label; labelEl.style.color = signal.color; }
+  if (descEl)  { descEl.textContent  = signal.desc; }
+
+  // ── Timestamp ───────────────────────────────────────────────────
+  var tsEl = document.getElementById('dp-timestamp');
+  if (tsEl) tsEl.textContent = 'Stand: ' + new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) + ' · Cache 30 Min';
+
+  // ── DIX / GEX ───────────────────────────────────────────────────
+  if (data.dix) {
+    var d = data.dix;
+    var dixColor = d.dix >= 45 ? 'var(--green)' : d.dix >= 40 ? 'var(--amber)' : 'var(--red)';
+    var gexColor = d.gex >= 0 ? 'var(--green)' : 'var(--red)';
+    _dpSet('dp-dix',     d.dix + '%', dixColor);
+    _dpSet('dp-dix-trend', d.dixTrend + ' · Ø20T: ' + d.dixAvg20 + '%');
+    _dpSet('dp-dix-avg', d.dixAvg20 + '%');
+    _dpSet('dp-gex',     (d.gex >= 0 ? '+' : '') + d.gex + ' Mrd', gexColor);
+    _dpSet('dp-gex-trend', d.gexTrend + ' · Ø20T: ' + d.gexAvg20);
+    _dpSet('dp-gex-avg', d.gexAvg20 + ' Mrd');
+  } else {
+    ['dp-dix','dp-dix-trend','dp-dix-avg','dp-gex','dp-gex-trend','dp-gex-avg']
+      .forEach(id => _dpSet(id, 'N/A'));
+  }
+
+  // ── PCR ─────────────────────────────────────────────────────────
+  if (data.pcr) {
+    var p = data.pcr;
+    var pcrColor = p.signal === 'ÜBERVERKAUFT' ? 'var(--green)' : p.signal === 'ÜBERKAUFT' ? 'var(--red)' : 'var(--amber)';
+    _dpSet('dp-pcr',      p.pcr, pcrColor);
+    _dpSet('dp-pcr-signal', p.signal, pcrColor);
+    _dpSet('dp-pcr-avg',  p.avg5);
+    _dpSet('dp-pcr-trend', p.trend);
+  } else {
+    ['dp-pcr','dp-pcr-signal','dp-pcr-avg','dp-pcr-trend'].forEach(id => _dpSet(id, 'N/A'));
+  }
+
+  // ── VIX Term ────────────────────────────────────────────────────
+  if (data.vixTerm) {
+    var v = data.vixTerm;
+    var vtColor = v.structure === 'CONTANGO' ? 'var(--green)' : 'var(--red)';
+    _dpSet('dp-vix',          v.vix);
+    _dpSet('dp-vix3m',        v.vix3m);
+    _dpSet('dp-vix-spread',   (v.spread >= 0 ? '+' : '') + v.spread, vtColor);
+    _dpSet('dp-vix-structure', v.structure, vtColor);
+    _dpSet('dp-vix-signal',   v.signal,    vtColor);
+  } else {
+    ['dp-vix','dp-vix3m','dp-vix-spread','dp-vix-structure','dp-vix-signal'].forEach(id => _dpSet(id, 'N/A'));
+  }
+
+  // ── Komponenten ─────────────────────────────────────────────────
+  var compEl = document.getElementById('dp-components-list');
+  if (compEl && scoreObj) {
+    var labels = { dix:'DIX (40%)', gex:'GEX (20%)', pcr:'PCR (25%)', vixTerm:'VIX Term (15%)' };
+    var html = '';
+    Object.keys(labels).forEach(function(k) {
+      var val = scoreObj.components[k];
+      if (val == null) return;
+      var bar = Math.round(val);
+      var col = val >= 60 ? 'var(--green)' : val >= 40 ? 'var(--amber)' : 'var(--red)';
+      html += '<div style="margin-bottom:.5rem">'
+        + '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">'
+        + '<span style="color:var(--text2)">' + labels[k] + '</span>'
+        + '<span style="font-weight:600;color:' + col + '">' + val + '</span>'
+        + '</div>'
+        + '<div style="height:4px;background:var(--bg3);border-radius:2px">'
+        + '<div style="height:100%;width:' + bar + '%;background:' + col + ';border-radius:2px;transition:width .4s"></div>'
+        + '</div></div>';
+    });
+    compEl.innerHTML = html || '<div style="color:var(--text3);font-size:12px">Keine Daten</div>';
+  }
+
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Aktualisieren'; }
+}
+
+function _dpSet(id, val, color) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = val != null ? val : '—';
+  if (color) el.style.color = color;
+}
 </script>
+
+<!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules -->
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-darkpool.js"></script>
 
 
