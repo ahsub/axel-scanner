@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260618-v139">
+<meta name="app-version" content="20260618-v140">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3725,8 +3725,15 @@ function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
-  window._appUnlocked = true; // ab jetzt sind externe Fetches erlaubt
-  document.body.style.cursor = 'default'; // Cursor nach PIN zurücksetzen
+  window._appUnlocked = true;
+  // Cursor global auf default erzwingen (alle Elemente)
+  var styleTag = document.getElementById('_cursor_fix');
+  if (!styleTag) {
+    styleTag = document.createElement('style');
+    styleTag.id = '_cursor_fix';
+    styleTag.textContent = '*, *::before, *::after { cursor: default !important; } button, a, [onclick], select, input[type=checkbox], input[type=radio], label { cursor: pointer !important; } input[type=text], input[type=number], textarea { cursor: text !important; }';
+    document.head.appendChild(styleTag);
+  }
   setTimeout(function(){ fetchQqqRegime(); }, 800);
   // Workflow-Modal zeigen (wenn nicht deaktiviert)
   setTimeout(function(){
