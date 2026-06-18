@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v120">
+<meta name="app-version" content="20260615-v122">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2063,6 +2063,350 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="eic-pin-error" style="font-size:12px;color:#ef4444;min-height:18px;transition:opacity .2s;opacity:0"></div>
   </div>
 </div>
+
+<script>
+// ── KO-CONFIG v1.0 (embedded) ──
+/**
+ * ko-config.js — Zentrale Konfiguration
+ * Alle Feature-Flags, API-Keys, Gewichte
+ * Version: 1.0 | ko-scanner v=115+
+ */
+
+const KoConfig = {
+
+  version: 'v115',
+
+  // ── API ENDPOINTS ──────────────────────────────────────────────
+  api: {
+    corsProxy:   'https://my-cors-proxy.ahildebrand.workers.dev',
+    koSync:      'https://ko-sync.ahildebrand.workers.dev',
+    koAlert:     (typeof KoConfig !== 'undefined' && KoConfig.api && KoConfig.api.koAlert ? KoConfig.api.koAlert : 'https://ko-alert.ahildebrand.workers.dev'),
+    ahMedia:     'https://ah-media.ahildebrand.workers.dev',
+  },
+
+  // ── FEATURE FLAGS ───────────────────────────────────────────────
+  // enabled: Modul aktiv
+  // weight:  Gewicht im Composite Score (0=deaktiviert, 1=normal, 2=verstärkt)
+  features: {
+    markov:      { enabled: true,  weight: 1.0, label: 'Markov 2.0' },
+    overheat:    { enabled: true,  weight: 1.0, label: 'Überhitzung' },
+    ivEnrich:    { enabled: true,  weight: 1.0, label: 'IV-Enrichment' },
+    skew:        { enabled: true,  weight: 1.0, label: 'Skew-Proxy' },
+    cpr:         { enabled: true,  weight: 1.0, label: 'Call/Put-Ratio' },
+    intermarket: { enabled: true,  weight: 1.0, label: 'Intermarket' },
+    breadth:     { enabled: true,  weight: 1.0, label: 'NDX Breadth' },
+    sectorScan:  { enabled: true,  weight: 1.0, label: 'Sektor-Überhitzung' },
+    backtest:    { enabled: true,  weight: 0.0, label: 'Backtest' },
+    kiAlerts:    { enabled: true,  weight: 1.0, label: 'KI-Alerts' },
+    kiMakro:     { enabled: true,  weight: 1.0, label: 'Auto-Makro' },
+    earnings:    { enabled: true,  weight: 1.0, label: 'Earnings' },
+  },
+
+  // ── STRATEGIE-PRESETS ───────────────────────────────────────────
+  // Für verschiedene Investmentstrategien — schaltet Features en bloc
+  presets: {
+    momentum: {
+      label: 'Momentum / SEPA',
+      features: { markov:true, overheat:true, ivEnrich:true,
+                  intermarket:true, breadth:true },
+    },
+    options: {
+      label: 'Options / Wheel',
+      features: { markov:true, ivEnrich:true, skew:true, cpr:true,
+                  overheat:true, intermarket:false },
+    },
+    deepValue: {
+      label: 'Deep Value (kommt)',
+      features: { markov:false, ivEnrich:false, skew:false, cpr:false,
+                  intermarket:false, breadth:false, overheat:true },
+    },
+    conservative: {
+      label: 'Konservativ / Minimal',
+      features: { markov:true, overheat:true, ivEnrich:false,
+                  intermarket:false, breadth:false, kiAlerts:false },
+    },
+  },
+
+  // ── AUTO-TOP ────────────────────────────────────────────────────
+  autoTop: {
+    n:        40,
+    minScore: 50,
+    minBull:  2,
+  },
+
+  // ── SCAN DEFAULTS ───────────────────────────────────────────────
+  scan: {
+    defaultTF:     '1d',
+    defaultMarket: 'us',
+    maxConcurrent: 3,
+    retryAttempts: 2,
+    cacheMinutes:  60,
+    daysMap: { '15m':5, '30m':8, '1h':14, '4h':30, '1d':260 },
+  },
+
+  // ── MARKOV ──────────────────────────────────────────────────────
+  markov: {
+    lookback:         60,
+    strideMin:        5,
+    strideMax:        15,
+    kTrendbruch:      2.5,   // Gewicht P(Bull→Bear) in σ_bereinigt
+    bullBearThresholds: { warn: 0.15, danger: 0.25, elevated: 0.08 },
+  },
+
+  // ── ÜBERHITZUNG ─────────────────────────────────────────────────
+  overheat: {
+    ema200ATR:   { leicht: 2.0, mittel: 3.0, hoch: 4.0, extrem: 5.0 },
+    rsi:         { elevated: 65, overbought: 75 },
+    distDays:    { warn: 3, danger: 5 },
+    bbPosition:  { warn: 0.85, danger: 0.95 },
+  },
+
+  // ── ALERT ROUTING ───────────────────────────────────────────────
+  alert: {
+    breadthScharf:    50,
+    breadthStumm:     70,
+    pBull2BearWarn:   0.15,
+    pBull2BearDanger: 0.25,
+    vixZoneSofort:    4,
+    minLevel:         'MITTEL',
+    digestHourUTC:    21,
+  },
+
+  // ── METHODEN ────────────────────────────────────────────────────
+  isEnabled(feature) {
+    return this.features[feature]?.enabled === true;
+  },
+
+  getWeight(feature) {
+    return this.features[feature]?.enabled
+      ? (this.features[feature]?.weight ?? 1.0)
+      : 0.0;
+  },
+
+  applyPreset(presetName) {
+    const preset = this.presets[presetName];
+    if (!preset) return false;
+    Object.keys(preset.features).forEach(f => {
+      if (this.features[f]) this.features[f].enabled = preset.features[f];
+    });
+    console.log(`[KoConfig] Preset: ${preset.label}`);
+    return true;
+  },
+
+  // Aus localStorage laden (persistente Overrides)
+  loadOverrides() {
+    try {
+      const overrides = JSON.parse(localStorage.getItem('ko_feature_flags') || '{}');
+      Object.keys(overrides).forEach(f => {
+        if (this.features[f]) Object.assign(this.features[f], overrides[f]);
+      });
+    } catch(e) {}
+  },
+
+  saveOverrides() {
+    localStorage.setItem('ko_feature_flags', JSON.stringify(this.features));
+  },
+};
+
+// Overrides beim Start laden
+KoConfig.loadOverrides();
+
+</script>
+
+<script>
+// ── KO-INDICATORS v1.0 (embedded) ──
+/**
+ * ko-indicators.js — Technische Indikatoren
+ * Reine Mathematik, kein API-Call, kein DOM
+ * Version: 1.0
+ */
+
+const KoIndicators = {
+
+  // ── EMA ─────────────────────────────────────────────────────────
+  calcEMA(closes, period) {
+    if (!closes || closes.length < period) return null;
+    const k = 2 / (period + 1);
+    let ema  = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < closes.length; i++) {
+      ema = closes[i] * k + ema * (1 - k);
+    }
+    return ema;
+  },
+
+  calcEMASeries(closes, period) {
+    if (!closes || closes.length < period) return [];
+    const k = 2 / (period + 1);
+    const series = [];
+    let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    series.push(ema);
+    for (let i = period; i < closes.length; i++) {
+      ema = closes[i] * k + ema * (1 - k);
+      series.push(ema);
+    }
+    return series;
+  },
+
+  // ── RSI ─────────────────────────────────────────────────────────
+  calcRSI(closes, period = 14) {
+    if (!closes || closes.length < period + 1) return null;
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= period; i++) {
+      const d = closes[i] - closes[i - 1];
+      if (d > 0) gains += d; else losses -= d;
+    }
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+    for (let i = period + 1; i < closes.length; i++) {
+      const d = closes[i] - closes[i - 1];
+      avgGain = (avgGain * (period - 1) + Math.max(0, d))  / period;
+      avgLoss = (avgLoss * (period - 1) + Math.max(0, -d)) / period;
+    }
+    if (avgLoss === 0) return 100;
+    return Math.round((100 - 100 / (1 + avgGain / avgLoss)) * 10) / 10;
+  },
+
+  calcRSIDivergence(closes, lookback = 20) {
+    if (!closes || closes.length < lookback * 2 + 14) return null;
+    const n = closes.length;
+    const rsiNow  = this.calcRSI(closes.slice(n - 14 - lookback));
+    const rsiPrev = this.calcRSI(closes.slice(n - 14 - lookback * 2, n - lookback));
+    if (rsiNow == null || rsiPrev == null) return null;
+    const recentMax  = Math.max(...closes.slice(n - lookback));
+    const previousMax= Math.max(...closes.slice(n - lookback * 2, n - lookback));
+    const priceDiff  = (recentMax - previousMax) / previousMax * 100;
+    const rsiDiff    = rsiNow - rsiPrev;
+    return {
+      bearish:   priceDiff > 2 && rsiDiff < -3,
+      priceDiff: Math.round(priceDiff * 10) / 10,
+      rsiDiff:   Math.round(rsiDiff * 10) / 10,
+      rsiNow, rsiPrev,
+    };
+  },
+
+  // ── MACD ────────────────────────────────────────────────────────
+  calcMACD(closes, fast = 12, slow = 26, signal = 9) {
+    if (!closes || closes.length < slow + signal) return null;
+    const emaFast = this.calcEMASeries(closes, fast);
+    const emaSlow = this.calcEMASeries(closes, slow);
+    const offset  = emaFast.length - emaSlow.length;
+    const macdLine= emaSlow.map((v, i) => emaFast[i + offset] - v);
+    const signalLine = this.calcEMASeries(macdLine, signal);
+    const n = signalLine.length;
+    const hist    = signalLine.map((v, i) => macdLine[macdLine.length - n + i] - v);
+    return {
+      macd:      macdLine[macdLine.length - 1],
+      signal:    signalLine[n - 1],
+      histogram: hist[hist.length - 1],
+      histPrev:  hist[hist.length - 2] ?? null,
+    };
+  },
+
+  // ── ATR ─────────────────────────────────────────────────────────
+  calcATR(closes, period = 14) {
+    if (!closes || closes.length < period + 1) return null;
+    const trs = [];
+    for (let i = 1; i < closes.length; i++) {
+      trs.push(Math.abs(closes[i] - closes[i - 1]));
+    }
+    return trs.slice(-period).reduce((a, b) => a + b, 0) / period;
+  },
+
+  // ── BOLLINGER BANDS ─────────────────────────────────────────────
+  calcBollinger(closes, period = 20, mult = 2) {
+    if (!closes || closes.length < period) return null;
+    const n      = closes.length;
+    const slice  = closes.slice(n - period);
+    const sma    = slice.reduce((a, b) => a + b, 0) / period;
+    const variance = slice.reduce((a, v) => a + (v - sma) ** 2, 0) / period;
+    const std    = Math.sqrt(variance);
+    const upper  = sma + mult * std;
+    const lower  = sma - mult * std;
+    const price  = closes[n - 1];
+    const pos    = std > 0 ? (price - lower) / (upper - lower) : 0.5;
+    return { upper, lower, mid: sma, price, pos: Math.round(pos * 100) / 100, std };
+  },
+
+  // ── ADX ─────────────────────────────────────────────────────────
+  calcADX(closes, period = 14) {
+    if (!closes || closes.length < period * 2) return null;
+    const n   = closes.length;
+    const dms = [];
+    for (let i = 1; i < n; i++) {
+      const up   = closes[i] - closes[i - 1];
+      const down = closes[i - 1] - closes[i];
+      dms.push({ plus: Math.max(0, up), minus: Math.max(0, down) });
+    }
+    let sumP = 0, sumM = 0;
+    for (let i = 0; i < period; i++) { sumP += dms[i].plus; sumM += dms[i].minus; }
+    const dxVals = [];
+    for (let i = period; i < dms.length; i++) {
+      sumP = sumP - sumP / period + dms[i].plus;
+      sumM = sumM - sumM / period + dms[i].minus;
+      const diP = sumP + sumM > 0 ? sumP / (sumP + sumM) * 100 : 0;
+      const diM = sumP + sumM > 0 ? sumM / (sumP + sumM) * 100 : 0;
+      const dx  = diP + diM > 0 ? Math.abs(diP - diM) / (diP + diM) * 100 : 0;
+      dxVals.push(dx);
+    }
+    if (dxVals.length < period) return null;
+    const adx     = dxVals.slice(-period).reduce((a, b) => a + b, 0) / period;
+    const adxPrev = dxVals.slice(-period * 2, -period).reduce((a, b) => a + b, 0) / period;
+    return {
+      value:  Math.round(adx * 10) / 10,
+      prev:   Math.round(adxPrev * 10) / 10,
+      trend:  adx > adxPrev ? 'rising' : 'falling',
+      strong: adx > 25,
+    };
+  },
+
+  // ── DISTRIBUTION DAYS ───────────────────────────────────────────
+  calcDistributionDays(closes, volumes, lookback = 25) {
+    if (!closes || !volumes || closes.length < lookback) return 0;
+    const n       = closes.length;
+    const recentC = closes.slice(n - lookback);
+    const recentV = volumes.slice(n - lookback);
+    const avgVol  = recentV.filter(Boolean).reduce((a, b) => a + b, 0) / recentV.length;
+    let distDays  = 0;
+    for (let i = 1; i < recentC.length; i++) {
+      const chg = (recentC[i] - recentC[i - 1]) / recentC[i - 1];
+      if (chg <= -0.002 && (recentV[i] || 0) > avgVol * 1.1) distDays++;
+    }
+    return distDays;
+  },
+
+  // ── OBV ─────────────────────────────────────────────────────────
+  calcOBVSlope(closes, volumes, period = 5) {
+    if (!closes || !volumes || closes.length < period + 1) return null;
+    const n = closes.length;
+    let obv = 0;
+    const obvSeries = [0];
+    for (let i = 1; i < n; i++) {
+      const d = closes[i] - closes[i - 1];
+      obv += d > 0 ? (volumes[i] || 0) : d < 0 ? -(volumes[i] || 0) : 0;
+      obvSeries.push(obv);
+    }
+    const recent = obvSeries.slice(-period);
+    const slope  = (recent[recent.length - 1] - recent[0]) / period;
+    return slope;
+  },
+
+  // ── EMA STACK ───────────────────────────────────────────────────
+  calcEMAStack(closes) {
+    const ema10  = this.calcEMA(closes, 10);
+    const ema20  = this.calcEMA(closes, 20);
+    const ema50  = this.calcEMA(closes, 50);
+    const ema200 = this.calcEMA(closes, 200);
+    const price  = closes[closes.length - 1];
+    if (!ema10 || !ema20 || !ema50) return null;
+    return {
+      ema10, ema20, ema50, ema200, price,
+      bullStack: price > ema10 && ema10 > ema20 && ema20 > ema50,
+      ema200dist: ema200 ? Math.round((price - ema200) / ema200 * 1000) / 10 : null,
+    };
+  },
+};
+
+</script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -4350,7 +4694,7 @@ async function runScan(){
 
       const intervalMapTD={'15m':'15min','30m':'30min','1h':'1h','4h':'4h','1d':'1day'};
       const outputMap={'15m':78,'30m':65,'1h':70,'4h':60,'1d':220}; // Bars: MACD braucht min 35, Ziel ~70
-      const daysMap={'15m':5,'30m':8,'1h':14,'4h':30,'1d':260}; // 260 für EMA200+Überhitzung
+      const daysMap=(typeof KoConfig !== 'undefined' ? KoConfig.scan.daysMap : {'15m':5,'30m':8,'1h':14,'4h':30,'1d':260});
       let closes=[],volumes=[],timestamps=[],dates=[];
       let dataSource='';
       const deOpen = typeof isGermanMarketOpen==='function' && isGermanMarketOpen();
@@ -5137,7 +5481,9 @@ function processData(raw){
 
   // Überhitzungs-Score berechnen
   var _overheat = null;
-  try { _overheat = calcOverheatScore(null, raw); } catch(e) { console.warn('overheat:', e.message, raw?.closes_full?.length, 'closes'); }
+  if (typeof KoConfig === 'undefined' || KoConfig.isEnabled('overheat')) {
+    try { _overheat = calcOverheatScore(null, raw); } catch(e) { console.warn('overheat:', e.message, raw?.closes_full?.length, 'closes'); }
+  }
 
   return Object.assign({},raw,{
     markov:raw._markov||null,
@@ -8555,6 +8901,9 @@ document.addEventListener('DOMContentLoaded', function(){ updateWatchlistDropdow
 // und aktualisiert die Karten mit IVP-Badge
 // ═══════════════════════════════════════════════════════════════════════════
 async function enrichTop40WithIV() {
+  if (typeof KoConfig !== 'undefined' && !KoConfig.isEnabled('ivEnrich')) {
+    showKoToast('IV-Enrichment deaktiviert (KoConfig)'); return;
+  }
   const btn = document.getElementById('iv-enrich-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> IV lädt…'; }
 
@@ -11920,60 +12269,27 @@ function calcRSI(closes, period) {
 }
 
 function calcRSIDivergence(closes, lookback) {
-  // Bärische Divergenz: Preis macht höheres Hoch, RSI macht tieferes Hoch
-  lookback = lookback || 20;
-  if (!closes || closes.length < lookback + 14) return null;
-  var n = closes.length;
-  var recentCloses  = closes.slice(n - lookback);
-  var earlierCloses = closes.slice(n - lookback*2, n - lookback);
-  if (earlierCloses.length < 14) return null;
-
-  var rsiNow   = calcRSI(closes.slice(n - 14 - lookback));
-  var rsiPrev  = calcRSI(closes.slice(n - 14 - lookback*2, n - lookback));
-  var priceNow = Math.max.apply(null, recentCloses);
-  var pricePrev= Math.max.apply(null, earlierCloses);
-
-  if (rsiNow == null || rsiPrev == null) return null;
-  // Bärische Divergenz: Preis steigt, RSI fällt
-  var priceDiff = (priceNow - pricePrev) / pricePrev * 100;
-  var rsiDiff   = rsiNow - rsiPrev;
-  if (priceDiff > 2 && rsiDiff < -3) {
-    return { bearish: true, priceDiff: Math.round(priceDiff*10)/10, rsiDiff: Math.round(rsiDiff*10)/10 };
+  // → KoIndicators.calcRSIDivergence
+  if (typeof KoIndicators !== 'undefined') {
+    return KoIndicators.calcRSIDivergence(closes, lookback);
   }
-  return { bearish: false, priceDiff: Math.round(priceDiff*10)/10, rsiDiff: Math.round(rsiDiff*10)/10 };
+  return null;
 }
 
 function calcDistributionDays(closes, volumes, lookback) {
-  // Distribution Day: Kurs fällt ≥0.2% bei Volumen > 20-Tage-Ø
-  lookback = lookback || 25;
-  if (!closes || !volumes || closes.length < lookback) return 0;
-  var n = closes.length;
-  var recentC = closes.slice(n - lookback);
-  var recentV = volumes.slice(n - lookback);
-  var avgVol  = recentV.reduce(function(a,b){return a+(b||0);},0) / recentV.length;
-  var distDays = 0;
-  for (var i = 1; i < recentC.length; i++) {
-    var chg = (recentC[i] - recentC[i-1]) / recentC[i-1];
-    var vol = recentV[i] || 0;
-    if (chg <= -0.002 && vol > avgVol * 1.1) distDays++;
+  // → KoIndicators.calcDistributionDays
+  if (typeof KoIndicators !== 'undefined') {
+    return KoIndicators.calcDistributionDays(closes, volumes, lookback);
   }
-  return distDays;
+  return 0;
 }
 
 function calcBollingerPosition(closes, period, stdMult) {
-  period  = period  || 20;
-  stdMult = stdMult || 2;
-  if (!closes || closes.length < period) return null;
-  var n   = closes.length;
-  var sma = closes.slice(n-period).reduce(function(a,b){return a+b;},0) / period;
-  var variance = closes.slice(n-period).reduce(function(a,v){return a+(v-sma)*(v-sma);},0) / period;
-  var std = Math.sqrt(variance);
-  var upper = sma + stdMult * std;
-  var lower = sma - stdMult * std;
-  var price = closes[n-1];
-  // Position 0=unteres Band, 0.5=Mitte, 1=oberes Band
-  var pos = std > 0 ? (price - lower) / (upper - lower) : 0.5;
-  return { pos: Math.round(pos*100)/100, upper, lower, mid: sma, price };
+  // → KoIndicators.calcBollinger
+  if (typeof KoIndicators !== 'undefined') {
+    return KoIndicators.calcBollinger(closes, period || 20, stdMult || 2);
+  }
+  return null;
 }
 
 function calcADX(closes, period) {
@@ -12319,7 +12635,7 @@ function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
 
   // Bereinigtes σ-Signal: P(bull)-P(bear) - k×P(Bull→Bear)
   const pBull2Bear = (matrix20 && matrix20.bull) ? matrix20.bull.bear : 0;
-  const K_TRENDBRUCH = 2.5; // Gewichtungsfaktor für Trendbruch-Risiko
+  const K_TRENDBRUCH = (typeof KoConfig !== "undefined" && KoConfig.markov) ? KoConfig.markov.kTrendbruch : 2.5; // Gewichtungsfaktor für Trendbruch-Risiko
   const signalBereinigt = Math.max(-1, Math.min(1,
     signal - K_TRENDBRUCH * pBull2Bear
   ));
@@ -14259,9 +14575,9 @@ function autoSaveShortlist() {
 // Neue Tops werden hinzugefügt, schwächere Einträge ersetzt wenn Score besser.
 // ══════════════════════════════════════════════════════════════════════════════
 var AUTO_TOP_KEY = 'ko_auto_top';
-var AUTO_TOP_N = 40;        // Wie viele Titel max. in der Liste
-var AUTO_TOP_MIN_SCORE = 50; // Mindestscore für Aufnahme
-var AUTO_TOP_MIN_BULL = 2;   // Mindestens 2/3 bullisch
+var AUTO_TOP_N = (typeof KoConfig !== 'undefined' ? KoConfig.autoTop.n : 40);
+var AUTO_TOP_MIN_SCORE = (typeof KoConfig !== 'undefined' ? KoConfig.autoTop.minScore : 50);
+var AUTO_TOP_MIN_BULL = (typeof KoConfig !== 'undefined' ? KoConfig.autoTop.minBull : 2);
 
 function autoTopGetTodayKey() {
   return new Date().toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'});
