@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260618-v129">
+<meta name="app-version" content="20260618-v131">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2064,6 +2064,23 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
 </div>
 
+<!-- PIN-Funktionen früh definieren (vor externen Modulen) damit onclick sofort verfügbar -->
+<script>
+window._pinEntry = '';
+window.pinPress = function(d){
+  if(window._pinEntry.length >= 4) return;
+  window._pinEntry += d;
+  for(var i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<window._pinEntry.length?' filled':'');
+  if(window._pinEntry.length === 4) setTimeout(window.pinSubmit, 100);
+};
+window.pinClear = function(){ window._pinEntry=window._pinEntry.slice(0,-1); for(var i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<window._pinEntry.length?' filled':''); };
+window.pinSubmit = function(){
+  var pin = (function(){ try{ return localStorage.getItem('ko_pin') || '1234'; } catch(e){ return '1234'; } })();
+  if(window._pinEntry === pin){ if(typeof unlockApp==='function') unlockApp(); }
+  else { document.getElementById('pin-error').classList.add('show'); window._pinEntry=''; for(var i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'; setTimeout(function(){document.getElementById('pin-error').classList.remove('show');},2000); }
+};
+</script>
+
 <!-- ko-config.js — extern geladen aus ahsub/ko-modules -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-config.js"></script>
 
@@ -3817,19 +3834,21 @@ window.currentMarket = 'us';
 window._markovFilterThreshold = parseFloat(localStorage.getItem('ko_markov_filter_threshold') || '0.10'); // 'us' or 'de'
 
 // ─── PIN ─────────────────────────────────────────────────────────────
-let pinEntry = '';
+// pinEntry, pinPress, pinClear, pinSubmit sind bereits früh als window.* definiert
+// Hier nur noch getPin und unlockApp ergänzen
 function getPin(){ try{ return localStorage.getItem('ko_pin') || DEFAULT_PIN; } catch(e){ return DEFAULT_PIN; } }
-function pinPress(d){
-  if(pinEntry.length >= 4) return;
-  pinEntry += d;
-  for(let i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<pinEntry.length?' filled':'');
-  if(pinEntry.length === 4) setTimeout(pinSubmit, 100);
-}
-function pinClear(){ pinEntry=pinEntry.slice(0,-1); for(let i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<pinEntry.length?' filled':''); }
-function pinSubmit(){
-  if(pinEntry === getPin()){ unlockApp(); }
-  else { document.getElementById('pin-error').classList.add('show'); pinEntry=''; for(let i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'; setTimeout(()=>document.getElementById('pin-error').classList.remove('show'),2000); }
-}
+// Überschreibe frühe window-Versionen mit vollständigen Versionen (unlockApp jetzt verfügbar)
+window.pinPress = function(d){
+  if(window._pinEntry.length >= 4) return;
+  window._pinEntry += String(d);
+  for(var i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<window._pinEntry.length?' filled':'');
+  if(window._pinEntry.length === 4) setTimeout(window.pinSubmit, 100);
+};
+window.pinClear = function(){ window._pinEntry=window._pinEntry.slice(0,-1); for(var i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<window._pinEntry.length?' filled':''); };
+window.pinSubmit = function(){
+  if(window._pinEntry === getPin()){ unlockApp(); }
+  else { document.getElementById('pin-error').classList.add('show'); window._pinEntry=''; for(var i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'; setTimeout(()=>document.getElementById('pin-error').classList.remove('show'),2000); }
+};
 function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
