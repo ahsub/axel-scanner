@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260618-v141">
+<meta name="app-version" content="20260618-v142">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1840,28 +1840,40 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
     </div>
     <div id="dp-dix-info" style="font-size:11px;color:var(--text3);margin-top:.5rem;line-height:1.5;padding:6px 8px;background:var(--bg3);border-radius:6px">
-      <b>DIX</b> = Dark Index: Anteil S&P500-Trades über Dark Pools. Hoch (&gt;45%) = Institutionen kaufen verdeckt → <span style="color:var(--green)">bullisch</span>.<br>
-      <b>GEX</b> = Gamma Exposure: Market Maker Hedging. Positiv = stabilisierend, Negativ = destabilisierend.
+      <b>DIX-Proxy</b> = OBV-basierter Institutional Flow auf SPY. Hoch (&gt;49%) = Institutionen kaufen → <span style="color:var(--green)">bullisch</span>.<br>
+      <b>GEX-Proxy</b> = Volumen-Anomalie SPY. Positiv = stabilisierend, Negativ = destabilisierend.<br>
+      <span style="color:var(--amber)">⚠ Echter DIX/GEX (squeezemetrics) seit 2024 Paywall-geschützt.</span>
     </div>
   </div>
 
-  <!-- Put/Call Ratio -->
-  <div class="sec">Put/Call Ratio (CBOE)</div>
+  <!-- VVIX / SKEW / PCR-Proxy -->
+  <div class="sec">Sentiment-Indikatoren (VVIX · SKEW · PCR-Proxy)</div>
   <div class="card" id="dp-pcr-card">
     <div class="sig-grid">
       <div class="sig-box">
-        <div class="sig-label">PCR aktuell</div>
+        <div class="sig-label">VVIX</div>
+        <div class="sig-val" id="dp-vvix">—</div>
+        <div class="sig-sub" style="color:var(--text3)">VIX der VIX-Opts</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">SKEW</div>
+        <div class="sig-val" id="dp-skew">—</div>
+        <div class="sig-sub" style="color:var(--text3)">Tail-Risk Index</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">PCR-Proxy</div>
         <div class="sig-val" id="dp-pcr">—</div>
         <div class="sig-sub" id="dp-pcr-signal" style="color:var(--text3)">—</div>
       </div>
       <div class="sig-box">
-        <div class="sig-label">PCR Ø5T</div>
-        <div class="sig-val" id="dp-pcr-avg">—</div>
+        <div class="sig-label">Signal</div>
+        <div class="sig-val" id="dp-pcr-avg" style="font-size:12px">—</div>
         <div class="sig-sub" id="dp-pcr-trend" style="color:var(--text3)">—</div>
       </div>
     </div>
     <div style="font-size:11px;color:var(--text3);margin-top:.5rem;padding:6px 8px;background:var(--bg3);border-radius:6px;line-height:1.5">
-      <b>PCR Kontraindikator:</b> &lt;0.7 = zu viele Calls → Markt überhitzt. &gt;1.0 = Angst/Puts dominieren → <span style="color:var(--green)">Kaufgelegenheit</span>.
+      <b>VVIX</b> &gt;100 = Angst bei Optionshändlern. <b>SKEW</b> &gt;135 = institutionelles Tail-Hedging.<br>
+      <b>PCR-Proxy</b> aus VVIX+SKEW: &lt;0.7 = Überkauft · &gt;1.0 = <span style="color:var(--green)">Kaufgelegenheit</span>.
     </div>
   </div>
 
@@ -15807,16 +15819,20 @@ async function loadDarkPool(forceReload) {
       .forEach(id => _dpSet(id, 'N/A'));
   }
 
-  // ── PCR ─────────────────────────────────────────────────────────
+  // ── PCR / VVIX / SKEW ───────────────────────────────────────────
   if (data.pcr) {
     var p = data.pcr;
     var pcrColor = p.signal === 'ÜBERVERKAUFT' ? 'var(--green)' : p.signal === 'ÜBERKAUFT' ? 'var(--red)' : 'var(--amber)';
-    _dpSet('dp-pcr',      p.pcr, pcrColor);
+    var vvixColor = p.vvix > 110 ? 'var(--red)' : p.vvix > 95 ? 'var(--amber)' : 'var(--green)';
+    var skewColor = p.skew > 140 ? 'var(--red)' : p.skew > 130 ? 'var(--amber)' : 'var(--green)';
+    _dpSet('dp-vvix',       p.vvix ? p.vvix : '—', vvixColor);
+    _dpSet('dp-skew',       p.skew ? p.skew : '—', skewColor);
+    _dpSet('dp-pcr',        p.pcr, pcrColor);
     _dpSet('dp-pcr-signal', p.signal, pcrColor);
-    _dpSet('dp-pcr-avg',  p.avg5);
-    _dpSet('dp-pcr-trend', p.trend);
+    _dpSet('dp-pcr-avg',    p.signal, pcrColor);
+    _dpSet('dp-pcr-trend',  'Proxy (VVIX+SKEW)');
   } else {
-    ['dp-pcr','dp-pcr-signal','dp-pcr-avg','dp-pcr-trend'].forEach(id => _dpSet(id, 'N/A'));
+    ['dp-vvix','dp-skew','dp-pcr','dp-pcr-signal','dp-pcr-avg','dp-pcr-trend'].forEach(id => _dpSet(id, 'N/A'));
   }
 
   // ── VIX Term ────────────────────────────────────────────────────
