@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260618-v144">
+<meta name="app-version" content="20260618-v145">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1871,9 +1871,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div class="sig-sub" id="dp-pcr-trend" style="color:var(--text3)">—</div>
       </div>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:.5rem;padding:6px 8px;background:var(--bg3);border-radius:6px;line-height:1.5">
-      <b>VVIX</b> &gt;100 = Angst bei Optionshändlern. <b>SKEW</b> &gt;135 = institutionelles Tail-Hedging.<br>
-      <b>PCR-Proxy</b> aus VVIX+SKEW: &lt;0.7 = Überkauft · &gt;1.0 = <span style="color:var(--green)">Kaufgelegenheit</span>.
+    <div style="font-size:11px;color:var(--text3);margin-top:.5rem;padding:8px 10px;background:var(--bg3);border-radius:6px;line-height:1.7">
+      <b>VVIX</b> (VIX of VIX): Misst die Volatilitat der VIX-Optionen. Normal: 80-95. &gt;100 = erhohte Unsicherheit. &gt;120 = Panik-Modus, starke Kursbewegungen erwartet.<br>
+      <b>SKEW</b> (CBOE Skew Index): Nachfrage nach weit aus-dem-Geld liegenden Puts (Tail-Risk Hedging). Normal: 100-130. &gt;135 = Institutionen sichern Risiken ab. &gt;145 = extremes Hedging, seltenes Warnsignal. Hoher SKEW ist kein sofortiges Verkaufssignal, zeigt aber dass Smart Money Risiken absichert.<br>
+      <b>PCR-Proxy</b> (synthetisch aus VVIX + SKEW): Naherung fur Put/Call-Verhaltnis. &lt;0.7 = Markt uberhitzt (kontr. barisch). &gt;1.0 = Angst dominiert &rarr; <span style="color:var(--green)">kontr. bullisch</span>.
     </div>
   </div>
 
