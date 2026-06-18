@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260618-v142">
+<meta name="app-version" content="20260618-v143">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1915,8 +1915,42 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
   </div>
 
+  <!-- ── KI-INTERPRETATION ─────────────────────────────────────────── -->
+  <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
+    <span><i class="ti ti-brain"></i> KI-Marktinterpretation</span>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);cursor:pointer">
+      <input type="checkbox" id="dp-ki-toggle" checked onchange="toggleDpKI(this.checked)"
+        style="width:14px;height:14px;accent-color:var(--accent)"> aktiv
+    </label>
+  </div>
+
+  <div id="dp-ki-box" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:1rem;margin-bottom:.75rem">
+    <!-- KI-Analyse Inhalt -->
+    <div id="dp-ki-content">
+      <div style="color:var(--text3);font-size:12px;text-align:center;padding:.5rem">
+        <i class="ti ti-brain"></i> Analyse wird nach dem Laden der Daten generiert…
+      </div>
+    </div>
+
+    <!-- Richtungspfeile-Legende -->
+    <div id="dp-ki-indicators" style="display:none;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border2)">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:.4rem;font-weight:600;letter-spacing:.5px">PARAMETER-TREND</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="dp-ki-arrows"></div>
+    </div>
+
+    <!-- Handlungsempfehlung -->
+    <div id="dp-ki-action" style="display:none;margin-top:.75rem;padding:.6rem .8rem;border-radius:8px;border-left:3px solid var(--accent)">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:600">HANDLUNGSEMPFEHLUNG</div>
+      <div id="dp-ki-action-text" style="font-size:13px;font-weight:600;color:var(--text)"></div>
+    </div>
+
+    <div id="dp-ki-footer" style="display:none;margin-top:.6rem;font-size:10px;color:var(--text3);text-align:right">
+      <i class="ti ti-robot"></i> Claude Sonnet · <span id="dp-ki-time"></span> · Kein Anlageberatung
+    </div>
+  </div>
+
   <div style="font-size:10px;color:var(--text3);text-align:center;padding:.5rem 0 .25rem;line-height:1.6">
-    Quellen: squeezemetrics.com (DIX/GEX) · CBOE via Yahoo Finance (PCR) · Yahoo Finance (VIX)<br>
+    Quellen: SPY/Yahoo Finance (DIX/GEX-Proxy) · VVIX/SKEW/VIX via Yahoo Finance<br>
     Kein Anlageberatung · Cache 30 Min
   </div>
 </div>
@@ -15871,6 +15905,14 @@ async function loadDarkPool(forceReload) {
   }
 
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Aktualisieren'; }
+
+  // ── Richtungspfeile rendern ──────────────────────────────────────
+  renderDpArrows(data);
+
+  // ── KI-Interpretation generieren ────────────────────────────────
+  if (_dpKiActive) {
+    generateDpKI(data, scoreObj, signal);
+  }
 }
 
 function _dpSet(id, val, color) {
@@ -15878,6 +15920,182 @@ function _dpSet(id, val, color) {
   if (!el) return;
   el.textContent = val != null ? val : '—';
   if (color) el.style.color = color;
+}
+
+// ── RICHTUNGSPFEILE ───────────────────────────────────────────────────────
+function renderDpArrows(data) {
+  var arrowsEl = document.getElementById('dp-ki-arrows');
+  if (!arrowsEl) return;
+
+  var arrows = [];
+
+  // DIX-Proxy
+  if (data.dix) {
+    var dixTrend = data.dix.dixTrend === 'steigend';
+    var dixBull  = data.dix.dix >= 49;
+    arrows.push({
+      label: 'DIX-Proxy',
+      val:   data.dix.dix + '%',
+      arrow: dixTrend ? '↑' : '↓',
+      color: dixBull ? 'var(--green)' : 'var(--amber)',
+      tip:   dixTrend ? 'Steigend — Institutionen kaufen' : 'Fallend — Institutionen zurückhaltend',
+    });
+  }
+
+  // VVIX
+  if (data.pcr && data.pcr.vvix) {
+    var vvixHigh = data.pcr.vvix > 100;
+    arrows.push({
+      label: 'VVIX',
+      val:   data.pcr.vvix,
+      arrow: vvixHigh ? '↑' : '→',
+      color: vvixHigh ? 'var(--red)' : 'var(--green)',
+      tip:   vvixHigh ? 'Erhöht — Angst bei Optionshändlern' : 'Normal — ruhige Optionsmärkte',
+    });
+  }
+
+  // SKEW
+  if (data.pcr && data.pcr.skew) {
+    var skewHigh = data.pcr.skew > 135;
+    var skewEx   = data.pcr.skew > 145;
+    arrows.push({
+      label: 'SKEW',
+      val:   data.pcr.skew,
+      arrow: skewHigh ? '↑' : '→',
+      color: skewEx ? 'var(--red)' : skewHigh ? 'var(--amber)' : 'var(--green)',
+      tip:   skewEx   ? 'Extrem — starkes Tail-Hedging der Institutionen' :
+             skewHigh ? 'Erhöht — institutionelle Absicherung aktiv' :
+                        'Normal — kein ungewöhnliches Hedging',
+    });
+  }
+
+  // VIX Term
+  if (data.vixTerm) {
+    var contango = data.vixTerm.structure === 'CONTANGO';
+    arrows.push({
+      label: 'VIX-Kurve',
+      val:   data.vixTerm.structure,
+      arrow: contango ? '↓' : '↑',
+      color: contango ? 'var(--green)' : 'var(--red)',
+      tip:   contango ? 'Contango — normaler Markt, kein Stress' : 'Backwardation — kurzfristige Angst dominiert',
+    });
+    arrows.push({
+      label: 'VIX Spread',
+      val:   (data.vixTerm.spread >= 0 ? '+' : '') + data.vixTerm.spread,
+      arrow: data.vixTerm.spread > 2 ? '↑' : data.vixTerm.spread < 0 ? '↓' : '→',
+      color: data.vixTerm.spread > 0 ? 'var(--green)' : 'var(--red)',
+      tip:   'VIX3M minus VIX Spot — positiv = beruhigter Markt',
+    });
+  }
+
+  arrowsEl.innerHTML = arrows.map(function(a) {
+    return '<div title="' + a.tip + '" style="display:flex;align-items:center;gap:4px;'
+      + 'background:var(--bg3);border-radius:6px;padding:4px 8px;cursor:help">'
+      + '<span style="color:' + a.color + ';font-size:14px;font-weight:700">' + a.arrow + '</span>'
+      + '<span style="font-size:10px;color:var(--text3)">' + a.label + '</span>'
+      + '<span style="font-size:11px;font-weight:600;color:' + a.color + '">' + a.val + '</span>'
+      + '</div>';
+  }).join('');
+
+  document.getElementById('dp-ki-indicators').style.display = 'block';
+}
+
+// ── KI-INTERPRETATION via Claude API ─────────────────────────────────────
+var _dpKiActive = true;
+
+function toggleDpKI(active) {
+  _dpKiActive = active;
+  document.getElementById('dp-ki-box').style.opacity = active ? '1' : '0.4';
+}
+
+async function generateDpKI(data, scoreObj, signal) {
+  if (!_dpKiActive) return;
+
+  var contentEl = document.getElementById('dp-ki-content');
+  var actionEl  = document.getElementById('dp-ki-action');
+  var footerEl  = document.getElementById('dp-ki-footer');
+
+  // Loading-State
+  contentEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:var(--text3);font-size:12px;padding:.25rem 0">'
+    + '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i>'
+    + ' Claude analysiert Marktdaten…</div>';
+
+  // Prompt zusammenbauen
+  var ctx = [];
+  ctx.push('INSTITUTIONAL FLOW SCORE: ' + (scoreObj ? scoreObj.total : '?') + '/100 → ' + signal.label);
+  if (data.dix) {
+    ctx.push('DIX-Proxy: ' + data.dix.dix + '% (' + data.dix.dixTrend + ') | GEX-Proxy: ' + (data.dix.gex >= 0 ? '+' : '') + data.dix.gex + ' Mrd');
+  }
+  if (data.pcr) {
+    ctx.push('VVIX: ' + (data.pcr.vvix || '?') + ' | SKEW: ' + (data.pcr.skew || '?') + ' | PCR-Proxy: ' + data.pcr.pcr + ' (' + data.pcr.signal + ')');
+  }
+  if (data.vixTerm) {
+    ctx.push('VIX Spot: ' + data.vixTerm.vix + ' | VIX 3M: ' + data.vixTerm.vix3m + ' | Spread: ' + data.vixTerm.spread + ' | Struktur: ' + data.vixTerm.structure);
+  }
+
+  var prompt = 'Du bist ein erfahrener Marktanalyst und Portfoliomanager. Analysiere folgende institutionelle Marktindikatoren und gib eine präzise, handlungsorientierte Interpretation auf Deutsch:\n\n'
+    + ctx.join('\n') + '\n\n'
+    + 'Beantworte in 4-5 prägnanten Sätzen:\n'
+    + '1. Was signalisieren die Daten über das institutionelle Verhalten?\n'
+    + '2. Was bedeutet die VIX-Kurvenstruktur für das Marktumfeld?\n'
+    + '3. Was sagt SKEW über Tail-Risiken aus?\n'
+    + '4. Konkrete Handlungsempfehlung (Positionsgröße, Absicherung, Vorsicht).\n'
+    + 'Stil: direkt, klar, keine Floskeln. Kein "Ich". Keine Haftungshinweise.';
+
+  try {
+    var antKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_ant_key') || '';
+    if (!antKey) {
+      contentEl.innerHTML = '<div style="color:var(--amber);font-size:12px">⚠ Anthropic API-Key fehlt — bitte im Admin-Tab eintragen.</div>';
+      return;
+    }
+
+    var proxyUrl = (typeof KoConfig !== 'undefined' ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev')
+      + '/?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages');
+
+    var res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-ant-key': antKey,
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    var j = await res.json();
+    var text = j?.content?.[0]?.text || '';
+
+    if (!text) {
+      contentEl.innerHTML = '<div style="color:var(--red);font-size:12px">Fehler: ' + (j?.error?.message || 'Keine Antwort') + '</div>';
+      return;
+    }
+
+    // Text formatieren
+    contentEl.innerHTML = '<div style="font-size:13px;line-height:1.7;color:var(--text)">' + text.replace(/\n/g, '<br>') + '</div>';
+
+    // Handlungsempfehlung ableiten
+    var score = scoreObj ? scoreObj.total : 50;
+    var actionText, actionColor, actionBorder;
+    if      (score >= 70) { actionText = '✅ KAUFEN / Positionen aufbauen — starkes institutionelles Kaufsignal'; actionColor = 'var(--green)'; actionBorder = 'var(--green)'; }
+    else if (score >= 55) { actionText = '📈 LEICHT BULLISCH — selektiver Positionsaufbau möglich'; actionColor = 'var(--green)'; actionBorder = 'var(--green)'; }
+    else if (score >= 45) { actionText = '⏸ HALTEN — neutrales Umfeld, abwarten'; actionColor = 'var(--amber)'; actionBorder = 'var(--amber)'; }
+    else if (score >= 30) { actionText = '⚠ VORSICHT — Positionsgrößen reduzieren, Stops setzen'; actionColor = 'var(--amber)'; actionBorder = 'var(--red)'; }
+    else                  { actionText = '🔴 DEFENSIV — Long-Positionen absichern oder schließen'; actionColor = 'var(--red)'; actionBorder = 'var(--red)'; }
+
+    document.getElementById('dp-ki-action-text').textContent = actionText;
+    document.getElementById('dp-ki-action-text').style.color = actionColor;
+    document.getElementById('dp-ki-action').style.borderColor = actionBorder;
+    actionEl.style.display  = 'block';
+
+    document.getElementById('dp-ki-time').textContent = new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+    footerEl.style.display = 'block';
+
+  } catch(e) {
+    contentEl.innerHTML = '<div style="color:var(--red);font-size:12px">Fehler: ' + e.message + '</div>';
+  }
 }
 </script>
 
