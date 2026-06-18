@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260618-v143">
+<meta name="app-version" content="20260618-v144">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1924,7 +1924,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </label>
   </div>
 
-  <div id="dp-ki-box" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:1rem;margin-bottom:.75rem">
+  <div id="dp-ki-box" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:1rem;margin-bottom:.75rem;min-height:200px">
     <!-- KI-Analyse Inhalt -->
     <div id="dp-ki-content">
       <div style="color:var(--text3);font-size:12px;text-align:center;padding:.5rem">
@@ -6969,7 +6969,7 @@ async function calcBullIndicator() {
   // HYG bereits in Intermarket geladen — SPY neu holen
   {
     try {
-      const hygData = results ? results.find(r => r.sym === 'JNK')?.data : null;
+      const hygData = (typeof results !== 'undefined' && results) ? results.find(r => r.sym === 'JNK')?.data : null;
       const spyData = await fetchYahooSingle('SPY');
       if (hygData && spyData) {
         // Divergenz: SPY 5d Richtung vs HYG 5d Richtung
@@ -16040,6 +16040,9 @@ async function generateDpKI(data, scoreObj, signal) {
     + '2. Was bedeutet die VIX-Kurvenstruktur für das Marktumfeld?\n'
     + '3. Was sagt SKEW über Tail-Risiken aus?\n'
     + '4. Konkrete Handlungsempfehlung (Positionsgröße, Absicherung, Vorsicht).\n'
+    + 'Wichtig: Basiere deine Analyse NUR auf den oben genannten Zahlen. '
+    + 'Erfinde keine Kurse, Ereignisse oder Nachrichten. '
+    + 'Wenn ein Wert fehlt oder unklar ist, sage das explizit. '
     + 'Stil: direkt, klar, keine Floskeln. Kein "Ich". Keine Haftungshinweise.';
 
   try {
@@ -16074,7 +16077,7 @@ async function generateDpKI(data, scoreObj, signal) {
     }
 
     // Text formatieren
-    contentEl.innerHTML = '<div style="font-size:13px;line-height:1.7;color:var(--text)">' + text.replace(/\n/g, '<br>') + '</div>';
+    contentEl.innerHTML = '<div style="font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap">' + text + '</div>';
 
     // Handlungsempfehlung ableiten
     var score = scoreObj ? scoreObj.total : 50;
