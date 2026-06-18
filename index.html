@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260618-v133">
+<meta name="app-version" content="20260618-v134">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -4748,10 +4748,20 @@ async function sendMacroState() {
     : 'https://ko-alert.ahildebrand.workers.dev';
 
   // State aus DOM lesen
-  var vixEl     = document.getElementById('m-vix');
-  var breadthEl = document.getElementById('breadth-pct');
-  var vix       = vixEl     ? parseFloat(vixEl.textContent)     || null : null;
-  var breadth   = breadthEl ? parseFloat(breadthEl.textContent) || null : null;
+  var vixEl = document.getElementById('m-vix');
+  var vix   = vixEl ? parseFloat(vixEl.textContent) || null : null;
+
+  // Breadth: zuerst window._nasdaqBreadthData (zuverlässig), dann DOM-Fallback
+  var breadth = null;
+  if (window._nasdaqBreadthData && window._nasdaqBreadthData.pct != null) {
+    breadth = parseFloat(window._nasdaqBreadthData.pct) || null;
+  } else {
+    var breadthEl = document.getElementById('breadth-pct');
+    if (breadthEl) {
+      var bTxt = (breadthEl.textContent || '').replace('%','').trim();
+      breadth = bTxt && bTxt !== '—' ? parseFloat(bTxt) || null : null;
+    }
+  }
 
   // VIX-Zone bestimmen
   var vixZone = 0;
