@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260615-v119">
+<meta name="app-version" content="20260615-v120">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13127,13 +13127,16 @@ function toggleKiDropdown(anchorEl) {
     { strat:'options',  label:'🎯 Options-Wheel' },
     { strat:'swing',    label:'🔄 Swing-Trading' },
     { strat:'dividend', label:'💰 Dividend Growth' },
-    { strat:'ludwig',   label:'⚙️ Optionen (E. Ludwig)', color:'#a371f7' },
+    { strat:'ludwig',   label:'⚙️ Optionen (E. Ludwig)' },
   ];
 
   var html = '<div style="font-size:10px;color:var(--text3);padding:2px 8px 5px;border-bottom:0.5px solid var(--border);margin-bottom:3px">KI-ANALYSE STARTEN:</div>';
   strategies.forEach(function(s) {
+    // Aktive Strategie hervorheben, sonst einheitliche Farbe
+    var isActive = (typeof _kiStrat !== 'undefined' && _kiStrat === s.strat);
+    var styleStr = isActive ? ' style="color:var(--accent);font-weight:600"' : '';
     html += '<button onclick="hideKiDropdown();openKiBriefing(\'' + s.strat + '\')" '
-      + 'class="ki-dd-btn"' + (s.color ? ' style="color:' + s.color + '"' : '') + '>'
+      + 'class="ki-dd-btn"' + styleStr + '>'
       + s.label + '</button>';
   });
   // YT-Eintrag: öffnet Modal statt KI-Briefing
