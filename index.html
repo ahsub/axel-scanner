@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260620-v154">
+<meta name="app-version" content="20260620-v155">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -288,6 +288,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <button onclick="openKiBriefing('momentum');hideKiDropdown()" class="ki-dd-btn">📈 Momentum</button>
             <button onclick="openKiBriefing('options');hideKiDropdown()" class="ki-dd-btn">🎯 Options-Wheel</button>
             <button onclick="openKiBriefing('swing');hideKiDropdown()" class="ki-dd-btn">🔄 Swing-Trading</button>
+            <button onclick="openKiBriefing('meanrev');hideKiDropdown()" class="ki-dd-btn">↩️ Mean Reversion</button>
+            <button onclick="openKiBriefing('breakout');hideKiDropdown()" class="ki-dd-btn">🚀 Breakout</button>
             <button onclick="openKiBriefing('dividend');hideKiDropdown()" class="ki-dd-btn">💰 Dividend Growth</button>
             <button onclick="openKiBriefing('ludwig');hideKiDropdown()" class="ki-dd-btn" style="color:#a371f7">⚙️ Optionen (E. Ludwig)</button>
             <div style="border-top:0.5px solid var(--border);margin-top:4px;padding-top:4px">
@@ -1972,6 +1974,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div style="display:flex;align-items:center;gap:8px">
         <div id="dd-score-badge" style="font-size:18px;font-weight:700;padding:4px 12px;border-radius:8px;background:var(--bg3)">—</div>
         <button onclick="closeDeepDive()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px"><i class="ti ti-x"></i></button>
+      </div>
+    </div>
+
+    <!-- Strategie-Schnellwahl direkt unter Header -->
+    <div style="padding:.6rem 1.25rem;background:var(--bg3);border-bottom:1px solid var(--border2)">
+      <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.4rem">ANALYSE-PERSPEKTIVE</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap" id="dd-strategy-btns-top">
+        <button onclick="setDdStrategy('momentum')" id="dd-strat-top-momentum" class="btn btn-sm" style="font-size:11px;padding:3px 8px;background:var(--accent);color:#fff;border-color:var(--accent)">📈 Momentum</button>
+        <button onclick="setDdStrategy('options')" id="dd-strat-top-options" class="btn btn-sm" style="font-size:11px;padding:3px 8px">⚙️ Options</button>
+        <button onclick="setDdStrategy('meanrev')" id="dd-strat-top-meanrev" class="btn btn-sm" style="font-size:11px;padding:3px 8px">↩️ Mean Rev.</button>
+        <button onclick="setDdStrategy('swing')" id="dd-strat-top-swing" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🔄 Swing</button>
+        <button onclick="setDdStrategy('breakout')" id="dd-strat-top-breakout" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🚀 Breakout</button>
       </div>
     </div>
 
@@ -16039,18 +16053,21 @@ var DD_STRATEGIES = {
 function setDdStrategy(strategy) {
   _ddCurrentStrategy = strategy;
   // Button-Highlighting
-  Object.keys(DD_STRATEGIES).forEach(function(k) {
-    var btn = document.getElementById('dd-strat-' + k);
-    if (!btn) return;
-    if (k === strategy) {
-      btn.style.background   = 'var(--accent)';
-      btn.style.color        = '#fff';
-      btn.style.borderColor  = 'var(--accent)';
-    } else {
-      btn.style.background   = 'var(--bg3)';
-      btn.style.color        = 'var(--text2)';
-      btn.style.borderColor  = 'var(--border2)';
-    }
+  // Beide Button-Reihen highlighten (Mitte + Header)
+  ['dd-strat-', 'dd-strat-top-'].forEach(function(prefix) {
+    Object.keys(DD_STRATEGIES).forEach(function(k) {
+      var btn = document.getElementById(prefix + k);
+      if (!btn) return;
+      if (k === strategy) {
+        btn.style.background  = 'var(--accent)';
+        btn.style.color       = '#fff';
+        btn.style.borderColor = 'var(--accent)';
+      } else {
+        btn.style.background  = 'var(--bg3)';
+        btn.style.color       = 'var(--text2)';
+        btn.style.borderColor = 'var(--border2)';
+      }
+    });
   });
   // KI neu generieren wenn Daten bereits geladen
   if (_ddCurrentRaw && _ddCurrentState) {
