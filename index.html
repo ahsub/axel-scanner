@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260619-v147">
+<meta name="app-version" content="20260620-v150">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1953,6 +1953,74 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div style="font-size:10px;color:var(--text3);text-align:center;padding:.5rem 0 .25rem;line-height:1.6">
     Quellen: SPY/Yahoo Finance (DIX/GEX-Proxy*) · VVIX/SKEW/VIX via Yahoo Finance · *Synthetische Näherungswerte, kein echter DIX/GEX<br>
     Alle Angaben ohne Gewähr · Keine Anlageberatung gem. §1 WpHG · Cache 30 Min
+  </div>
+</div>
+
+<!-- ── DEEP DIVE MODAL ────────────────────────────────────────────── -->
+<div id="deep-dive-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);overflow-y:auto;padding:1rem">
+  <div style="max-width:600px;margin:0 auto;background:var(--bg2);border-radius:16px;border:1px solid var(--border2);overflow:hidden">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,rgba(139,92,246,0.2),rgba(79,142,247,0.2));padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border2)">
+      <div>
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:1px">DEEP DIVE ANALYSE</div>
+        <div id="dd-title" style="font-size:20px;font-weight:700;color:var(--text)">—</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="dd-score-badge" style="font-size:18px;font-weight:700;padding:4px 12px;border-radius:8px;background:var(--bg3)">—</div>
+        <button onclick="closeDeepDive()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px"><i class="ti ti-x"></i></button>
+      </div>
+    </div>
+
+    <!-- Technische Schnellübersicht -->
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border2)">
+      <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.6rem">TECHNISCHE INDIKATOREN</div>
+      <div id="dd-tech-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
+    </div>
+
+    <!-- Marktkontext -->
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border2)">
+      <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.6rem">MARKTKONTEXT</div>
+      <div id="dd-market-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
+    </div>
+
+    <!-- KI-Analyse -->
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+        <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px"><i class="ti ti-brain"></i> KI-DATEN-SYNTHESE</div>
+        <div id="dd-ki-status" style="font-size:10px;color:var(--text3)"></div>
+      </div>
+      <div id="dd-ki-text" style="font-size:13px;line-height:1.8;color:var(--text);min-height:80px">
+        <div style="color:var(--text3);display:flex;align-items:center;gap:6px"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analyse wird generiert…</div>
+      </div>
+    </div>
+
+    <!-- Statistische Kontext-Analyse -->
+    <div id="dd-action-box" style="display:none;margin:0 1.25rem .75rem;padding:.75rem 1rem;border-radius:8px;border-left:3px solid var(--accent)">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:600">STATISTISCHE KONTEXT-ANALYSE</div>
+      <div id="dd-action-text" style="font-size:13px;font-weight:600"></div>
+    </div>
+
+    <!-- ATR Positionsgröße -->
+    <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border2);background:var(--bg3);border-radius:0 0 16px 16px">
+      <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.5rem">ATR-POSITIONSGRÖSSE</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:4px;font-size:12px">
+          <span style="color:var(--text3)">Depot €</span>
+          <input type="number" id="dd-depot" value="50000" style="width:80px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text)" oninput="calcDdPosition()">
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:12px">
+          <span style="color:var(--text3)">Risiko %</span>
+          <input type="number" id="dd-risk" value="1" step="0.5" style="width:50px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text)" oninput="calcDdPosition()">
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:12px">
+          <span style="color:var(--text3)">KO-Barriere $</span>
+          <input type="number" id="dd-barrier" placeholder="z.B. 420" style="width:80px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text)" oninput="calcDdPosition()">
+        </div>
+        <div id="dd-position-result" style="font-size:12px;font-weight:600;color:var(--accent)">—</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -5690,6 +5758,7 @@ function renderCard(t,state){
     '<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#34c26e;display:inline-block;border-radius:1px"></span>MACD</span>'+
     '<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#f0a93a;border-top:2px dashed #f0a93a"></span>OBV</span>'+
     '<button class="btn btn-sm" data-sym="'+t.sym+'" onclick="useInRechner(this.dataset.sym)" style="margin-left:auto;padding:3px 8px;font-size:11px"><i class="ti ti-calculator"></i> Rechner</button>'+
+    '<button class="btn btn-sm" data-sym="'+t.sym+'" data-name="'+encodeURIComponent(t.name||t.sym)+'" onclick="openDeepDive(this.dataset.sym, decodeURIComponent(this.dataset.name))" style="padding:3px 8px;font-size:11px;background:rgba(139,92,246,0.12);border-color:rgba(139,92,246,0.4);color:#8b5cf6" title="KI Deep Dive Analyse"><i class="ti ti-brain"></i> Deep Dive</button>'+
     '<button class="btn btn-sm tv-chart-btn" data-sym="'+t.sym+'" data-name="'+encodeURIComponent(t.name||t.sym)+'" data-de="'+(window.currentMarket==='de'?'1':'0')+'" style="padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c" title="TradingView Chart"><i class="ti ti-chart-candle"></i></button>'+
     (window.currentMarket!=='de'?'<button class="btn btn-sm tv-de-btn" data-sym="'+t.sym+'" data-name="'+encodeURIComponent(t.name||t.sym)+'" style="padding:3px 8px;font-size:11px;background:rgba(52,194,110,0.1);border-color:rgba(52,194,110,0.3);color:var(--green)" title="DE-Chart auf Tradegate">🇩🇪</button>':'')+
     '<button class="btn btn-sm" data-sym="'+t.sym+'" onclick="openWatchlistModal(this.dataset.sym)" style="padding:3px 8px;font-size:11px" title="Zu Watchlist hinzufügen"><i class="ti ti-star"></i></button>'+
@@ -9916,6 +9985,8 @@ function calcEMA(data,period){
         <div style="display:flex;gap:5px">
           <button onclick="openMoverModal('active')" id="mm-btn-active" class="btn btn-sm" style="font-size:11px;padding:3px 8px"><i class="ti ti-flame"></i> Aktivste</button>
           <button onclick="openMoverModal('ah')" id="mm-btn-ah" class="btn btn-sm" style="font-size:11px;padding:3px 8px"><i class="ti ti-moon"></i> After-Hours</button>
+          <button onclick="openMoverModal('winners')" id="mm-btn-winners" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:var(--green)"><i class="ti ti-trending-up"></i> Winners</button>
+          <button onclick="openMoverModal('losers')" id="mm-btn-losers" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:var(--red)"><i class="ti ti-trending-down"></i> Losers</button>
           <button onclick="openMoverModal('scan')" id="mm-btn-scan" class="btn btn-sm" style="font-size:11px;padding:3px 8px"><i class="ti ti-radar"></i> Letzter Scan</button>
         </div>
         <div style="display:flex;gap:4px;align-items:center">
@@ -10129,7 +10200,7 @@ function openMoverModal(mode) {
   _moverModalMode = mode || 'active';
   document.getElementById('mover-modal').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  ['active','ah','scan'].forEach(function(m){
+  ['active','ah','winners','losers','scan'].forEach(function(m){
     var btn=document.getElementById('mm-btn-'+m);
     if(btn){
       btn.style.background = m===_moverModalMode ? 'var(--accent)' : 'var(--bg3)';
@@ -10174,53 +10245,134 @@ async function loadMoverModalCards(){
   }
 
   var isDE=window.currentMarket==='de';
-  var syms2, modeLabel2;
-  if(_moverModalMode==='active'){
-    syms2=isDE?['SAP','SIE','ALV','MBG','BMW','BAS','DTE','MRK','BAYN','ADS','DBK','RHM','HEN3','EOAN','LIN','VOW3','IFX','MTX','ENR','ZAL']:
-               ['NVDA','AAPL','MSFT','TSLA','AMD','META','AMZN','GOOGL','PLTR','MRVL','AVGO','VRT','ARM','CRDO','LRCX','TSM','APP','COIN','HOOD','SMCI'];
-    modeLabel2=isDE?'Top Aktivste — DE Xetra':'Top Aktivste — US';
-  } else {
-    syms2=isDE?['SAP','SIE','ALV','MBG','BMW','BAS','DTE','MRK','BAYN','ADS','DBK','RHM','HEN3','EOAN','LIN','VOW3','MUV2','IFX','MTX','ZAL']:
-               ['AAPL','MSFT','NVDA','GOOGL','META','AMZN','TSLA','AMD','AVGO','MRVL','VRT','LRCX','TSM','ARM','CRDO','PLTR','SMCI','ORCL','CRM','SNOW'];
-    modeLabel2=isDE?'After-Hours / Letzter Schluss — DE':'After-Hours Movers — US';
+  var modeLabel2;
+  var corsProxy = (typeof KoConfig!=='undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
+
+  // ── Echte Yahoo Finance Screener-Daten ──────────────────────────────────
+  // MarketCap-Filter: >2 Mrd USD (verhindert Penny-Stocks)
+  var MIN_MCAP = 5e9;  // >5 Mrd USD
+
+  async function fetchYFScreener(screenerUrl, label) {
+    try {
+      var r = await fetch(corsProxy + '/?url=' + encodeURIComponent(screenerUrl));
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var j = await r.json();
+      var quotes = j?.finance?.result?.[0]?.quotes || j?.quoteResponse?.result || [];
+      return quotes
+        .filter(function(q){ return (q.marketCap||0) >= MIN_MCAP && q.symbol && !q.symbol.includes('^'); })
+        .map(function(q){
+          return {
+            sym:       q.symbol,
+            price:     q.regularMarketPrice || q.postMarketPrice || 0,
+            chg:       q.regularMarketChangePercent || 0,
+            chgAH:     q.postMarketChangePercent || null,
+            priceAH:   q.postMarketPrice || null,
+            volume:    q.regularMarketVolume || 0,
+            dollarVol: (q.regularMarketPrice||0) * (q.regularMarketVolume||0),
+            mcap:      q.marketCap || 0,
+            name:      q.shortName || q.longName || q.symbol,
+          };
+        });
+    } catch(e) {
+      console.warn('[Screener]', label, e.message);
+      return [];
+    }
   }
-  syms2=syms2.slice(0,count);
-  if(title) title.textContent=modeLabel2;
-  if(status) status.innerHTML='<i class="ti ti-loader"></i> Lade '+syms2.length+' Titel…';
 
-  var fhKey=getFinnhubKey();
-  var results=await Promise.all(syms2.map(function(sym){
-    var fhSym=isDE?sym+'.DE':sym;
-    var fetchFH=fhKey
-      ?fetch('https://finnhub.io/api/v1/quote?symbol='+fhSym+'&token='+fhKey)
+  var results = [];
+
+  if (_moverModalMode === 'active') {
+    // ── Top Aktivste: höchstes Dollar-Volumen ────────────────────────────
+    modeLabel2 = isDE ? 'Top Aktivste — DE (Dollar-Volumen)' : 'Top Aktivste — US (Dollar-Volumen)';
+    if(title) title.textContent = modeLabel2;
+    if(status) status.innerHTML = '<i class="ti ti-loader"></i> Lade echte Volumendaten…';
+
+    if (isDE) {
+      // DE: feste Liste großer Titel nach Volumen sortieren
+      var deTickers = ['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','MRK.DE','HEN3.DE','EOAN.DE','VOW3.DE','IFX.DE','MUV2.DE','MTX.DE','ZAL.DE','DHER.DE','ENR.DE','HAG.DE'];
+      var deResults = await Promise.all(deTickers.map(function(sym){
+        return fetch(corsProxy+'/?url='+encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/chart/'+sym+'?interval=1d&range=2d'))
           .then(function(r){return r.json();})
-          .then(function(d){
-            var pc=d.pc&&d.pc>0?d.pc:0;
-            var price=(d.c&&d.c>0)?d.c:pc;
-            if(!price&&!pc) return null;
-            var displayPrice=price>0?price:pc;
-            // Use Finnhub dp (day % change) directly - most reliable
-            var chg=d.dp!=null?d.dp:(pc>0&&price>0?((price-pc)/pc*100):0);
-            return {sym:sym,price:displayPrice,chg:chg};
-          }).catch(function(){return null;})
-      :Promise.resolve(null);
-    return fetchFH.then(function(res){
-      if(res) return res;
-      var yfSym=isDE?sym+'.DE':sym;
-      return fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/chart/'+yfSym+'?interval=1d&range=2d'))
-        .then(function(r){return r.json();})
-        .then(function(j){
-          var res2=j&&j.chart&&j.chart.result&&j.chart.result[0]; if(!res2) return {sym:sym,error:true};
-          var closes=res2.indicators.quote[0].close.filter(function(v){return v!=null;});
-          if(!closes.length) return {sym:sym,error:true};
-          var price=closes[closes.length-1]; var prev=closes.length>=2?closes[closes.length-2]:price;
-          return {sym:sym,price:price,chg:prev>0?((price-prev)/prev*100):0};
-        }).catch(function(){return {sym:sym,error:true};});
-    });
-  }));
+          .then(function(j){
+            var res2=j?.chart?.result?.[0]; if(!res2) return null;
+            var q2=res2.indicators.quote[0];
+            var closes=(q2.close||[]).filter(function(v){return v!=null;});
+            var vols=(q2.volume||[]).filter(function(v){return v!=null;});
+            if(!closes.length) return null;
+            var price=res2.meta.regularMarketPrice||closes[closes.length-1];
+            var prev=closes.length>=2?closes[closes.length-2]:price;
+            var vol=vols[vols.length-1]||0;
+            return {sym:sym.replace('.DE',''),price:price,chg:prev>0?((price-prev)/prev*100):0,dollarVol:price*vol,volume:vol,name:res2.meta.shortName||sym};
+          }).catch(function(){return null;});
+      }));
+      results = deResults.filter(Boolean).sort(function(a,b){return b.dollarVol-a.dollarVol;});
+    } else {
+      // US: Yahoo Finance most-active screener
+      var yfUrl = 'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=most_actives&count=25&start=0';
+      results = await fetchYFScreener(yfUrl, 'most_actives');
+      results.sort(function(a,b){ return b.dollarVol - a.dollarVol; });
+    }
 
-  results.sort(function(a,b){return Math.abs(b.chg||0)-Math.abs(a.chg||0);});
-  if(status) status.textContent=modeLabel2+' · '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr';
+  } else if (_moverModalMode === 'ah') {
+    // ── After-Hours Movers: größte % Bewegung nach Börsenschluss ─────────
+    modeLabel2 = isDE ? 'Tagesgewinner/-verlierer — DE' : 'After-Hours Movers — US';
+    if(title) title.textContent = modeLabel2;
+    if(status) status.innerHTML = '<i class="ti ti-loader"></i> Lade After-Hours Daten…';
+
+    if (isDE) {
+      // DE: Tagesgewinner/-verlierer aus DAX40 + MDAX
+      var deTickers2 = ['SAP.DE','SIE.DE','ALV.DE','MBG.DE','BMW.DE','BAS.DE','DTE.DE','BAYN.DE','ADS.DE','DBK.DE','RHM.DE','MRK.DE','HEN3.DE','EOAN.DE','VOW3.DE','IFX.DE','MUV2.DE','MTX.DE','ZAL.DE','DHER.DE','ENR.DE','HAG.DE','NDA.DE','TAG.DE'];
+      var deRes2 = await Promise.all(deTickers2.map(function(sym){
+        return fetch(corsProxy+'/?url='+encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/chart/'+sym+'?interval=1d&range=2d'))
+          .then(function(r){return r.json();})
+          .then(function(j){
+            var res2=j?.chart?.result?.[0]; if(!res2) return null;
+            var q2=res2.indicators.quote[0];
+            var closes=(q2.close||[]).filter(function(v){return v!=null;});
+            if(!closes.length) return null;
+            var price=res2.meta.regularMarketPrice||closes[closes.length-1];
+            var prev=closes.length>=2?closes[closes.length-2]:price;
+            return {sym:sym.replace('.DE',''),price:price,chg:prev>0?((price-prev)/prev*100):0,name:res2.meta.shortName||sym};
+          }).catch(function(){return null;});
+      }));
+      results = deRes2.filter(Boolean).sort(function(a,b){return Math.abs(b.chg)-Math.abs(a.chg);});
+    } else {
+      // US: Yahoo day-gainers + day-losers kombiniert
+      var [gainers, losers] = await Promise.all([
+        fetchYFScreener('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_gainers&count=15', 'gainers'),
+        fetchYFScreener('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_losers&count=15', 'losers'),
+      ]);
+      // After-Hours: sortiere nach postMarketChangePercent wenn verfügbar, sonst Tagesperformance
+      results = [...gainers, ...losers]
+        .filter(function(q,i,a){ return a.findIndex(function(x){return x.sym===q.sym;})==i; }) // deduplicate
+        .sort(function(a,b){ return Math.abs(b.chgAH||b.chg) - Math.abs(a.chgAH||a.chg); });
+    }
+  }
+
+  // ── Daily Winners (größte Tagesgewinner, MarketCap >2 Mrd) ─────────────
+  if (_moverModalMode === 'winners') {
+    modeLabel2 = isDE ? 'Tagesgewinner — DE (MarketCap >2 Mrd)' : 'Daily Winners — US (MarketCap >2 Mrd)';
+    if(title) title.textContent = modeLabel2;
+    if(status) status.innerHTML = '<i class="ti ti-loader"></i> Lade Gewinner…';
+    if (!isDE) {
+      results = await fetchYFScreener('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_gainers&count=25', 'winners');
+      results.sort(function(a,b){ return b.chg - a.chg; });
+    }
+  }
+
+  // ── Daily Losers (größte Tagesverlierer, MarketCap >2 Mrd) ──────────────
+  if (_moverModalMode === 'losers') {
+    modeLabel2 = isDE ? 'Tagesverlierer — DE (MarketCap >2 Mrd)' : 'Daily Losers — US (MarketCap >2 Mrd)';
+    if(title) title.textContent = modeLabel2;
+    if(status) status.innerHTML = '<i class="ti ti-loader"></i> Lade Verlierer…';
+    if (!isDE) {
+      results = await fetchYFScreener('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_losers&count=25', 'losers');
+      results.sort(function(a,b){ return a.chg - b.chg; }); // aufsteigend = größte Verlierer zuerst
+    }
+  }
+
+  results = results.slice(0, count);
+  if(status) status.textContent = modeLabel2 + ' · MarketCap >2 Mrd · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
   renderMoverModalCards(results, isDE);
 }
 
@@ -15800,6 +15952,298 @@ function importBacklogData() {
     reader.readAsText(file);
   };
   input.click();
+}
+
+// ── DEEP DIVE ANALYSE ─────────────────────────────────────────────────────────
+
+var _ddCurrentSym   = null;
+var _ddCurrentState = null;
+
+function openDeepDive(sym, name) {
+  _ddCurrentSym = sym;
+
+  // Modal öffnen + Reset
+  document.getElementById('deep-dive-modal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  document.getElementById('dd-title').textContent = (name || sym) + '  (' + sym + ')';
+  document.getElementById('dd-score-badge').textContent = '…';
+  document.getElementById('dd-score-badge').style.background = 'var(--bg3)';
+  document.getElementById('dd-tech-grid').innerHTML = '<div style="color:var(--text3);font-size:12px;grid-column:1/-1">Lade Daten…</div>';
+  document.getElementById('dd-market-grid').innerHTML = '';
+  document.getElementById('dd-ki-text').innerHTML = '<div style="color:var(--text3);display:flex;align-items:center;gap:6px"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analyse wird generiert…</div>';
+  document.getElementById('dd-action-box').style.display = 'none';
+  document.getElementById('dd-ki-status').textContent = '';
+  document.getElementById('dd-position-result').textContent = '—';
+
+  // Daten aus tickerData (Scanner-Ergebnis) holen falls vorhanden
+  var raw = window.tickerData && window.tickerData[sym];
+  if (raw && !raw.error) {
+    _ddCurrentState = processData(raw);
+    renderDeepDiveTech(sym, raw, _ddCurrentState);
+    renderDeepDiveMarket();
+    generateDeepDiveKI(sym, name, raw, _ddCurrentState);
+  } else {
+    // Neu laden via Yahoo Finance
+    document.getElementById('dd-tech-grid').innerHTML = '<div style="color:var(--text3);font-size:12px;grid-column:1/-1"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Lade Live-Daten für ' + sym + '…</div>';
+    fetchSingleForDeepDive(sym, name);
+  }
+}
+
+async function fetchSingleForDeepDive(sym, name) {
+  try {
+    var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
+    var to   = Math.floor(Date.now() / 1000);
+    var from = to - 60 * 60 * 24 * 260;
+    var url  = 'https://query1.finance.yahoo.com/v7/finance/chart/' + encodeURIComponent(sym)
+             + '?interval=1d&period1=' + from + '&period2=' + to;
+    var r = await fetch(corsProxy + '/?url=' + encodeURIComponent(url));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var j = await r.json();
+    var res = j?.chart?.result?.[0];
+    if (!res) throw new Error('Keine Daten');
+
+    var q       = res.indicators.quote[0];
+    var closes  = (q.close  || []).filter(function(v){ return v != null; });
+    var highs   = (q.high   || []).filter(function(v){ return v != null; });
+    var lows    = (q.low    || []).filter(function(v){ return v != null; });
+    var volumes = (q.volume || []).filter(function(v){ return v != null; });
+    var price   = res.meta.regularMarketPrice || closes[closes.length-1];
+
+    // Indikatoren berechnen
+    function calcEmaArr(data, len) {
+      var k = 2/(len+1), r = [];
+      var sma = data.slice(0,len).reduce(function(a,b){return a+b;},0)/len;
+      r.push(sma);
+      for (var i=len;i<data.length;i++) { sma = data[i]*k+sma*(1-k); r.push(sma); }
+      return r;
+    }
+    var ema50arr  = calcEmaArr(closes, 50);
+    var ema200arr = calcEmaArr(closes, 200);
+    var ema50  = ema50arr[ema50arr.length-1];
+    var ema200 = ema200arr.length ? ema200arr[ema200arr.length-1] : null;
+
+    // RSI
+    var rsiChanges = closes.slice(1).map(function(v,i){return v-closes[i];});
+    var gains = rsiChanges.map(function(c){return c>0?c:0;});
+    var losses= rsiChanges.map(function(c){return c<0?-c:0;});
+    var ag = gains.slice(0,14).reduce(function(a,b){return a+b;},0)/14;
+    var al = losses.slice(0,14).reduce(function(a,b){return a+b;},0)/14;
+    for (var i=14;i<gains.length;i++){ag=(ag*13+gains[i])/14;al=(al*13+losses[i])/14;}
+    var rsi = al===0?100:Math.round(100-(100/(1+ag/al)));
+
+    // ATR
+    var trs = [];
+    for (var i=1;i<closes.length;i++) trs.push(Math.max(highs[i]-lows[i],Math.abs(highs[i]-closes[i-1]),Math.abs(lows[i]-closes[i-1])));
+    var atr = trs.slice(-14).reduce(function(a,b){return a+b;},0)/14;
+
+    // OBV Trend
+    var obv = 0, obvs = [0];
+    for (var i=1;i<closes.length;i++) { obv += closes[i]>closes[i-1]?volumes[i]:closes[i]<closes[i-1]?-volumes[i]:0; obvs.push(obv); }
+    var obvTrend = obvs[obvs.length-1] - obvs[Math.max(0,obvs.length-6)];
+
+    // MACD
+    var ema12 = calcEmaArr(closes,12); var ema26 = calcEmaArr(closes,26);
+    var macdLine = ema12.slice(ema12.length-ema26.length).map(function(v,i){return v-ema26[i];});
+    var sigLine  = calcEmaArr(macdLine, 9);
+    var macdHist = macdLine[macdLine.length-1] - sigLine[sigLine.length-1];
+
+    // 52W High/Low
+    var w52 = closes.slice(-252);
+    var high52 = Math.max.apply(null, w52);
+    var low52  = Math.min.apply(null, w52);
+
+    // Überhitzung
+    var distAtr = ema200 ? (price - ema200) / atr : 0;
+    var overheat = Math.min(100, Math.max(0,
+      (distAtr > 5?40:distAtr>4?30:distAtr>3?20:distAtr>2?10:0) +
+      (rsi>80?30:rsi>75?20:rsi>70?10:0)
+    ));
+
+    // Bull-Signale
+    var bullCount = (price>ema50?1:0) + (macdHist>0?1:0) + (obvTrend>0?1:0);
+    var score = Math.min(100, Math.max(0, 50 + bullCount*15 + (macdHist>0?10:0) - Math.round(overheat*0.15)));
+    var grade = score>=85?'A+':score>=70?'A':score>=55?'B':score>=40?'C':'F';
+
+    var raw = {
+      sym: sym, price: price, ma50: ema50, ma200: ema200,
+      rsi: rsi, atr: Math.round(atr*100)/100,
+      macd_hist: Math.round(macdHist*100)/100,
+      obv_slope_5d: obvTrend,
+      high52: Math.round(high52*100)/100,
+      low52:  Math.round(low52*100)/100,
+      overheat: { score: overheat },
+      bullCount: bullCount, compositeScore: score, grade: grade,
+    };
+    _ddCurrentState = { bullCount, compositeScore: score, grade, overheat: {score: overheat} };
+    window.tickerData = window.tickerData || {};
+    window.tickerData[sym] = raw;
+
+    renderDeepDiveTech(sym, raw, _ddCurrentState);
+    renderDeepDiveMarket();
+    generateDeepDiveKI(sym, name, raw, _ddCurrentState);
+
+  } catch(e) {
+    document.getElementById('dd-tech-grid').innerHTML = '<div style="color:var(--red);font-size:12px;grid-column:1/-1">Fehler: ' + e.message + '</div>';
+  }
+}
+
+function renderDeepDiveTech(sym, raw, state) {
+  var price = raw.price || 0;
+  var boxes = [
+    { label: 'Kurs', val: '$' + price.toFixed(2), color: 'var(--text)' },
+    { label: 'Score', val: (state.compositeScore||0) + ' (' + (state.grade||'?') + ')', color: state.compositeScore>=70?'var(--green)':state.compositeScore>=50?'var(--amber)':'var(--red)' },
+    { label: 'Bull-Signale', val: (state.bullCount||0) + '/3', color: state.bullCount>=2?'var(--green)':'var(--amber)' },
+    { label: 'RSI', val: raw.rsi ? Math.round(raw.rsi) : '—', color: raw.rsi>75?'var(--red)':raw.rsi<30?'var(--green)':'var(--text)' },
+    { label: 'EMA50', val: raw.ma50 ? '$'+raw.ma50.toFixed(2) : '—', color: price>raw.ma50?'var(--green)':'var(--red)' },
+    { label: 'EMA200', val: raw.ma200 ? '$'+raw.ma200.toFixed(2) : '—', color: raw.ma200&&price>raw.ma200?'var(--green)':'var(--red)' },
+    { label: 'MACD Hist', val: raw.macd_hist != null ? raw.macd_hist.toFixed(3) : '—', color: raw.macd_hist>0?'var(--green)':'var(--red)' },
+    { label: 'OBV Trend', val: raw.obv_slope_5d>0?'↑ bullisch':'↓ bärisch', color: raw.obv_slope_5d>0?'var(--green)':'var(--red)' },
+    { label: 'Überhitzung', val: (state.overheat?.score||0)+'/100', color: (state.overheat?.score||0)>60?'var(--red)':(state.overheat?.score||0)>30?'var(--amber)':'var(--green)' },
+  ];
+  if (raw.high52) boxes.push({ label: '52W-Hoch', val: '$'+raw.high52, color: 'var(--text3)' });
+  if (raw.low52)  boxes.push({ label: '52W-Tief', val: '$'+raw.low52,  color: 'var(--text3)' });
+  if (raw.atr)    boxes.push({ label: 'ATR', val: '$'+raw.atr, color: 'var(--text3)' });
+
+  document.getElementById('dd-tech-grid').innerHTML = boxes.map(function(b) {
+    return '<div style="background:var(--bg3);border-radius:8px;padding:6px 8px">'
+      + '<div style="font-size:10px;color:var(--text3)">' + b.label + '</div>'
+      + '<div style="font-size:13px;font-weight:600;color:' + b.color + '">' + b.val + '</div>'
+      + '</div>';
+  }).join('');
+
+  // Score Badge
+  var score = state.compositeScore || 0;
+  var badge = document.getElementById('dd-score-badge');
+  badge.textContent = (state.grade||'?') + ' ' + score;
+  badge.style.color = score>=70?'var(--green)':score>=50?'var(--amber)':'var(--red)';
+  badge.style.background = 'var(--bg3)';
+
+  // ATR Positionsgröße vorbefüllen
+  if (raw.price) document.getElementById('dd-barrier').placeholder = 'z.B. ' + Math.round(raw.price * 0.93);
+  calcDdPosition();
+}
+
+function renderDeepDiveMarket() {
+  var vixEl   = document.getElementById('m-vix');
+  var vix     = vixEl ? parseFloat(vixEl.textContent) || null : null;
+  var dpScore = window._dpLastScore || null;
+  var regime  = window._lastRegime  || null;
+
+  var boxes = [
+    { label: 'VIX', val: vix ? vix.toFixed(1) : '—', color: !vix?'var(--text3)':vix<16?'var(--green)':vix<25?'var(--amber)':'var(--red)' },
+    { label: 'Dark Pool Score', val: dpScore ? dpScore : '—', color: !dpScore?'var(--text3)':dpScore>=60?'var(--green)':dpScore>=40?'var(--amber)':'var(--red)' },
+    { label: 'Markt-Regime', val: regime || '—', color: regime==='bull'?'var(--green)':regime==='bear'?'var(--red)':'var(--amber)' },
+  ];
+
+  document.getElementById('dd-market-grid').innerHTML = boxes.map(function(b) {
+    return '<div style="background:var(--bg3);border-radius:8px;padding:6px 8px">'
+      + '<div style="font-size:10px;color:var(--text3)">' + b.label + '</div>'
+      + '<div style="font-size:13px;font-weight:600;color:' + b.color + '">' + b.val + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+async function generateDeepDiveKI(sym, name, raw, state) {
+  var antKey = typeof getAnthropicKey === 'function' ? getAnthropicKey() : localStorage.getItem('ko_ant_key') || '';
+  if (!antKey) {
+    document.getElementById('dd-ki-text').innerHTML = '<div style="color:var(--amber);font-size:12px">⚠ Anthropic API-Key fehlt — bitte im Admin-Tab eintragen.</div>';
+    return;
+  }
+
+  var vixEl = document.getElementById('m-vix');
+  var vix   = vixEl ? parseFloat(vixEl.textContent) || null : null;
+  var dpScore = window._dpLastScore || null;
+
+  var ctx = [
+    'Titel: ' + (name||sym) + ' (' + sym + ')',
+    'Kurs: $' + (raw.price||0).toFixed(2),
+    'Composite Score: ' + (state.compositeScore||0) + '/100 (' + (state.grade||'?') + ')',
+    'Bull-Signale: ' + (state.bullCount||0) + '/3 (MA50: ' + (raw.price>raw.ma50?'✓':'✗') + ', MACD: ' + (raw.macd_hist>0?'✓':'✗') + ', OBV: ' + (raw.obv_slope_5d>0?'✓':'✗') + ')',
+    'RSI: ' + (raw.rsi ? Math.round(raw.rsi) : 'n/a'),
+    'EMA50: $' + (raw.ma50||0).toFixed(2) + ' | EMA200: ' + (raw.ma200 ? '$'+raw.ma200.toFixed(2) : 'n/a'),
+    'MACD Histogramm: ' + (raw.macd_hist||0).toFixed(3),
+    'Überhitzungs-Score: ' + (state.overheat?.score||0) + '/100',
+    '52W-Hoch: $' + (raw.high52||'n/a') + ' | 52W-Tief: $' + (raw.low52||'n/a'),
+    'ATR (14): $' + (raw.atr||'n/a'),
+    'Marktkontext — VIX: ' + (vix||'n/a') + ' | Institutional Flow Score: ' + (dpScore||'n/a'),
+  ];
+
+  var prompt = 'Du bist ein quantitativer Marktanalyst. Erstelle eine sachliche Daten-Synthese für den folgenden Einzeltitel auf Deutsch.\n\n'
+    + 'MESSWERTE:\n' + ctx.join('\n') + '\n\n'
+    + 'Formuliere eine objektive Kontext-Analyse in 4 Sätzen:\n'
+    + '1. Technisches Gesamtbild des Titels (Trend, Momentum, Volumen)\n'
+    + '2. Stärken und Schwächen der aktuellen Datenlage\n'
+    + '3. Einordnung in den aktuellen Marktkontext (VIX, Institutional Flow)\n'
+    + '4. Welche Parameter sollte der Anwender mit seinen Risiko-Parametern abgleichen?\n\n'
+    + 'STRIKTE REGELN:\n'
+    + '- Basiere die Analyse AUSSCHLIESSLICH auf den oben genannten Messwerten.\n'
+    + '- Erfinde KEINE Nachrichten, Ereignisse oder Kurserwartungen.\n'
+    + '- Gib KEINE direkten Kauf- oder Verkaufsempfehlungen.\n'
+    + '- Formuliere deskriptiv: "Die Datenlage zeigt..." nicht "Kaufen Sie...".\n'
+    + '- Stil: sachlich, präzise, kein "Ich".';
+
+  try {
+    var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
+    var res = await fetch(corsProxy + '/?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-ant-key': antKey },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    var j = await res.json();
+    var text = j?.content?.[0]?.text || '';
+    if (!text) throw new Error(j?.error?.message || 'Keine Antwort');
+
+    document.getElementById('dd-ki-text').innerHTML = '<div style="font-size:13px;line-height:1.8;color:var(--text)">' + text + '</div>';
+    document.getElementById('dd-ki-status').textContent = 'Claude Sonnet · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' · Keine Anlageberatung gem. §1 WpHG';
+
+    // Kontext-Analyse Box
+    var score = state.compositeScore || 50;
+    var actionText, actionColor;
+    if      (score>=70) { actionText='🟢 TECHNISCH STARK ('+score+') — Datenlage zeigt intaktes Bull-Setup. Abgleich mit Marktkontext und Risiko-Parametern empfohlen.'; actionColor='var(--green)'; }
+    else if (score>=55) { actionText='🟢 LEICHT POSITIV ('+score+') — Mehrheitlich bullische Signale. Selektiver Ansatz und Positionsgröße prüfen.'; actionColor='var(--green)'; }
+    else if (score>=40) { actionText='🟡 NEUTRAL ('+score+') — Gemischte Signale. Erhöhte Selektivität empfohlen, kein klares Setup.'; actionColor='var(--amber)'; }
+    else                { actionText='🔴 SCHWACHES SETUP ('+score+') — Mehrheitlich bärische Signale. Risiko-Exposition prüfen.'; actionColor='var(--red)'; }
+
+    document.getElementById('dd-action-text').textContent = actionText;
+    document.getElementById('dd-action-text').style.color = actionColor;
+    document.getElementById('dd-action-box').style.display = 'block';
+
+    // Dark Pool Score speichern für nächsten Aufruf
+    if (typeof KoDarkPool !== 'undefined' && KoDarkPool._cache) {
+      var sc = KoDarkPool.score(KoDarkPool._cache);
+      if (sc) window._dpLastScore = sc.total;
+    }
+
+  } catch(e) {
+    document.getElementById('dd-ki-text').innerHTML = '<div style="color:var(--red);font-size:12px">Fehler: ' + e.message + '</div>';
+  }
+}
+
+function calcDdPosition() {
+  var depot   = parseFloat(document.getElementById('dd-depot')?.value) || 0;
+  var risk    = parseFloat(document.getElementById('dd-risk')?.value)  || 1;
+  var barrier = parseFloat(document.getElementById('dd-barrier')?.value) || 0;
+  var raw     = _ddCurrentSym && window.tickerData && window.tickerData[_ddCurrentSym];
+  var price   = raw ? (raw.price || 0) : 0;
+  var res     = document.getElementById('dd-position-result');
+  if (!res) return;
+  if (!barrier || !price || barrier >= price) { res.textContent = '— (KO-Barriere eingeben)'; return; }
+  var riskAmount = depot * (risk / 100);
+  var distToKO   = price - barrier;
+  var shares     = Math.floor(riskAmount / distToKO);
+  var posValue   = Math.round(shares * price);
+  res.textContent = shares + ' Stück · €' + posValue.toLocaleString('de-DE') + ' Positionswert · €' + Math.round(riskAmount) + ' Risiko';
+}
+
+function closeDeepDive() {
+  document.getElementById('deep-dive-modal').style.display = 'none';
+  document.body.style.overflow = '';
+  _ddCurrentSym   = null;
+  _ddCurrentState = null;
 }
 
 function clearOversoldList() {
