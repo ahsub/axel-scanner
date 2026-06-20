@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260620-v150">
+<meta name="app-version" content="20260620-v151">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16180,7 +16180,7 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     + '- Erfinde KEINE Nachrichten, Ereignisse oder Kurserwartungen.\n'
     + '- Gib KEINE direkten Kauf- oder Verkaufsempfehlungen.\n'
     + '- Formuliere deskriptiv: "Die Datenlage zeigt..." nicht "Kaufen Sie...".\n'
-    + '- Stil: sachlich, präzise, kein "Ich".';
+    + '- Stil: sachlich, präzise, kein "Ich", KEIN Markdown (keine ##, keine **).';
 
   try {
     var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
@@ -16189,7 +16189,7 @@ async function generateDeepDiveKI(sym, name, raw, state) {
       headers: { 'Content-Type': 'application/json', 'x-ant-key': antKey },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 400,
+        max_tokens: 600,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -16197,7 +16197,13 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     var text = j?.content?.[0]?.text || '';
     if (!text) throw new Error(j?.error?.message || 'Keine Antwort');
 
-    document.getElementById('dd-ki-text').innerHTML = '<div style="font-size:13px;line-height:1.8;color:var(--text)">' + text + '</div>';
+    // Markdown → HTML konvertieren
+    var html = text
+      .replace(/##\s(.+)/g, '<b style="color:var(--accent);font-size:13px">$1</b>')
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+    document.getElementById('dd-ki-text').innerHTML = '<div style="font-size:13px;line-height:1.8;color:var(--text)">' + html + '</div>';
     document.getElementById('dd-ki-status').textContent = 'Claude Sonnet · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' · Keine Anlageberatung gem. §1 WpHG';
 
     // Kontext-Analyse Box
