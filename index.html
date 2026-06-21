@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260621-v160">
+<meta name="app-version" content="20260621-v162">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -238,16 +238,26 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="panel-scanner" class="panel active">
       <div class="sec">Technischer Scanner</div>
 
-      <!-- MARKET REGIME COCKPIT -->
-      <div id="regime-cockpit" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:.6rem .9rem;margin-bottom:.6rem;cursor:pointer" onclick="showPanel('makro')">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <div id="rc-regime" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:var(--bg3);color:var(--text3)">— Regime</div>
-          <div id="rc-vix" style="font-size:11px;color:var(--text2)">VIX —</div>
-          <div id="rc-dp" style="font-size:11px;color:var(--text2)">Flow —</div>
-          <div id="rc-tsi" style="font-size:11px;color:var(--text2)">Stress —</div>
-          <div style="font-size:10px;color:var(--text3);margin-left:auto">→ Makro</div>
+      <!-- MARKET REGIME COCKPIT + ONE-BUTTON MORNING BRIEFING -->
+      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:.6rem">
+        <!-- Cockpit Zeile -->
+        <div id="regime-cockpit" style="padding:.6rem .9rem;cursor:pointer;border-bottom:1px solid var(--border2)" onclick="showPanel('makro')">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div id="rc-regime" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:var(--bg3);color:var(--text3)">— Regime</div>
+            <div id="rc-vix" style="font-size:11px;color:var(--text2)">VIX —</div>
+            <div id="rc-dp" style="font-size:11px;color:var(--text2)">Flow —</div>
+            <div id="rc-tsi" style="font-size:11px;color:var(--text2)">Stress —</div>
+            <div style="font-size:10px;color:var(--text3);margin-left:auto">→ Makro</div>
+          </div>
+          <div id="rc-action" style="font-size:11px;color:var(--text3);margin-top:3px">Lädt…</div>
         </div>
-        <div id="rc-action" style="font-size:11px;color:var(--text3);margin-top:3px">Laden…</div>
+        <!-- Morning Briefing Button -->
+        <div style="padding:.5rem .9rem;display:flex;align-items:center;gap:8px">
+          <button id="morning-btn" onclick="runMorningBriefing()" style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
+            <i class="ti ti-sunrise"></i> Morning Briefing starten
+          </button>
+          <div id="morning-cache-info" style="font-size:10px;color:var(--text3)"></div>
+        </div>
       </div>
       <!-- US/DE Market Toggle -->
       <div style="display:flex;gap:0;margin-bottom:.75rem;border:0.5px solid var(--border2);border-radius:var(--radius-sm);overflow:hidden">
@@ -2062,7 +2072,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
     </div>
 
-    <!-- Strategie-Schnellwahl direkt unter Header -->
+    <!-- Strategie-Schnellwahl + KI direkt unter Header -->
     <div style="padding:.6rem 1.25rem;background:var(--bg3);border-bottom:1px solid var(--border2)">
       <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.4rem">ANALYSE-PERSPEKTIVE</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap" id="dd-strategy-btns-top">
@@ -2074,19 +2084,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
     </div>
 
-    <!-- Technische Schnellübersicht -->
-    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border2)">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.6rem">TECHNISCHE INDIKATOREN</div>
-      <div id="dd-tech-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
-    </div>
-
-    <!-- Marktkontext -->
-    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border2)">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.6rem">MARKTKONTEXT</div>
-      <div id="dd-market-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
-    </div>
-
-    <!-- KI-Analyse -->
+    <!-- KI-Analyse direkt nach Strategie-Auswahl -->
     <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border2)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
         <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px"><i class="ti ti-brain"></i> KI-DATEN-SYNTHESE</div>
@@ -2101,6 +2099,20 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="dd-action-box" style="display:none;margin:0 1.25rem .75rem;padding:.75rem 1rem;border-radius:8px;border-left:3px solid var(--accent)">
       <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:600">STATISTISCHE KONTEXT-ANALYSE</div>
       <div id="dd-action-text" style="font-size:13px;font-weight:600"></div>
+    </div>
+
+    <!-- Technische Indikatoren (nach KI) -->
+    <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border2)">
+      <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.5rem;cursor:pointer" onclick="var g=document.getElementById('dd-tech-grid');g.style.display=g.style.display==='none'?'grid':'none'">
+        TECHNISCHE INDIKATOREN <span style="font-size:9px">(ein/ausklappen)</span>
+      </div>
+      <div id="dd-tech-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
+    </div>
+
+    <!-- Marktkontext (nach KI) -->
+    <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border2)">
+      <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.5rem">MARKTKONTEXT</div>
+      <div id="dd-market-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
     </div>
 
     <!-- ATR Positionsgröße -->
@@ -16635,6 +16647,168 @@ async function calcTreasuryStress() {
   if (labelEl) { labelEl.textContent = scoreLabel; labelEl.style.color = scoreColor; }
 }
 
+
+
+// ── ONE-BUTTON MORNING BRIEFING ───────────────────────────────────────────────
+// Läuft 1x täglich, Cache in localStorage (Datum als Key)
+// Führt durch: VIX laden → Dark Pool → Treasury Stress → KI-Makro-Briefing
+
+var _morningRunning = false;
+
+async function runMorningBriefing() {
+  if (_morningRunning) return;
+
+  // Cache-Check: heute schon gelaufen?
+  var today     = new Date().toISOString().slice(0, 10);
+  var cacheKey  = 'morning_briefing_' + today;
+  var cached    = null;
+  try { cached = JSON.parse(localStorage.getItem(cacheKey)); } catch(e) {}
+
+  var cacheEl = document.getElementById('morning-cache-info');
+
+  if (cached) {
+    // Gecachte Ergebnisse anzeigen
+    if (cacheEl) cacheEl.textContent = 'Heute ' + cached.time + ' Uhr · gecacht';
+    _applyMorningResults(cached);
+    showToast('Morning Briefing: Gecachte Ergebnisse von ' + cached.time + ' Uhr geladen');
+    return;
+  }
+
+  _morningRunning = true;
+  var btn = document.getElementById('morning-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Briefing läuft…'; }
+  if (cacheEl) cacheEl.textContent = '';
+
+  var steps = [
+    '1/5 VIX + Marktdaten…',
+    '2/5 Dark Pool Score…',
+    '3/5 Treasury Stress…',
+    '4/5 Makro-Regime…',
+    '5/5 KI-Synthese…',
+  ];
+  var stepIdx = 0;
+  function setStep(i) {
+    if (btn) btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> ' + steps[i];
+  }
+
+  var results = { date: today, time: new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) };
+
+  try {
+    // ── Schritt 1: VIX + Cockpit Update ───────────────────────────
+    setStep(0);
+    await updateRegimeCockpit();
+    var vixEl = document.getElementById('m-vix');
+    results.vix = vixEl ? parseFloat(vixEl.textContent) || null : null;
+    await new Promise(function(r){ setTimeout(r, 300); });
+
+    // ── Schritt 2: Dark Pool ───────────────────────────────────────
+    setStep(1);
+    if (typeof KoDarkPool !== 'undefined') {
+      KoDarkPool.clearCache();
+      var dpData   = await KoDarkPool.fetchCached();
+      var dpScore  = KoDarkPool.score(dpData);
+      results.dpScore   = dpScore ? dpScore.total : null;
+      results.dpSignal  = dpData  ? KoDarkPool.interpret(dpScore, dpData).label : null;
+      window._dpLastScore = results.dpScore;
+      // Cockpit updaten
+      var dpEl = document.getElementById('rc-dp');
+      if (dpEl && results.dpScore) {
+        dpEl.textContent = 'Flow ' + results.dpScore;
+        dpEl.style.color = results.dpScore >= 60 ? 'var(--green)' : results.dpScore >= 40 ? 'var(--amber)' : 'var(--red)';
+      }
+    }
+    await new Promise(function(r){ setTimeout(r, 300); });
+
+    // ── Schritt 3: Treasury Stress ────────────────────────────────
+    setStep(2);
+    await calcTreasuryStress();
+    var tsiEl = document.getElementById('tsi-score');
+    results.tsiScore = tsiEl ? parseInt(tsiEl.textContent) || null : null;
+    window._lastTsiScore = results.tsiScore;
+    // Cockpit updaten
+    var rcTsi = document.getElementById('rc-tsi');
+    if (rcTsi && results.tsiScore != null) {
+      rcTsi.textContent = 'Stress ' + results.tsiScore;
+      rcTsi.style.color = results.tsiScore > 60 ? 'var(--red)' : results.tsiScore > 35 ? 'var(--amber)' : 'var(--green)';
+    }
+    await new Promise(function(r){ setTimeout(r, 300); });
+
+    // ── Schritt 4: QQQ Regime (aus Markov) ────────────────────────
+    setStep(3);
+    // Markov-Regime aus letztem QQQ-Scan wenn verfügbar
+    var regime = window._lastQqqRegime || null;
+    results.regime = regime;
+    await new Promise(function(r){ setTimeout(r, 200); });
+
+    // ── Schritt 5: KI-Makro-Briefing ──────────────────────────────
+    setStep(4);
+    var antKey = typeof getAnthropicKey === 'function' ? getAnthropicKey() : localStorage.getItem('ko_ant_key') || '';
+    if (antKey) {
+      var vixZone = !results.vix ? 3 : results.vix < 12 ? 1 : results.vix < 16 ? 2 : results.vix < 20 ? 3 : results.vix < 28 ? 4 : 5;
+      var prompt  = 'Erstelle ein kurzes Morning Briefing (3 Sätze) für einen institutionellen Trader auf Deutsch.\n\n'
+        + 'AKTUELLE MESSWERTE:\n'
+        + 'VIX: ' + (results.vix || '—') + ' (Zone ' + vixZone + ')\n'
+        + 'Institutional Flow Score: ' + (results.dpScore || '—') + '/100 · ' + (results.dpSignal || '—') + '\n'
+        + 'Treasury Stress Score: ' + (results.tsiScore || '—') + '/100\n'
+        + 'Markt-Regime (QQQ): ' + (results.regime || 'unbekannt') + '\n\n'
+        + 'Format: 1. Marktlage (1 Satz) · 2. Risiko-Einschätzung (1 Satz) · 3. Tages-Fokus (1 Satz)\n'
+        + 'NUR auf Basis der Messwerte. Keine Kursnennung. Kein "Ich". BaFin-konform.';
+
+      try {
+        var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
+        var r = await fetch(corsProxy + '/?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-ant-key': antKey },
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 200,
+            messages: [{ role: 'user', content: prompt }] }),
+        });
+        var j = await r.json();
+        results.kiBriefing = j?.content?.[0]?.text || null;
+      } catch(e) {
+        results.kiBriefing = null;
+      }
+    }
+
+    // ── Ergebnisse cachen (bis Mitternacht) ───────────────────────
+    try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) {}
+
+    _applyMorningResults(results);
+    if (cacheEl) cacheEl.textContent = 'Heute ' + results.time + ' Uhr';
+
+  } catch(e) {
+    console.error('[Morning Briefing] Fehler:', e);
+    if (btn) btn.innerHTML = '<i class="ti ti-alert-triangle"></i> Fehler — erneut versuchen';
+  } finally {
+    _morningRunning = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Briefing abgeschlossen · ' + results.time; }
+  }
+}
+
+function _applyMorningResults(results) {
+  // KI-Briefing im Cockpit anzeigen
+  var actionEl = document.getElementById('rc-action');
+  if (actionEl && results.kiBriefing) {
+    actionEl.textContent = results.kiBriefing;
+    actionEl.style.color = 'var(--text2)';
+  }
+  // Alle Cockpit-Werte aktualisieren
+  updateRegimeCockpit();
+
+  // Toast
+  var summary = [];
+  if (results.vix)      summary.push('VIX ' + results.vix);
+  if (results.dpScore)  summary.push('Flow ' + results.dpScore);
+  if (results.tsiScore != null) summary.push('Stress ' + results.tsiScore);
+  showToast('✅ Morning Briefing: ' + summary.join(' · '));
+}
+
+function showToast(msg) {
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:8px 16px;font-size:12px;color:var(--text);z-index:9999;max-width:90vw;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.4)';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 4000);
+}
 
 // ── MARKET REGIME COCKPIT (Autostart) ────────────────────────────────────────
 async function updateRegimeCockpit() {
