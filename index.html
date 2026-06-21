@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260620-v158">
+<meta name="app-version" content="20260621-v159">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -5211,6 +5211,8 @@ function sortAndRenderCards(tickers){
         '<i class="ti ti-chart-candle"></i> IV laden (Top40)</button>'+
       '<button onclick="showMeanReversionFilter()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:rgba(245,158,11,0.12);border-color:var(--amber);color:var(--amber)">'+
         '<i class="ti ti-arrow-back-up"></i> Mean Reversion</button>'+
+      '<button onclick="showSwingFilter()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:rgba(6,182,212,0.12);border-color:#06b6d4;color:#06b6d4">'+
+        '<i class="ti ti-wave-sine"></i> Swing-Trading</button>'+
       '<span id="iv-status-badge" style="display:none;font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(52,194,110,0.12);color:var(--green);border:0.5px solid var(--green);align-self:center">'+
         '<i class="ti ti-check"></i> <span id="iv-status-count">0</span> IV geladen</span>'+
       '<button onclick="toggleKiDropdown(this)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.15));border-color:#818cf8;color:#818cf8"><i class=\"ti ti-brain\"></i> KI ▾</button>'+
@@ -16415,6 +16417,190 @@ function closeDeepDive() {
   document.body.style.overflow = '';
   _ddCurrentSym   = null;
   _ddCurrentState = null;
+}
+
+// ── SWING-TRADING FILTER & ANALYSE ───────────────────────────────────────────
+
+function showSwingFilter() {
+  var candidates = { long: [], neutral: [] };
+
+  Object.keys(tickerData).forEach(function(sym) {
+    var raw = tickerData[sym];
+    if (!raw || raw.error) return;
+
+    var price    = raw.price || 0;
+    var ema50    = raw.ma50  || null;
+    var ema200   = raw.ma200 || null;
+    var atr      = raw.atr   || null;
+    var rsi      = raw.rsi   || null;
+    var macdH    = raw.macd_hist     || null;
+    var macdHPrev= raw.macd_hist_prev || macdH;
+    var obvSlope = raw.obv_slope_5d  || null;
+    var overheat = raw.overheat ? raw.overheat.score : 0;
+
+    if (!ema50 || !atr || atr === 0) return;
+
+    // Synthetischer ADX aus Overheat + OBV (echtes ADX kommt vom Aggregator)
+    // Proxy: Overheat < 60 + klarer Trend = ADX-Näherung
+    var adxProxy = null;
+    var adxStrong = false;
+    if (raw.adx != null) {
+      adxProxy  = raw.adx;
+      adxStrong = raw.adx > 25;
+    } else {
+      // Proxy aus verfügbaren Daten
+      var trendClarity = (price > ema50 ? 1 : 0) + (macdH > 0 ? 1 : 0) + (obvSlope > 0 ? 1 : 0);
+      adxProxy  = 15 + trendClarity * 6;
+      adxStrong = trendClarity >= 2;
+    }
+
+    // Stochastik-Proxy aus RSI (bis echte Stochastik aus Aggregator kommt)
+    var stochProxy = rsi ? (rsi < 30 ? 15 : rsi < 40 ? 25 : rsi > 70 ? 85 : 50) : 50;
+    var stochBull  = stochProxy < 25;
+
+    // Marktstruktur-Proxy
+    var structProxy = (price > ema50 && price > ema200) ? 'BULLISH'
+                    : (price < ema50 && price < ema200) ? 'BEARISH' : 'NEUTRAL';
+
+    // Swing Score berechnen
+    var swingScore = 0;
+    var swingReasons = [];
+
+    if (adxStrong) { swingScore += 25; swingReasons.push('Trend ADX-Proxy: ' + adxProxy); }
+    else { swingScore -= 10; }
+
+    if (structProxy === 'BULLISH') {
+      swingScore += 10;
+      var distToEMA50 = (price - ema50) / atr;
+      if (distToEMA50 >= 0 && distToEMA50 <= 1.5) {
+        swingScore += 15;
+        swingReasons.push('Pullback-Zone: ' + distToEMA50.toFixed(1) + ' ATR');
+      }
+    }
+
+    if (macdH != null && macdHPrev != null && macdH > macdHPrev) {
+      swingScore += macdH > 0 ? 12 : 20;
+      swingReasons.push('MACD-Wende');
+    }
+
+    if (stochBull) { swingScore += 12; swingReasons.push('Stoch ueberverkauft (' + Math.round(stochProxy) + ')'); }
+
+    if (obvSlope > 0) { swingScore += 10; swingReasons.push('OBV steigend'); }
+
+    if (rsi && rsi < 35) { swingScore += 5; swingReasons.push('RSI ' + Math.round(rsi)); }
+
+    swingScore = Math.max(0, Math.min(100, swingScore));
+
+    if (swingScore >= 45) {
+      candidates.long.push({
+        sym, price, swingScore, ema50, atr,
+        adx: adxProxy, rsi: rsi ? Math.round(rsi) : null,
+        macdH: macdH ? Math.round(macdH * 1000) / 1000 : null,
+        structure: structProxy,
+        reasons: swingReasons,
+      });
+    }
+  });
+
+  candidates.long.sort(function(a,b){ return b.swingScore - a.swingScore; });
+  renderSwingModal(candidates);
+}
+
+function swingCard(c) {
+  var el = document.createElement('div');
+  el.style.cssText = 'background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:6px;border-left:3px solid #06b6d4';
+  el.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+    + '<span style="font-family:var(--mono);font-weight:700;font-size:14px">' + c.sym + '</span>'
+    + '<span style="font-size:11px;font-weight:600;color:#06b6d4">Score: ' + c.swingScore + '</span>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;font-size:11px;color:var(--text2);flex-wrap:wrap">'
+    + '<span>$' + c.price.toFixed(2) + '</span>'
+    + '<span style="color:#06b6d4">Struktur: ' + c.structure + '</span>'
+    + (c.rsi ? '<span>RSI: ' + c.rsi + '</span>' : '')
+    + (c.adx ? '<span>ADX-P: ' + Math.round(c.adx) + '</span>' : '')
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--text3);margin-top:3px">' + c.reasons.join(' · ') + '</div>'
+    + '<div class="sw-btn-row" style="display:flex;gap:6px;margin-top:6px"></div>';
+
+  var btnRow = el.querySelector('.sw-btn-row');
+  var btnDD  = document.createElement('button');
+  btnDD.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(139,92,246,0.12);border:0.5px solid rgba(139,92,246,0.4);color:#8b5cf6;cursor:pointer';
+  btnDD.innerHTML = '<i class="ti ti-brain"></i> Deep Dive Swing';
+  btnDD.onclick = (function(s){ return function(){ openDeepDive(s,s); setDdStrategy('swing'); }; })(c.sym);
+  btnRow.appendChild(btnDD);
+
+  var btnR = document.createElement('button');
+  btnR.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:6px;background:var(--bg2);border:0.5px solid var(--border2);color:var(--text2);cursor:pointer';
+  btnR.innerHTML = '<i class="ti ti-calculator"></i> Rechner';
+  btnR.onclick = (function(s){ return function(){ useInRechner(s); }; })(c.sym);
+  btnRow.appendChild(btnR);
+
+  return el;
+}
+
+function renderSwingModal(candidates) {
+  var existing = document.getElementById('swing-modal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id  = 'swing-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);overflow-y:auto;padding:1rem';
+
+  var inner = document.createElement('div');
+  inner.style.cssText = 'max-width:560px;margin:0 auto;background:var(--bg2);border-radius:16px;border:1px solid var(--border2);overflow:hidden';
+
+  function closeSW() { modal.remove(); document.body.style.overflow = ''; }
+
+  // Header
+  var header = document.createElement('div');
+  header.style.cssText = 'background:linear-gradient(135deg,rgba(6,182,212,0.2),rgba(79,142,247,0.15));padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border2)';
+  header.innerHTML = '<div><div style="font-size:10px;color:var(--text3);letter-spacing:1px">SWING-TRADING SCANNER</div><div style="font-size:18px;font-weight:700">&#127744; Swing-Kandidaten</div></div>';
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px';
+  closeBtn.innerHTML = '<i class="ti ti-x"></i>';
+  closeBtn.onclick = closeSW;
+  header.appendChild(closeBtn);
+  inner.appendChild(header);
+
+  // Info
+  var info = document.createElement('div');
+  info.style.cssText = 'padding:.6rem 1.25rem;background:var(--bg3);border-bottom:1px solid var(--border2);font-size:11px;color:var(--text3);line-height:1.6';
+  info.innerHTML = '<b style="color:#06b6d4">Swing-Setup:</b> ADX &gt;25 (Trend) + EMA50-Pullback + MACD-Wende + Stochastik ueberverkauft + OBV steigend<br>'
+    + '<span style="color:var(--amber)">ADX/Stochastik als Proxy bis Aggregator-Daten verfuegbar. Statistisches Muster, kein Anlageberatung gem. §1 WpHG</span>';
+  inner.appendChild(info);
+
+  // Kandidaten
+  var sec = document.createElement('div');
+  sec.style.cssText = 'padding:1rem 1.25rem';
+  var title = document.createElement('div');
+  title.style.cssText = 'font-size:11px;font-weight:600;color:#06b6d4;margin-bottom:.5rem';
+  title.textContent = 'SWING-KANDIDATEN (' + candidates.long.length + ') — Score ≥45';
+  sec.appendChild(title);
+
+  if (candidates.long.length) {
+    candidates.long.slice(0, 10).forEach(function(c){ sec.appendChild(swingCard(c)); });
+  } else {
+    var empty = document.createElement('div');
+    empty.style.cssText = 'color:var(--text3);font-size:12px;padding:.5rem';
+    empty.textContent = 'Keine Swing-Kandidaten — mehr Titel scannen oder Schwelle anpassen.';
+    sec.appendChild(empty);
+  }
+  inner.appendChild(sec);
+
+  // Footer
+  var footer = document.createElement('div');
+  footer.style.cssText = 'padding:.75rem 1.25rem;border-top:1px solid var(--border2)';
+  var footerBtn = document.createElement('button');
+  footerBtn.style.cssText = 'width:100%;padding:8px;border-radius:10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer';
+  footerBtn.innerHTML = '<i class="ti ti-x"></i> Schliessen';
+  footerBtn.onclick = closeSW;
+  footer.appendChild(footerBtn);
+  inner.appendChild(footer);
+
+  modal.appendChild(inner);
+  document.body.appendChild(modal);
+  document.body.style.overflow = 'hidden';
 }
 
 // ── MEAN REVERSION FILTER & ANALYSE ──────────────────────────────────────────
