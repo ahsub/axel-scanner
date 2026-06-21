@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260621-v159">
+<meta name="app-version" content="20260621-v160">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -237,6 +237,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <!-- SCANNER PANEL -->
     <div id="panel-scanner" class="panel active">
       <div class="sec">Technischer Scanner</div>
+
+      <!-- MARKET REGIME COCKPIT -->
+      <div id="regime-cockpit" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:.6rem .9rem;margin-bottom:.6rem;cursor:pointer" onclick="showPanel('makro')">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div id="rc-regime" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:var(--bg3);color:var(--text3)">— Regime</div>
+          <div id="rc-vix" style="font-size:11px;color:var(--text2)">VIX —</div>
+          <div id="rc-dp" style="font-size:11px;color:var(--text2)">Flow —</div>
+          <div id="rc-tsi" style="font-size:11px;color:var(--text2)">Stress —</div>
+          <div style="font-size:10px;color:var(--text3);margin-left:auto">→ Makro</div>
+        </div>
+        <div id="rc-action" style="font-size:11px;color:var(--text3);margin-top:3px">Laden…</div>
+      </div>
       <!-- US/DE Market Toggle -->
       <div style="display:flex;gap:0;margin-bottom:.75rem;border:0.5px solid var(--border2);border-radius:var(--radius-sm);overflow:hidden">
         <button id="mkt-us-btn" onclick="setMarket('us')" style="flex:1;padding:8px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:var(--accent);color:#fff;transition:all .15s">
@@ -833,6 +845,79 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
       <div style="margin-top:.5rem;font-size:11px;color:var(--text3)">
         <i class="ti ti-info-circle"></i> Admin-Tab → Makro täglich aktualisieren · Keine Anlageberatung
+      </div>
+    </div>
+
+
+    <!-- TREASURY STRESS INDEX (Modul 3 nach Gemini Pine Script) -->
+    <div style="margin:.75rem 0">
+      <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
+        <span><i class="ti ti-building-bank"></i> Treasury Stress Index</span>
+        <button onclick="calcTreasuryStress()" class="btn btn-sm" style="font-size:11px;padding:3px 8px">
+          <i class="ti ti-refresh"></i> Berechnen
+        </button>
+      </div>
+
+      <!-- Stress Score -->
+      <div class="card card-accent" style="text-align:center;padding:1rem;margin-bottom:.5rem">
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;margin-bottom:.4rem">TREASURY STRESS SCORE</div>
+        <div id="tsi-score" style="font-size:42px;font-weight:700;font-family:var(--mono);color:var(--green)">—</div>
+        <div id="tsi-label" style="font-size:13px;font-weight:600;margin-top:.3rem;color:var(--text3)">Noch nicht berechnet</div>
+      </div>
+
+      <!-- Metriken Grid -->
+      <div class="card" style="padding:.75rem">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:.6rem">
+          <div style="background:var(--bg3);border-radius:8px;padding:6px 8px">
+            <div style="font-size:10px;color:var(--text3)">10Y-2Y Spread</div>
+            <div id="tsi-yield-spread" style="font-size:13px;font-weight:600">—</div>
+            <div id="tsi-yield-signal" style="font-size:10px;color:var(--text3)">—</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:6px 8px">
+            <div style="font-size:10px;color:var(--text3)">DXY vs SMA200</div>
+            <div id="tsi-dxy" style="font-size:13px;font-weight:600">—</div>
+            <div id="tsi-dxy-signal" style="font-size:10px;color:var(--text3)">—</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:6px 8px">
+            <div style="font-size:10px;color:var(--text3)">VIX</div>
+            <div id="tsi-vix-val" style="font-size:13px;font-weight:600">—</div>
+            <div id="tsi-vix-signal" style="font-size:10px;color:var(--text3)">—</div>
+          </div>
+        </div>
+
+        <!-- Auktions-Daten (manuell) -->
+        <div style="border-top:1px solid var(--border2);padding-top:.6rem;margin-top:.2rem">
+          <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.5px;margin-bottom:.4rem">
+            AUKTIONS-DATEN (manuell nach US-Treasury Auktion)
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <div style="display:flex;align-items:center;gap:4px;font-size:12px">
+              <span style="color:var(--text3)">Bid-to-Cover</span>
+              <input type="number" id="tsi-btc" value="2.30" step="0.01" min="0" max="10"
+                style="width:60px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text)"
+                oninput="calcTreasuryStress()">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;font-size:12px">
+              <span style="color:var(--text3)">Tail (bp)</span>
+              <input type="number" id="tsi-tail" value="1.5" step="0.1"
+                style="width:55px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text)"
+                oninput="calcTreasuryStress()">
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;font-size:12px">
+              <span style="color:var(--text3)">Indirect %</span>
+              <input type="number" id="tsi-indirect" value="62.0" step="0.1"
+                style="width:60px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text)"
+                oninput="calcTreasuryStress()">
+            </div>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:.3rem">
+            BTC &lt;2.4 · Tail &gt;1.0bp · Indirect &lt;65% = schwache Nachfrage
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:10px;color:var(--text3);text-align:center;padding:.25rem 0">
+        Quellen: Yahoo Finance (10Y/2Y/DXY/VIX) · Auktionsdaten: treasury.gov · Kein Anlageberatung
       </div>
     </div>
 
@@ -1999,18 +2084,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border2)">
       <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.6rem">MARKTKONTEXT</div>
       <div id="dd-market-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
-    </div>
-
-    <!-- Strategie-Auswahl -->
-    <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border2);background:var(--bg3)">
-      <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.5rem">ANALYSE-PERSPEKTIVE</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap" id="dd-strategy-btns">
-        <button onclick="setDdStrategy('momentum')" id="dd-strat-momentum" class="btn btn-sm" style="font-size:11px;padding:3px 8px;background:var(--accent);color:#fff;border-color:var(--accent)">📈 Momentum/SEPA</button>
-        <button onclick="setDdStrategy('options')" id="dd-strat-options" class="btn btn-sm" style="font-size:11px;padding:3px 8px">⚙️ Options/Wheel</button>
-        <button onclick="setDdStrategy('meanrev')" id="dd-strat-meanrev" class="btn btn-sm" style="font-size:11px;padding:3px 8px">↩️ Mean Reversion</button>
-        <button onclick="setDdStrategy('swing')" id="dd-strat-swing" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🔄 Swing-Trading</button>
-        <button onclick="setDdStrategy('breakout')" id="dd-strat-breakout" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🚀 Breakout</button>
-      </div>
     </div>
 
     <!-- KI-Analyse -->
@@ -3995,6 +4068,9 @@ function unlockApp(){
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
   window._appUnlocked = true;
+  // Market Regime Cockpit beim Start befüllen
+  setTimeout(updateRegimeCockpit, 1500);
+
   // Cursor global auf default erzwingen (alle Elemente)
   var styleTag = document.getElementById('_cursor_fix');
   if (!styleTag) {
@@ -16402,14 +16478,30 @@ function calcDdPosition() {
   var barrier = parseFloat(document.getElementById('dd-barrier')?.value) || 0;
   var raw     = _ddCurrentSym && window.tickerData && window.tickerData[_ddCurrentSym];
   var price   = raw ? (raw.price || 0) : 0;
+  var atr     = raw ? (raw.atr || null) : null;
   var res     = document.getElementById('dd-position-result');
   if (!res) return;
-  if (!barrier || !price || barrier >= price) { res.textContent = '— (KO-Barriere eingeben)'; return; }
+  if (!barrier || !price || barrier >= price) {
+    res.textContent = '— (KO-Barriere eingeben)';
+    return;
+  }
   var riskAmount = depot * (risk / 100);
   var distToKO   = price - barrier;
   var shares     = Math.floor(riskAmount / distToKO);
   var posValue   = Math.round(shares * price);
-  res.textContent = shares + ' Stück · €' + posValue.toLocaleString('de-DE') + ' Positionswert · €' + Math.round(riskAmount) + ' Risiko';
+  var leverage   = price / distToKO;
+
+  // ATR-Plausibilitäts-Check
+  var atrHint = '';
+  if (atr && distToKO < atr * 0.5) {
+    atrHint = ' ⚠ Barriere sehr nah (< 0.5 ATR)';
+  }
+
+  res.innerHTML = '<b>' + shares + ' Stück</b>'
+    + ' · €' + posValue.toLocaleString('de-DE') + ' Positionswert'
+    + ' · €' + Math.round(riskAmount) + ' Risiko'
+    + ' · Hebel ~' + leverage.toFixed(1) + 'x'
+    + (atrHint ? '<br><span style="color:var(--amber);font-size:11px">' + atrHint + '</span>' : '');
 }
 
 function closeDeepDive() {
@@ -16418,6 +16510,206 @@ function closeDeepDive() {
   _ddCurrentSym   = null;
   _ddCurrentState = null;
 }
+
+
+// ── TREASURY STRESS INDEX ─────────────────────────────────────────────────────
+async function calcTreasuryStress() {
+  var scoreEl = document.getElementById('tsi-score');
+  var labelEl = document.getElementById('tsi-label');
+  if (!scoreEl) return;
+
+  // Auktions-Parameter lesen
+  var btc      = parseFloat(document.getElementById('tsi-btc')?.value)      || 2.30;
+  var tail     = parseFloat(document.getElementById('tsi-tail')?.value)     || 1.5;
+  var indirect = parseFloat(document.getElementById('tsi-indirect')?.value) || 62.0;
+
+  // Auktions-Stress (0-40 Punkte)
+  var auctionStress = 0;
+  if (btc      < 2.40) auctionStress += 15;
+  if (tail     > 1.0)  auctionStress += 15;
+  if (indirect < 65.0) auctionStress += 10;
+
+  var score = auctionStress;
+
+  // Marktdaten via Yahoo Finance laden
+  var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
+
+  async function fetchYF(sym) {
+    try {
+      var url = 'https://query1.finance.yahoo.com/v7/finance/chart/' + encodeURIComponent(sym) + '?interval=1d&range=30d';
+      var r   = await fetch(corsProxy + '/?url=' + encodeURIComponent(url));
+      if (!r.ok) return null;
+      var j   = await r.json();
+      var res = j?.chart?.result?.[0];
+      if (!res) return null;
+      var closes = (res.indicators.quote[0].close || []).filter(function(v){ return v != null; });
+      return { price: res.meta.regularMarketPrice || closes[closes.length-1], closes };
+    } catch(e) { return null; }
+  }
+
+  // Parallel laden
+  var [us10y, us2y, dxy, spx] = await Promise.all([
+    fetchYF('^TNX'),   // 10Y Treasury Yield
+    fetchYF('^IRX'),   // 2Y Treasury Yield (13-week proxy)
+    fetchYF('DX-Y.NYB'), // DXY Dollar Index
+    fetchYF('^GSPC'),  // S&P 500
+  ]);
+
+  // Auch ^TYX (30Y) als Fallback für 10Y
+  if (!us10y) us10y = await fetchYF('^TYX');
+
+  // 2Y besser: ^FVX (5Y) als Proxy wenn ^IRX nicht geht
+  if (!us2y || !us2y.price) us2y = await fetchYF('^FVX');
+
+  // ── Zinskurve ──────────────────────────────────────────────────
+  var yieldSpread = null;
+  var yieldEl     = document.getElementById('tsi-yield-spread');
+  var yieldSigEl  = document.getElementById('tsi-yield-signal');
+  if (us10y && us2y && us10y.price && us2y.price) {
+    yieldSpread = Math.round((us10y.price - us2y.price) * 100) / 100;
+    var inverted = yieldSpread < 0;
+    if (inverted) score += 15;
+    if (yieldEl) {
+      yieldEl.textContent = (yieldSpread >= 0 ? '+' : '') + yieldSpread + '%';
+      yieldEl.style.color = inverted ? 'var(--red)' : 'var(--green)';
+    }
+    if (yieldSigEl) {
+      yieldSigEl.textContent = inverted ? 'INVERTIERT ⚠' : 'NORMAL ✓';
+      yieldSigEl.style.color = inverted ? 'var(--red)' : 'var(--green)';
+    }
+  } else {
+    if (yieldEl) yieldEl.textContent = 'N/A';
+    if (yieldSigEl) yieldSigEl.textContent = 'Daten fehlen';
+  }
+
+  // ── DXY ────────────────────────────────────────────────────────
+  var dxyEl    = document.getElementById('tsi-dxy');
+  var dxySigEl = document.getElementById('tsi-dxy-signal');
+  if (dxy && dxy.closes && dxy.closes.length >= 20) {
+    var dxySma200 = dxy.closes.slice(-20).reduce(function(a,b){return a+b;},0) / Math.min(20, dxy.closes.length);
+    var dxyBull   = dxy.price > dxySma200;
+    if (dxyBull) score += 15; // Starker Dollar = Risk-Off
+    if (dxyEl) {
+      dxyEl.textContent = dxy.price.toFixed(2);
+      dxyEl.style.color = dxyBull ? 'var(--amber)' : 'var(--green)';
+    }
+    if (dxySigEl) {
+      dxySigEl.textContent = dxyBull ? 'STARK (Risk-Off)' : 'SCHWACH';
+      dxySigEl.style.color = dxyBull ? 'var(--amber)' : 'var(--green)';
+    }
+  } else {
+    if (dxyEl) dxyEl.textContent = 'N/A';
+  }
+
+  // ── VIX (aus Makro-Tab DOM) ────────────────────────────────────
+  var vixEl    = document.getElementById('tsi-vix-val');
+  var vixSigEl = document.getElementById('tsi-vix-signal');
+  var vixDom   = document.getElementById('m-vix');
+  var vix      = vixDom ? parseFloat(vixDom.textContent) || null : null;
+  if (!vix) {
+    // Direkt laden
+    var vixData = await fetchYF('^VIX');
+    vix = vixData ? vixData.price : null;
+  }
+  if (vix) {
+    var vixHigh = vix > 20;
+    if (vixHigh) score += 15;
+    if (vixEl) {
+      vixEl.textContent = vix.toFixed(1);
+      vixEl.style.color = vixHigh ? 'var(--red)' : 'var(--green)';
+    }
+    if (vixSigEl) {
+      vixSigEl.textContent = vixHigh ? 'ERHÖHT ⚠' : 'RUHIG ✓';
+      vixSigEl.style.color = vixHigh ? 'var(--red)' : 'var(--green)';
+    }
+  }
+
+  // ── Gesamtscore anzeigen ───────────────────────────────────────
+  score = Math.min(100, Math.round(score));
+  var scoreColor = score > 60 ? 'var(--red)' : score > 35 ? 'var(--amber)' : 'var(--green)';
+  var scoreLabel = score > 60 ? '🔴 RISK OFF — Hoher Stress'
+                : score > 35  ? '🟠 ERHÖHTES RISIKO — Selektiv'
+                :               '🟢 RISK ON — Normales Umfeld';
+
+  if (scoreEl) { scoreEl.textContent = score; scoreEl.style.color = scoreColor; }
+  if (labelEl) { labelEl.textContent = scoreLabel; labelEl.style.color = scoreColor; }
+}
+
+
+// ── MARKET REGIME COCKPIT (Autostart) ────────────────────────────────────────
+async function updateRegimeCockpit() {
+  var cockpit   = document.getElementById('regime-cockpit');
+  var regimeEl  = document.getElementById('rc-regime');
+  var vixEl     = document.getElementById('rc-vix');
+  var dpEl      = document.getElementById('rc-dp');
+  var tsiEl     = document.getElementById('rc-tsi');
+  var actionEl  = document.getElementById('rc-action');
+  if (!cockpit) return;
+
+  // VIX aus DOM (wird durch Makro-Tab geladen) oder direkt
+  var vixDom = document.getElementById('m-vix');
+  var vix    = vixDom ? parseFloat(vixDom.textContent) || null : null;
+
+  // Falls VIX noch nicht geladen — kurz via Yahoo holen
+  if (!vix) {
+    try {
+      var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
+      var r = await fetch(corsProxy + '/?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/chart/%5EVIX?interval=1d&range=5d'));
+      if (r.ok) {
+        var j   = await r.json();
+        var res = j?.chart?.result?.[0];
+        if (res) vix = res.meta.regularMarketPrice;
+      }
+    } catch(e) {}
+  }
+
+  // VIX Zone
+  var vixZone  = !vix ? 0 : vix < 12 ? 1 : vix < 16 ? 2 : vix < 20 ? 3 : vix < 28 ? 4 : vix < 36 ? 5 : 6;
+  var vixColor = vixZone <= 2 ? 'var(--green)' : vixZone <= 3 ? 'var(--amber)' : 'var(--red)';
+
+  // Markov Regime aus letztem Scan
+  var regime    = window._lastQqqRegime || null;
+  var regColor  = !regime ? 'var(--text3)' : regime === 'bull' ? 'var(--green)' : regime === 'bear' ? 'var(--red)' : 'var(--amber)';
+  var regLabel  = !regime ? '— Regime' : regime === 'bull' ? '🟢 Bull-Regime' : regime === 'bear' ? '🔴 Bear-Regime' : '🟡 Sideways';
+
+  // Dark Pool Score
+  var dpScore = window._dpLastScore || null;
+  var dpColor = !dpScore ? 'var(--text3)' : dpScore >= 60 ? 'var(--green)' : dpScore >= 40 ? 'var(--amber)' : 'var(--red)';
+
+  // Treasury Stress (wenn berechnet)
+  var tsiScore = window._lastTsiScore || null;
+  var tsiColor = !tsiScore ? 'var(--text3)' : tsiScore > 60 ? 'var(--red)' : tsiScore > 35 ? 'var(--amber)' : 'var(--green)';
+
+  // Update DOM
+  if (regimeEl) { regimeEl.textContent = regLabel; regimeEl.style.color = regColor; regimeEl.style.background = 'var(--bg3)'; }
+  if (vixEl)    { vixEl.textContent    = vix ? 'VIX ' + vix.toFixed(1) : 'VIX —'; vixEl.style.color = vixColor; }
+  if (dpEl)     { dpEl.textContent     = dpScore ? 'Flow ' + dpScore : 'Flow —'; dpEl.style.color = dpColor; }
+  if (tsiEl)    { tsiEl.textContent    = tsiScore ? 'Stress ' + tsiScore : 'Stress —'; tsiEl.style.color = tsiColor; }
+
+  // Handlungsampel
+  var actionText, actionColor;
+  if (vixZone >= 5 || (tsiScore && tsiScore > 60)) {
+    actionText  = '🔴 Hohes Risiko — Defensive Positionierung · Treasury-Stress erhöht';
+    actionColor = 'var(--red)';
+  } else if (regime === 'bear' || vixZone >= 4) {
+    actionText  = '🟠 Erhöhtes Risiko — Positionsgrößen reduzieren · Selektiv vorgehen';
+    actionColor = 'var(--amber)';
+  } else if (regime === 'bull' && vixZone <= 3) {
+    actionText  = '🟢 Stabiles Umfeld — Long-Setups mit A+/A-Qualität bevorzugen';
+    actionColor = 'var(--green)';
+  } else {
+    actionText  = '🟡 Neutral — Marktdaten vor Scan laden für vollständige Analyse';
+    actionColor = 'var(--text3)';
+  }
+
+  if (actionEl) { actionEl.textContent = actionText; actionEl.style.color = actionColor; }
+
+  // TSI Score für spätere Verwendung speichern
+  // (wird nach calcTreasuryStress() aktualisiert)
+}
+
+// TSI Score nach Berechnung in Cockpit übertragen
+var _origCalcTSI = window.calcTreasuryStress;
 
 // ── SWING-TRADING FILTER & ANALYSE ───────────────────────────────────────────
 
