@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v191">
+<meta name="app-version" content="20260622-v194">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -298,7 +298,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="regime-cockpit" style="display:none"></div>
         <!-- Morning Briefing Button -->
         <div style="padding:.5rem .9rem;display:flex;align-items:center;gap:8px">
-          <button id="morning-btn" onclick="runMorningBriefing()" style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
+          <button onclick="showBearScanner()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--red);background:rgba(239,68,68,0.1);color:var(--red);font-size:12px;font-weight:600;cursor:pointer" title="Bear Scanner">
+              <i class="ti ti-trending-down"></i>
+            </button>
+            <button id="morning-btn" onclick="runMorningBriefing()" style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
             <i class="ti ti-sunrise"></i> Morning Briefing starten
           </button>
           <div id="morning-cache-info" style="font-size:10px;color:var(--text3)"></div>
@@ -4551,13 +4554,17 @@ function setMarket(mkt){
         '<option value="default">50 US-Aktien (alle scannen)</option>'+
         '<option value="top50-us">Top-50 Liste (IBD Momentum)</option>'+
         '<option value="custom">Eigene Ticker</option>'+
-        '<optgroup label="── 🇩🇪 Deutsche Indizes ──">'+
+        '<optgroup label="── 🇩🇪 Deutsche &amp; EU Indizes ──">'+
           '<option value="fixed:DAX40">📊 DAX 40 (alle 40 Titel)</option>'+
           '<option value="fixed:MDAX">📈 MDAX Top 20</option>'+
           '<option value="fixed:TECDAX">💻 TecDAX Top 20</option>'+
+          '<option value="fixed:EUROSTOXX50">🇪🇺 EuroStoxx 50 Top 40</option>'+
+          '<option value="fixed:FTSE100">🇬🇧 FTSE 100 Top 40</option>'+
+          '<option value="fixed:STOXX_EU">🌍 STOXX EU Wachstum Top 40</option>'+
         '</optgroup>'+
         '<optgroup label="── 🇺🇸 US-Indizes ──">'+
-          '<option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>'+'<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
+          '<option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>'+
+          '<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
           '<option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>'+
         '</optgroup>'+
         '<optgroup label="── 🏭 Sektoren ──">'+
@@ -4567,6 +4574,10 @@ function setMarket(mkt){
           '<option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>'+
           '<option value="fixed:FINANCE">🏦 Financials &amp; Banks</option>'+
           '<option value="fixed:CONSUMER">🛒 Consumer Discretionary</option>'+
+        '</optgroup>'+
+        '<optgroup label="── 📉 Bear Scanner Listen ──">'+
+          '<option value="fixed:BEAR_US">🔴 Top 50 Bear US (Momentum/Hype)</option>'+
+          '<option value="fixed:BEAR_DE_EU">🔴 Top 50 Bear DE/EU (Zykliker)</option>'+
         '</optgroup>'+
         (wlOpts?'<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options">'+wlOpts+'</optgroup>':
           '<optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options"></optgroup>');
@@ -11867,9 +11878,81 @@ var DE_LIST_GROUPS = {
     {sym:'WAF',name:'Siltronic AG'},{sym:'HAG',name:'Hensoldt AG'},
     {sym:'NDX1',name:'Nordex SE'},{sym:'SMHN',name:'Ströer SE'},
     {sym:'UTDI',name:'United Internet'},{sym:'FNTN',name:'freenet AG'},
-    {sym:'CAN',name:'CAN'},{sym:'SFQ',name:'SAF-Holland SE'},
-    {sym:'TLX',name:'Talanx AG'},{sym:'MOR',name:'MorphoSys AG'},
-    {sym:'DMP',name:'Dermapharm AG'},{sym:'MDNT',name:'Medios AG'},
+    {sym:'SFQ',name:'SAF-Holland SE'},{sym:'TLX',name:'Talanx AG'},
+    {sym:'DMP',name:'Dermapharm AG'},{sym:'GXI',name:'Gerresheimer'},
+    {sym:'PUM',name:'Puma SE'},{sym:'1COV',name:'Covestro AG'},
+  ],
+
+  // ── EUROSTOXX 50 (Top 40 nach Marktkapitalisierung) ─────────────────────────
+  'EuroStoxx 50': [
+    {sym:'ASML.AS',name:'ASML Holding'},{sym:'SAP.DE',name:'SAP SE'},
+    {sym:'LVMH.PA',name:'LVMH (MC.PA)  → MC.PA'},{sym:'MC.PA',name:'LVMH'},
+    {sym:'OR.PA',name:'LOreal'},{sym:'SIE.DE',name:'Siemens AG'},
+    {sym:'ALV.DE',name:'Allianz SE'},{sym:'TTE.PA',name:'TotalEnergies'},
+    {sym:'SAN.PA',name:'Sanofi'},{sym:'AIR.PA',name:'Airbus SE'},
+    {sym:'BNP.PA',name:'BNP Paribas'},{sym:'RHM.DE',name:'Rheinmetall'},
+    {sym:'IBE.MC',name:'Iberdrola'},{sym:'SU.PA',name:'Schneider Electric'},
+    {sym:'INGA.AS',name:'ING Groep'},{sym:'BBVA.MC',name:'BBVA'},
+    {sym:'SAN.MC',name:'Santander'},{sym:'ITX.MC',name:'Inditex'},
+    {sym:'ENEL.MI',name:'Enel SpA'},{sym:'ENI.MI',name:'Eni SpA'},
+    {sym:'ABI.BR',name:'AB InBev'},{sym:'RACE.MI',name:'Ferrari'},
+    {sym:'DG.PA',name:'Vinci SA'},{sym:'RI.PA',name:'Pernod Ricard'},
+    {sym:'CS.PA',name:'AXA SA'},{sym:'MUV2.DE',name:'Munich Re'},
+    {sym:'DBK.DE',name:'Deutsche Bank'},{sym:'VOW3.DE',name:'Volkswagen'},
+    {sym:'BAYN.DE',name:'Bayer AG'},{sym:'BAS.DE',name:'BASF SE'},
+    {sym:'DTE.DE',name:'Deutsche Telekom'},{sym:'IFX.DE',name:'Infineon'},
+    {sym:'ADYEN.AS',name:'Adyen NV'},{sym:'PHIA.AS',name:'Philips'},
+    {sym:'UCG.MI',name:'UniCredit'},{sym:'ISP.MI',name:'Intesa Sanpaolo'},
+    {sym:'STM.PA',name:'STMicroelectronics'},{sym:'NOKIA.HE',name:'Nokia'},
+    {sym:'NOVO-B.CO',name:'Novo Nordisk'},{sym:'DSV.CO',name:'DSV A/S'},
+  ],
+
+  // ── FTSE 100 Top 40 ──────────────────────────────────────────────────────────
+  'FTSE 100 Top40': [
+    {sym:'AZN.L',name:'AstraZeneca'},{sym:'SHEL.L',name:'Shell plc'},
+    {sym:'HSBA.L',name:'HSBC Holdings'},{sym:'ULVR.L',name:'Unilever'},
+    {sym:'RIO.L',name:'Rio Tinto'},{sym:'BP.L',name:'BP plc'},
+    {sym:'GSK.L',name:'GSK plc'},{sym:'REL.L',name:'RELX Group'},
+    {sym:'BATS.L',name:'British American Tobacco'},{sym:'DGE.L',name:'Diageo'},
+    {sym:'NG.L',name:'National Grid'},{sym:'VOD.L',name:'Vodafone'},
+    {sym:'BA.L',name:'BAE Systems'},{sym:'EXPN.L',name:'Experian'},
+    {sym:'LSEG.L',name:'London Stock Exchange'},{sym:'PRU.L',name:'Prudential'},
+    {sym:'AAL.L',name:'Anglo American'},{sym:'GLEN.L',name:'Glencore'},
+    {sym:'NWG.L',name:'NatWest Group'},{sym:'LLOY.L',name:'Lloyds Banking'},
+    {sym:'BT-A.L',name:'BT Group'},{sym:'MNG.L',name:'M&G plc'},
+    {sym:'AV.L',name:'Aviva plc'},{sym:'TSCO.L',name:'Tesco'},
+    {sym:'ABF.L',name:'Associated British Foods'},{sym:'IMB.L',name:'Imperial Brands'},
+    {sym:'STAN.L',name:'Standard Chartered'},{sym:'WPP.L',name:'WPP plc'},
+    {sym:'CRH.L',name:'CRH plc'},{sym:'IHG.L',name:'IHG Hotels'},
+    {sym:'RKT.L',name:'Reckitt Benckiser'},{sym:'SSE.L',name:'SSE plc'},
+    {sym:'BME.L',name:'B&M European Value'},{sym:'EZJ.L',name:'easyJet'},
+    {sym:'IAG.L',name:'Intl Airlines Group'},{sym:'RR.L',name:'Rolls-Royce'},
+    {sym:'SBRY.L',name:'Sainsburys'},{sym:'MKS.L',name:'Marks & Spencer'},
+    {sym:'JD.L',name:'JD Sports Fashion'},{sym:'SPX.L',name:'Spirax-Sarco'},
+  ],
+
+  // ── STOXX Europe 600 — Wachstum & Tech Top 40 ───────────────────────────────
+  'STOXX EU Wachstum': [
+    {sym:'ASML.AS',name:'ASML'},{sym:'SAP.DE',name:'SAP SE'},
+    {sym:'NOVO-B.CO',name:'Novo Nordisk'},{sym:'ADYEN.AS',name:'Adyen'},
+    {sym:'DSV.CO',name:'DSV A/S'},{sym:'RACE.MI',name:'Ferrari'},
+    {sym:'RR.L',name:'Rolls-Royce'},{sym:'MC.PA',name:'LVMH'},
+    {sym:'OR.PA',name:'LOreal'},{sym:'SU.PA',name:'Schneider Electric'},
+    {sym:'AIR.PA',name:'Airbus'},{sym:'RHM.DE',name:'Rheinmetall'},
+    {sym:'HAG.DE',name:'Hensoldt'},{sym:'KNEBV.HE',name:'Kone Oyj'},
+    {sym:'STM.PA',name:'STMicro'},{sym:'NOKIA.HE',name:'Nokia'},
+    {sym:'ORSTED.CO',name:'Ørsted'},{sym:'CARL-B.CO',name:'Carlsberg'},
+    {sym:'MAERSK-B.CO',name:'AP Mller Maersk'},{sym:'GIVN.SW',name:'Givaudan'},
+    {sym:'SIKA.SW',name:'Sika AG'},{sym:'LONN.SW',name:'Lonza Group'},
+    {sym:'ROG.SW',name:'Roche'},{sym:'NOVN.SW',name:'Novartis'},
+    {sym:'ABBN.SW',name:'ABB Ltd'},{sym:'ZURN.SW',name:'Zurich Insurance'},
+    {sym:'ALC.SW',name:'Alcon'},{sym:'PGHN.SW',name:'Partners Group'},
+    {sym:'HOLN.SW',name:'Holcim'},{sym:'ERICB.ST',name:'Ericsson B'},
+    {sym:'VOLVA.ST',name:'Volvo A'},{sym:'ATCO-A.ST',name:'Atlas Copco A'},
+    {sym:'SAND.ST',name:'Sandvik AB'},{sym:'SEB-A.ST',name:'SEB A'},
+    {sym:'UCB.BR',name:'UCB SA'},{sym:'KER.PA',name:'Kering SA'},
+    {sym:'EZU',name:'EuroStoxx ETF (USD)'},{sym:'VGK',name:'Vanguard Europe ETF'},
+    {sym:'EWG',name:'iShares Germany ETF'},{sym:'EWU',name:'iShares UK ETF'},
   ],
 };
 
@@ -11923,8 +12006,8 @@ var FIXED_LISTS = {
     {sym:'CI',name:'Cigna Group'},{sym:'HCA',name:'HCA Healthcare'},{sym:'DUK',name:'Duke Energy'},
     {sym:'SO',name:'Southern Company'},{sym:'NEE',name:'NextEra Energy'},{sym:'D',name:'Dominion Energy'},
     {sym:'CL',name:'Colgate-Palmolive'},{sym:'KO',name:'Coca-Cola'},{sym:'PEP',name:'PepsiCo'},
-    {sym:'PM',name:'Philip Morris'},{sym:'MCD',name:'McDonald\'s'},{sym:'SBUX',name:'Starbucks'},
-    {sym:'NKE',name:'Nike Inc.'},{sym:'LOW',name:'Lowe\'s'},{sym:'TGT',name:'Target Corp.'},
+    {sym:'PM',name:'Philip Morris'},{sym:'MCD',name:'McDonalds'},{sym:'SBUX',name:'Starbucks'},
+    {sym:'NKE',name:'Nike Inc.'},{sym:'LOW',name:'Lowes'},{sym:'TGT',name:'Target Corp.'},
     {sym:'LRCX',name:'Lam Research'},{sym:'KLAC',name:'KLA Corp.'},{sym:'MCHP',name:'Microchip Tech.'},
     {sym:'PANW',name:'Palo Alto Networks'},{sym:'CRWD',name:'CrowdStrike'},{sym:'FTNT',name:'Fortinet'},
     {sym:'SNPS',name:'Synopsys'},{sym:'CDNS',name:'Cadence Design'},{sym:'MRVL',name:'Marvell Tech.'},
@@ -11935,6 +12018,74 @@ var FIXED_LISTS = {
     {sym:'MMM',name:'3M Company'},{sym:'DE',name:'Deere & Company'},{sym:'EMR',name:'Emerson Electric'},
     {sym:'LMT',name:'Lockheed Martin'},{sym:'NOC',name:'Northrop Grumman'},{sym:'GD',name:'General Dynamics'},
   ],
+  'EUROSTOXX50': DE_LIST_GROUPS['EuroStoxx 50'],
+  'FTSE100':     DE_LIST_GROUPS['FTSE 100 Top40'],
+  'STOXX_EU':    DE_LIST_GROUPS['STOXX EU Wachstum'],
+
+  // ── TOP50 BEAR-LISTEN: Vorfilterierte Short-Kandidaten ───────────────────────
+  // US: Momentum-Titel die anfällig für Trendbrüche sind (hoher EMA200-Abstand, AI/Tech Hype)
+  'BEAR_US': [
+    {sym:'NVDA',name:'NVIDIA Corp.'},{sym:'AMD',name:'AMD Inc.'},
+    {sym:'SMCI',name:'Super Micro'},{sym:'MSTR',name:'MicroStrategy'},
+    {sym:'COIN',name:'Coinbase'},{sym:'PLTR',name:'Palantir'},
+    {sym:'ARM',name:'Arm Holdings'},{sym:'TSLA',name:'Tesla Inc.'},
+    {sym:'MRVL',name:'Marvell Tech.'},{sym:'ALAB',name:'Astera Labs'},
+    {sym:'META',name:'Meta Platforms'},{sym:'NFLX',name:'Netflix'},
+    {sym:'CRWD',name:'CrowdStrike'},{sym:'SNOW',name:'Snowflake'},
+    {sym:'NET',name:'Cloudflare'},{sym:'DDOG',name:'Datadog'},
+    {sym:'MDB',name:'MongoDB'},{sym:'SHOP',name:'Shopify'},
+    {sym:'SQ',name:'Block Inc.'},{sym:'HOOD',name:'Robinhood'},
+    {sym:'RIVN',name:'Rivian'},{sym:'LCID',name:'Lucid Group'},
+    {sym:'NIO',name:'NIO Inc.'},{sym:'XPEV',name:'XPeng'},
+    {sym:'LI',name:'Li Auto'},{sym:'BIDU',name:'Baidu'},
+    {sym:'BABA',name:'Alibaba'},{sym:'PDD',name:'PDD Holdings'},
+    {sym:'ENPH',name:'Enphase Energy'},{sym:'FSLR',name:'First Solar'},
+    {sym:'PLUG',name:'Plug Power'},{sym:'BE',name:'Bloom Energy'},
+    {sym:'MRNA',name:'Moderna'},{sym:'BNTX',name:'BioNTech'},
+    {sym:'ILMN',name:'Illumina'},{sym:'BIIB',name:'Biogen'},
+    {sym:'ZM',name:'Zoom Video'},{sym:'DOCU',name:'DocuSign'},
+    {sym:'UBER',name:'Uber Tech.'},{sym:'LYFT',name:'Lyft Inc.'},
+    {sym:'ABNB',name:'Airbnb'},{sym:'DASH',name:'DoorDash'},
+    {sym:'RBLX',name:'Roblox'},{sym:'SNAP',name:'Snap Inc.'},
+    {sym:'PINS',name:'Pinterest'},{sym:'MTCH',name:'Match Group'},
+    {sym:'UPST',name:'Upstart'},{sym:'AFRM',name:'Affirm'},
+    {sym:'SOFI',name:'SoFi Tech.'},{sym:'GME',name:'GameStop'},
+  ],
+
+  // DE/EU: Zyklische + Hype-Titel anfällig für Sektor-Rotation
+  'BEAR_DE_EU': [
+    // Deutsche Zykliker & Turnaround-Risiken
+    {sym:'BAYN.DE',name:'Bayer AG'},{sym:'VOW3.DE',name:'Volkswagen'},
+    {sym:'BMW.DE',name:'BMW AG'},{sym:'MBG.DE',name:'Mercedes-Benz'},
+    {sym:'CON.DE',name:'Continental'},{sym:'DHER.DE',name:'Delivery Hero'},
+    {sym:'ZAL.DE',name:'Zalando'},{sym:'HFG.DE',name:'HelloFresh'},
+    {sym:'VNA.DE',name:'Vonovia'},{sym:'LEG.DE',name:'LEG Immobilien'},
+    {sym:'TAG.DE',name:'TAG Immobilien'},{sym:'1COV.DE',name:'Covestro'},
+    {sym:'EVT.DE',name:'Evotec SE'},{sym:'SRT.DE',name:'Sartorius'},
+    {sym:'NDX1.DE',name:'Nordex SE'},{sym:'AIXA.DE',name:'Aixtron'},
+    {sym:'WAF.DE',name:'Siltronic'},{sym:'IFX.DE',name:'Infineon'},
+    {sym:'ENPH',name:'Enphase (US)'},{sym:'ORSTED.CO',name:'Ørsted'},
+    // Europäische Zykliker
+    {sym:'STLAM.MI',name:'Stellantis'},{sym:'RNO.PA',name:'Renault'},
+    {sym:'VOD.L',name:'Vodafone'},{sym:'BT-A.L',name:'BT Group'},
+    {sym:'TEF.MC',name:'Telefonica'},{sym:'BAYN.DE',name:'Bayer AG'},
+    {sym:'UCB.BR',name:'UCB SA'},{sym:'GLPG.BR',name:'Galapagos'},
+    {sym:'PLUG',name:'Plug Power (US/EU-Listing)'},{sym:'BE',name:'Bloom Energy'},
+    // Schwacher Sektor: Immobilien EU
+    {sym:'VNA.DE',name:'Vonovia'},{sym:'ARND.DE',name:'Aroundtown'},
+    {sym:'LEG.DE',name:'LEG Immobilien'},{sym:'WDP.BR',name:'WDP BE'},
+    // China-Exposure EU
+    {sym:'MC.PA',name:'LVMH'},{sym:'KER.PA',name:'Kering'},
+    {sym:'BMW.DE',name:'BMW AG'},{sym:'VOW3.DE',name:'VW'},
+    // Energie-Risiko
+    {sym:'RWE.DE',name:'RWE AG'},{sym:'ENEL.MI',name:'Enel'},
+    {sym:'BP.L',name:'BP plc'},{sym:'SHEL.L',name:'Shell'},
+    {sym:'TTE.PA',name:'TotalEnergies'},{sym:'IBE.MC',name:'Iberdrola'},
+    // High-Debt / Zinsrisiko
+    {sym:'DTE.DE',name:'Deutsche Telekom'},{sym:'TEF.MC',name:'Telefonica'},
+    {sym:'EZJ.L',name:'easyJet'},{sym:'IAG.L',name:'IAG'},
+  ],
+
   'NDX100': [
     {sym:'AAPL',name:'Apple Inc.'},{sym:'MSFT',name:'Microsoft Corp.'},{sym:'NVDA',name:'NVIDIA Corp.'},
     {sym:'AMZN',name:'Amazon.com'},{sym:'META',name:'Meta Platforms'},{sym:'GOOGL',name:'Alphabet A'},
@@ -11960,7 +12111,7 @@ var FIXED_LISTS = {
     {sym:'MPWR',name:'Monolithic Power'},{sym:'ENPH',name:'Enphase Energy'},{sym:'FSLR',name:'First Solar'},
     {sym:'PCAR',name:'PACCAR Inc.'},{sym:'FAST',name:'Fastenal'},{sym:'CTAS',name:'Cintas Corp.'},
     {sym:'PAYX',name:'Paychex'},{sym:'VRSK',name:'Verisk Analytics'},{sym:'CPRT',name:'Copart Inc.'},
-    {sym:'ORLY',name:'O\'Reilly Auto'},{sym:'ROST',name:'Ross Stores'},{sym:'DLTR',name:'Dollar Tree'},
+    {sym:'ORLY',name:'OReilly Auto'},{sym:'ROST',name:'Ross Stores'},{sym:'DLTR',name:'Dollar Tree'},
     {sym:'KDP',name:'Keurig Dr Pepper'},{sym:'MDLZ',name:'Mondelez Int\'l'},{sym:'PDD',name:'PDD Holdings'},
     {sym:'TCOM',name:'Trip.com Group'},{sym:'JD',name:'JD.com'},{sym:'BIDU',name:'Baidu Inc.'},
     {sym:'DASH',name:'DoorDash Inc.'},{sym:'ALGN',name:'Align Technology'},{sym:'DXCM',name:'DexCom Inc.'},
@@ -12022,7 +12173,7 @@ var FIXED_LISTS = {
   ],
   'CONSUMER': [
     {sym:'AMZN',name:'Amazon.com'},{sym:'TSLA',name:'Tesla Inc.'},{sym:'HD',name:'Home Depot'},
-    {sym:'LOW',name:'Lowe\'s'},{sym:'MCD',name:'McDonald\'s'},{sym:'SBUX',name:'Starbucks'},
+    {sym:'LOW',name:'Lowes'},{sym:'MCD',name:'McDonalds'},{sym:'SBUX',name:'Starbucks'},
     {sym:'NKE',name:'Nike Inc.'},{sym:'TGT',name:'Target Corp.'},{sym:'BKNG',name:'Booking Holdings'},
     {sym:'ABNB',name:'Airbnb Inc.'},{sym:'UBER',name:'Uber Tech.'},{sym:'LYFT',name:'Lyft Inc.'},
     {sym:'DASH',name:'DoorDash'},{sym:'EBAY',name:'eBay Inc.'},{sym:'ETSY',name:'Etsy Inc.'},
@@ -17608,7 +17759,7 @@ async function runMorningBriefing() {
         var r = await fetch(corsProxy + '/?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-ant-key': antKey },
-          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1200,
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000,
             messages: [{ role: 'user', content: prompt }] }),
         });
         var j = await r.json();
@@ -18130,12 +18281,42 @@ function renderSwingModal(candidates) {
 // 4 Short-Gates: Markov Bear-Regime · EMA200-Überdehnung · RSI-Divergenz · BB-Breakdown
 // Zusatz: Short-Squeeze-Risiko als Warnflag
 
-function showBearScanner() {
+function showBearScanner(forceList) {
   var candidates = [];
 
-  Object.keys(tickerData).forEach(function(sym) {
-    var raw = tickerData[sym];
-    if (!raw || raw.error) return;
+  // Quelle: aktuelle Scan-Liste oder Bear-spezifische Liste
+  var preset   = document.getElementById('preset-select');
+  var curVal   = forceList || (preset ? preset.value : 'default');
+  var isDE     = window._currentMarket === 'de';
+
+  // Bestimme Kandidaten-Pool
+  var pool = {};  // sym → true
+
+  // Wenn Bear-Liste explizit gewählt oder als Default → alle aus tickerData
+  var bearList = null;
+  if (curVal === 'fixed:BEAR_US')    bearList = getFixedListTickers('BEAR_US');
+  else if (curVal === 'fixed:BEAR_DE_EU') bearList = getFixedListTickers('BEAR_DE_EU');
+  else if (curVal === 'fixed:EUROSTOXX50') bearList = getFixedListTickers('EUROSTOXX50');
+  else if (curVal === 'fixed:FTSE100')  bearList = getFixedListTickers('FTSE100');
+  else if (curVal === 'fixed:STOXX_EU') bearList = getFixedListTickers('STOXX_EU');
+
+  // Pool aufbauen
+  var symsToScan;
+  if (bearList && bearList.length > 0) {
+    symsToScan = bearList.map(function(t){ return t.sym; });
+  } else if (Object.keys(tickerData).length > 0) {
+    symsToScan = Object.keys(tickerData);
+  } else {
+    // Fallback: Bear-Listen direkt verwenden
+    symsToScan = isDE
+      ? getFixedListTickers('BEAR_DE_EU').map(function(t){ return t.sym; })
+      : getFixedListTickers('BEAR_US').map(function(t){ return t.sym; });
+  }
+
+  symsToScan.forEach(function(sym) {
+    // KV-Daten als Fallback falls tickerData leer
+    var raw = tickerData[sym] || (_kvMasterData && _kvMasterData.bySymbol[sym]);
+      if (!raw || raw.error) return;
 
     var price    = raw.price || 0;
     var ema200   = raw.ma200 || null;
@@ -18215,10 +18396,18 @@ function showBearScanner() {
   });
 
   candidates.sort(function(a,b){ return b.score - a.score; });
-  renderBearScannerModal(candidates);
+
+  // Determine list label
+  var listLabel = bearList
+    ? (curVal.includes('DE_EU') ? '🔴 Bear DE/EU' : curVal.includes('EUROSTOXX') ? '🇪🇺 EuroStoxx' : curVal.includes('FTSE') ? '🇬🇧 FTSE 100' : curVal.includes('STOXX') ? '🌍 STOXX EU' : '🔴 Bear US')
+    : (isDE ? '🇩🇪 DE Scan' : '🇺🇸 US Scan');
+
+  renderBearScannerModal(candidates, listLabel, symsToScan.length);
 }
 
-function renderBearScannerModal(candidates) {
+function renderBearScannerModal(candidates, listLabel, totalScanned) {
+  listLabel = listLabel || 'Aktueller Scan';
+  totalScanned = totalScanned || candidates.length;
   var existing = document.getElementById('bear-modal');
   if (existing) existing.remove();
 
@@ -18246,6 +18435,26 @@ function renderBearScannerModal(candidates) {
   inner.appendChild(header);
 
   // Info-Box (Gemini-Blueprint Logik)
+  // Quick-Selector für Bear-Listen
+  var listSel = document.createElement('div');
+  listSel.style.cssText = 'padding:.5rem 1.25rem;background:rgba(239,68,68,0.04);border-bottom:1px solid rgba(239,68,68,0.12);display:flex;gap:6px;flex-wrap:wrap';
+  [
+    ['🔴 Bear US (Top50)',  'fixed:BEAR_US'],
+    ['🔴 Bear DE/EU',       'fixed:BEAR_DE_EU'],
+    ['🇪🇺 EuroStoxx 50',   'fixed:EUROSTOXX50'],
+    ['🇬🇧 FTSE 100',        'fixed:FTSE100'],
+    ['🌍 STOXX EU',         'fixed:STOXX_EU'],
+    ['🇺🇸 S&P 500',         'fixed:SP500'],
+    ['📊 DAX 40',           'fixed:DAX40'],
+  ].forEach(function(item) {
+    var btn = document.createElement('button');
+    btn.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:6px;border:0.5px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);color:var(--red);cursor:pointer';
+    btn.textContent = item[0];
+    btn.onclick = function() { modal.remove(); document.body.style.overflow=''; showBearScanner(item[1]); };
+    listSel.appendChild(btn);
+  });
+  inner.appendChild(listSel);
+
   var info = document.createElement('div');
   info.style.cssText = 'padding:.6rem 1.25rem;background:rgba(239,68,68,0.06);border-bottom:1px solid rgba(239,68,68,0.15);font-size:11px;color:var(--text3);line-height:1.6';
   info.innerHTML =
