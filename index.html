@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v180">
+<meta name="app-version" content="20260622-v184">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a0a">
-<title>KO-Scanner</title>
+<title>UnderlyingIQ</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d0f12'/><text y='72' x='10' font-size='75' font-family='sans-serif'>📡</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -238,8 +238,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <!-- PIN SCREEN -->
 <div id="pin-screen" style="display:flex">
   <div class="pin-logo"><i class="ti ti-chart-candle"></i></div>
-  <div class="pin-title">KO-Scanner</div>
-  <div class="pin-sub">Hebelprodukt-Analyse · Axel Hildebrand</div>
+  <div class="pin-title">UnderlyingIQ</div>
+  <div class="pin-sub">Market Intelligence · Axel Hildebrand</div>
   <div class="pin-dots" id="pin-dots">
     <div class="pin-dot" id="pd0"></div>
     <div class="pin-dot" id="pd1"></div>
@@ -268,7 +268,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="topbar">
     <div class="topbar-title">
       <span class="topbar-dot"></span>
-      KO-Scanner
+      UnderlyingIQ
     </div>
     <div class="topbar-time" id="topbar-time"></div>
   </div>
@@ -1120,6 +1120,19 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           </div>
           <div style="font-size:10px;color:var(--text3);margin-top:.4rem">
             Erfordert aktive EIC-Verifizierung · Nur für persönliche Nutzung · Kein kommerzieller Betrieb
+          </div>
+
+          <!-- EIC Vorschlagsliste -->
+          <div id="eic-suggest-wrap" style="display:none;margin-top:.75rem;border-top:1px solid var(--border);padding-top:.75rem">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+              <div style="font-size:11px;font-weight:600;color:#8b5cf6">📋 Regime-Vorschlagsliste</div>
+              <button class="btn btn-sm" onclick="loadEicSuggestions()" style="font-size:10px;border-color:#8b5cf6;color:#8b5cf6">
+                <i class="ti ti-refresh"></i> Laden
+              </button>
+            </div>
+            <div id="eic-suggest-content" style="font-size:11px;color:var(--text3)">
+              Klick "Laden" für Kandidaten passend zum aktuellen Regime.
+            </div>
           </div>
         </div>
 
@@ -2252,7 +2265,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
       <div>
-        <div style="font-size:15px;font-weight:700;color:var(--text)">🚀 KO-Scanner Workflow</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text)">🚀 UnderlyingIQ Workflow</div>
         <div style="font-size:11px;color:var(--text3)">Optimaler Tagesablauf für maximale Analyse-Qualität</div>
       </div>
       <button onclick="closeWorkflowModal()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:4px"><i class="ti ti-x"></i></button>
@@ -2527,7 +2540,7 @@ window.pinSubmit = function(){
 /**
  * KO-WL — Watchlist Modul v1.0
  * ════════════════════════════════════════════════════════════════
- * Portables, framework-freies Watchlist-Modul für KO-Scanner
+ * Portables, framework-freies Watchlist-Modul für UnderlyingIQ
  * und zukünftige Projekte.
  *
  * Verwendung:
@@ -7106,7 +7119,7 @@ function requestMakroUpdate(){
   const eth = document.getElementById('m-eth')?.textContent||'—';
   const gold = document.getElementById('m-gold')?.textContent||'—';
 
-  const prompt = 'MAKRO_UPDATE_REQUEST '+today+': Bitte erstelle eine aktuelle Makro-Tageseinschätzung für den KO-Scanner als JSON.\n\n'+
+  const prompt = 'MAKRO_UPDATE_REQUEST '+today+': Bitte erstelle eine aktuelle Makro-Tageseinschätzung für UnderlyingIQ als JSON.\n\n'+
     'Aktuelle Live-Daten (gerade abgerufen):\n'+
     '- S&P 500: '+sp+'\n'+
     '- Nasdaq: '+nq+'\n'+
@@ -8681,7 +8694,7 @@ function exportAllData(){
     portfolio: JSON.parse(localStorage.getItem('ko_portfolio')||'{}'),
     // Note: API keys not exported for security
   };
-  downloadJSON(data, 'KO-Scanner-Backup-'+today+'.json');
+  downloadJSON(data, 'UnderlyingIQ-Backup-'+today+'.json');
   showBackupMsg('✓ Export erfolgreich — Datei gespeichert', 'var(--green)');
 }
 
@@ -9249,6 +9262,40 @@ getTickers = function(){
 const _origRenderCard = renderCard;
 renderCard = function(t, state){
   _origRenderCard(t, state);
+
+  // ── REGIME-BADGE auf Scanner-Karten (Market Weather → Karten) ──
+  // Zeigt ob aktuelle Strategie im MSE-Regime aktiv/gesperrt ist
+  if (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime && state && !state.error) {
+    var cardEl = document.getElementById('card-' + t.sym);
+    if (cardEl && !cardEl.querySelector('.regime-badge')) {
+      var regime = KoMarketState._lastRegime;
+      var gates  = KoMarketState.getStrategyGates(regime);
+      var score  = state.compositeScore || state.score || 0;
+
+      // Strategie ableiten aus Score/Signalen
+      var strat = score >= 65 ? 'momentum' : score >= 50 ? 'csp_wheel' : 'meanrev';
+      if (state.rsi != null && state.rsi < 32) strat = 'meanrev';
+
+      var stratInfo = gates.strategies[strat];
+      if (stratInfo) {
+        var active = stratInfo.active;
+        var badge  = document.createElement('div');
+        badge.className = 'regime-badge';
+        badge.title     = stratInfo.note + ' · Regime: ' + regime;
+        badge.style.cssText = 'font-size:9px;padding:2px 6px;border-radius:4px;margin:3px 0 0;display:inline-flex;align-items:center;gap:3px;'
+          + (active
+            ? 'background:rgba(34,197,94,0.1);color:var(--green);border:0.5px solid rgba(34,197,94,0.3)'
+            : 'background:rgba(239,68,68,0.1);color:var(--red);border:0.5px solid rgba(239,68,68,0.3)');
+        badge.innerHTML = (active ? '✓ ' : '✗ ') + gates.label.replace(/^[^ ]+ /, '');
+
+        // Einfügen unterhalb Ticker-Head
+        var head = cardEl.querySelector('.ticker-head');
+        if (head && head.nextSibling) head.parentNode.insertBefore(badge, head.nextSibling);
+        else cardEl.appendChild(badge);
+      }
+    }
+  }
+
   // Async fetch earnings after card renders
   if(window.currentMarket !== 'de' && getFinnhubKey()){
     fetchEarningsDate(t.sym).then(function(e){
@@ -11319,10 +11366,10 @@ function leWLShare(){
     base += ',"'+(r.sector||'')+'","'+(r.note||'')+'"';
     return base;
   });
-  var csv = '# KO-Scanner Watchlist: '+name+'\n# Exportiert: '+new Date().toLocaleDateString('de-DE')+'\n# Version: 1.0\n'
+  var csv = '# UnderlyingIQ Watchlist: '+name+'\n# Exportiert: '+new Date().toLocaleDateString('de-DE')+'\n# Version: 1.0\n'
             + header + '\n' + rows.join('\n');
   var today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\./g,'-');
-  var fname = 'KO-Scanner-WL-'+name.replace(/[^a-zA-Z0-9]/g,'_')+'-'+today+'.csv';
+  var fname = 'UnderlyingIQ-WL-'+name.replace(/[^a-zA-Z0-9]/g,'_')+'-'+today+'.csv';
 
   // Show share dialog
   var menu = document.getElementById('le-share-menu');
@@ -11342,8 +11389,8 @@ function leShareDownload(){
 
 function leShareMail(){
   var d = window._leShareData; if(!d) return;
-  var subject = encodeURIComponent('KO-Scanner Watchlist: '+d.name);
-  var body = encodeURIComponent('Hallo,\n\nanbei meine KO-Scanner Watchlist "'+d.name+'":\n\n'+d.csv+'\n\nViele Grüße');
+  var subject = encodeURIComponent('UnderlyingIQ Watchlist: '+d.name);
+  var body = encodeURIComponent('Hallo,\n\nanbei meine UnderlyingIQ Watchlist "'+d.name+'":\n\n'+d.csv+'\n\nViele Grüße');
   window.open('mailto:?subject='+subject+'&body='+body);
   document.getElementById('le-share-menu').style.display='none';
 }
@@ -11354,13 +11401,13 @@ function leShareSystem(){
   var file = new File([blob], d.fname, {type:'text/csv'});
   if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
     navigator.share({
-      title: 'KO-Scanner Watchlist: '+d.name,
-      text: 'Watchlist aus dem KO-Scanner',
+      title: 'UnderlyingIQ Watchlist: '+d.name,
+      text: 'Watchlist aus UnderlyingIQ',
       files: [file]
     }).then(function(){ leShowStatus('✓ Geteilt!', 'var(--green)'); })
       .catch(function(e){ if(e.name!=='AbortError') leShareCopyFallback(d); });
   } else if(navigator.share){
-    navigator.share({title:'KO-Scanner Watchlist: '+d.name, text:d.csv})
+    navigator.share({title:'UnderlyingIQ Watchlist: '+d.name, text:d.csv})
       .catch(function(e){ if(e.name!=='AbortError') leShareCopyFallback(d); });
   } else {
     leShareCopyFallback(d);
@@ -11473,7 +11520,7 @@ function exportListCSV(){
   });
   var csv = header + '\n' + rows.join('\n');
   var today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\./g,'-');
-  var fname = 'KO-Scanner-' + _listEditorMode.toUpperCase() + '-' + today + '.csv';
+  var fname = 'UnderlyingIQ-' + _listEditorMode.toUpperCase() + '-' + today + '.csv';
   downloadTextFile(csv, fname, 'text/csv;charset=utf-8');
   leShowStatus('✓ CSV exportiert: ' + fname, 'var(--green)');
 }
@@ -16349,7 +16396,7 @@ function exportBacklogData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'ko-scanner-backlog-' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = 'underlyingiq-backlog-' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
   URL.revokeObjectURL(url);
   showKoToast('💾 Backlog exportiert');
@@ -17132,6 +17179,8 @@ function toggleExpertMode(checked) {
       statusEl.style.borderLeft = '3px solid #8b5cf6';
     }
     showToast('🔬 Expert-Modus aktiviert — explizite Empfehlungen freigeschaltet');
+    var sw = document.getElementById('eic-suggest-wrap');
+    if (sw) sw.style.display = 'block';
   } else {
     if (slider) slider.style.background = 'var(--bg2)';
     if (slider) slider.style.borderColor = 'var(--border2)';
@@ -17142,6 +17191,8 @@ function toggleExpertMode(checked) {
       statusEl.style.borderLeft = '';
     }
     showToast('Public-Modus aktiv — BaFin-konforme Ausgaben');
+    var sw2 = document.getElementById('eic-suggest-wrap');
+    if (sw2) sw2.style.display = 'none';
   }
 }
 
@@ -17159,6 +17210,103 @@ function onEicLock() {
     document.getElementById('expert-mode-toggle').checked = false;
     toggleExpertMode(false);
     showToast('Expert-Modus deaktiviert — EIC gesperrt');
+  }
+}
+
+// ── EIC VORSCHLAGSLISTE ──────────────────────────────────────────────────────
+async function loadEicSuggestions() {
+  var el = document.getElementById('eic-suggest-content');
+  if (!el) return;
+  if (!_eicUnlocked || !_expertModeActive) {
+    el.innerHTML = '<span style="color:var(--red)">⛔ Expert-Modus erforderlich</span>';
+    return;
+  }
+
+  el.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Lade Kandidaten…';
+
+  var regime  = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : null;
+  var gates   = regime && typeof KoMarketState !== 'undefined' ? KoMarketState.getStrategyGates(regime) : null;
+
+  // Strategie-Prioritäten aus aktuellem Regime
+  var activeStrats = gates ? Object.entries(gates.strategies)
+    .filter(function(e){ return e[1].active; })
+    .sort(function(a,b){ return a[1].priority - b[1].priority; })
+    .map(function(e){ return e[0]; }) : ['momentum','csp_wheel'];
+
+  var stratLabel = {
+    momentum: 'Momentum/SEPA', swing: 'Swing', csp_wheel: 'CSP/Wheel',
+    meanrev: 'Mean Reversion', breakout: 'Breakout'
+  };
+
+  // Kandidaten aus tickerData + KV filtern
+  var candidates = [];
+  var srcData = _kvMasterData ? Object.values(_kvMasterData.bySymbol) : Object.values(tickerData);
+
+  srcData.forEach(function(t) {
+    if (!t || !t.sym || !t.score && !t.compositeScore) return;
+    var score = t.score || t.compositeScore || 0;
+    var grade = t.grade || t.scoreLabel || '';
+    var rsi   = t.rsi || null;
+    var atr   = t.atr || null;
+    var regime_t = t.regime || '';
+
+    // Regime-spezifische Filter
+    var ok = false;
+    if (activeStrats.includes('momentum') && score >= 65 && ['BULL','SIDEWAYS'].some(function(r){ return regime_t.includes(r); })) ok = true;
+    if (activeStrats.includes('csp_wheel') && score >= 55 && rsi && rsi > 45 && rsi < 70) ok = true;
+    if (activeStrats.includes('meanrev') && rsi && rsi < 32) ok = true;
+    if (activeStrats.includes('breakout') && score >= 70) ok = true;
+    if (activeStrats.includes('swing') && score >= 58 && rsi && rsi < 60) ok = true;
+
+    if (ok) candidates.push({ sym: t.sym, score: score, grade: grade, rsi: rsi, atr: atr, regime: regime_t });
+  });
+
+  // Top 15 nach Score
+  candidates.sort(function(a,b){ return b.score - a.score; });
+  candidates = candidates.slice(0, 15);
+
+  if (!candidates.length) {
+    el.innerHTML = '<span style="color:var(--text3)">Keine Kandidaten — erst Scan durchführen oder KV laden.</span>';
+    return;
+  }
+
+  var regimeHtml = regime && gates
+    ? '<div style="font-size:10px;background:rgba(139,92,246,0.1);border-left:2px solid #8b5cf6;padding:4px 8px;border-radius:4px;margin-bottom:.5rem">'
+      + '<b style="color:#8b5cf6">' + gates.label + '</b> · Aktiv: '
+      + activeStrats.map(function(s){ return stratLabel[s]||s; }).join(', ')
+      + '</div>'
+    : '';
+
+  var rows = candidates.map(function(c) {
+    var col = c.score >= 75 ? 'var(--green)' : c.score >= 55 ? 'var(--accent)' : 'var(--amber)';
+    var rsiTxt = c.rsi ? ' · RSI ' + Math.round(c.rsi) : '';
+    return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid var(--border)">'
+      + '<span style="font-family:var(--mono);font-weight:600;font-size:11px;min-width:52px">' + c.sym + '</span>'
+      + '<span style="font-size:10px;font-weight:700;color:' + col + '">' + c.grade + ' ' + Math.round(c.score) + '</span>'
+      + '<span style="font-size:10px;color:var(--text3)">' + rsiTxt + '</span>'
+      + '<button onclick="eicAddSym(\'' + c.sym + '\')" style="margin-left:auto;font-size:9px;padding:1px 5px;background:rgba(139,92,246,0.15);border:0.5px solid #8b5cf6;color:#8b5cf6;border-radius:4px;cursor:pointer">+ WL</button>'
+      + '</div>';
+  }).join('');
+
+  el.innerHTML = regimeHtml
+    + '<div style="max-height:220px;overflow-y:auto">' + rows + '</div>'
+    + '<div style="font-size:9px;color:var(--text3);margin-top:.4rem">'
+    + candidates.length + ' Kandidaten · ' + (regime || 'Kein Regime') + ' · Kein Anlageberatung gem. §1 WpHG</div>';
+}
+
+function eicAddSym(sym) {
+  // Fügt Symbol zur aktiven Watchlist-Textarea hinzu falls Editor offen
+  var ta = document.getElementById('eic-textarea');
+  if (ta && ta.style.display !== 'none') {
+    var lines = ta.value.trim().split('\n').filter(Boolean);
+    if (!lines.some(function(l){ return l.startsWith(sym); })) {
+      ta.value += (ta.value.trim() ? '\n' : '') + sym;
+      showToast('✓ ' + sym + ' hinzugefügt');
+    } else {
+      showToast(sym + ' bereits in Liste');
+    }
+  } else {
+    showToast('ℹ️ EIC-Editor öffnen um ' + sym + ' hinzuzufügen');
   }
 }
 
