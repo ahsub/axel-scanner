@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v177">
+<meta name="app-version" content="20260622-v179">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -4150,12 +4150,38 @@ function unlockApp(){
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
   window._appUnlocked = true;
-  // Market Regime Cockpit + MSE beim Start befüllen
-  setTimeout(updateRegimeCockpit, 1500);
   // Expert-Modus Status wiederherstellen
   setTimeout(initExpertMode, 500);
-  // MSE wird nur via Morning Briefing Button geladen — kein Autostart
-  // (verhindert Warte-Cursor beim App-Start)
+  // Market Regime Cockpit befüllen
+  setTimeout(updateRegimeCockpit, 1500);
+
+  // MSE v2.0: Badge sofort aus wiederhergestelltem Regime befüllen
+  setTimeout(function() {
+    if (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) {
+      var gates  = KoMarketState.getStrategyGates(KoMarketState._lastRegime);
+      var badge  = document.getElementById('mse-badge');
+      var action = document.getElementById('rc-action');
+      var gates2 = document.getElementById('mse-gates');
+      if (badge) {
+        badge.textContent      = gates.label;
+        badge.style.color      = gates.color;
+        badge.style.borderLeft = '3px solid ' + gates.color;
+        badge.title            = 'Letztes Regime (' + (KoMarketState._lastUpdate ? new Date(KoMarketState._lastUpdate).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '?') + ') — Morning Briefing aktualisiert';
+      }
+      if (action) { action.textContent = gates.action; action.style.color = gates.color; }
+      if (gates2) {
+        var sL = { momentum:'📈 Momentum', swing:'🔄 Swing', csp_wheel:'⚙️ CSP/Wheel', meanrev:'↩️ Mean Rev.', breakout:'🚀 Breakout' };
+        gates2.innerHTML = Object.entries(gates.strategies).map(function(e) {
+          var k = e[0], s = e[1];
+          var col = s.active ? 'var(--green)' : 'var(--red)';
+          var bg  = s.active ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+          return '<div title="' + s.note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;background:' + bg + ';color:' + col + '">' + (s.active ? '✓' : '✗') + ' ' + sL[k] + '</div>';
+        }).join('');
+      }
+      window._currentRegime = KoMarketState._lastRegime;
+    }
+  }, 200);
+  // MSE wird nur via Morning Briefing Button neu geladen — kein API-Autostart
 
   // Cursor global auf default erzwingen (alle Elemente)
   var styleTag = document.getElementById('_cursor_fix');
@@ -4749,10 +4775,11 @@ async function loadKVMasterData(force) {
   _kvLoading = true;
   try {
     var koSync   = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
-    var url      = koSync + '/get?key=master_market_data';
+    var url      = koSync + '/sync/master_market_data';
     var r        = await fetch(url, { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    var data     = await r.json();
+    var resp     = await r.json();
+    var data     = resp.data || resp;   // Worker gibt {key, data, updated_at} zurück
     if (!data?.tickers?.length) throw new Error('Keine Ticker in KV');
 
     // In Map umwandeln für O(1) Zugriff
@@ -13421,10 +13448,11 @@ async function loadSektorRS() {
   // ── Zuerst: KV-Cache (Aggregator-Daten) prüfen ─────────────────
   try {
     var kvUrl  = (typeof KoConfig !== 'undefined' ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev')
-               + '/get?key=master_market_data';
+               + '/sync/master_market_data';
     var kvResp = await fetch(kvUrl, { cache: 'no-store' });
     if (kvResp.ok) {
-      var kvData = await kvResp.json();
+      var kvResp2 = await kvResp.json();
+      var kvData   = kvResp2.data || kvResp2;   // Worker gibt {key, data, updated_at}
       var sectorRS = kvData?.sectorRS;
       if (sectorRS && Object.keys(sectorRS).length >= 5) {
         // Aus KV-Daten rendern
@@ -17334,7 +17362,10 @@ async function runMorningBriefing() {
       messwerteLines.push('DATUM: ' + new Date().toLocaleDateString('de-DE'));
       messwerteLines.push('');
       messwerteLines.push('--- MARKT-REGIME ---');
-      messwerteLines.push('MSE Regime: ' + mseRegime + (mseRegime !== '—' ? ' (Market State Engine)' : ' (noch nicht berechnet)'));
+      messwerteLines.push('MSE Regime: ' + mseRegime + (mseRegime !== '—' ? ' (Market State Engine v2.0)' : ' (noch nicht berechnet)'));
+      if (typeof KoMarketState !== 'undefined' && KoMarketState._historySource) {
+        messwerteLines.push('MSE History: ' + KoMarketState._historySource + ' (' + (KoMarketState._history.vvix || []).length + ' VVIX-Punkte, ' + (KoMarketState._history.skew || []).length + ' SKEW-Punkte)');
+      }
       messwerteLines.push('QQQ Markov: ' + regime);
       messwerteLines.push('VIX: ' + (results.vix || '—') + ' · Zone ' + vixZone + ' von 6');
       messwerteLines.push('VIX Term Structure: ' + termStruct);
