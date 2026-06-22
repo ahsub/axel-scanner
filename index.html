@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v188">
+<meta name="app-version" content="20260622-v191">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -5522,6 +5522,8 @@ function sortAndRenderCards(tickers){
         '<i class="ti ti-arrow-back-up"></i> Mean Reversion</button>'+
       '<button onclick="showSwingFilter()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:rgba(6,182,212,0.12);border-color:#06b6d4;color:#06b6d4">'+
         '<i class="ti ti-wave-sine"></i> Swing-Trading</button>'+
+      '<button onclick="showBearScanner()" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:rgba(239,68,68,0.12);border-color:var(--red);color:var(--red)">'+
+        '<i class="ti ti-trending-down"></i> Bear-Scanner</button>'+
       '<span id="iv-status-badge" style="display:none;font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(52,194,110,0.12);color:var(--green);border:0.5px solid var(--green);align-self:center">'+
         '<i class="ti ti-check"></i> <span id="iv-status-count">0</span> IV geladen</span>'+
       '<button onclick="toggleKiDropdown(this)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.15));border-color:#818cf8;color:#818cf8"><i class=\"ti ti-brain\"></i> KI ▾</button>'+
@@ -17395,7 +17397,12 @@ function getMorningBriefingPrompt(messwerteLines, mseRegime, regime, vixZone, re
 
   if (_expertModeActive && _eicUnlocked) {
     return getKiSystemPrompt() + '\n\n'
-      + 'AUFGABE: Morning Briefing für heute (5-6 Sätze, direkt und konkret).\n\n'
+      + 'AUFGABE: Morning Briefing Tearsheet für heute. Strukturiere deine Antwort in diese Abschnitte (jeweils 2-4 Sätze):\n'
+      + '1. MARKT-REGIME: Charakter des aktuellen Regimes und was es für den Handelstag bedeutet.\n'
+      + '2. VOLATILITÄT & FLOW: VVIX/SKEW/DIX/GEX Interpretation — wo steht das Smart Money?\n'
+      + '3. MAKRO-RISIKEN: Treasury Stress, Intermarket, Breadth — systemische Risiken?\n'
+      + '4. SEKTOR-ROTATION: Welche Sektoren zeigen relative Stärke, welche Schwäche?\n'
+      + '5. STRATEGIE-EMPFEHLUNG: Welche konkreten Strategien sind heute bevorzugt (Strikes, DTE, Richtung)?\n\n'
       + basis + '\n\n'
       + 'STRUKTUR:\n'
       + '1. REGIME-EINSCHÄTZUNG: Welches Markt-Regime liegt vor und was bedeutet das konkret?\n'
@@ -17407,16 +17414,17 @@ function getMorningBriefingPrompt(messwerteLines, mseRegime, regime, vixZone, re
       + '\nNur Messwerte verwenden. Fehlende Werte als "n/v" kennzeichnen. Direkt und konkret.';
   } else {
     return getKiSystemPrompt() + '\n\n'
-      + 'AUFGABE: Morning Briefing (4-5 deskriptive Sätze, BaFin-konform).\n\n'
+      + 'AUFGABE: Morning Briefing Tearsheet — vollständige Marktbeurteilung für den heutigen Handelstag.\n'
+      + 'Strukturiere die Analyse in 5 Abschnitte (jeweils 2-4 Sätze, deskriptiv, BaFin-konform gem. §1 WpHG):\n\n'
       + basis + '\n\n'
-      + 'STRUKTUR (je 1 Satz):\n'
-      + '1. MARKTREGIME: Was zeigt die Kombination aus MSE-Regime, VIX und Term-Structure?\n'
-      + '2. FLOW & SENTIMENT: Was signalisieren DIX, GEX, SKEW und Flow-Score?\n'
-      + '3. MAKRO-KONTEXT: Was zeigen Treasury-Stress, Intermarket und Breadth?\n'
-      + '4. STRATEGIE-FOKUS: Welche Strategien sind laut Datenlage angezeigt?\n'
-      + '5. RISIKO-HINWEIS: Welcher Messwert verdient heute besondere Aufmerksamkeit?\n'
-      + '\nNur vorhandene Messwerte. Fehlende Werte explizit benennen.';
-  }
+      + 'ABSCHNITTE:\n'
+      + '1. MARKT-REGIME: Charakter und Bedeutung des aktuellen Regimes. Was sagt die Kombination aus MSE-Regime, VIX-Niveau und VIX-Term-Structure über den Marktzustand?\n'
+      + '2. VOLATILITÄT & INSTITUTIONELLER FLOW: VVIX-Z-Score, SKEW-Perzentil, DIX-Z, GEX-Z und Dark-Pool-Flow-Score interpretieren. Wo positioniert sich das institutionelle Smart Money?\n'
+      + '3. MAKRO-RISIKEN: Treasury Stress Index, Intermarket-Signale und NDX Marktbreite einordnen. Systemische Risiken oder Entwarnung?\n'
+      + '4. SEKTOR-ROTATION: Relative Stärke vs. SPY nach Sektoren. Welche Sektoren führen, welche hinken nach? Rotation sichtbar?\n'
+      + '5. HANDLUNGSRAHMEN: Welche Strategie-Typen passen zum heutigen Marktumfeld laut Datenlage? (Deskriptiv — keine konkreten Empfehlungen gem. §1 WpHG)\n'
+      + '\nNur die gegebenen Messwerte verwenden. Fehlende Werte (\'—\') als \'nicht verfügbar\' benennen. Kein Markdown, kein \'Ich\'.';
+}
 }
 
 // ── ONE-BUTTON MORNING BRIEFING ───────────────────────────────────────────────
@@ -17600,7 +17608,7 @@ async function runMorningBriefing() {
         var r = await fetch(corsProxy + '/?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-ant-key': antKey },
-          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 300,
+          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1200,
             messages: [{ role: 'user', content: prompt }] }),
         });
         var j = await r.json();
@@ -17717,8 +17725,8 @@ function showMorningTearsheet(results) {
       '<td style="padding:3px 8px;font-weight:600;font-size:11px;color:' + (color||'#e8eaf0') + '">' + value + '</td></tr>';
   }
 
-  var html = '<div id="tearsheet-modal" style="position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.88);backdrop-filter:blur(6px);overflow-y:auto;padding:1rem;display:flex;align-items:flex-start;justify-content:center">' +
-    '<div id="tearsheet-body" style="width:min(680px,100%);background:#0d0f12;border-radius:16px;border:1px solid #2a2f42;overflow:hidden;margin:auto">' +
+  var html = '<div id="tearsheet-modal" style="position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.88);backdrop-filter:blur(6px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1rem 1rem 3rem">' +
+    '<div id="tearsheet-body" style="width:min(680px,100%);background:#0d0f12;border-radius:16px;border:1px solid #2a2f42;overflow:visible;margin:0 auto">' +
 
     // Header
     '<div style="background:linear-gradient(135deg,#1a1f35,#0f1628);padding:1.25rem 1.5rem;border-bottom:1px solid #2a2f42;display:flex;align-items:center;justify-content:space-between">' +
@@ -17804,28 +17812,25 @@ function showMorningTearsheet(results) {
 }
 
 function printTearsheet() {
-  // Print-optimierter CSS + window.print()
   var body = document.getElementById('tearsheet-body');
   if (!body) return;
-  var w = window.open('', '_blank', 'width=800,height=900');
-  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>UnderlyingIQ Morning Briefing</title>' +
-    '<style>body{font-family:-apple-system,sans-serif;background:#fff;color:#111;margin:0;padding:0}' +
-    '*{box-sizing:border-box} @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}' +
-    '.tearsheet{max-width:700px;margin:0 auto;padding:20px}' +
-    'h1{font-size:18px;margin:0 0 4px} .sub{font-size:11px;color:#666;margin-bottom:16px}' +
-    '.section{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e5e7eb}' +
-    '.sec-title{font-size:9px;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:6px;font-weight:600}' +
-    'table{width:100%;border-collapse:collapse;font-size:11px}' +
-    'td{padding:2px 6px} td:first-child{color:#6b7280;width:45%}' +
-    '.ki{font-size:12px;line-height:1.7;color:#374151;white-space:pre-wrap}' +
-    '.footer{font-size:9px;color:#9ca3af;margin-top:16px;padding-top:10px;border-top:1px solid #e5e7eb}' +
-    '.badge{display:inline-block;font-size:10px;padding:1px 7px;border-radius:10px;margin:2px;border:0.5px solid #d1d5db}' +
-    '</style></head><body><div class="tearsheet">');
-  w.document.write(body.innerHTML);
-  w.document.write('</div></body></html>');
-  w.document.close();
-  w.focus();
-  setTimeout(function(){ w.print(); }, 500);
+  var css = 'body{font-family:-apple-system,sans-serif;background:#fff;color:#111;margin:0;padding:20px}'
+    + '*{box-sizing:border-box}'
+    + '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+    + 'table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px}'
+    + 'td{padding:3px 6px}td:first-child{color:#6b7280;width:45%}'
+    + 'button{display:none!important}';
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    + '<title>UnderlyingIQ Morning Briefing</title>'
+    + '<st' + 'yle>' + css + '</st' + 'yle>'
+    + '</head><body>' + body.outerHTML + '</body></html>';
+  var blob = new Blob([html], {type: 'text/html'});
+  var url  = URL.createObjectURL(blob);
+  var w    = window.open(url, '_blank', 'width=820,height=950');
+  setTimeout(function() {
+    if (w) { w.focus(); w.print(); }
+    URL.revokeObjectURL(url);
+  }, 600);
 }
 
 function saveTearsheetJSON() {
@@ -18112,6 +18117,238 @@ function renderSwingModal(candidates) {
   footerBtn.innerHTML = '<i class="ti ti-x"></i> Schliessen';
   footerBtn.onclick = closeSW;
   footer.appendChild(footerBtn);
+  inner.appendChild(footer);
+
+  modal.appendChild(inner);
+  document.body.appendChild(modal);
+  document.body.style.overflow = 'hidden';
+}
+
+
+// ── BEAR SCANNER ──────────────────────────────────────────────────────────────
+// Symmetrischer Gegenpart zu Long-Strategien (Gemini-Blueprint)
+// 4 Short-Gates: Markov Bear-Regime · EMA200-Überdehnung · RSI-Divergenz · BB-Breakdown
+// Zusatz: Short-Squeeze-Risiko als Warnflag
+
+function showBearScanner() {
+  var candidates = [];
+
+  Object.keys(tickerData).forEach(function(sym) {
+    var raw = tickerData[sym];
+    if (!raw || raw.error) return;
+
+    var price    = raw.price || 0;
+    var ema200   = raw.ma200 || null;
+    var ema50    = raw.ma50  || null;
+    var atr      = raw.atr   || null;
+    var rsi      = raw.rsi   || null;
+    var bbPos    = raw.bb_pos != null ? raw.bb_pos : null;
+    var overheat = raw.overheat ? raw.overheat.score : 0;
+    var macdH    = raw.macd_hist || null;
+    var obvSlope = raw.obv_slope_5d || 0;
+    var volRatio = raw.volume_ratio || 1;
+    var pBull2Bear = raw.pBull2Bear || null;
+    var markovR  = (raw.markov && raw.markov.regime) ? raw.markov.regime : (raw.regime || '');
+
+    if (!ema200 || !atr || atr === 0 || price <= 0) return;
+
+    var distAtr = (price - ema200) / atr;   // positiv = über EMA200
+    var score   = 0;
+    var reasons = [];
+    var warnings = [];
+
+    // ── GATE 1: Markov-Regime ───────────────────────────────────────
+    // Bear-Regime oder hohe Bear-Transition-Wahrscheinlichkeit = stärkstes Gate
+    var isBearRegime  = markovR.toLowerCase().includes('bear');
+    var isHighBear2   = pBull2Bear != null && pBull2Bear > 0.20;
+    if (isBearRegime)  { score += 30; reasons.push('Markov: BEAR-Regime'); }
+    else if (isHighBear2) { score += 15; reasons.push('P(Bull→Bear): ' + Math.round(pBull2Bear*100) + '%'); }
+
+    // ── GATE 2: EMA200-Überdehnung (Mean Reversion Short) ──────────
+    // Extrem weit über EMA200 = "Gummiband" gespannt
+    if (distAtr > 5.0)      { score += 30; reasons.push('EMA200: +' + distAtr.toFixed(1) + ' ATR (extrem)'); }
+    else if (distAtr > 3.5) { score += 20; reasons.push('EMA200: +' + distAtr.toFixed(1) + ' ATR (stark)'); }
+    else if (distAtr > 2.5) { score += 10; reasons.push('EMA200: +' + distAtr.toFixed(1) + ' ATR'); }
+
+    // ── GATE 3: RSI-Überhitzung + bärische Divergenz (Proxy) ───────
+    if (rsi !== null) {
+      if (rsi > 80)      { score += 20; reasons.push('RSI: ' + Math.round(rsi) + ' (extrem überkauft)'); }
+      else if (rsi > 70) { score += 12; reasons.push('RSI: ' + Math.round(rsi) + ' (überkauft)'); }
+      else if (rsi > 65) { score += 5;  reasons.push('RSI: ' + Math.round(rsi)); }
+    }
+
+    // ── GATE 4: Bollinger Band + Überhitzung ────────────────────────
+    if (bbPos !== null && bbPos > 0.92) { score += 15; reasons.push('BB: ' + Math.round(bbPos*100) + '% (oberes Band)'); }
+    if (overheat >= 75)  { score += 20; reasons.push('Überhitzung: ' + overheat + '/100'); }
+    else if (overheat >= 55) { score += 10; reasons.push('Überhitzung: ' + overheat + '/100'); }
+
+    // ── GATE 5: MACD-Histogramm fallend (Momentum-Verlust) ─────────
+    if (macdH !== null && macdH < 0) { score += 10; reasons.push('MACD hist. < 0'); }
+
+    // ── GATE 6: Volumen-Anomalie (Distribution) ─────────────────────
+    // Kurs steigt aber Volumen sinkt = Kauf-Erschöpfung
+    if (volRatio < 0.7 && distAtr > 2.0) { score += 10; reasons.push('Vol-Erschöpfung (' + Math.round(volRatio*100) + '% Ø)'); }
+    // OBV fällt trotz steigendem Kurs = Distribution
+    if (obvSlope < 0 && distAtr > 2.0)   { score += 10; reasons.push('OBV Distribution'); }
+
+    // ── SHORT-SQUEEZE WARNUNG ────────────────────────────────────────
+    // Stark gehypte Titel mit extrem hohem Score sind squeeze-gefährdet
+    if (score >= 40 && distAtr > 4.0 && rsi && rsi > 75) {
+      warnings.push('⚠️ Squeeze-Risiko bei extremem Momentum');
+    }
+    if (isBearRegime && obvSlope < 0 && volRatio > 1.5) {
+      warnings.push('📉 Hohe Distribution — institutioneller Verkaufsdruck');
+    }
+
+    // Mindest-Score: mind. 2 Gates müssen feuern
+    if (score >= 30 && reasons.length >= 2) {
+      candidates.push({
+        sym, price, distAtr: Math.round(distAtr*10)/10,
+        rsi: rsi ? Math.round(rsi) : null,
+        bbPos, overheat, score, reasons, warnings,
+        ema200: Math.round(ema200*100)/100,
+        atr: Math.round(atr*100)/100,
+        macdH, obvSlope: Math.round(obvSlope*100)/100,
+        isBearRegime, pBull2Bear,
+      });
+    }
+  });
+
+  candidates.sort(function(a,b){ return b.score - a.score; });
+  renderBearScannerModal(candidates);
+}
+
+function renderBearScannerModal(candidates) {
+  var existing = document.getElementById('bear-modal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'bear-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);overflow-y:auto;padding:1rem';
+
+  var inner = document.createElement('div');
+  inner.style.cssText = 'max-width:580px;margin:0 auto;background:var(--bg2);border-radius:16px;border:1px solid rgba(239,68,68,0.3);overflow:hidden';
+
+  function closeBear() { modal.remove(); document.body.style.overflow = ''; }
+
+  // Header
+  var header = document.createElement('div');
+  header.style.cssText = 'background:linear-gradient(135deg,rgba(239,68,68,0.2),rgba(220,38,38,0.1));padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(239,68,68,0.2)';
+  header.innerHTML =
+    '<div><div style="font-size:10px;color:var(--red);letter-spacing:1px;font-weight:600">BEAR SCANNER — SYMMETRISCHES SHORT-MODUL</div>'
+    + '<div style="font-size:18px;font-weight:700;margin-top:2px">📉 Bärische Kandidaten</div>'
+    + '<div style="font-size:11px;color:var(--text3);margin-top:2px">Kein Anlageberatung gem. §1 WpHG · Short-Squeezes einkalkulieren</div></div>';
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px';
+  closeBtn.innerHTML = '<i class="ti ti-x"></i>';
+  closeBtn.onclick = closeBear;
+  header.appendChild(closeBtn);
+  inner.appendChild(header);
+
+  // Info-Box (Gemini-Blueprint Logik)
+  var info = document.createElement('div');
+  info.style.cssText = 'padding:.6rem 1.25rem;background:rgba(239,68,68,0.06);border-bottom:1px solid rgba(239,68,68,0.15);font-size:11px;color:var(--text3);line-height:1.6';
+  info.innerHTML =
+    '<b style="color:var(--red)">4 Short-Gates:</b> '
+    + '🔴 Markov Bear-Regime · 📏 EMA200 >2.5 ATR drüber · 📊 RSI >65 · 🔥 Überhitzung >55<br>'
+    + '<b style="color:var(--amber)">Asymmetrie-Warnung:</b> Shorts fallen schneller als Longs steigen — '
+    + 'Short-Squeezes sind bei Momentum-Titeln jederzeit möglich. KO-Puffer ≥30% wählen.';
+  inner.appendChild(info);
+
+  // Gates Legende
+  var legend = document.createElement('div');
+  legend.style.cssText = 'padding:.5rem 1.25rem;border-bottom:1px solid var(--border2);display:flex;gap:12px;flex-wrap:wrap';
+  [
+    ['🔴 Markov Bear', 'var(--red)', '30 Pkt'],
+    ['📏 EMA200 extrem', 'var(--red)', '30 Pkt'],
+    ['📊 RSI überkauft', 'var(--amber)', '20 Pkt'],
+    ['🔥 Überhitzung', 'var(--amber)', '20 Pkt'],
+    ['📉 Distribution', 'var(--text3)', '10 Pkt'],
+  ].forEach(function(g) {
+    legend.innerHTML += '<span style="font-size:9px;color:' + g[1] + '">' + g[0] + ' <span style="color:var(--text3)">(' + g[2] + ')</span></span>';
+  });
+  inner.appendChild(legend);
+
+  // Kandidaten
+  var listSection = document.createElement('div');
+  listSection.style.cssText = 'padding:.75rem 1.25rem';
+
+  if (!candidates.length) {
+    listSection.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:.5rem">Keine bärischen Kandidaten im aktuellen Scan — Markt ist bullisch oder neutral. Scan zuerst durchführen.</div>';
+  } else {
+    var title = document.createElement('div');
+    title.style.cssText = 'font-size:11px;font-weight:600;color:var(--red);margin-bottom:.5rem';
+    title.textContent = 'SHORT-KANDIDATEN (' + candidates.length + ') — Score ≥30';
+    listSection.appendChild(title);
+
+    candidates.slice(0, 12).forEach(function(c) {
+      var card = document.createElement('div');
+      var scoreCol = c.score >= 60 ? 'var(--red)' : c.score >= 40 ? 'var(--amber)' : 'var(--text2)';
+      card.style.cssText = 'background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:6px;border-left:3px solid ' + scoreCol;
+      card.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+        + '<span style="font-family:var(--mono);font-weight:700;font-size:14px">' + c.sym + '</span>'
+        + '<div style="display:flex;align-items:center;gap:8px">'
+        + (c.isBearRegime ? '<span style="font-size:9px;padding:1px 6px;background:rgba(239,68,68,0.15);color:var(--red);border-radius:4px">BEAR</span>' : '')
+        + '<span style="font-size:12px;font-weight:700;color:' + scoreCol + '">Score: ' + c.score + '</span>'
+        + '</div></div>'
+        + '<div style="display:flex;gap:8px;font-size:11px;color:var(--text2);flex-wrap:wrap;margin-bottom:3px">'
+        + '<span>$' + c.price.toFixed(2) + '</span>'
+        + '<span style="color:var(--red)">EMA200: +' + c.distAtr + ' ATR</span>'
+        + (c.rsi ? '<span style="color:' + (c.rsi > 75 ? 'var(--red)' : 'var(--amber)') + '">RSI: ' + c.rsi + '</span>' : '')
+        + '<span>UH: ' + c.overheat + '</span>'
+        + '</div>'
+        + '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">' + c.reasons.join(' · ') + '</div>'
+        + (c.warnings.length ? '<div style="font-size:10px;color:var(--amber);margin-bottom:4px">' + c.warnings.join(' · ') + '</div>' : '');
+
+      var btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:6px;margin-top:4px';
+
+      // Deep Dive Button
+      var btnDD = document.createElement('button');
+      btnDD.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(239,68,68,0.12);border:0.5px solid rgba(239,68,68,0.4);color:var(--red);cursor:pointer';
+      btnDD.innerHTML = '<i class="ti ti-brain"></i> Deep Dive';
+      btnDD.onclick = (function(s){ return function(){ openDeepDive(s,s); setDdStrategy('meanrev'); }; })(c.sym);
+      btnRow.appendChild(btnDD);
+
+      // KO-Rechner Button (mit Short-Hinweis)
+      var btnR = document.createElement('button');
+      btnR.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:6px;background:var(--bg2);border:0.5px solid var(--border2);color:var(--text2);cursor:pointer';
+      btnR.innerHTML = '<i class="ti ti-calculator"></i> KO-Rechner';
+      btnR.onclick = (function(s){ return function(){
+        showPanel('rechner');
+        showToast('⚠️ Short-KO: KO-Puffer ≥30% wählen — Squeeze-Risiko!');
+        useInRechner(s);
+      }; })(c.sym);
+      btnRow.appendChild(btnR);
+
+      card.appendChild(btnRow);
+      listSection.appendChild(card);
+    });
+  }
+  inner.appendChild(listSection);
+
+  // MSE-Regime Hinweis
+  var regime = window._currentRegime || (typeof KoMarketState !== 'undefined' ? KoMarketState._lastRegime : null);
+  if (regime) {
+    var regNote = document.createElement('div');
+    regNote.style.cssText = 'padding:.6rem 1.25rem;border-top:1px solid var(--border2);font-size:11px;color:var(--text3)';
+    var gateOpen = ['STRESS_UNSTABLE','POST_PANIC_REVERSION'].includes(regime);
+    regNote.innerHTML = '<b style="color:' + (gateOpen ? 'var(--red)' : 'var(--amber)') + '">MSE Regime: ' + regime + '</b> — '
+      + (gateOpen
+        ? '✅ Short-Gate OFFEN: Regime unterstützt bärische Strategien.'
+        : '⚠️ Short-Gate eingeschränkt: Regime (' + regime + ') bevorzugt Long-Seite. Nur selektive Shorts.');
+    inner.appendChild(regNote);
+  }
+
+  // Footer
+  var footer = document.createElement('div');
+  footer.style.cssText = 'padding:.75rem 1.25rem;border-top:1px solid var(--border2)';
+  var closeFooter = document.createElement('button');
+  closeFooter.style.cssText = 'width:100%;padding:8px;border-radius:10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer';
+  closeFooter.innerHTML = '<i class="ti ti-x"></i> Schließen';
+  closeFooter.onclick = closeBear;
+  footer.appendChild(closeFooter);
   inner.appendChild(footer);
 
   modal.appendChild(inner);
