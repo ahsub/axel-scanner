@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v176">
+<meta name="app-version" content="20260622-v177">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -75,10 +75,13 @@ document.addEventListener('DOMContentLoaded', function() {
   --font: 'DM Sans', sans-serif;
   --mono: 'DM Mono', monospace;
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{cursor:default}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;cursor:inherit}
 button:disabled{cursor:default !important;}
 canvas{cursor:default !important;}
 body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;overscroll-behavior:none;cursor:default}
+button,[onclick],a,select,input[type=checkbox],input[type=radio],label[for]{cursor:pointer}
+input[type=text],input[type=number],input[type=password],input[type=search],input[type=email],textarea{cursor:text}
 input,select,button,textarea{font-family:var(--font);font-size:14px}
 
 /* PIN SCREEN */
