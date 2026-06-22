@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v173">
+<meta name="app-version" content="20260622-v174">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -4114,12 +4114,8 @@ function unlockApp(){
   setTimeout(updateRegimeCockpit, 1500);
   // Expert-Modus Status wiederherstellen
   setTimeout(initExpertMode, 500);
-  // MSE mit frischen Yahoo-Daten nach 3 Sekunden
-  setTimeout(function() {
-    if (typeof updateMarketWeatherWidget === 'function') {
-      updateMarketWeatherWidget(null, null, null);
-    }
-  }, 3000);
+  // MSE wird nur via Morning Briefing Button geladen — kein Autostart
+  // (verhindert Warte-Cursor beim App-Start)
 
   // Cursor global auf default erzwingen (alle Elemente)
   var styleTag = document.getElementById('_cursor_fix');
