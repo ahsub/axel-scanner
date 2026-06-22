@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v167">
+<meta name="app-version" content="20260622-v169">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13266,19 +13266,64 @@ async function fetchSektorPerf(sym) {
 async function loadSektorRS() {
   if (_sektorLoading) return;
   _sektorLoading = true;
-  const btn = document.getElementById('sektor-rs-btn');
-  const el  = document.getElementById('sektor-rs-content');
+  const btn    = document.getElementById('sektor-rs-btn');
+  const el     = document.getElementById('sektor-rs-content');
   const timeEl = document.getElementById('sektor-rs-time');
   if (btn) btn.disabled = true;
 
   el.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text3);font-size:12px"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Lade Sektor-Daten...</div>';
 
-  // SPY als Referenz
-  const spyData = await fetchSektorPerf('SPY');
-  const spy5d = spyData ? spyData.perf5d : 0;
-  const spy1d = spyData ? spyData.perf1d : 0;
+  // ── Zuerst: KV-Cache (Aggregator-Daten) prüfen ─────────────────
+  try {
+    var kvUrl  = (typeof KoConfig !== 'undefined' ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev')
+               + '/get?key=master_market_data';
+    var kvResp = await fetch(kvUrl, { cache: 'no-store' });
+    if (kvResp.ok) {
+      var kvData = await kvResp.json();
+      var sectorRS = kvData?.sectorRS;
+      if (sectorRS && Object.keys(sectorRS).length >= 5) {
+        // Aus KV-Daten rendern
+        var kvResults = Object.values(sectorRS)
+          .filter(function(s){ return s.rs5 != null; })
+          .map(function(s) {
+            // SEKTOREN-Mapping für Label
+            var match = (typeof SEKTOREN !== 'undefined')
+              ? SEKTOREN.find(function(x){ return x.sym === s.sym; })
+              : null;
+            return {
+              sym:   s.sym,
+              name:  match ? match.name : s.sym,
+              rs5d:  s.rs5  || 0,
+              rs1d:  s.rs5  || 0,  // Näherung
+              perf5d:s.ret5 || 0,
+              price: s.price|| 0,
+              fromKV: true,
+            };
+          })
+          .sort(function(a,b){ return b.rs5d - a.rs5d; });
 
-  // Alle Sektoren laden
+        if (kvResults.length >= 5) {
+          _sektorData = kvResults;
+          renderSektorRS(kvResults, 0, 0);
+          var age    = kvData.meta ? Math.round((Date.now() - new Date(kvData.meta.generated).getTime()) / 3600000) : '?';
+          var lastTD = kvData.meta?.last_trading_day || '';
+          var tdTxt  = lastTD ? ' · Handelstag: ' + lastTD : '';
+          if (timeEl) timeEl.textContent = 'Aggregator · ' + age + 'h alt' + tdTxt;
+          if (btn) btn.disabled = false;
+          _sektorLoading = false;
+          return; // KV-Daten erfolgreich — kein Live-Load nötig
+        }
+      }
+    }
+  } catch(e) {
+    console.log('[SektorRS] KV nicht verfügbar, lade live:', e.message);
+  }
+
+  // ── Fallback: Live-Daten von Yahoo ─────────────────────────────
+  const spyData = await fetchSektorPerf('SPY');
+  const spy5d   = spyData ? spyData.perf5d : 0;
+  const spy1d   = spyData ? spyData.perf1d : 0;
+
   const results = [];
   for (const s of SEKTOREN) {
     const d = await fetchSektorPerf(s.sym);
@@ -13287,20 +13332,18 @@ async function loadSektorRS() {
         ...s,
         perf5d: d.perf5d,
         perf1d: d.perf1d,
-        rs5d: d.perf5d - spy5d,   // Relative Strength vs SPY
-        rs1d: d.perf1d - spy1d,
-        price: d.price,
-        fromCache: d.fromCache
+        rs5d:   d.perf5d - spy5d,
+        rs1d:   d.perf1d - spy1d,
+        price:  d.price,
+        fromCache: d.fromCache,
       });
     }
   }
 
-  // Sortierung: RS 5d absteigend
   results.sort((a,b) => b.rs5d - a.rs5d);
   _sektorData = results;
-
   renderSektorRS(results, spy5d, spy1d);
-  if (timeEl) timeEl.textContent = 'Stand: ' + new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'});
+  if (timeEl) timeEl.textContent = 'Live · ' + new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'});
   if (btn) btn.disabled = false;
   _sektorLoading = false;
 }
@@ -17033,6 +17076,13 @@ async function runMorningBriefing() {
     if (btn) btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> ' + txt;
   }
   if (cacheEl) cacheEl.textContent = '';
+
+  // Makro-Caches zurücksetzen für frische Daten
+  try {
+    localStorage.removeItem('morning_briefing_' + today);
+    if (typeof KoDarkPool !== 'undefined') KoDarkPool.clearCache();
+    if (typeof KoMarketState !== 'undefined') KoMarketState._lastUpdate = null;
+  } catch(e) {}
 
   var results = {
     date: today,
