@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v184">
+<meta name="app-version" content="20260622-v185">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,41 +15,39 @@
 <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.5.0/tabler-icons.min.css" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-// ── CURSOR-BUG FIX: Chart.js setzt intern cursor:crosshair als Inline-Style ─
-// Unterdrücke dies global über Chart.defaults und einen MutationObserver
-document.addEventListener('DOMContentLoaded', function() {
-  // 1) Chart.js default: onHover soll Cursor nicht ändern
-  if (window.Chart && window.Chart.defaults) {
-    window.Chart.defaults.onHover = null;
-  }
-  // 2) MutationObserver: bewacht alle canvas-Elemente und setzt Inline-Cursor zurück
-  var cursorObserver = new MutationObserver(function(mutations) {
-    mutations.forEach(function(m) {
-      if (m.type === 'attributes' && m.attributeName === 'style') {
-        var el = m.target;
-        if (el.tagName === 'CANVAS' && el.style.cursor && el.style.cursor !== 'default') {
-          el.style.cursor = 'default';
-        }
-      }
-    });
-  });
-  // Observer wird nach kurzem Delay gestartet (Canvas-Elemente werden dynamisch erzeugt)
-  setTimeout(function() {
-    document.querySelectorAll('canvas').forEach(function(c) {
-      cursorObserver.observe(c, { attributes: true });
-    });
-    // Auch neue Canvas-Elemente überwachen (dynamisch erstellt durch Scanner)
-    var bodyObserver = new MutationObserver(function() {
-      document.querySelectorAll('canvas').forEach(function(c) {
-        if (!c._cursorWatched) {
-          c._cursorWatched = true;
-          cursorObserver.observe(c, { attributes: true });
-        }
+// ── CURSOR-BUG FIX v3 ────────────────────────────────────────────────────────
+// Chart.js 4.x setzt canvas.style.cursor direkt im setCursorStyle()-Aufruf.
+// Fix: CSSStyleDeclaration.cursor-Setter für alle Canvas-Elemente überschreiben,
+// sodass nur 'default', 'pointer' und '' durchgelassen werden.
+// Zusätzlich: document.body mousemove-Listener setzt Cursor global zurück.
+(function() {
+  // Patch: alle künftig erstellten Canvas-Elemente bekommen einen bewachten cursor-Setter
+  var _origCreateElement = document.createElement.bind(document);
+  document.createElement = function(tag) {
+    var el = _origCreateElement(tag);
+    if (typeof tag === 'string' && tag.toLowerCase() === 'canvas') {
+      Object.defineProperty(el.style, 'cursor', {
+        get: function() { return 'default'; },
+        set: function(v) {
+          // Nur harmlose Werte durchlassen
+          if (!v || v === 'default' || v === 'pointer' || v === 'text' || v === 'inherit') {
+            Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'cursor').set.call(this, v || 'default');
+          }
+          // Alles andere (crosshair, wait, progress, move etc.) → ignorieren
+        },
+        configurable: true
       });
-    });
-    bodyObserver.observe(document.body, { childList: true, subtree: true });
-  }, 500);
-});
+    }
+    return el;
+  };
+
+  // Fallback: mousemove auf body setzt Cursor zurück falls er sich geändert hat
+  document.addEventListener('mousemove', function() {
+    if (document.body.style.cursor && document.body.style.cursor !== '' && document.body.style.cursor !== 'default') {
+      document.body.style.cursor = '';
+    }
+  }, { passive: true });
+})();
 </script>
 <style>
 :root {
