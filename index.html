@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260621-v162">
+<meta name="app-version" content="20260622-v164">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -240,17 +240,24 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
       <!-- MARKET REGIME COCKPIT + ONE-BUTTON MORNING BRIEFING -->
       <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-bottom:.6rem">
-        <!-- Cockpit Zeile -->
-        <div id="regime-cockpit" style="padding:.6rem .9rem;cursor:pointer;border-bottom:1px solid var(--border2)" onclick="showPanel('makro')">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <div id="rc-regime" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:var(--bg3);color:var(--text3)">— Regime</div>
+        <!-- Market Weather Widget -->
+        <div id="market-weather-widget" style="padding:.6rem .9rem;border-bottom:1px solid var(--border2)">
+          <!-- Regime Badge + Metriken -->
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:.3rem">
+            <div id="mse-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:var(--bg3);color:var(--text3);cursor:pointer" onclick="showMSEDetail()">— Regime</div>
             <div id="rc-vix" style="font-size:11px;color:var(--text2)">VIX —</div>
             <div id="rc-dp" style="font-size:11px;color:var(--text2)">Flow —</div>
             <div id="rc-tsi" style="font-size:11px;color:var(--text2)">Stress —</div>
-            <div style="font-size:10px;color:var(--text3);margin-left:auto">→ Makro</div>
+            <div style="font-size:10px;color:var(--text3);margin-left:auto;cursor:pointer" onclick="showPanel('makro')">→ Makro</div>
           </div>
-          <div id="rc-action" style="font-size:11px;color:var(--text3);margin-top:3px">Lädt…</div>
+          <!-- Strategie-Gates (werden nach Regime aktualisiert) -->
+          <div id="mse-gates" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:.3rem"></div>
+          <!-- Action Text -->
+          <div id="rc-action" style="font-size:11px;color:var(--text3)">Lädt…</div>
         </div>
+
+        <!-- MSE Detail Modal Trigger -->
+        <div id="regime-cockpit" style="display:none"></div>
         <!-- Morning Briefing Button -->
         <div style="padding:.5rem .9rem;display:flex;align-items:center;gap:8px">
           <button id="morning-btn" onclick="runMorningBriefing()" style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
@@ -4080,8 +4087,14 @@ function unlockApp(){
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
   window._appUnlocked = true;
-  // Market Regime Cockpit beim Start befüllen
+  // Market Regime Cockpit + MSE beim Start befüllen
   setTimeout(updateRegimeCockpit, 1500);
+  // MSE mit frischen Yahoo-Daten nach 3 Sekunden
+  setTimeout(function() {
+    if (typeof updateMarketWeatherWidget === 'function') {
+      updateMarketWeatherWidget(null, null, null);
+    }
+  }, 3000);
 
   // Cursor global auf default erzwingen (alle Elemente)
   var styleTag = document.getElementById('_cursor_fix');
@@ -16473,10 +16486,16 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     document.getElementById('dd-action-text').style.color = actionColor;
     document.getElementById('dd-action-box').style.display = 'block';
 
-    // Dark Pool Score speichern für nächsten Aufruf
+    // Dark Pool Score + MSE aktualisieren
     if (typeof KoDarkPool !== 'undefined' && KoDarkPool._cache) {
       var sc = KoDarkPool.score(KoDarkPool._cache);
-      if (sc) window._dpLastScore = sc.total;
+      if (sc) {
+        window._dpLastScore = sc.total;
+        if (typeof KoMarketState !== 'undefined' && typeof updateMarketWeatherWidget === 'function') {
+          var vixNow = document.getElementById('m-vix') ? parseFloat(document.getElementById('m-vix').textContent) || null : null;
+          updateMarketWeatherWidget(KoDarkPool._cache, vixNow, window._lastTsiScore);
+        }
+      }
     }
 
   } catch(e) {
@@ -16648,6 +16667,191 @@ async function calcTreasuryStress() {
 }
 
 
+
+
+// ── MARKET STATE ENGINE INTEGRATION ──────────────────────────────────────────
+
+async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
+  // ── Frische Daten direkt von Yahoo Finance laden ──────────────
+  var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
+
+  async function fetchYahoo(sym) {
+    try {
+      var url = 'https://query1.finance.yahoo.com/v7/finance/chart/' + encodeURIComponent(sym) + '?interval=1d&range=30d';
+      var r   = await fetch(corsProxy + '/?url=' + encodeURIComponent(url));
+      if (!r.ok) return null;
+      var j   = await r.json();
+      var res = j?.chart?.result?.[0];
+      if (!res) return null;
+      var closes = (res.indicators.quote[0].close || []).filter(function(v){ return v != null; });
+      return { price: res.meta.regularMarketPrice || closes[closes.length-1], closes };
+    } catch(e) { return null; }
+  }
+
+  // Parallel laden: VVIX, SKEW, VIX, VIX3M
+  var [vvixData, skewData, vixData, vix3mData] = await Promise.all([
+    fetchYahoo('^VVIX'),
+    fetchYahoo('^SKEW'),
+    fetchYahoo('^VIX'),
+    fetchYahoo('^VIX3M'),
+  ]);
+
+  // Rohdaten zusammenstellen — frisch von Yahoo, kein Cache
+  var rawData = {
+    vvix:     vvixData  ? vvixData.price  : null,
+    skew:     skewData  ? skewData.price  : null,
+    vix:      vixData   ? vixData.price   : (vix || null),
+    vixRatio: (vix3mData && vixData && vixData.price > 0)
+              ? Math.round((vix3mData.price / vixData.price) * 1000) / 1000
+              : null,
+    // GEX + DIX aus Dark Pool Cache (keine freie API verfügbar)
+    gex:      dpData?.gex?.value || null,
+    dix:      dpData?.dix?.value || null,
+  };
+
+  // VIX-Anzeige im Cockpit aktualisieren
+  if (rawData.vix) {
+    var rcVix = document.getElementById('rc-vix');
+    if (rcVix) {
+      rcVix.textContent = 'VIX ' + rawData.vix.toFixed(1);
+      rcVix.style.color = rawData.vix < 16 ? 'var(--green)' : rawData.vix < 25 ? 'var(--amber)' : 'var(--red)';
+    }
+    // Auch m-vix updaten für andere Komponenten
+    var mVix = document.getElementById('m-vix');
+    if (mVix && !mVix.textContent.trim()) mVix.textContent = rawData.vix.toFixed(1);
+  }
+
+  console.log('[MSE] Frische Daten geladen — VVIX:', rawData.vvix, '| SKEW:', rawData.skew, '| VIX-Ratio:', rawData.vixRatio);
+
+  // Nur analysieren wenn genug Daten vorhanden
+  var hasData = rawData.vvix || rawData.vixRatio || rawData.skew;
+  var result  = hasData ? KoMarketState.analyze(rawData) : null;
+  KoMarketState.saveHistory();
+
+  // Badge updaten
+  var badge = document.getElementById('mse-badge');
+  if (badge) {
+    if (result) {
+      badge.textContent   = result.label;
+      badge.style.color   = result.color;
+      badge.style.background = 'var(--bg3)';
+      badge.style.borderLeft = '3px solid ' + result.color;
+    } else {
+      badge.textContent = '— Regime laden…';
+    }
+  }
+
+  // Strategy Gates anzeigen
+  var gatesEl = document.getElementById('mse-gates');
+  if (gatesEl && result) {
+    var strategyLabels = {
+      momentum:  '📈 Momentum',
+      swing:     '🔄 Swing',
+      csp_wheel: '⚙️ CSP/Wheel',
+      meanrev:   '↩️ Mean Rev.',
+      breakout:  '🚀 Breakout',
+    };
+    gatesEl.innerHTML = Object.entries(result.strategies).map(function(entry) {
+      var key = entry[0], strat = entry[1];
+      var color  = strat.active ? 'var(--green)' : 'var(--red)';
+      var bg     = strat.active ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
+      var prefix = strat.active ? '✓' : '✗';
+      return '<div title="' + strat.note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;background:' + bg + ';color:' + color + ';cursor:help">'
+        + prefix + ' ' + strategyLabels[key] + '</div>';
+    }).join('');
+  }
+
+  // Action Text
+  var actionEl = document.getElementById('rc-action');
+  if (actionEl && result) {
+    actionEl.textContent = result.action;
+    actionEl.style.color = result.color;
+  }
+
+  // Globale Variable für Scanner-Filter
+  window._currentRegime = result ? result.regime : null;
+  window._lastQqqRegime = result ? result.regime.toLowerCase() : null;
+}
+
+// MSE Detail Modal
+function showMSEDetail() {
+  var regime  = KoMarketState._lastRegime;
+  var metrics = KoMarketState._lastMetrics;
+  if (!regime || !metrics) {
+    alert('Noch keine Regime-Daten — Morning Briefing starten!');
+    return;
+  }
+  var gates  = KoMarketState.getStrategyGates(regime);
+  var modal  = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;z-index:2200;background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);overflow-y:auto;padding:1rem';
+
+  var strategyLabels = {
+    momentum:  '📈 Momentum/SEPA',
+    swing:     '🔄 Swing-Trading',
+    csp_wheel: '⚙️ CSP/Wheel',
+    meanrev:   '↩️ Mean Reversion',
+    breakout:  '🚀 Breakout',
+  };
+
+  var stratsHtml = Object.entries(gates.strategies).map(function(entry) {
+    var key = entry[0], s = entry[1];
+    var color = s.active ? 'var(--green)' : 'var(--red)';
+    var bg    = s.active ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)';
+    var icon  = s.active ? '✅' : '🚫';
+    return '<div style="background:' + bg + ';border-radius:8px;padding:8px 12px;margin-bottom:6px;border-left:3px solid ' + color + '">'
+      + '<div style="font-size:12px;font-weight:600;color:' + color + '">' + icon + ' ' + strategyLabels[key] + '</div>'
+      + '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + s.note + '</div>'
+      + '</div>';
+  }).join('');
+
+  var metricsHtml = [
+    ['VVIX Z-Score', metrics.vvix_z20 != null ? metrics.vvix_z20.toFixed(2) : '—'],
+    ['GEX Z-Score',  metrics.gex_z20  != null ? metrics.gex_z20.toFixed(2)  : '—'],
+    ['DIX Z-Score',  metrics.dix_z20  != null ? metrics.dix_z20.toFixed(2)  : '—'],
+    ['SKEW Pct20',   metrics.skew_pct20 != null ? metrics.skew_pct20 + '%'  : '—'],
+    ['VIX Term',     metrics.term_structure || '—'],
+  ].map(function(r) {
+    return '<div style="background:var(--bg3);border-radius:6px;padding:6px 10px">'
+      + '<div style="font-size:10px;color:var(--text3)">' + r[0] + '</div>'
+      + '<div style="font-size:13px;font-weight:600">' + r[1] + '</div>'
+      + '</div>';
+  }).join('');
+
+  modal.innerHTML = '<div style="max-width:520px;margin:0 auto;background:var(--bg2);border-radius:16px;border:1px solid var(--border2);overflow:hidden">'
+    + '<div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border2);background:linear-gradient(135deg,rgba(79,142,247,0.15),rgba(139,92,246,0.1))">'
+    + '<div style="font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:.3rem">MARKET STATE ENGINE</div>'
+    + '<div style="font-size:18px;font-weight:700;color:' + gates.color + '">' + gates.label + '</div>'
+    + '<div style="font-size:12px;color:var(--text2);margin-top:.2rem">' + gates.description + '</div>'
+    + '</div>'
+    // Metriken
+    + '<div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border2)">'
+    + '<div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:.4rem">NORMALISIERTE MESSWERTE (Z-Score 20T)</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">' + metricsHtml + '</div>'
+    + '</div>'
+    // Strategy Gates
+    + '<div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border2)">'
+    + '<div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:.4rem">STRATEGY ROUTER</div>'
+    + stratsHtml
+    + '</div>'
+    // Action
+    + '<div style="padding:.75rem 1.25rem;background:var(--bg3);border-bottom:1px solid var(--border2)">'
+    + '<div style="font-size:11px;font-weight:600;color:' + gates.color + '">' + gates.action + '</div>'
+    + '</div>'
+    // Close
+    + '<div style="padding:.75rem 1.25rem">'
+    + '<button id="mse-close-btn" style="width:100%;padding:8px;border-radius:10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer">'
+    + '<i class="ti ti-x"></i> Schließen</button>'
+    + '</div>'
+    + '</div>';
+
+  document.body.appendChild(modal);
+  document.body.style.overflow = 'hidden';
+  // Close button via addEventListener (no inline onclick needed)
+  var closeBtn = document.getElementById('mse-close-btn');
+  if (closeBtn) {
+    closeBtn.onclick = function() { modal.remove(); document.body.style.overflow = ''; };
+  }
+}
 
 // ── ONE-BUTTON MORNING BRIEFING ───────────────────────────────────────────────
 // Läuft 1x täglich, Cache in localStorage (Datum als Key)
@@ -17528,6 +17732,7 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules -->
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-market-state.js" defer></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-darkpool.js"></script>
 
 
