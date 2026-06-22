@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v187">
+<meta name="app-version" content="20260622-v188">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17642,7 +17642,23 @@ function _applyMorningResults(results) {
   showToast('✅ Morning Briefing: ' + summary.join(' · '));
 
   // Tearsheet öffnen
-  showMorningTearsheet(results);
+  try {
+    showMorningTearsheet(results);
+  } catch(e) {
+    console.error('[Tearsheet] Fehler:', e);
+    // Fallback: einfaches Modal
+    var fb = document.createElement('div');
+    fb.id = 'tearsheet-modal';
+    fb.style.cssText = 'position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;padding:1rem';
+    fb.innerHTML = '<div style="background:#1c2030;border-radius:12px;padding:1.5rem;max-width:500px;width:100%">'
+      + '<div style="font-size:16px;font-weight:700;color:#e8eaf0;margin-bottom:1rem">Morning Briefing Zusammenfassung</div>'
+      + '<pre style="font-size:11px;color:#c8d0e0;white-space:pre-wrap;line-height:1.6">'
+      + (results.kiBriefing || 'Keine KI-Analyse verfügbar') + '</pre>'
+      + '<button onclick="closeTearsheet()" style="margin-top:1rem;padding:6px 16px;border-radius:8px;border:1px solid #2a2f42;background:#0d0f12;color:#8090b0;cursor:pointer;font-size:12px">Schließen</button>'
+      + '</div>';
+    document.body.appendChild(fb);
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function closeTearsheet() {
@@ -17750,9 +17766,9 @@ function showMorningTearsheet(results) {
         '<div style="font-size:9px;color:#4f6080;letter-spacing:1.5px;margin-bottom:.5rem">MAKRO-INDIKATOREN</div>' +
         '<table style="width:100%;border-collapse:collapse">' +
           metricRow('Treasury Stress', val(results.tsiScore, '/100'), scoreColor(results.tsiScore, 35, 60) === 'var(--green)' ? '#22c55e' : results.tsiScore > 60 ? '#ef4444' : '#f0a93a') +
-          metricRow('Intermarket Risk', document.getElementById('intermarket-score')?.textContent || '—') +
-          metricRow('NDX Breadth', document.getElementById('breadth-pct')?.textContent || '—') +
-          metricRow('Bull Indikator', document.getElementById('bull-score')?.textContent || '—') +
+          metricRow('Intermarket Risk', (document.getElementById('intermarket-score') ? document.getElementById('intermarket-score').textContent : '—')) +
+          metricRow('NDX Breadth', (document.getElementById('breadth-pct') ? document.getElementById('breadth-pct').textContent : '—')) +
+          metricRow('Bull Indikator', (document.getElementById('bull-score') ? document.getElementById('bull-score').textContent : '—')) +
           metricRow('QQQ Markov', window._lastQqqRegime || '—') +
         '</table>' +
       '</div>' +
