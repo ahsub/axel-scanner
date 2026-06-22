@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v185">
+<meta name="app-version" content="20260622-v186">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -10402,8 +10402,61 @@ document.addEventListener('click', function(e) {
 });
 
 // ─── TRADINGVIEW CHART MODAL ──────────────────────────────────────────────────
+// ── TRADEGATE TICKER MAPPING ─────────────────────────────────────────────────
+// US-Aktien haben auf Tradegate oft andere Symbole als an der NYSE/Nasdaq.
+// Mapping: US-Symbol → Tradegate-Symbol (fuer TV-Chart-Links)
+var TRADEGATE_MAP = {
+  // Mega-Cap Tech
+  "AAPL":"APC","MSFT":"MSF","NVDA":"NVD","AMZN":"AMZ","GOOGL":"ABEA","GOOG":"ABEC",
+  "META":"FB2A","TSLA":"TL0","AVGO":"1YD","ORCL":"ORC",
+  // Semiconductors
+  "AMD":"AMD","QCOM":"QCI","TXN":"TII","INTC":"INL","MU":"MTE","KLAC":"KLC",
+  "LRCX":"LAR","AMAT":"AMT","ADI":"ADI","MCHP":"MHP","NXPI":"NXP","ARM":"0A8",
+  "MRVL":"M8R","SMCI":"SMC","ASML":"ASME",
+  // Software & Cloud
+  "ADBE":"ADB","CRM":"CRM","NOW":"N2W","INTU":"ITU","SNPS":"SNY","CDNS":"CDN",
+  "ANSS":"ANS","ADSK":"ADK","WDAY":"WDA","TEAM":"T8A","PANW":"PA8",
+  "CRWD":"CW1","FTNT":"FT7","ZS":"ZSC","DDOG":"D0G","MDB":"MDB","SNOW":"SQ7",
+  "NET":"NT2","PLTR":"PLTR","COIN":"1QZ",
+  // Consumer Tech
+  "NFLX":"NFL","UBER":"UT8","SHOP":"SHOP","PYPL":"PYP","SQ":"SQ2",
+  "HOOD":"HDD","SOFI":"SF3","AFRM":"AFR",
+  // Healthcare & Pharma
+  "JNJ":"JNJ","LLY":"LLY","ABT":"ABT","MRK":"MRK","ABBV":"4AB","TMO":"TMO",
+  "ISRG":"IS8","REGN":"REG","VRTX":"VRX","GILD":"GIS","AMGN":"AGN",
+  "MRNA":"MO4","BNTX":"22UA","NVO":"NOVO","AZN":"AZN",
+  // Financials
+  "JPM":"JPM","BAC":"BAC","WFC":"WFC","GS":"GOS","MS":"DWD","BLK":"BL3",
+  "V":"VIS","MA":"MAC","AXP":"AXP","SCHW":"SCH","PYPL":"PYP",
+  // Consumer & Retail
+  "AMZN":"AMZ","COST":"CTO","WMT":"WMT","HD":"HDI","MCD":"MDO","SBUX":"SRB",
+  "NKE":"NKE","BKNG":"BCO",
+  // Energy
+  "XOM":"XONA","CVX":"CVX","COP":"COP","SLB":"SLB","BP":"BP2","SHEL":"R6C",
+  // Industrial
+  "CAT":"CAT","HON":"HON","DE":"DE","GE":"GEC","BA":"BCO","LMT":"LOM",
+  "RTX":"RTX","NOC":"NOC","UPS":"UPS","UNP":"UNP",
+  // EV / Auto
+  "TSLA":"TL0","F":"FMC","GM":"GM","RIVN":"RVN","LCID":"LCD",
+  // China ADRs
+  "BABA":"AHLA","JD":"JD3","PDD":"PDD","BIDU":"B1C","NIO":"NIO",
+};
+
+function getTradegateSym(sym) {
+  // 1. Direktes Mapping
+  if (TRADEGATE_MAP[sym]) return TRADEGATE_MAP[sym];
+  // 2. Xetra .DE → Tradegate (gleicher Ticker ohne Suffix)
+  if (sym.endsWith('.DE')) return sym.replace('.DE', '');
+  // 3. Andere Heimatboersen (.PA, .AS, .MI etc.) → meist gleicher Ticker
+  var m = sym.match(/^([A-Z0-9]+)\.[A-Z]{2}$/);
+  if (m) return m[1];
+  // 4. Fallback: US-Symbol unveraendert
+  return sym;
+}
+
 function openTVChart(sym, name, isDE) {
-  var tvSym = isDE ? ('TRADEGATE:' + sym) : sym;
+  var tgSym = getTradegateSym(sym);
+  var tvSym = isDE ? ('TRADEGATE:' + tgSym) : sym;
   var existing = document.getElementById('tv-modal');
   if(existing) existing.remove();
   var modal = document.createElement('div');
