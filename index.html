@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v171">
+<meta name="app-version" content="20260622-v172">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17056,19 +17056,14 @@ var _morningRunning = false;
 async function runMorningBriefing() {
   if (_morningRunning) return;
 
-  // Cache-Check: heute schon gelaufen?
+  // Morning Briefing lädt IMMER frisch — kein Cache-Rückgriff
   var today    = new Date().toISOString().slice(0, 10);
   var cacheKey = 'morning_briefing_' + today;
-  var cached   = null;
-  try { cached = JSON.parse(localStorage.getItem(cacheKey)); } catch(e) {}
   var cacheEl  = document.getElementById('morning-cache-info');
 
-  // Kein Cache-Rückgriff — Morning Briefing lädt immer alle Daten frisch
-  // Cache wird nur für _applyMorningResults am Ende gespeichert
-
-  // ── Cache IMMER löschen — Morning Briefing lädt immer frisch ──
+  // Cache + alle Abhängigkeiten leeren
   try {
-    localStorage.removeItem('morning_briefing_' + today);
+    localStorage.removeItem(cacheKey);
     if (typeof KoDarkPool !== 'undefined') KoDarkPool.clearCache();
     if (typeof KoMarketState !== 'undefined') KoMarketState._lastUpdate = null;
   } catch(e) {}
