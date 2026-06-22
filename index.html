@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v169">
+<meta name="app-version" content="20260622-v170">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17695,6 +17695,10 @@ function renderMeanReversionModal(candidates) {
   modal.appendChild(inner);
   document.body.appendChild(modal);
   document.body.style.overflow = 'hidden';
+  // Safety: Klick außerhalb schließt Modal
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) { closeMR(); }
+  });
 }
 
 
@@ -17703,6 +17707,22 @@ function clearOversoldList() {
   const el = document.getElementById('backlog-oversold-list');
   if (el) el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text3)"><i class="ti ti-trending-down" style="font-size:24px;display:block;margin-bottom:.5rem"></i>Oversold-Liste geleert</div>';
 }
+
+// ── OVERFLOW SAFETY ───────────────────────────────────────────────────────────
+// Globale Sicherheitsfunktion: setzt overflow zurück falls Modal vergessen wurde
+function resetBodyOverflow() {
+  var modals = document.querySelectorAll('[id$="-modal"], #mr-modal, #swing-modal, #deep-dive-modal');
+  var anyVisible = false;
+  modals.forEach(function(m) {
+    if (m.style.display !== 'none' && m.offsetParent !== null) anyVisible = true;
+  });
+  if (!anyVisible) {
+    document.body.style.overflow = '';
+    document.body.style.cursor   = '';
+  }
+}
+// Alle 5 Sekunden prüfen (Fallback)
+setInterval(resetBodyOverflow, 5000);
 
 // ── DARK POOL TAB ─────────────────────────────────────────────────────────
 
