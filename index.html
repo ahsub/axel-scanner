@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v174">
+<meta name="app-version" content="20260622-v176">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,6 +14,43 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.5.0/tabler-icons.min.css" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ── CURSOR-BUG FIX: Chart.js setzt intern cursor:crosshair als Inline-Style ─
+// Unterdrücke dies global über Chart.defaults und einen MutationObserver
+document.addEventListener('DOMContentLoaded', function() {
+  // 1) Chart.js default: onHover soll Cursor nicht ändern
+  if (window.Chart && window.Chart.defaults) {
+    window.Chart.defaults.onHover = null;
+  }
+  // 2) MutationObserver: bewacht alle canvas-Elemente und setzt Inline-Cursor zurück
+  var cursorObserver = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      if (m.type === 'attributes' && m.attributeName === 'style') {
+        var el = m.target;
+        if (el.tagName === 'CANVAS' && el.style.cursor && el.style.cursor !== 'default') {
+          el.style.cursor = 'default';
+        }
+      }
+    });
+  });
+  // Observer wird nach kurzem Delay gestartet (Canvas-Elemente werden dynamisch erzeugt)
+  setTimeout(function() {
+    document.querySelectorAll('canvas').forEach(function(c) {
+      cursorObserver.observe(c, { attributes: true });
+    });
+    // Auch neue Canvas-Elemente überwachen (dynamisch erstellt durch Scanner)
+    var bodyObserver = new MutationObserver(function() {
+      document.querySelectorAll('canvas').forEach(function(c) {
+        if (!c._cursorWatched) {
+          c._cursorWatched = true;
+          cursorObserver.observe(c, { attributes: true });
+        }
+      });
+    });
+    bodyObserver.observe(document.body, { childList: true, subtree: true });
+  }, 500);
+});
+</script>
 <style>
 :root {
   --bg: #0d0f12;
@@ -4122,7 +4159,7 @@ function unlockApp(){
   if (!styleTag) {
     styleTag = document.createElement('style');
     styleTag.id = '_cursor_fix';
-    styleTag.textContent = '*, *::before, *::after { cursor: default !important; } button, a, [onclick], select, input[type=checkbox], input[type=radio], label { cursor: pointer !important; } input[type=text], input[type=number], textarea { cursor: text !important; }';
+    styleTag.textContent = '*, *::before, *::after { cursor: default !important; } button, a, [onclick], select, input[type=checkbox], input[type=radio], label { cursor: pointer !important; } input[type=text], input[type=number], input[type=password], input[type=search], textarea { cursor: text !important; } canvas { cursor: default !important; }';
     document.head.appendChild(styleTag);
   }
   setTimeout(function(){ fetchQqqRegime(); }, 800);
@@ -4690,6 +4727,92 @@ window._EU_TICKER_MAP = {
   'HAG':   {sym:'HAG',   sfx:'DE'},  // Hensoldt → HAG.DE
 };
 
+
+// ── KV-FIRST SCANNER ──────────────────────────────────────────────────────────
+// Lädt master_market_data.json aus Cloudflare KV und nutzt diese Daten
+// als Basis für den Scanner — kein Live-API-Call pro Ticker nötig
+
+var _kvMasterData   = null;
+var _kvLoadTime     = 0;
+var _kvLoading      = false;
+var KV_CACHE_MS     = 60 * 60 * 1000; // 1 Stunde
+
+async function loadKVMasterData(force) {
+  if (_kvLoading) return null;
+  if (!force && _kvMasterData && (Date.now() - _kvLoadTime) < KV_CACHE_MS) {
+    return _kvMasterData;
+  }
+
+  _kvLoading = true;
+  try {
+    var koSync   = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
+    var url      = koSync + '/get?key=master_market_data';
+    var r        = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var data     = await r.json();
+    if (!data?.tickers?.length) throw new Error('Keine Ticker in KV');
+
+    // In Map umwandeln für O(1) Zugriff
+    _kvMasterData = {
+      meta:    data.meta,
+      market:  data.market,
+      top40:   data.top40   || [],
+      sectorRS:data.sectorRS || {},
+      bySymbol: {},
+    };
+    data.tickers.forEach(function(t) {
+      _kvMasterData.bySymbol[t.sym] = t;
+    });
+
+    _kvLoadTime = Date.now();
+    var total   = data.tickers.length;
+    var lastTD  = data.meta?.last_trading_day || '?';
+    console.log('[KV-Scanner] ' + total + ' Ticker geladen · Handelstag: ' + lastTD);
+    return _kvMasterData;
+  } catch(e) {
+    console.warn('[KV-Scanner] KV nicht verfügbar:', e.message);
+    return null;
+  } finally {
+    _kvLoading = false;
+  }
+}
+
+function getKVTicker(sym) {
+  if (!_kvMasterData) return null;
+  // Direkter Treffer
+  if (_kvMasterData.bySymbol[sym]) return _kvMasterData.bySymbol[sym];
+  // DE-Ticker: mit .DE suffix versuchen
+  if (_kvMasterData.bySymbol[sym + '.DE']) return _kvMasterData.bySymbol[sym + '.DE'];
+  return null;
+}
+
+function kvDataToTickerData(kvTicker) {
+  // Konvertiert KV-Format in das interne tickerData-Format
+  if (!kvTicker) return null;
+  return {
+    sym:           kvTicker.sym,
+    price:         kvTicker.price,
+    ma50:          kvTicker.ema50,
+    ma200:         kvTicker.ema200,
+    atr:           kvTicker.atr,
+    rsi:           kvTicker.rsi,
+    macd_hist:     kvTicker.macdHist,
+    obv_slope_5d:  kvTicker.obvTrend,
+    bb_pos:        kvTicker.bbPos,
+    overheat:      { score: kvTicker.overheat || 0 },
+    compositeScore:kvTicker.score,
+    grade:         kvTicker.grade,
+    bullCount:     kvTicker.bullSignals,
+    high52:        kvTicker.high52,
+    low52:         kvTicker.low52,
+    vol_ratio:     kvTicker.volRatio,
+    regime:        kvTicker.regime,
+    pBull2Bear:    kvTicker.pBull2Bear,
+    fromKV:        true,
+    updated:       kvTicker.updated,
+  };
+}
+
 async function runScan(){
   // Ticker ermitteln — mit Yahoo Search für Klarnamen
   var rawInput = document.getElementById('custom-input');
@@ -4743,8 +4866,11 @@ async function runScan(){
   const btn=document.getElementById('scan-btn');
   btn.disabled=true;
   document.getElementById('scan-progress').style.display='block';
-  // VIX-Ampel aktualisieren
-  // VIX und QQQ nur laden wenn noch nicht geladen (kein API-Spam beim Scan)
+
+  // ── KV-Daten vorladen (im Hintergrund) ───────────────────────
+  loadKVMasterData(false); // Non-blocking — Daten stehen beim processData() bereit
+
+  // VIX und QQQ nur laden wenn noch nicht geladen
   if (_vixLevel === null) fetchVix().then(function(vix){ renderVixAmpel(vix); });
   else renderVixAmpel(_vixLevel);
   if (!_qqqRegime) { if(window._appUnlocked) fetchQqqRegime(); }
@@ -4764,6 +4890,26 @@ async function runScan(){
     document.getElementById('scan-bar').style.width=((i/tickers.length)*100)+'%';
     try{
       const tf=window.currentTF||'1d';
+
+      // ── KV-FIRST: Prüfe ob Daten aus nächtlichem Aggregator verfügbar ──
+      // Nur für 1T Tageschart UND wenn KV-Daten nicht zu alt (<12h)
+      if (tf === '1d' && _kvMasterData) {
+        var kvT = getKVTicker(t.sym);
+        if (kvT && kvT.price && kvT.score != null) {
+          var kvAge = kvT.updated ? Math.round((Date.now() - new Date(kvT.updated).getTime()) / 3600000) : 99;
+          if (kvAge < 20) { // Max 20 Stunden alt (nach overnight run)
+            // KV-Daten in tickerData-Format konvertieren
+            var kvConverted = kvDataToTickerData(kvT);
+            tickerData[t.sym] = kvConverted;
+            var state = processData(kvConverted);
+            // KV-Badge in state einfügen
+            state.sessionNote = '📦 KV·' + kvAge + 'h';
+            state.fromKV = true;
+            renderCard(t, state);
+            continue;
+          }
+        }
+      }
 
       // ─── Session-aware interval selection ───────────────────────────────
       // DST: MESZ (summer) = UTC+2, MEZ (winter) = UTC+1
