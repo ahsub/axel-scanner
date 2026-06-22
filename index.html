@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v170">
+<meta name="app-version" content="20260622-v171">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17063,12 +17063,15 @@ async function runMorningBriefing() {
   try { cached = JSON.parse(localStorage.getItem(cacheKey)); } catch(e) {}
   var cacheEl  = document.getElementById('morning-cache-info');
 
-  if (cached) {
-    if (cacheEl) cacheEl.textContent = 'Heute ' + cached.time + ' Uhr · gecacht';
-    _applyMorningResults(cached);
-    showToast('Morning Briefing: Gecachte Ergebnisse von ' + cached.time + ' Uhr geladen');
-    return;
-  }
+  // Kein Cache-Rückgriff — Morning Briefing lädt immer alle Daten frisch
+  // Cache wird nur für _applyMorningResults am Ende gespeichert
+
+  // ── Cache IMMER löschen — Morning Briefing lädt immer frisch ──
+  try {
+    localStorage.removeItem('morning_briefing_' + today);
+    if (typeof KoDarkPool !== 'undefined') KoDarkPool.clearCache();
+    if (typeof KoMarketState !== 'undefined') KoMarketState._lastUpdate = null;
+  } catch(e) {}
 
   _morningRunning = true;
   var btn = document.getElementById('morning-btn');
@@ -17076,13 +17079,6 @@ async function runMorningBriefing() {
     if (btn) btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> ' + txt;
   }
   if (cacheEl) cacheEl.textContent = '';
-
-  // Makro-Caches zurücksetzen für frische Daten
-  try {
-    localStorage.removeItem('morning_briefing_' + today);
-    if (typeof KoDarkPool !== 'undefined') KoDarkPool.clearCache();
-    if (typeof KoMarketState !== 'undefined') KoMarketState._lastUpdate = null;
-  } catch(e) {}
 
   var results = {
     date: today,
