@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v195">
+<meta name="app-version" content="20260622-v196">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1950,36 +1950,31 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <button class="nav-btn active" id="nav-scanner" onclick="showPanel('scanner')">
       <i class="ti ti-radar"></i>Scanner
     </button>
-    <button class="nav-btn" id="nav-rechner" onclick="showPanel('rechner')">
-      <i class="ti ti-calculator"></i>Rechner
-    </button>
-    <button class="nav-btn" id="nav-fibo" onclick="showPanel('fibo');buildFiboTab()">
-      <i class="ti ti-chart-arrows-vertical"></i>Fibo
+    <button class="nav-btn" id="nav-alpha" onclick="showPanel('alpha');loadAlphaDashboard()" style="color:#a78bfa">
+      <i class="ti ti-sparkles"></i>Alpha
     </button>
     <button class="nav-btn" id="nav-makro" onclick="showPanel('makro')">
       <i class="ti ti-world"></i>Makro
     </button>
-    <button class="nav-btn" id="nav-journal" onclick="showPanel('journal')">
-      <i class="ti ti-notebook"></i>Journal
+    <button class="nav-btn" id="nav-darkpool" onclick="showPanel('darkpool');loadDarkPool()">
+      <i class="ti ti-building-bank"></i>Dark Pool
     </button>
     <button class="nav-btn" id="nav-backlog" onclick="showPanel('backlog');renderBacklogPanel()">
       <i class="ti ti-archive"></i>Backlog
     </button>
-    <button class="nav-btn" id="nav-darkpool" onclick="showPanel('darkpool');loadDarkPool()">
-      <i class="ti ti-building-bank"></i>Dark Pool
+    <button class="nav-btn" id="nav-journal" onclick="showPanel('journal')">
+      <i class="ti ti-notebook"></i>Journal
+    </button>
+    <button class="nav-btn" id="nav-rechner" onclick="showPanel('rechner')">
+      <i class="ti ti-calculator"></i>Rechner
     </button>
     <button class="nav-btn" id="nav-admin" onclick="showPanel('admin')">
       <i class="ti ti-settings"></i>Admin
     </button>
-
-    <button class="nav-btn" id="nav-alpha" onclick="showPanel('alpha');loadAlphaDashboard()" title="Alpha Trading Desk">
-      <i class="ti ti-sparkles"></i><span style="font-size:9px">Alpha</span>
-    </button>
     <button class="nav-btn" id="nav-sync" onclick="showSyncModal()" title="Cloud Sync">
-      <i class="ti ti-cloud" id="sync-icon"></i><span style="font-size:9px" id="sync-label">Sync</span>
+      <i class="ti ti-cloud" id="sync-icon"></i><span style="font-size:9px" id="sync-label">✓ Sync</span>
     </button>
   </nav>
-</div>
 
 <!-- ── DARK POOL PANEL ────────────────────────────────────────────── -->
 <div id="panel-alpha" class="panel">
