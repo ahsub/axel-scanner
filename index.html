@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v194">
+<meta name="app-version" content="20260622-v195">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1972,6 +1972,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <i class="ti ti-settings"></i>Admin
     </button>
 
+    <button class="nav-btn" id="nav-alpha" onclick="showPanel('alpha');loadAlphaDashboard()" title="Alpha Trading Desk">
+      <i class="ti ti-sparkles"></i><span style="font-size:9px">Alpha</span>
+    </button>
     <button class="nav-btn" id="nav-sync" onclick="showSyncModal()" title="Cloud Sync">
       <i class="ti ti-cloud" id="sync-icon"></i><span style="font-size:9px" id="sync-label">Sync</span>
     </button>
@@ -1979,6 +1982,52 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 
 <!-- ── DARK POOL PANEL ────────────────────────────────────────────── -->
+<div id="panel-alpha" class="panel">
+  <!-- Header -->
+  <div style="padding:.75rem 1rem .5rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:10">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:10px;color:var(--accent);letter-spacing:1.5px;font-weight:600">UNDERLYINGIQ · ALPHA TRADING DESK</div>
+        <div style="font-size:16px;font-weight:700;margin-top:1px">✨ Master Shortlist</div>
+      </div>
+      <button onclick="loadAlphaDashboard(true)" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer">
+        <i class="ti ti-refresh"></i> Refresh
+      </button>
+    </div>
+    <!-- Regime Badge + Meta -->
+    <div id="alpha-meta" style="margin-top:.5rem;font-size:11px;color:var(--text3)">Lade Daten…</div>
+  </div>
+
+  <!-- Market Weather Row -->
+  <div id="alpha-weather" style="padding:.6rem 1rem;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:1rem;flex-wrap:wrap;align-items:center"></div>
+
+  <!-- Strategy Leaderboards (collapsed tabs) -->
+  <div style="padding:.5rem 1rem .25rem;border-bottom:1px solid var(--border)">
+    <div style="font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:.4rem">STRATEGIE LEADERBOARDS</div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap" id="alpha-lb-tabs">
+      <button class="alpha-lb-tab active-lb" data-lb="long_minervini" onclick="switchAlphaLB(this,'long_minervini')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.12);color:var(--green);cursor:pointer">🚀 Minervini</button>
+      <button class="alpha-lb-tab" data-lb="long_swing" onclick="switchAlphaLB(this,'long_swing')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #06b6d4;background:rgba(6,182,212,0.08);color:#06b6d4;cursor:pointer">🔄 Swing</button>
+      <button class="alpha-lb-tab" data-lb="long_mr" onclick="switchAlphaLB(this,'long_mr')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">↩️ Mean Rev.</button>
+      <button class="alpha-lb-tab" data-lb="short_breakdown" onclick="switchAlphaLB(this,'short_breakdown')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--red);background:rgba(239,68,68,0.08);color:var(--red);cursor:pointer">📉 Breakdown</button>
+      <button class="alpha-lb-tab" data-lb="short_fading" onclick="switchAlphaLB(this,'short_fading')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.08);color:#f97316;cursor:pointer">🔝 Fading</button>
+    </div>
+    <div id="alpha-lb-content" style="margin-top:.4rem;min-height:36px;font-size:11px;color:var(--text3)">–</div>
+  </div>
+
+  <!-- Master Shortlist Cards -->
+  <div style="padding:.75rem 1rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+      <div style="font-size:10px;color:var(--text3);letter-spacing:1px">MASTER SHORTLIST — KI-ANGEREICHERT</div>
+      <div style="display:flex;gap:5px">
+        <button onclick="filterAlpha('all')"   id="af-all"   style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--accent);color:#fff;cursor:pointer">Alle</button>
+        <button onclick="filterAlpha('long')"  id="af-long"  style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">🟢 Long</button>
+        <button onclick="filterAlpha('short')" id="af-short" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">🔴 Short</button>
+      </div>
+    </div>
+    <div id="alpha-cards" style="display:flex;flex-direction:column;gap:.6rem"></div>
+  </div>
+</div>
+
 <div id="panel-darkpool" class="panel">
   <div class="sec"><i class="ti ti-building-bank"></i> Dark Pool & Institutional Flow</div>
 
@@ -18275,6 +18324,209 @@ function renderSwingModal(candidates) {
   document.body.style.overflow = 'hidden';
 }
 
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ALPHA TRADING DESK — Executive Dashboard (M2)
+// Liest masterShortlist + leaderboards aus Cloudflare KV
+// ══════════════════════════════════════════════════════════════════════════════
+
+var _alphaData   = null;
+var _alphaFilter = 'all';
+var _alphaLB     = 'long_minervini';
+
+async function loadAlphaDashboard(force) {
+  var metaEl    = document.getElementById('alpha-meta');
+  var cardsEl   = document.getElementById('alpha-cards');
+  var weatherEl = document.getElementById('alpha-weather');
+  if (!metaEl || !cardsEl) return;
+
+  if (!force && _alphaData) { renderAlphaDashboard(_alphaData); return; }
+
+  cardsEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:12px"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Lade Master Shortlist aus KV…</div>';
+
+  try {
+    var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
+    var r = await fetch(koSync + '/sync/master_market_data', {cache:'no-store'});
+    if (!r.ok) throw new Error('KV HTTP ' + r.status);
+    var resp = await r.json();
+    var data = resp.data || resp;
+    _alphaData = data;
+    renderAlphaDashboard(data);
+  } catch(e) {
+    cardsEl.innerHTML = '<div style="color:var(--red);font-size:12px;padding:1rem">⚠️ KV nicht erreichbar: ' + e.message + '<br><span style="color:var(--text3)">Scan durchführen um Daten zu laden.</span></div>';
+  }
+}
+
+function renderAlphaDashboard(data) {
+  var ms   = data.masterShortlist || [];
+  var lb   = data.leaderboards    || {};
+  var sm   = data.strategyMeta    || {};
+  var mkt  = data.market          || {};
+  var meta = data.meta            || {};
+  var vt   = mkt.vixTerm          || {};
+
+  // ── Meta-Zeile ─────────────────────────────────────────────────────────────
+  var metaEl = document.getElementById('alpha-meta');
+  if (metaEl) {
+    var regColor = sm.regimeUsed && sm.regimeUsed.includes('BULL') ? 'var(--green)'
+                 : sm.regimeUsed && sm.regimeUsed.includes('STRESS') ? 'var(--red)' : 'var(--amber)';
+    metaEl.innerHTML =
+      '<span style="color:' + regColor + ';font-weight:600">' + (sm.regimeUsed || '—') + '</span>' +
+      ' · ' + (meta.total || '—') + ' Ticker · ' + (meta.generated || '').slice(0,16) +
+      ' · ' + (sm.enriched ? '<span style="color:var(--green)">✓ KI-angereichert</span>' : '<span style="color:var(--amber)">⚡ ohne KI</span>') +
+      ' · §1 WpHG';
+  }
+
+  // ── Market Weather ──────────────────────────────────────────────────────────
+  var weatherEl = document.getElementById('alpha-weather');
+  if (weatherEl) {
+    var srs = data.sectorRS || {};
+    var topSectors = Object.entries(srs)
+      .filter(function(e){ return e[1] && e[1].rs5 != null; })
+      .sort(function(a,b){ return (b[1].rs5||0) - (a[1].rs5||0); })
+      .slice(0,3).map(function(e){ return e[0]; });
+
+    function pill(label, val, col) {
+      return '<div style="font-size:10px;background:var(--bg3);border-radius:6px;padding:3px 8px;border:0.5px solid var(--border2)">'
+        + '<span style="color:var(--text3)">' + label + '</span> '
+        + '<b style="color:' + (col||'var(--text2)') + '">' + val + '</b></div>';
+    }
+    weatherEl.innerHTML =
+      pill('VIX', vt.vix || '—', vt.vix && vt.vix < 20 ? 'var(--green)' : 'var(--red)') +
+      pill('Term', vt.signal || '—', vt.signal === 'CONTANGO' ? 'var(--green)' : 'var(--red)') +
+      pill('Ratio', vt.ratio || '—') +
+      (topSectors.length ? pill('Top Sektoren', topSectors.join(' · '), 'var(--green)') : '') +
+      pill('Kandidaten', ms.length + '/20');
+  }
+
+  // ── Leaderboard ────────────────────────────────────────────────────────────
+  renderAlphaLB(lb, _alphaLB);
+
+  // ── Shortlist Cards ─────────────────────────────────────────────────────────
+  renderAlphaCards(ms);
+}
+
+function renderAlphaLB(lb, key) {
+  var el = document.getElementById('alpha-lb-content');
+  if (!el) return;
+  var items = (lb || {})[key] || [];
+  if (!items.length) { el.innerHTML = '<span style="color:var(--text3)">Keine Daten</span>'; return; }
+
+  var isShort = key.startsWith('short');
+  var col = key === 'long_minervini' ? 'var(--green)'
+          : key === 'long_swing'     ? '#06b6d4'
+          : key === 'long_mr'        ? 'var(--amber)'
+          : key === 'short_breakdown'? 'var(--red)' : '#f97316';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap';
+  items.slice(0,10).forEach(function(x) {
+    var chip = document.createElement('div');
+    chip.style.cssText = 'font-size:10px;padding:2px 7px;border-radius:5px;background:var(--bg3);border:0.5px solid var(--border2);cursor:pointer';
+    chip.title = 'Score: ' + x.score;
+    chip.innerHTML = '<span style="font-family:var(--mono);font-weight:600;color:' + col + '">' + x.sym + '</span> <span style="color:var(--text3)">' + x.score + '</span>';
+    chip.onclick = (function(s){ return function(){ openDeepDive(s,s); }; })(x.sym);
+    wrap.appendChild(chip);
+  });
+  el.innerHTML = '';
+  el.appendChild(wrap);
+}
+
+function switchAlphaLB(btn, key) {
+  _alphaLB = key;
+  document.querySelectorAll('.alpha-lb-tab').forEach(function(b){ b.style.opacity = '0.5'; });
+  btn.style.opacity = '1';
+  if (_alphaData) renderAlphaLB(_alphaData.leaderboards, key);
+}
+
+function filterAlpha(f) {
+  _alphaFilter = f;
+  ['all','long','short'].forEach(function(x) {
+    var b = document.getElementById('af-' + x);
+    if (b) { b.style.background = x === f ? 'var(--accent)' : 'var(--bg3)'; b.style.color = x === f ? '#fff' : 'var(--text2)'; }
+  });
+  if (_alphaData) renderAlphaCards(_alphaData.masterShortlist || []);
+}
+
+function renderAlphaCards(ms) {
+  var el = document.getElementById('alpha-cards');
+  if (!el) return;
+
+  var filtered = ms.filter(function(c) {
+    if (_alphaFilter === 'long')  return c.strategy.startsWith('long');
+    if (_alphaFilter === 'short') return c.strategy.startsWith('short');
+    return true;
+  });
+
+  if (!filtered.length) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:1rem;text-align:center">Keine Kandidaten für diesen Filter.</div>';
+    return;
+  }
+
+  var stratIcons = {
+    long_minervini: '🚀', long_swing: '🔄', long_mr: '↩️',
+    short_breakdown: '📉', short_fading: '🔝'
+  };
+  var stratLabels = {
+    long_minervini: 'Minervini SEPA', long_swing: 'Swing-Pullback', long_mr: 'Mean Rev. Long',
+    short_breakdown: 'Short Breakdown', short_fading: 'Short Fading'
+  };
+
+  el.innerHTML = filtered.map(function(c, idx) {
+    var isShort  = c.strategy.startsWith('short');
+    var ki       = c.ki || {};
+    var col      = isShort ? 'var(--red)' : 'var(--green)';
+    var bgBorder = isShort ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.1)';
+    var icon     = stratIcons[c.strategy] || '◆';
+    var label    = stratLabels[c.strategy] || c.strategy;
+
+    var kiBlock = '';
+    if (ki.trigger) {
+      var crvColor = ki.crv >= 2.5 ? 'var(--green)' : ki.crv >= 2 ? 'var(--amber)' : 'var(--red)';
+      kiBlock =
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin:.5rem 0;font-size:11px">' +
+        '<div style="background:rgba(34,197,94,0.08);border-radius:5px;padding:4px 6px">' +
+          '<div style="font-size:9px;color:var(--text3)">TRIGGER</div>' +
+          '<div style="font-weight:700;color:var(--green)">$' + ki.trigger + '</div></div>' +
+        '<div style="background:rgba(239,68,68,0.08);border-radius:5px;padding:4px 6px">' +
+          '<div style="font-size:9px;color:var(--text3)">STOP-LOSS</div>' +
+          '<div style="font-weight:700;color:var(--red)">$' + ki.stopLoss + '</div></div>' +
+        '<div style="background:rgba(79,142,247,0.08);border-radius:5px;padding:4px 6px">' +
+          '<div style="font-size:9px;color:var(--text3)">TARGET</div>' +
+          '<div style="font-weight:700;color:var(--accent)">$' + (ki.target || '—') + '</div></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px;margin-bottom:.3rem">' +
+        '<span style="background:var(--bg2);padding:2px 6px;border-radius:4px">CRV <b style="color:' + crvColor + '">' + ki.crv + ':1</b></span>' +
+        '<span style="background:var(--bg2);padding:2px 6px;border-radius:4px">⏱ ' + ki.holdingDays + 'd</span>' +
+        '<span style="background:var(--bg2);padding:2px 6px;border-radius:4px">⚖️ ' + ki.positionPct + '% Depot</span>' +
+        (ki.leverageRec ? '<span style="background:var(--bg2);padding:2px 6px;border-radius:4px;color:var(--text3)">' + ki.leverageRec + '</span>' : '') +
+        '</div>' +
+        (ki.keyRisk ? '<div style="font-size:10px;color:var(--amber);margin-bottom:2px">⚠️ ' + ki.keyRisk + '</div>' : '') +
+        (ki.note ? '<div style="font-size:10px;color:var(--text3)">' + ki.note + '</div>' : '');
+    } else {
+      kiBlock = '<div style="font-size:10px;color:var(--text3);padding:.3rem 0">Kein KI-Enrichment für diesen Kandidaten</div>';
+    }
+
+    return '<div style="background:var(--bg2);border-radius:12px;border:1px solid var(--border);border-left:3px solid ' + col + ';padding:.75rem 1rem;overflow:hidden">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-family:var(--mono);font-size:16px;font-weight:700">' + c.sym + '</span>' +
+          '<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:' + bgBorder + ';color:' + col + '">' + icon + ' ' + label + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+          '<span style="font-size:12px;font-weight:700;color:' + col + '">Score: ' + c.score + '</span>' +
+          '<button data-sym="' + c.sym + '" onclick="openDeepDive(this.dataset.sym,this.dataset.sym)" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer"><i class="ti ti-brain"></i></button>' +
+          (c.price ? '<button data-sym="' + c.sym + '" onclick="useInRechner(this.dataset.sym)" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer"><i class="ti ti-calculator"></i></button>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:.4rem">' +
+        '$' + (c.price || '—') + ' · RSI ' + (c.rsi ? Math.round(c.rsi) : '—') + ' · ATR ' + (c.atr ? c.atr.toFixed(2) : '—') +
+        (c.shortDir ? ' · <span style="color:var(--red)">' + c.shortDir + '</span>' : '') +
+      '</div>' +
+      kiBlock +
+    '</div>';
+  }).join('');
+}
 
 // ── BEAR SCANNER ──────────────────────────────────────────────────────────────
 // Symmetrischer Gegenpart zu Long-Strategien (Gemini-Blueprint)
