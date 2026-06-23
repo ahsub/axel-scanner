@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260623-v202">
+<meta name="app-version" content="20260623-v203">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1595,21 +1595,25 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="td-test-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
       </div>
 
-      <div class="sec">Anthropic API-Key (Auto-Makro)</div>
+      <div class="sec">UnderlyingIQ KI-Zugang</div>
       <div class="card" style="margin-bottom:1rem">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:.5rem">Für automatische KI-Makro-Einschätzung (Auto-Makro Button). Pay-per-use, ~$0.01/Aufruf.</div>
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener"
-           style="display:inline-flex;align-items:center;gap:5px;margin-bottom:.65rem;font-size:12px;color:var(--accent);text-decoration:none;padding:5px 10px;border-radius:6px;background:var(--blue-bg);border:0.5px solid var(--accent)">
-          <i class="ti ti-external-link"></i> Anthropic Console → API Keys
-        </a>
-        <div class="fg" style="margin-bottom:.65rem">
-          <label>Anthropic API-Key</label>
-          <input type="password" id="ant-key-input" placeholder="sk-ant-..." style="font-family:var(--mono)">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:.5rem">
+          KI-Funktionen (Auto-Makro, Morning Briefing, Deep Dive, Dark Pool) laufen über den
+          <b>ko-ai Worker</b> — API-Key und System-Prompts bleiben serverside geschützt.
+          Trage hier deinen persönlichen Zugangs-Token ein.
         </div>
-        <button class="btn btn-primary" onclick="saveAnthropicKey()" style="width:100%">
-          <i class="ti ti-key"></i> Key speichern
+        <div class="fg" style="margin-bottom:.65rem">
+          <label>KI-Zugangs-Token</label>
+          <input type="password" id="ai-token-input" placeholder="uiq-..." style="font-family:var(--mono)"
+                 autocomplete="off">
+        </div>
+        <button class="btn btn-primary" onclick="saveAiToken()" style="width:100%">
+          <i class="ti ti-key"></i> Token speichern
         </button>
-        <div id="ant-key-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Key gespeichert</div>
+        <div id="ai-token-msg" style="display:none;margin-top:.5rem;font-size:12px;color:var(--green)">✓ Token gespeichert</div>
+        <div style="margin-top:.5rem;font-size:11px;color:var(--text3)">
+          Token wird lokal gespeichert · nie an Dritte übermittelt · nur an ko-ai Worker gesendet
+        </div>
       </div>
 
       <!-- OpenAI Key für Whisper -->
@@ -3148,6 +3152,47 @@ const DEFAULT_PIN = '2409';
 // API_BASE ('/api/scan') entfernt — war Überrest des lokalen Dev-Proxys, wird nicht verwendet.
 const PROXY = 'https://my-cors-proxy.ahildebrand.workers.dev/'; // für TwelveData SPY-Fetch (fetchSpyData)
 
+// ── KO-AI Worker — zentraler KI-Proxy (Prompts + API-Key serverside) ────────────
+const KO_AI_WORKER = 'https://ko-ai.ahildebrand.workers.dev';
+
+// Token für Phase 1 (statischer Bearer) — in ko-config.js oder localStorage
+function getAiToken() {
+  if (typeof KoConfig !== 'undefined' && KoConfig.api && KoConfig.api.aiToken) {
+    return KoConfig.api.aiToken;
+  }
+  return localStorage.getItem('ko_ai_token') || '';
+}
+
+// Zentraler KI-Call — ersetzt alle direkten Anthropic-Proxy-Aufrufe
+async function koAiCall(action, payload, expertMode) {
+  const token = getAiToken();
+  if (!token) throw new Error('KI-Token nicht gesetzt — bitte im Admin-Tab eintragen');
+
+  const resp = await fetch(KO_AI_WORKER, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': 'Bearer ' + token,
+    },
+    body: JSON.stringify({
+      action,
+      payload,
+      expert_mode: expertMode || false,
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status }));
+    if (resp.status === 401) throw new Error('KI-Token ungültig — bitte im Admin-Tab aktualisieren');
+    if (resp.status === 429) throw new Error('Rate-Limit erreicht — bitte kurz warten');
+    throw new Error(err.error || 'KI-Worker Fehler ' + resp.status);
+  }
+
+  const data = await resp.json();
+  if (!data.text) throw new Error('Leere Antwort vom KI-Worker');
+  return data.text;
+}
+
 // ── KoSync: Cloud-Sync via ko-sync Worker ──────────────────────────────────────
 const KoSync = {
   BASE: 'https://ko-sync.ahildebrand.workers.dev',
@@ -4359,6 +4404,8 @@ function showPanel(id){
     if(tdInp&&getTwelveKey()) tdInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
     const antInp=document.getElementById('ant-key-input');
     if(antInp&&getAnthropicKey()) antInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
+    const aiTokInp=document.getElementById('ai-token-input');
+    if(aiTokInp&&localStorage.getItem('ko_ai_token')) aiTokInp.placeholder='Token gesetzt ✓ (neu eingeben zum Ändern)';
     loadPortfolioSettings();
     renderAdminWLList();
     try{ schedulerLoadUI(); }catch(e){}
@@ -7305,14 +7352,33 @@ function getAnthropicKey(){ return localStorage.getItem('ko_ant_key') || ''; }
 function setAnthropicKey(k){ localStorage.setItem('ko_ant_key', k.trim()); }
 
 function saveAnthropicKey(){
-  const k = document.getElementById('ant-key-input').value.trim();
+  const k = document.getElementById('ant-key-input') && document.getElementById('ant-key-input').value.trim();
   if(!k){ alert('Bitte Key eingeben'); return; }
   setAnthropicKey(k);
   document.getElementById('ant-key-input').value = '';
   const msg = document.getElementById('ant-key-msg');
-  msg.style.display = 'block';
-  setTimeout(function(){ msg.style.display='none'; }, 3000);
+  if (msg) { msg.style.display = 'block'; setTimeout(function(){ msg.style.display='none'; }, 3000); }
 }
+
+// ── KI-Token (ko-ai Worker) ────────────────────────────────────────────────
+function saveAiToken() {
+  const inp = document.getElementById('ai-token-input');
+  const k = inp ? inp.value.trim() : '';
+  if (!k) { alert('Bitte Token eingeben'); return; }
+  localStorage.setItem('ko_ai_token', k);
+  inp.value = '';
+  inp.placeholder = 'Token gesetzt ✓';
+  const msg = document.getElementById('ai-token-msg');
+  if (msg) { msg.style.display = 'block'; setTimeout(function(){ msg.style.display='none'; }, 3000); }
+}
+
+function clearAiToken() {
+  localStorage.removeItem('ko_ai_token');
+  const inp = document.getElementById('ai-token-input');
+  if (inp) { inp.value = ''; inp.placeholder = 'uiq-...'; }
+  showKoToast('KI-Token gelöscht');
+}
+
 
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -8300,34 +8366,8 @@ async function autoMakro(){
     '- Sprache: Deutsch, professionell aber verständlich';
 
   try {
-    // Anthropic API direkt (Browser-Zugriff mit speziellem Header)
-    const antBody = JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 3000,
-      system: 'Du bist ein Makro-Analyse-Assistent. KRITISCHE REGEL: Verwende NUR die Daten aus dem Prompt. Erfinde KEINE Kurse, Prozentwerte oder Marktdaten. Wenn Daten fehlen: explizit schreiben "Daten nicht verfügbar".',
-      messages: [{ role: 'user', content: prompt }]
-    });
-    // Anthropic immer via Proxy (CORS-Problem bei direktem GitHub Pages Call)
-    const antProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-      + encodeURIComponent('https://api.anthropic.com/v1/messages');
-    const response = await fetch(antProxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-ant-key': antKey },
-      body: antBody
-    });
-
-    if(!response.ok){
-      let errText = '';
-      try { const errJ = await response.json(); errText = errJ.error?.message || JSON.stringify(errJ).substring(0,150); }
-      catch(e2) { try { errText = await response.text(); } catch(e3) { errText = 'Unbekannt'; } }
-      if(response.status === 401) throw new Error('API-Key ungültig oder abgelaufen — bitte neuen Key im Admin-Tab eintragen');
-      if(response.status === 403) throw new Error('API-Key hat keine Berechtigung — Browser-Zugriff nicht erlaubt für diesen Key');
-      if(response.status === 429) throw new Error('Rate-Limit erreicht — bitte kurz warten');
-      throw new Error('Claude API Fehler '+response.status+': '+errText.substring(0,150));
-    }
-
-    const data = await response.json();
-    const text = data.content && data.content[0] && data.content[0].text;
+    // KI-Call via ko-ai Worker (System-Prompt + API-Key serverside)
+    const text = await koAiCall('makro', prompt, false);
     if(!text) throw new Error('Keine Antwort von Claude');
 
     // Parse JSON from response — robust gegen Sonderzeichen und abgeschnittene Antworten
@@ -14624,41 +14664,18 @@ async function openKiBriefing(defaultStrat) {
   const dummy = 'Du bist ein erfahrener Knock-out-Trading-Experte'; // ersetzt durch stratCfg.prompt
 
   try {
-    const makroProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-      + encodeURIComponent('https://api.anthropic.com/v1/messages');
-
-    let response;
+        // KI-Call via ko-ai Worker
+    const _expertMode = typeof _expertModeActive !== 'undefined' && _expertModeActive && typeof _eicUnlocked !== 'undefined' && _eicUnlocked;
+    let _kiText;
     try {
-      response = await fetch(makroProxyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-ant-key': apiKey },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2048,
-          system: 'Du bist ein Trading-Analyse-Assistent. ' +
-            'KRITISCHE REGEL: Verwende AUSSCHLIESSLICH die Daten aus dem Nutzer-Prompt. ' +
-            'Erfinde oder schätze NIEMALS Kurse, Strikes, Prämien oder andere Zahlen. ' +
-            'Der aktuelle Handelskurs steht immer im Feld "Kurs:$XX". ' +
-            'Das Feld "EMA200-Kurs:$XX" ist der gleitende Durchschnitt, NICHT der Handelskurs. ' +
-            'Bei fehlenden Daten: explizit "in IBKR prüfen" schreiben, niemals raten.',
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
+      _kiText = await koAiCall('ki_briefing', prompt, _expertMode);
     } catch(fetchErr) {
       content.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:12px">'
         + '⚠️ Fetch-Fehler: ' + fetchErr.message + '</div>';
       return;
     }
-
-    if (!response.ok) {
-      const errText = await response.text();
-      content.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:12px">'
-        + '⚠️ HTTP ' + response.status + '<br>' + errText.substring(0, 400) + '</div>';
-      return;
-    }
-
-    const data = await response.json();
-    if (!data.content || !data.content[0] || !data.content[0].text) {
+    const _kiData = { content: [{ text: _kiText }] };
+    if (!_kiData.content || !_kiData.content[0] || !_kiData.content[0].text) {
       content.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:12px">'
         + '⚠️ Unerwartete Antwort: ' + JSON.stringify(data).substring(0, 300) + '</div>';
       return;
@@ -16002,23 +16019,7 @@ async function runOversoldScan() {
     + 'Sortiere absteigend nach oversold_score. Nur Titel mit oversold_score >= 40 zurückgeben.';
 
   try {
-    const proxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-      + encodeURIComponent('https://api.anthropic.com/v1/messages');
-
-    const resp = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-ant-key': apiKey },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
-        system: 'Du bist ein technischer Analyse-Assistent. KRITISCHE REGEL: Berechne oversold_score NUR aus den Scanner-Daten im Prompt (MACD, OBV, Score, bullCount). Erfinde KEINE technischen Indikatoren, Kurse oder Werte die nicht im Prompt stehen. Antworte NUR mit validem JSON.',
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    if (!resp.ok) throw new Error('API-Fehler ' + resp.status);
-    const data = await resp.json();
-    const text = (data.content && data.content[0] && data.content[0].text) || '';
+    const text = await koAiCall('oversold', prompt, false);
     const clean = text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
     const results = parsed.candidates || [];
@@ -16626,22 +16627,7 @@ async function runMetaAnalysis() {
     + 'Antworte auf Deutsch, strukturiert 1-5. Max. 350 Wörter. Vollständig abschließen.';
 
   try {
-    const proxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-      + encodeURIComponent('https://api.anthropic.com/v1/messages');
-
-    const resp = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-ant-key': apiKey },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
-        system: 'Du bist ein Trading-Performance-Analyst. KRITISCHE REGEL: Analysiere NUR die KI-Tracking-Daten aus dem Prompt. Erfinde KEINE Kurse, Performance-Zahlen oder Empfehlungen die nicht aus den Tracking-Daten ableitbar sind. Bei fehlenden Daten: explizit "Datenbasis zu klein" schreiben.',
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    if (!resp.ok) throw new Error('API-Fehler ' + resp.status);
-    const data = await resp.json();
-    const text = (data.content && data.content[0] && data.content[0].text) || '';
+    const text = await koAiCall('meta_analysis', prompt, false);
     const formatted = text
       .replace(/^(\d\. [A-ZÄÖÜA-Z\- ]+:?)/gm, '<div style="font-weight:600;color:#818cf8;margin-top:.75rem;margin-bottom:.2rem">$1</div>')
       .replace(/\n/g, '<br>');
@@ -17015,19 +17001,9 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     + '\nNur Messwerte verwenden. Kein Markdown.';
 
   try {
-    var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
-    var res = await fetch(corsProxy + '/?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-ant-key': antKey },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 600,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-    var j = await res.json();
-    var text = j?.content?.[0]?.text || '';
-    if (!text) throw new Error(j?.error?.message || 'Keine Antwort');
+    var _ddExpert = typeof _expertModeActive !== 'undefined' && _expertModeActive && typeof _eicUnlocked !== 'undefined' && _eicUnlocked;
+    var text = await koAiCall('deep_dive', prompt, _ddExpert);
+    if (!text) throw new Error('Keine Antwort vom KI-Worker');
 
     // Markdown → HTML konvertieren
     var html = text
@@ -17821,16 +17797,9 @@ async function runMorningBriefing() {
       var prompt = getMorningBriefingPrompt(messwerteLines, mseRegime, regime, vixZone, results);
 
       try {
-        var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
-        var r = await fetch(corsProxy + '/?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-ant-key': antKey },
-          body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000,
-            messages: [{ role: 'user', content: prompt }] }),
-        });
-        var j = await r.json();
-        results.kiBriefing = j?.content?.[0]?.text || null;
-      } catch(e) { results.kiBriefing = null; }
+        var _mbExpert = typeof _expertModeActive !== 'undefined' && _expertModeActive && typeof _eicUnlocked !== 'undefined' && _eicUnlocked;
+        results.kiBriefing = await koAiCall('morning', prompt, _mbExpert);
+      } catch(e) { console.warn('[Morning] KI-Fehler:', e.message); results.kiBriefing = null; }
     }
 
     // ── Cache + Anzeige ───────────────────────────────────────────
@@ -19271,26 +19240,16 @@ async function generateDpKI(data, scoreObj, signal) {
     }
 
     var proxyUrl = (typeof KoConfig !== 'undefined' ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev')
-      + '/?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages');
 
-    var res = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-ant-key': antKey,
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 400,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    var j = await res.json();
-    var text = j?.content?.[0]?.text || '';
-
+    var text;
+    try {
+      text = await koAiCall('dark_pool', prompt, false);
+    } catch(dpErr) {
+      contentEl.innerHTML = '<div style="color:var(--red);font-size:12px">Fehler: ' + dpErr.message + '</div>';
+      return;
+    }
     if (!text) {
-      contentEl.innerHTML = '<div style="color:var(--red);font-size:12px">Fehler: ' + (j?.error?.message || 'Keine Antwort') + '</div>';
+      contentEl.innerHTML = '<div style="color:var(--red);font-size:12px">Fehler: Keine Antwort vom KI-Worker</div>';
       return;
     }
 
