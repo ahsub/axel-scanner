@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v198">
+<meta name="app-version" content="20260622-v199">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -307,16 +307,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <i class="ti ti-radar" aria-hidden="true"></i>
       <span class="nav-btn-label">Scanner<span class="nav-btn-sub">Aktien scannen &amp; filtern</span></span>
     </button>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">Analyse</div>
+    <button class="nav-btn" id="nav-makro" onclick="showPanel('makro')">
+      <i class="ti ti-world" aria-hidden="true"></i>
+      <span class="nav-btn-label">Makro<span class="nav-btn-sub">VIX · Sektoren · Marktbreite</span></span>
+    </button>
     <button class="nav-btn" id="nav-darkpool" onclick="showPanel('darkpool');loadDarkPool()">
       <i class="ti ti-building-bank" aria-hidden="true"></i>
       <span class="nav-btn-label">Dark Pool<span class="nav-btn-sub">DIX · GEX · Orderflow</span></span>
     </button>
-    <button class="nav-btn" id="nav-makro" onclick="showPanel('makro')">
-      <i class="ti ti-world" aria-hidden="true"></i>
-      <span class="nav-btn-label">Makro<span class="nav-btn-sub">VIX · Sektoren · Stress</span></span>
-    </button>
-    <div class="sidebar-divider"></div>
-    <div class="sidebar-section">Analyse</div>
     <button class="nav-btn" id="nav-rechner" onclick="showPanel('rechner')">
       <i class="ti ti-calculator" aria-hidden="true"></i>
       <span class="nav-btn-label">KO-Rechner<span class="nav-btn-sub">Hebelprodukte berechnen</span></span>
@@ -2030,7 +2030,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
 
   </div><!-- /content -->
-  </div><!-- /main-content -->
+
 
 <!-- ── ALPHA PANEL ────────────────────────────────────────────────── -->
 <!-- ── DARK POOL PANEL ────────────────────────────────────────────── -->
@@ -19372,4 +19372,6 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-market-state.js?v=2.0" defer></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-darkpool.js"></script>
 
-
+  </div><!-- /content -->
+  </div><!-- /main-content -->
+</div><!-- /app -->
