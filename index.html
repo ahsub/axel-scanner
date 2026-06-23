@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260622-v200">
+<meta name="app-version" content="20260623-v201">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2623,19 +2623,19 @@ window.pinSubmit = function(){
 </script>
 
 <!-- ko-config.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@892fe3af7de4af32694f4e91707570ad1dbe4065/ko-config.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-config.js"></script>
 
-<!-- ko-indicators.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-indicators.js?v=1.1"></script>
+<!-- ko-indicators.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-indicators.js"></script>
 
-<!-- ko-scoring.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-scoring.js?v=1.1"></script>
+<!-- ko-scoring.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-scoring.js"></script>
 
-<!-- ko-markov.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-markov.js?v=1.1"></script>
+<!-- ko-markov.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-markov.js"></script>
 
-<!-- ko-data.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-data.js?v=1.1"></script>
+<!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-data.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -3165,8 +3165,8 @@ var _eicUnlocked  = false;
 
 // ─── CONFIG ───────────────────────────────────────────────────────────
 const DEFAULT_PIN = '2409';
-const API_BASE = '/api/scan';
-const PROXY = 'https://my-cors-proxy.ahildebrand.workers.dev/'; // legacy - not used
+// API_BASE ('/api/scan') entfernt — war Überrest des lokalen Dev-Proxys, wird nicht verwendet.
+const PROXY = 'https://my-cors-proxy.ahildebrand.workers.dev/'; // für TwelveData SPY-Fetch (fetchSpyData)
 
 // ── KoSync: Cloud-Sync via ko-sync Worker ──────────────────────────────────────
 const KoSync = {
@@ -3644,13 +3644,9 @@ function ytSetStrategy(btn, strat) {
   }
 }
 
-async function ytPaste() {
-  try {
-    const text = await navigator.clipboard.readText();
-    var inp = document.getElementById('yt-url-input');
-    if (inp) inp.value = text.trim();
-  } catch(e) { showKoToast('Clipboard nicht verfügbar'); }
-}
+// ytPaste: generische Version mit inputId-Parameter oben definiert.
+// Dieser Aufruf ohne Parameter nutzt den hardcoded Default 'yt-url-input':
+function ytPasteDefault() { ytPaste('yt-url-input'); }
 
 function ytShowLoading(msg) {
   document.getElementById('yt-loading').style.display = 'block';
@@ -8333,11 +8329,10 @@ async function autoMakro(){
     });
     // Anthropic immer via Proxy (CORS-Problem bei direktem GitHub Pages Call)
     const antProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-      + encodeURIComponent('https://api.anthropic.com/v1/messages')
-      + '&ant_key=' + encodeURIComponent(antKey);
+      + encodeURIComponent('https://api.anthropic.com/v1/messages');
     const response = await fetch(antProxyUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-ant-key': antKey },
       body: antBody
     });
 
@@ -9018,29 +9013,13 @@ async function debugDEFetch(){
 }
 
 // ─── EARNINGS KALENDER ────────────────────────────────────────────────────────
-const earningsCache = {};
-
-async function fetchEarningsDate(sym){
-  if(earningsCache[sym]) return earningsCache[sym];
-  const fhKey = getFinnhubKey();
-  if(!fhKey) return null;
-  try{
-    const today = new Date();
-    const from = today.toISOString().split('T')[0];
-    const to = new Date(today.getTime()+90*24*60*60*1000).toISOString().split('T')[0];
-    const url = 'https://finnhub.io/api/v1/calendar/earnings?symbol='+sym+'&from='+from+'&to='+to+'&token='+fhKey;
-    const r = await fetch(url);
-    const j = await r.json();
-    if(j.earningsCalendar && j.earningsCalendar.length > 0){
-      const next = j.earningsCalendar[0];
-      const date = next.date;
-      const daysAway = Math.round((new Date(date)-today)/(24*60*60*1000));
-      const result = {date: date, daysAway: daysAway};
-      earningsCache[sym] = result;
-      return result;
-    }
-  } catch(e){}
-  return null;
+// fetchEarningsDate: primäre Implementierung bei Z.4029 (mit localStorage-Cache, fhThrottle, CORS-Proxy)
+// Adapter: daysAway-Alias für lokalen Earnings-Render-Code (nutzt daysUntil aus der primären Impl.)
+async function fetchEarningsDateLocal(sym) {
+  const result = await fetchEarningsDate(sym);
+  if (!result) return null;
+  // Alias daysAway → daysUntil für Kompatibilität mit dem WL-Render-Block
+  return Object.assign({}, result, { daysAway: result.daysUntil });
 }
 
 // ─── WATCHLIST MANAGEMENT ─────────────────────────────────────────────────────
@@ -9281,12 +9260,7 @@ function updateWatchlistDropdown(activeWL) {
   });
 }
 
-function deleteWatchlist(name){
-  const wls = getWatchlists();
-  delete wls[name];
-  localStorage.setItem(WL_KEY, JSON.stringify(wls));
-  updateWatchlistDropdown();
-}
+// deleteWatchlist: primäre Implementierung weiter unten (mit confirm-Dialog und renderWatchlistModal)
 
 function onPresetChange(){
   const val = document.getElementById('ticker-preset').value;
@@ -9424,7 +9398,7 @@ renderCard = function(t, state){
 
   // Async fetch earnings after card renders
   if(window.currentMarket !== 'de' && getFinnhubKey()){
-    fetchEarningsDate(t.sym).then(function(e){
+    fetchEarningsDateLocal(t.sym).then(function(e){
       if(!e) return;
       const cardEl = document.getElementById('card-'+t.sym);
       if(!cardEl) return;
@@ -14671,14 +14645,13 @@ async function openKiBriefing(defaultStrat) {
 
   try {
     const makroProxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-      + encodeURIComponent('https://api.anthropic.com/v1/messages')
-      + '&ant_key=' + encodeURIComponent(apiKey);
+      + encodeURIComponent('https://api.anthropic.com/v1/messages');
 
     let response;
     try {
       response = await fetch(makroProxyUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-ant-key': apiKey },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 2048,
@@ -16050,12 +16023,11 @@ async function runOversoldScan() {
 
   try {
     const proxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-      + encodeURIComponent('https://api.anthropic.com/v1/messages')
-      + '&ant_key=' + encodeURIComponent(apiKey);
+      + encodeURIComponent('https://api.anthropic.com/v1/messages');
 
     const resp = await fetch(proxyUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-ant-key': apiKey },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1500,
@@ -16675,12 +16647,11 @@ async function runMetaAnalysis() {
 
   try {
     const proxyUrl = 'https://my-cors-proxy.ahildebrand.workers.dev/?url='
-      + encodeURIComponent('https://api.anthropic.com/v1/messages')
-      + '&ant_key=' + encodeURIComponent(apiKey);
+      + encodeURIComponent('https://api.anthropic.com/v1/messages');
 
     const resp = await fetch(proxyUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-ant-key': apiKey },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1500,
@@ -19368,9 +19339,9 @@ async function generateDpKI(data, scoreObj, signal) {
 }
 </script>
 
-<!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-market-state.js?v=2.0" defer></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@main/ko-darkpool.js"></script>
+<!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-darkpool.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
