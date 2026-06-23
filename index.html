@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260623-v201">
+<meta name="app-version" content="20260623-v202">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,33 +15,13 @@
 <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.5.0/tabler-icons.min.css" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-// ── CURSOR-BUG FIX v3 ────────────────────────────────────────────────────────
-// Chart.js 4.x setzt canvas.style.cursor direkt im setCursorStyle()-Aufruf.
-// Fix: CSSStyleDeclaration.cursor-Setter für alle Canvas-Elemente überschreiben,
-// sodass nur 'default', 'pointer' und '' durchgelassen werden.
-// Zusätzlich: document.body mousemove-Listener setzt Cursor global zurück.
+// ── CURSOR-BUG FIX v4 ─────────────────────────────────────────────────────────
+// Chart.js 4.x setzt canvas.style.cursor direkt via setCursorStyle().
+// CSS canvas{cursor:default!important} (im Stylesheet unten) verhindert den
+// crosshair-Cursor zuverlässig via Spezifität. Der createElement-Override (v3)
+// wurde entfernt — Monkey Patching von document.createElement ist zu riskant.
+// Dieser Listener korrigiert nur noch Body-Cursor-Drift als Fallback.
 (function() {
-  // Patch: alle künftig erstellten Canvas-Elemente bekommen einen bewachten cursor-Setter
-  var _origCreateElement = document.createElement.bind(document);
-  document.createElement = function(tag) {
-    var el = _origCreateElement(tag);
-    if (typeof tag === 'string' && tag.toLowerCase() === 'canvas') {
-      Object.defineProperty(el.style, 'cursor', {
-        get: function() { return 'default'; },
-        set: function(v) {
-          // Nur harmlose Werte durchlassen
-          if (!v || v === 'default' || v === 'pointer' || v === 'text' || v === 'inherit') {
-            Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'cursor').set.call(this, v || 'default');
-          }
-          // Alles andere (crosshair, wait, progress, move etc.) → ignorieren
-        },
-        configurable: true
-      });
-    }
-    return el;
-  };
-
-  // Fallback: mousemove auf body setzt Cursor zurück falls er sich geändert hat
   document.addEventListener('mousemove', function() {
     if (document.body.style.cursor && document.body.style.cursor !== '' && document.body.style.cursor !== 'default') {
       document.body.style.cursor = '';
@@ -2682,7 +2662,7 @@ class KoWatchlistManager {
         const diff = Object.keys(raw).length - Object.keys(clean).length;
         if (diff > 0) console.log(`[KoWL] Startup-Cleanup: ${Object.keys(raw).length} → ${Object.keys(clean).length} WLs (${diff} Junk entfernt)`);
       }
-    } catch(e) {}
+    } catch(e) { console.warn('[KoWL] Init-Fehler:', e.message); }
   }
 
   // ── BEREINIGUNG ─────────────────────────────────────────────────────────
@@ -2818,7 +2798,7 @@ class KoWatchlistManager {
       if (changedName) ts[changedName] = now;
       else Object.keys(all).forEach(k => { if (!ts[k]) ts[k] = now; });
       localStorage.setItem(this.cfg.perTsKey, JSON.stringify(ts));
-    } catch(e) {}
+    } catch(e) { /* localStorage voll — ignoriert */ }
 
     // Cloud-Sync (fire-and-forget)
     this._syncPush();
@@ -2835,7 +2815,7 @@ class KoWatchlistManager {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: 'watchlist', data: wls, ts: Date.now() })
       });
-    } catch(e) {}
+    } catch(e) { console.warn('[KoWL] syncPush Fehler:', e.message); }
   }
 
   async syncPull() {
@@ -2855,7 +2835,7 @@ class KoWatchlistManager {
         this._emit('change', { action: 'sync-pull' });
         return true;
       }
-    } catch(e) {}
+    } catch(e) { console.warn('[KoWL] syncPull Fehler:', e.message); }
     return false;
   }
 
@@ -3193,7 +3173,7 @@ const KoSync = {
       const r = await fetch(this.BASE + '/sync/' + key);
       if (!r.ok) return null; // 404 = key not yet written, silent
       return await r.json();
-    } catch(e) { return null; } // silent - worker may not be ready
+    } catch(e) { console.warn('[KoWL] pull Fehler:', e.message); return null; }
   },
 
   // Status aller Keys
@@ -5416,7 +5396,7 @@ async function runScan(){
   document.getElementById('scan-label').textContent='Scan abgeschlossen ✓';
   setTimeout(function(){ document.getElementById('scan-progress').style.display='none'; },2000);
   btn.disabled=false;
-  try { autoSaveShortlist(); } catch(e) {}
+  try { autoSaveShortlist(); } catch(e) { console.warn('[Shortlist] autoSave Fehler:', e.message); }
 
   // IV-Toolbar-Button nach Scan immer anzeigen
   var _ivTb = document.getElementById('iv-toolbar-btn');
@@ -7201,7 +7181,7 @@ async function refreshLivePrices(){
   if(makroDateEl){
     const storedMakro = localStorage.getItem('ko_makro');
     let manualDate = '—';
-    try { const m=JSON.parse(storedMakro); manualDate=m.date||'—'; } catch(e){}
+    try { const m=JSON.parse(storedMakro); manualDate=m.date||'—'; } catch(e){ console.warn('[Makro] Parse-Fehler:', e.message); }
     makroDateEl.textContent = now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})
       + ' · Live: ' + timeStr + ' Uhr · Manuell: ' + manualDate;
   }
@@ -17854,7 +17834,7 @@ async function runMorningBriefing() {
     }
 
     // ── Cache + Anzeige ───────────────────────────────────────────
-    try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) {}
+    try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) { console.warn('[Briefing] Cache-Fehler:', e.message); }
     _applyMorningResults(results);
     if (cacheEl) cacheEl.textContent = 'Heute ' + results.time + ' Uhr';
 
@@ -19034,8 +19014,9 @@ function resetBodyOverflow() {
     document.body.style.cursor   = '';
   }
 }
-// Alle 5 Sekunden prüfen (Fallback)
-setInterval(resetBodyOverflow, 5000);
+// Stille Notbremse: prüft alle 30s ob overflow hängt (alle primären Modal-Close-Funktionen
+// setzen overflow='' selbst — dieses Interval ist nur ein letzter Fallback).
+setInterval(resetBodyOverflow, 30000);
 
 // ── DARK POOL TAB ─────────────────────────────────────────────────────────
 
