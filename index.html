@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260623-v203">
+<meta name="app-version" content="20260626-v205">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2610,16 +2610,16 @@ window.pinSubmit = function(){
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-config.js"></script>
 
 <!-- ko-indicators.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-indicators.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-indicators.js"></script>
 
 <!-- ko-scoring.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-scoring.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-scoring.js"></script>
 
 <!-- ko-markov.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-markov.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-markov.js"></script>
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-data.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-data.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -3153,7 +3153,51 @@ const DEFAULT_PIN = '2409';
 const PROXY = 'https://my-cors-proxy.ahildebrand.workers.dev/'; // für TwelveData SPY-Fetch (fetchSpyData)
 
 // ── KO-AI Worker — zentraler KI-Proxy (Prompts + API-Key serverside) ────────────
-const KO_AI_WORKER = 'https://ko-ai.ahildebrand.workers.dev';
+const KO_AI_WORKER   = 'https://ko-ai.ahildebrand.workers.dev';
+const KO_AUTH_WORKER = 'https://ko-auth.ahildebrand.workers.dev';
+
+// ── USER TIER MANAGEMENT ──────────────────────────────────────────────────────
+// Tier wird beim App-Start via ko-auth Worker verifiziert und gecacht
+let _userTier     = null;   // 'free' | 'pro' | 'premium' | 'admin'
+let _userFeatures = null;   // Feature-Objekt vom Worker
+
+const TIER_FEATURES_DEFAULT = {
+  free:    { kiBriefing: false, bearScanner: false, deepDive: false, expertMode: false, maxWatchlists: 1 },
+  pro:     { kiBriefing: true,  bearScanner: true,  deepDive: true,  expertMode: false, maxWatchlists: 10 },
+  premium: { kiBriefing: true,  bearScanner: true,  deepDive: true,  expertMode: true,  maxWatchlists: -1 },
+  admin:   { kiBriefing: true,  bearScanner: true,  deepDive: true,  expertMode: true,  maxWatchlists: -1 },
+};
+
+function getUserTier()     { return _userTier || 'admin'; }  // Fallback admin solange Phase 1
+function getUserFeatures() { return _userFeatures || TIER_FEATURES_DEFAULT['admin']; }
+function hasFeature(feat)  { return getUserFeatures()[feat] === true; }
+
+async function verifyUserToken() {
+  const token = getAiToken();
+  if (!token) { _userTier = 'free'; _userFeatures = TIER_FEATURES_DEFAULT.free; return; }
+  try {
+    const resp = await fetch(KO_AUTH_WORKER + '/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      _userTier     = data.tier     || 'free';
+      _userFeatures = data.features || TIER_FEATURES_DEFAULT[_userTier] || TIER_FEATURES_DEFAULT.free;
+      console.log('[Auth] Tier:', _userTier);
+    } else {
+      // Worker noch nicht deployed → fallback admin (Phase 1)
+      _userTier = 'admin';
+      _userFeatures = TIER_FEATURES_DEFAULT.admin;
+      console.warn('[Auth] ko-auth nicht erreichbar — Fallback admin (Phase 1)');
+    }
+  } catch(e) {
+    // ko-auth noch nicht deployed → kein Crash, Fallback admin
+    _userTier = 'admin';
+    _userFeatures = TIER_FEATURES_DEFAULT.admin;
+    console.warn('[Auth] ko-auth Fehler:', e.message, '— Fallback admin');
+  }
+}
 
 // Token für Phase 1 (statischer Bearer) — in ko-config.js oder localStorage
 function getAiToken() {
@@ -4286,6 +4330,8 @@ function unlockApp(){
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
   window._appUnlocked = true;
+  // User-Tier via ko-auth verifizieren (non-blocking, Fallback admin in Phase 1)
+  verifyUserToken().catch(e => console.warn('[Auth] verifyUserToken:', e.message));
   // Expert-Modus Status wiederherstellen
   setTimeout(initExpertMode, 500);
   // Market Regime Cockpit befüllen
@@ -19280,8 +19326,8 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-market-state.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@2bf921d/ko-darkpool.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-darkpool.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
