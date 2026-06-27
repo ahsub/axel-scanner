@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260627-v208">
+<meta name="app-version" content="20260627-v209">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2608,19 +2608,19 @@ window.pinSubmit = function(){
 </script>
 
 <!-- ko-config.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-config.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-config.js"></script>
 
 <!-- ko-indicators.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-indicators.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-indicators.js"></script>
 
 <!-- ko-scoring.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-scoring.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-scoring.js"></script>
 
 <!-- ko-markov.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-markov.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-markov.js"></script>
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-data.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-data.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -14825,7 +14825,9 @@ var KI_ANTI_HALLUZINATION = '';
 // Initialisierung nach KoPrompts-Load
 function _initKoPrompts() {
   if (typeof KoPrompts === 'undefined') {
-    console.warn('[KoPrompts] Modul nicht geladen — Fallback auf leere Config');
+    // CDN noch nicht geladen — kurz warten und retry
+    console.warn('[KoPrompts] Modul noch nicht geladen — retry in 500ms');
+    setTimeout(_initKoPrompts, 500);
     return;
   }
   KI_STRAT_CONFIG = KoPrompts.STRATEGIES;
@@ -17716,9 +17718,29 @@ function showMorningTearsheet(results) {
   var existing = document.getElementById('tearsheet-modal');
   if (existing) existing.remove();
 
-  var now     = new Date();
-  var dateStr = now.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
-  var timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  var now = new Date();
+  var kvMeta = _kvMasterData && _kvMasterData.meta ? _kvMasterData.meta : null;
+  var lastTradingDay = kvMeta ? (kvMeta.last_trading_day || null) : null;
+  var kvGenerated    = kvMeta ? (kvMeta.generated || null) : null;
+  var dow = now.getUTCDay(); // 0=So, 6=Sa
+  var isWeekendDay = (dow === 0 || dow === 6);
+
+  var dateStr, timeStr, staleBadge = '';
+  if (isWeekendDay && lastTradingDay) {
+    var ltdDate = new Date(lastTradingDay + 'T00:00:00');
+    dateStr = ltdDate.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+    timeStr = 'Börsenschluss';
+    staleBadge = ' · <span style="background:rgba(251,191,36,0.15);color:var(--yellow);padding:1px 6px;border-radius:4px;font-size:10px">Handelsfrei · ' + now.toLocaleDateString('de-DE', {weekday:'long'}) + '</span>';
+  } else if (kvGenerated) {
+    var genDate = new Date(kvGenerated);
+    var ageH = Math.round((Date.now() - genDate.getTime()) / 3600000);
+    dateStr = now.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+    timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+    if (ageH > 20) staleBadge = ' · <span style="background:rgba(251,191,36,0.15);color:var(--yellow);padding:1px 6px;border-radius:4px;font-size:10px">Daten ' + ageH + 'h alt</span>';
+  } else {
+    dateStr = now.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+    timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  }
 
   // Regime-Daten
   var regime  = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '—';
@@ -17769,7 +17791,7 @@ function showMorningTearsheet(results) {
       '<div>' +
         '<div style="font-size:10px;color:#4f6080;letter-spacing:2px;margin-bottom:3px">UNDERLYINGIQ · MORNING BRIEFING</div>' +
         '<div style="font-size:20px;font-weight:700;color:#e8eaf0">' + dateStr + '</div>' +
-        '<div style="font-size:11px;color:#5a6a80;margin-top:2px">Stand: ' + timeStr + ' Uhr · Alle Angaben ohne Gewähr · §1 WpHG</div>' +
+        '<div style="font-size:11px;color:#5a6a80;margin-top:2px">Stand: ' + timeStr + ' Uhr · Alle Angaben ohne Gewähr · §1 WpHG' + staleBadge + '</div>' +
       '</div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
         '<button onclick="printTearsheet()" style="padding:6px 12px;border-radius:8px;border:1px solid #2a2f42;background:#1c2030;color:#8090b0;font-size:11px;cursor:pointer" title="Als PDF drucken"><i class="ti ti-printer"></i> PDF</button>' +
@@ -19127,9 +19149,9 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-market-state.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-darkpool.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-prompts.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-darkpool.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-prompts.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
