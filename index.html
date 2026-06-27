@@ -17546,84 +17546,225 @@ function onEicLock() {
 }
 
 // ── EIC VORSCHLAGSLISTE ──────────────────────────────────────────────────────
+// ── EIC VORSCHLAGSLISTE v2 — Top-5 Unleashed aus masterShortlist ──────────────
 async function loadEicSuggestions() {
   var el = document.getElementById('eic-suggest-content');
   if (!el) return;
   if (!_eicUnlocked || !_expertModeActive) {
-    el.innerHTML = '<span style="color:var(--red)">⛔ Expert-Modus erforderlich</span>';
+    el.innerHTML = '<span style="color:var(--red)">⛔ Expert-Modus + EIC-PIN erforderlich</span>';
     return;
   }
 
-  el.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Lade Kandidaten…';
+  el.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Lade Top-5 Unleashed…';
 
-  var regime  = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : null;
-  var gates   = regime && typeof KoMarketState !== 'undefined' ? KoMarketState.getStrategyGates(regime) : null;
+  var regime = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : 'NEUTRAL';
 
-  // Strategie-Prioritäten aus aktuellem Regime
-  var activeStrats = gates ? Object.entries(gates.strategies)
-    .filter(function(e){ return e[1].active; })
-    .sort(function(a,b){ return a[1].priority - b[1].priority; })
-    .map(function(e){ return e[0]; }) : ['momentum','csp_wheel'];
-
-  var stratLabel = {
-    momentum: 'Momentum/SEPA', swing: 'Swing', csp_wheel: 'CSP/Wheel',
-    meanrev: 'Mean Reversion', breakout: 'Breakout'
-  };
-
-  // Kandidaten aus tickerData + KV filtern
+  // Quelle 1: masterShortlist aus Alpha Desk KV (nach Aggregator-Patch befüllt)
   var candidates = [];
-  var srcData = _kvMasterData ? Object.values(_kvMasterData.bySymbol) : Object.values(tickerData);
+  if (window._alphaData && _alphaData.masterShortlist && _alphaData.masterShortlist.length) {
+    candidates = _alphaData.masterShortlist.map(function(c) {
+      return {
+        sym:      c.sym,
+        score:    c.score,
+        grade:    c.grade || '',
+        strategy: c.strategy || '',
+        rsi:      c.rsi,
+        atr:      c.atr,
+        hvp:      c.hvp,
+        ema50:    c.ema50,
+        ema200:   c.ema200,
+        macdHist: c.macdHist,
+        obvTrend: c.obvTrend,
+        volRatio: c.volRatio,
+        high52:   c.high52,
+        low52:    c.low52,
+        dist200:  c.dist200,
+        price:    c.price,
+        sMinervini: c.sMinervini,
+        sSwing:     c.sSwing,
+        sMrLong:    c.sMrLong,
+        sBreakdown: c.sBreakdown,
+        sFading:    c.sFading,
+        _src: 'kv'
+      };
+    });
+  } else {
+    // Fallback: tickerData / KV bySymbol — Legacy-Pfad
+    var srcData = _kvMasterData ? Object.values(_kvMasterData.bySymbol) : Object.values(tickerData);
+    srcData.forEach(function(t) {
+      if (!t || !t.sym) return;
+      var score = t.score || t.compositeScore || 0;
+      if (score < 50) return;
+      candidates.push({
+        sym: t.sym, score: score, grade: t.grade || '', rsi: t.rsi,
+        atr: t.atr, hvp: t.hvp, price: t.price, strategy: '', _src: 'legacy'
+      });
+    });
+    candidates.sort(function(a,b){ return b.score - a.score; });
+  }
 
-  srcData.forEach(function(t) {
-    if (!t || !t.sym || !t.score && !t.compositeScore) return;
-    var score = t.score || t.compositeScore || 0;
-    var grade = t.grade || t.scoreLabel || '';
-    var rsi   = t.rsi || null;
-    var atr   = t.atr || null;
-    var regime_t = t.regime || '';
-
-    // Regime-spezifische Filter
-    var ok = false;
-    if (activeStrats.includes('momentum') && score >= 65 && ['BULL','SIDEWAYS'].some(function(r){ return regime_t.includes(r); })) ok = true;
-    if (activeStrats.includes('csp_wheel') && score >= 55 && rsi && rsi > 45 && rsi < 70) ok = true;
-    if (activeStrats.includes('meanrev') && rsi && rsi < 32) ok = true;
-    if (activeStrats.includes('breakout') && score >= 70) ok = true;
-    if (activeStrats.includes('swing') && score >= 58 && rsi && rsi < 60) ok = true;
-
-    if (ok) candidates.push({ sym: t.sym, score: score, grade: grade, rsi: rsi, atr: atr, regime: regime_t });
+  // Signal-Clustering (Gemini): Ticker mit mehreren starken Scores bevorzugen
+  // Minervini-Impuls + Markov-Regime = echtes Alpha-Cluster
+  candidates.forEach(function(c) {
+    var scores = [c.sMinervini||0, c.sSwing||0, c.sMrLong||0, c.sBreakdown||0, c.sFading||0];
+    var strongCount = scores.filter(function(s){ return s >= 50; }).length;
+    c._clusterScore = (c.score || 0) + (strongCount >= 3 ? 25 : strongCount >= 2 ? 10 : 0);
   });
+  candidates.sort(function(a,b){ return b._clusterScore - a._clusterScore; });
 
-  // Top 15 nach Score
-  candidates.sort(function(a,b){ return b.score - a.score; });
-  candidates = candidates.slice(0, 15);
+  // Top 5 schärfste Kandidaten
+  candidates = candidates.slice(0, 5);
 
   if (!candidates.length) {
-    el.innerHTML = '<span style="color:var(--text3)">Keine Kandidaten — erst Scan durchführen oder KV laden.</span>';
+    el.innerHTML = '<span style="color:var(--text3)">Keine Kandidaten — Alpha Desk laden oder KV-Daten fehlen.</span>';
     return;
   }
 
-  var regimeHtml = regime && gates
-    ? '<div style="font-size:10px;background:rgba(139,92,246,0.1);border-left:2px solid #8b5cf6;padding:4px 8px;border-radius:4px;margin-bottom:.5rem">'
-      + '<b style="color:#8b5cf6">' + gates.label + '</b> · Aktiv: '
-      + activeStrats.map(function(s){ return stratLabel[s]||s; }).join(', ')
-      + '</div>'
-    : '';
+  var stratIcons = {
+    long_minervini: '🚀', long_swing: '🔄', long_mr: '↩️',
+    short_breakdown: '📉', short_fading: '🔝', '': '◆'
+  };
+  var stratLabels = {
+    long_minervini: 'SEPA', long_swing: 'Swing', long_mr: 'MR Long',
+    short_breakdown: 'Short BD', short_fading: 'Short Fading', '': 'Composite'
+  };
 
-  var rows = candidates.map(function(c) {
+  var srcNote = candidates[0]._src === 'kv' ? 'Alpha Desk masterShortlist' : 'Composite Score Fallback';
+  var regimeBadge = '<div style="font-size:10px;background:rgba(139,92,246,0.12);border-left:2px solid #8b5cf6;padding:4px 8px;border-radius:4px;margin-bottom:.5rem">'
+    + '<b style="color:#8b5cf6">🔬 EIC Unleashed · Top-5</b> · Regime: ' + regime + ' · Quelle: ' + srcNote
+    + '</div>';
+
+  var rows = candidates.map(function(c, i) {
     var col = c.score >= 75 ? 'var(--green)' : c.score >= 55 ? 'var(--accent)' : 'var(--amber)';
-    var rsiTxt = c.rsi ? ' · RSI ' + Math.round(c.rsi) : '';
-    return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid var(--border)">'
-      + '<span style="font-family:var(--mono);font-weight:600;font-size:11px;min-width:52px">' + c.sym + '</span>'
-      + '<span style="font-size:10px;font-weight:700;color:' + col + '">' + c.grade + ' ' + Math.round(c.score) + '</span>'
-      + '<span style="font-size:10px;color:var(--text3)">' + rsiTxt + '</span>'
-      + '<button onclick="eicAddSym(\'' + c.sym + '\')" style="margin-left:auto;font-size:9px;padding:1px 5px;background:rgba(139,92,246,0.15);border:0.5px solid #8b5cf6;color:#8b5cf6;border-radius:4px;cursor:pointer">+ WL</button>'
-      + '</div>';
+    var isShort = (c.strategy || '').startsWith('short');
+    var stratIcon = stratIcons[c.strategy] || '◆';
+    var stratLbl  = stratLabels[c.strategy] || c.strategy || '';
+    var rsiTxt    = c.rsi  ? 'RSI ' + Math.round(c.rsi) : '';
+    var hvpTxt    = c.hvp  != null ? ' · HVP ' + c.hvp : '';
+    var atrTxt    = c.atr  ? ' · ATR $' + c.atr.toFixed(2) : '';
+    var priceTxt  = c.price ? '$' + c.price.toFixed(2) : '';
+
+    // Kandidaten im globalen Array cachen — Button gibt nur Index weiter (kein JSON im HTML-Attribut)
+    window._eicCandidates = window._eicCandidates || [];
+    var eicIdx = window._eicCandidates.length;
+    window._eicCandidates.push({
+      sym: c.sym, price: c.price, rsi: c.rsi, atr: c.atr, hvp: c.hvp,
+      ema50: c.ema50, ema200: c.ema200, macdHist: c.macdHist, obvTrend: c.obvTrend,
+      volRatio: c.volRatio, high52: c.high52, low52: c.low52, dist200: c.dist200,
+      strategy: c.strategy, score: c.score, grade: c.grade, regime: c.regime,
+      sMinervini: c.sMinervini, sSwing: c.sSwing, sMrLong: c.sMrLong,
+      sBreakdown: c.sBreakdown, sFading: c.sFading
+    });
+
+    return '<div style="padding:5px 0;border-bottom:0.5px solid var(--border)">'
+      + '<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">'
+        + '<span style="font-family:var(--mono);font-weight:700;font-size:12px;color:var(--text);min-width:48px">' + c.sym + '</span>'
+        + '<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(139,92,246,0.12);color:#8b5cf6">' + stratIcon + ' ' + stratLbl + '</span>'
+        + '<span style="font-size:10px;font-weight:700;color:' + col + ';margin-left:2px">' + c.grade + ' ' + Math.round(c.score) + '</span>'
+        + '<span style="font-size:10px;color:var(--text3);margin-left:4px">' + priceTxt + '</span>'
+        + '<div style="margin-left:auto;display:flex;gap:4px">'
+          + '<button onclick="eicAddSym(\'' + c.sym + '\')" style="font-size:9px;padding:1px 5px;background:rgba(139,92,246,0.15);border:0.5px solid #8b5cf6;color:#8b5cf6;border-radius:4px;cursor:pointer" title="Zu WL hinzufügen">+ WL</button>'
+          + '<button data-eicidx="' + eicIdx + '" onclick="runEicQuickAnalysis(this)" style="font-size:9px;padding:1px 5px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green);border-radius:4px;cursor:pointer" title="EIC Unleashed Analyse">🔬 Analyse</button>'
+        + '</div>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--text3)">' + rsiTxt + hvpTxt + atrTxt + '</div>'
+      + '<div id="eic-qa-result-' + eicIdx + '" style="display:none;font-size:11px;line-height:1.6;color:var(--text);margin-top:4px;padding:5px 7px;background:var(--bg3);border-radius:5px;border-left:2px solid var(--green)"></div>'
+    + '</div>';
   }).join('');
 
-  el.innerHTML = regimeHtml
-    + '<div style="max-height:220px;overflow-y:auto">' + rows + '</div>'
+  el.innerHTML = regimeBadge
+    + '<div>' + rows + '</div>'
     + '<div style="font-size:9px;color:var(--text3);margin-top:.4rem">'
-    + candidates.length + ' Kandidaten · ' + (regime || 'Kein Regime') + ' · Kein Anlageberatung gem. §1 WpHG</div>';
+    + '🔬 EIC Unleashed · Nur für persönliche Nutzung · Kein öffentliches Angebot</div>';
+}
+
+// ── EIC QUICK-ANALYSE: Unleashed Deep Dive für Einzelkandidaten ───────────────
+async function runEicQuickAnalysis(btn) {
+  if (!_eicUnlocked || !_expertModeActive) return;
+  var idx = parseInt(btn.getAttribute('data-eicidx'), 10);
+  var c = (window._eicCandidates || [])[idx];
+  if (!c) return;
+
+  var resultEl = document.getElementById('eic-qa-result-' + idx);
+  if (!resultEl) return;
+
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  resultEl.style.display = 'block';
+  resultEl.textContent = 'Analyse läuft…';
+
+  // ATR-basierte Strike-Kalkulation
+  var atr     = c.atr || 0;
+  var ema200  = c.ema200 || 0;
+  var price   = c.price || 0;
+  var cspStrike = ema200 > 0 && atr > 0 ? (ema200 - 1.5 * atr).toFixed(2) : 'n/v';
+  var stopLong  = atr > 0 ? (price - 1.5 * atr).toFixed(2) : 'n/v';
+  var stopShort = atr > 0 ? (price + 1.5 * atr).toFixed(2) : 'n/v';
+  var targetL   = atr > 0 ? (price + 3.5 * atr).toFixed(2) : 'n/v';
+  var targetS   = atr > 0 ? (price - 3.5 * atr).toFixed(2) : 'n/v';
+  var koAbstand = atr > 0 ? (2 * atr).toFixed(2) : 'n/v';
+  var koLevel   = atr > 0 && c.strategy && c.strategy.startsWith('short')
+                  ? (price + 2 * atr).toFixed(2) : (price - 2 * atr).toFixed(2);
+  var hebelEst  = atr > 0 && price > 0 ? (price / (2 * atr)).toFixed(1) : 'n/v';
+
+  var isShort = (c.strategy || '').startsWith('short');
+  var stratMap = {
+    long_minervini: 'Minervini SEPA Stage-2-Ausbruch',
+    long_swing:     'Swing-Pullback EMA50-Bounce',
+    long_mr:        'Mean-Reversion Long Kapitulations-Bounce',
+    short_breakdown:'Short Breakdown Death-Cross',
+    short_fading:   'Short Fading FOMO-Klimax'
+  };
+
+  var ctx = [
+    'TICKER: ' + c.sym + ' | STRATEGIE: ' + (stratMap[c.strategy] || c.strategy || 'Composite'),
+    'Kurs: $' + price + ' | RSI: ' + (c.rsi ? Math.round(c.rsi) : 'n/v') + ' | ATR(14): $' + (atr||'n/v'),
+    'EMA50: $' + (c.ema50||'n/v') + ' | EMA200: $' + (ema200||'n/v') + ' | Dist200: ' + (c.dist200 != null ? c.dist200.toFixed(1)+'%' : 'n/v'),
+    'MACD Hist: ' + (c.macdHist != null ? c.macdHist.toFixed(3) : 'n/v') + ' | OBV-Trend: ' + (c.obvTrend != null ? (c.obvTrend > 0 ? '+' : '') + (c.obvTrend/1e6).toFixed(1)+'M' : 'n/v'),
+    'Volumen-Ratio: ' + (c.volRatio != null ? (c.volRatio*100).toFixed(0)+'%' : 'n/v') + ' | HVP: ' + (c.hvp != null ? c.hvp+'%' : 'n/v'),
+    '52W-Hoch: $' + (c.high52||'n/v') + ' | 52W-Tief: $' + (c.low52||'n/v'),
+    'Strategie-Scores: SEPA=' + (c.sMinervini||0) + ' Swing=' + (c.sSwing||0) + ' MR=' + (c.sMrLong||0) + ' BD=' + (c.sBreakdown||0) + ' Fading=' + (c.sFading||0),
+    '--- BERECHNETE PARAMETER (ATR-basiert) ---',
+    'Stop-Loss Long: $' + stopLong + ' | Stop-Loss Short: $' + stopShort,
+    'Ziel Long: $' + targetL + ' | Ziel Short: $' + targetS,
+    'CSP-Strike (EMA200 − 1.5×ATR): $' + cspStrike + ' | DTE: 21–45 Tage | Delta: 0.20–0.30',
+    'KO-Level (2×ATR): $' + koLevel + ' | KO-Abstand: $' + koAbstand + ' | Hebel-Schätzung: ~' + hebelEst + 'x'
+  ].join('\n');
+
+  // Gemini: UNLEASHED EXECUTIVE BRIEFING — 4 Sätze, direkter Start mit Ticker-Symbol
+  var direction = isShort ? 'SHORT' : 'LONG';
+  var hvpNote = c.hvp != null
+    ? (c.hvp < 30
+        ? 'HVP ' + c.hvp + ' NIEDRIG — KEIN Prämienverkauf → Debit-Spread/Long-Option'
+        : c.hvp > 70
+          ? 'HVP ' + c.hvp + ' HOCH — CSP/Credit Spread weit OTM, Delta 0.15–0.20'
+          : 'HVP ' + c.hvp + ' moderat — Standard-Sizing')
+    : 'HVP n/v';
+  var prompt = getKiSystemPrompt('EIC Einzeltitel-Analyse: ' + c.sym)
+    + '\n\n[UNLEASHED EXECUTIVE BRIEFING]\n'
+    + 'Ticker: ' + c.sym + ' | Kurs: $' + price.toFixed(2) + ' | Setup: ' + (stratMap[c.strategy]||'Composite') + ' | Score: ' + c.score + '\n'
+    + 'RSI: ' + (c.rsi ? Math.round(c.rsi) : 'n/v') + ' | ' + hvpNote + '\n'
+    + 'EMA50: $' + (c.ema50||'n/v') + ' | EMA200: $' + (ema200||'n/v') + ' | Dist200: ' + (c.dist200 != null ? c.dist200.toFixed(1)+'%' : 'n/v') + '\n'
+    + 'MACD Hist: ' + (c.macdHist != null ? c.macdHist.toFixed(3) : 'n/v') + ' | OBV: ' + (c.obvTrend != null ? (c.obvTrend>0?'+':'') + (c.obvTrend/1e6).toFixed(1)+'M' : 'n/v') + ' | Vol: ' + (c.volRatio != null ? (c.volRatio*100).toFixed(0)+'%' : 'n/v') + '\n'
+    + '52W H/L: $' + (c.high52||'n/v') + ' / $' + (c.low52||'n/v') + ' | ATR(14): $' + (atr.toFixed(2)||'n/v') + '\n'
+    + 'Scores: SEPA=' + (c.sMinervini||0) + ' Swing=' + (c.sSwing||0) + ' MR=' + (c.sMrLong||0) + ' BD=' + (c.sBreakdown||0) + ' Fading=' + (c.sFading||0) + '\n\n'
+    + 'VORBERECHNETE SETUP-VORGABEN (bestätigen oder begründet adjustieren):\n'
+    + '1. AKTIEN/ETF (' + direction + '): Entry $' + price.toFixed(2) + ' | Stop $' + (isShort ? stopShort : stopLong) + ' | Ziel $' + (isShort ? targetS : targetL) + '\n'
+    + '2. OPTIONEN: Strike $' + cspStrike + ' (EMA200−1.5×ATR) | Delta 0.20–0.25 | DTE 30–45 | ' + hvpNote + '\n'
+    + '3. KO/TURBO ' + direction + ': KO $' + koLevel + ' (2×ATR ' + (isShort?'über':'unter') + ' Kurs) | Hebel ~' + hebelEst + 'x\n\n'
+    + 'ANALYSE-AUFTRAG: Bewerte die 3 Setups in max. 4 Sätzen. '
+    + 'Nenne welches Instrument das beste CRV bietet. '
+    + 'Kein Disclaimer, kein Markdown. Starte direkt mit ' + c.sym + '.';
+
+  try {
+    var text = await koAiCall('deep_dive', prompt, true);
+    resultEl.textContent = text;
+  } catch(e) {
+    resultEl.textContent = '⚠ Fehler: ' + e.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔬 Analyse';
 }
 
 function eicAddSym(sym) {
@@ -17643,21 +17784,36 @@ function eicAddSym(sym) {
 }
 
 // ── EXPERT PROMPT GENERATOR ──────────────────────────────────────────────────
+// ── EIC-KI-UNLEASHED System Prompt v2 ─────────────────────────────────────────
+// Verlässt BaFin-Zurückhaltung bewusst für EIC-verifizierten Eigengebrauch.
+// STRICT NO-HALLUCINATION: Ausschließlich aus gegebenen Messwerten.
 function getKiSystemPrompt(context) {
   if (_expertModeActive && _eicUnlocked) {
-    // EXPERT: Volle Empfehlungen
-    return 'Du bist ein erfahrener quantitativer Portfolio-Manager und Options-Trader. '
-      + 'Analysiere die folgenden Marktdaten und gib konkrete, datenbasierte Handlungsempfehlungen. '
-      + 'REGELN:\n'
-      + '- Basiere ALLE Empfehlungen ausschliesslich auf den gegebenen Messwerten.\n'
-      + '- Erfinde KEINE Kurse, Nachrichten oder externe Ereignisse.\n'
-      + '- Gib KONKRETE Empfehlungen: Richtung (Long/Short), Strategie, Strike-Überlegungen.\n'
-      + '- Bei Optionen: explizite DTE, Delta, Strike-Überlegung basierend auf ATR/IV.\n'
-      + '- Nenne explizit Stop-Loss und Gewinnziel in ATR-Einheiten.\n'
-      + '- Stil: direkt, professionell, keine Haftungshinweise.\n'
+    // ── EIC UNLEASHED: Direkte Empfehlungen, keine Compliance-Sprache ─────────
+    return 'Du bist ein erfahrener quantitativer Portfolio-Manager, Options-Trader und '
+      + 'Knock-out-Produkt-Spezialist. Analysiere die gegebenen Messwerte und gib '
+      + 'KONKRETE, DIREKTE Handlungsempfehlungen.\n\n'
+      + 'STRICT NO-HALLUCINATION — ABSOLUTE PFLICHT:\n'
+      + '- ALLE Aussagen NUR aus den explizit gegebenen Messwerten ableiten.\n'
+      + '- KEINE Kurse, News, Bewertungen oder externe Daten erfinden oder schätzen.\n'
+      + '- Fehlende Werte mit n/v kennzeichnen — niemals interpolieren.\n'
+      + '- ATR ist deine Berechnungseinheit für alle Abstände, Strikes und Stops.\n\n'
+      + 'EMPFEHLUNGS-FORMAT:\n'
+      + '• AKTIEN/ETF: Richtung (Long/Short) + Einstiegsbereich ($-Wert oder ATR-Abstand vom EMA) '
+      + '+ Stop-Loss (1.5–2× ATR unter Entry) + Ziel (3–5× ATR) + Haltezeit in Tagen.\n'
+      + '• OPTIONS (CSP/CC/Spread): Delta 0.20–0.30 · DTE 21–45 Tage · '
+      + 'Strike = EMA200 − n×ATR (konkreten Wert berechnen und nennen) · '
+      + 'Prämien-Erwartung: HVP-basiert (HVP>60=attraktiv, HVP<30=mager).\n'
+      + '• KO-PRODUKTE/TURBOS: Knock-out-Abstand ≥ 2×ATR vom aktuellen Kurs · '
+      + 'Hebelbereich = Kurs÷KO-Abstand (konkreten Bereich nennen, z.B. Hebel 4–6×) · '
+      + 'Basispreis-Logik basierend auf EMA50/EMA200 als Orientierung.\n'
+      + '• HVP-REGEL (zwingend): HVP < 30 → KEIN Prämienverkauf (CSP/CC/Short-Vola) — '
+      + 'stattdessen Debit Calls/Puts oder Debit-Spreads empfehlen. '
+      + 'HVP > 70 → Prämienverkauf (CSP / Credit Spread) weit OTM, Delta 0.15–0.20.\n\n'
+      + 'STIL: Direkt. Professionell. Kein Disclaimer. Keine BaFin-Formulierungen. Kein Markdown.\n'
       + (context ? '\nKONTEXT: ' + context : '');
   } else {
-    // PUBLIC: BaFin-konform
+    // ── PUBLIC: BaFin-konform §1 WpHG ─────────────────────────────────────────
     return 'Du bist ein quantitativer Marktanalyst. '
       + 'Erstelle eine sachliche, deskriptive Daten-Synthese auf Deutsch. '
       + 'ABSOLUTE REGELN:\n'
