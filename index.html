@@ -2621,6 +2621,7 @@ window.pinSubmit = function(){
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-data.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-prompts.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -14770,7 +14771,7 @@ async function openKiBriefing(defaultStrat) {
         + '⚠️ Unerwartete Antwort: ' + JSON.stringify(_kiData).substring(0, 300) + '</div>';
       return;
     }
-    const text = data.content[0].text || '';
+    const text = _kiData.content[0].text || '';
 
     // Text formatieren: Nummern als Abschnitte
     const formatted = text
@@ -17661,7 +17662,10 @@ async function runMorningBriefing() {
       try {
         var _mbExpert = typeof _expertModeActive !== 'undefined' && _expertModeActive && typeof _eicUnlocked !== 'undefined' && _eicUnlocked;
         results.kiBriefing = await koAiCall('morning', prompt, _mbExpert);
-      } catch(e) { console.warn('[Morning] KI-Fehler:', e.message); results.kiBriefing = null; }
+      } catch(e) {
+        console.warn('[Morning] KI-Fehler:', e.message);
+        results.kiBriefing = '⚠️ KI-Fehler: ' + e.message;
+      }
     }
 
     // ── Cache + Anzeige ───────────────────────────────────────────
@@ -17959,6 +17963,12 @@ async function updateRegimeCockpit() {
       }
     } catch(e) {}
   }
+
+  // VIX KV-Fallback wenn Yahoo null
+  if (!vix && typeof _vixFallbackFromKV === 'function') {
+    vix = _vixFallbackFromKV() || null;
+  }
+  if (!vix && _vixLevel) vix = _vixLevel;
 
   // VIX Zone
   var vixZone  = !vix ? 0 : vix < 12 ? 1 : vix < 16 ? 2 : vix < 20 ? 3 : vix < 28 ? 4 : vix < 36 ? 5 : 6;
@@ -19161,7 +19171,6 @@ async function generateDpKI(data, scoreObj, signal) {
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-darkpool.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-prompts.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
