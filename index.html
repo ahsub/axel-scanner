@@ -4332,8 +4332,9 @@ function unlockApp(){
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
   window._appUnlocked = true;
-  // KoPrompts initialisieren (Strategie-Config aus ko-prompts.js Modul)
+  // KoPrompts + UI-Cache initialisieren
   _initKoPrompts();
+  _initUICache();
   // User-Tier via ko-auth verifizieren (non-blocking, Fallback admin in Phase 1)
   verifyUserToken().catch(e => console.warn('[Auth] verifyUserToken:', e.message));
   // Expert-Modus Status wiederherstellen
@@ -4772,6 +4773,15 @@ function setMarket(mkt){
       // Selektion wiederherstellen falls Option noch existiert
       if(_savedVal && Array.from(preset.options).some(function(o){return o.value===_savedVal;})){
         preset.value = _savedVal;
+      } else if (_savedVal && _savedVal.startsWith('wl:')) {
+        // WL-Option nicht gefunden — Custom-Input mit WL-Inhalt befüllen
+        var _wlName = _savedVal.slice(3);
+        var _wls = getWatchlists();
+        if (_wls[_wlName]) {
+          preset.value = 'custom';
+          var _ci = document.getElementById('custom-input');
+          if (_ci) _ci.value = _wls[_wlName];
+        }
       }
     }
   } else {
@@ -5549,16 +5559,15 @@ async function sendMacroState() {
     ? KoConfig.api.koAlert
     : 'https://ko-alert.ahildebrand.workers.dev';
 
-  // State aus DOM lesen
-  var vixEl = document.getElementById('m-vix');
-  var vix   = vixEl ? parseFloat(vixEl.textContent) || null : null;
+  // State aus DOM lesen — robust mit Fallback-Kaskade (Gemini-Fix)
+  var vix = _getVixRobust();
 
   // Breadth: zuerst window._nasdaqBreadthData (zuverlässig), dann DOM-Fallback
   var breadth = null;
   if (window._nasdaqBreadthData && window._nasdaqBreadthData.pct != null) {
     breadth = parseFloat(window._nasdaqBreadthData.pct) || null;
   } else {
-    var breadthEl = document.getElementById('breadth-pct');
+    var breadthEl = (UI && UI.breadthPct) ? UI.breadthPct : document.getElementById('breadth-pct');
     if (breadthEl) {
       var bTxt = (breadthEl.textContent || '').replace('%','').trim();
       breadth = bTxt && bTxt !== '—' ? parseFloat(bTxt) || null : null;
@@ -13088,6 +13097,26 @@ function _vixFallbackFromKV() {
   return null;
 }
 
+// ── VIX-Wert robust lesen (Gemini-Fix) ────────────────────────────────────────
+// Kaskade: #m-vix DOM → _vixLevel global → #rc-vix Scanner-Header → KV-Fallback
+function _getVixRobust() {
+  var rawVix = null;
+  // 1. Makro-Panel DOM (nur wenn befüllt)
+  var vixEl = (UI && UI.mVix) ? UI.mVix : document.getElementById('m-vix');
+  if (vixEl) rawVix = parseFloat(vixEl.textContent) || null;
+  // 2. Globale Variable (von fetchVix() gesetzt)
+  if (!rawVix && typeof _vixLevel !== 'undefined' && _vixLevel) rawVix = _vixLevel;
+  // 3. Scanner-Header Widget (#rc-vix)
+  if (!rawVix) {
+    var rcVixEl = document.getElementById('rc-vix');
+    if (rcVixEl) rawVix = parseFloat(rcVixEl.textContent.replace(/[^\d.]/g, '')) || null;
+  }
+  // 4. KV-Aggregator Fallback (letzter bekannter Wert)
+  if (!rawVix && typeof _vixFallbackFromKV === 'function') rawVix = _vixFallbackFromKV();
+  return rawVix || null;
+}
+
+
 function renderVixAmpel(vix) {
   const el = document.getElementById('vix-ampel');
   if (!el) return;
@@ -14845,6 +14874,26 @@ function _initKoPrompts() {
   KI_ANTI_HALLUZINATION = KoPrompts.KI_ANTI_HALLUZINATION;
   console.log('[KoPrompts] v' + KoPrompts.VERSION + ' geladen — ' + KoPrompts.ids().length + ' Strategien');
 }
+
+// ── UI-ELEMENT CACHE (Gemini-Fix: DOM-Abfrage-Optimierung) ───────────────────
+// Einmalige DOM-Abfrage beim App-Start — verhindert Layout Thrashing
+// Verwendung: UI.mVix statt document.getElementById('m-vix')
+var UI = {};
+function _initUICache() {
+  UI.mVix          = document.getElementById('m-vix');
+  UI.rcVix         = document.getElementById('rc-vix');
+  UI.dpKiAction    = document.getElementById('dp-ki-action-text');
+  UI.kiContent     = document.getElementById('ki-content');
+  UI.macroDate     = document.getElementById('makro-date');
+  UI.breadthPct    = document.getElementById('breadth-pct');
+  UI.intermarket   = document.getElementById('intermarket-score');
+  UI.bullScore     = document.getElementById('bull-score');
+  UI.vixAmpel      = document.getElementById('vix-ampel');
+  UI.qqqBanner     = document.getElementById('qqq-regime-banner');
+  UI.scanContainer = document.getElementById('scan-container');
+  UI.alphaCards    = document.getElementById('alpha-cards');
+}
+
 
 function setKiStrat(btn) {
   // Alle Buttons zurücksetzen - Options-EIC behält lila, Value bleibt gedimmt
@@ -17526,8 +17575,7 @@ async function runMorningBriefing() {
       var dpCache = (typeof KoDarkPool !== 'undefined') ? KoDarkPool._cache : null;
       await updateMarketWeatherWidget(dpCache, null, null);
     }
-    var vixEl = document.getElementById('m-vix');
-    results.vix = vixEl ? parseFloat(vixEl.textContent) || null : null;
+    results.vix = _getVixRobust(); // Gemini-Fix: Fallback-Kaskade
     await new Promise(function(r){ setTimeout(r, 500); });
 
     // ── 2/9: Live-Preise (S&P, Nasdaq, DAX, Öl, Gold) ────────────
@@ -17562,7 +17610,7 @@ async function runMorningBriefing() {
 
     // ── 8/9: Treasury Stress Index ───────────────────────────────
     setStep('8/9 Treasury Stress…');
-    await calcTreasuryStress();
+    try { await calcTreasuryStress(); } catch(e) { console.warn('[Morning 8/9] TSI fehlgeschlagen:', e.message); }
     var tsiEl = document.getElementById('tsi-score');
     results.tsiScore = tsiEl ? parseInt(tsiEl.textContent) || null : null;
     window._lastTsiScore = results.tsiScore;
@@ -17948,10 +17996,9 @@ async function updateRegimeCockpit() {
   if (!cockpit) return;
 
   // VIX aus DOM (wird durch Makro-Tab geladen) oder direkt
-  var vixDom = document.getElementById('m-vix');
-  var vix    = vixDom ? parseFloat(vixDom.textContent) || null : null;
-
-  // Falls VIX noch nicht geladen — kurz via Yahoo holen
+  // VIX robust lesen — Fallback-Kaskade (Gemini-Fix)
+  var vix = _getVixRobust();
+  // Falls immer noch null — Yahoo Finance versuchen
   if (!vix) {
     try {
       var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
@@ -17963,12 +18010,7 @@ async function updateRegimeCockpit() {
       }
     } catch(e) {}
   }
-
-  // VIX KV-Fallback wenn Yahoo null
-  if (!vix && typeof _vixFallbackFromKV === 'function') {
-    vix = _vixFallbackFromKV() || null;
-  }
-  if (!vix && _vixLevel) vix = _vixLevel;
+  if (!vix) vix = _getVixRobust(); // Nochmal nach Yahoo-Versuch
 
   // VIX Zone
   var vixZone  = !vix ? 0 : vix < 12 ? 1 : vix < 16 ? 2 : vix < 20 ? 3 : vix < 28 ? 4 : vix < 36 ? 5 : 6;
