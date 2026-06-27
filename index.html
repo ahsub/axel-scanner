@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260626-v205">
+<meta name="app-version" content="20260627-v206">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3852,7 +3852,7 @@ async function ytAnalyze() {
 
   const antKey = getAntKey ? getAntKey() : localStorage.getItem('ko_ant_key');
   if (!antKey) {
-    ytShowError('Anthropic API-Key fehlt — Admin-Tab → API-Key eintragen');
+    ytShowError('KI-Token fehlt — Admin-Tab → UnderlyingIQ KI-Zugang → Token eintragen');
     return;
   }
 
@@ -8251,9 +8251,9 @@ async function loadIntermarket() {
 }
 
 async function autoMakro(){
-  const antKey = getAnthropicKey();
+  const antKey = getAiToken();
   if(!antKey){
-    alert('Bitte zuerst Anthropic API-Key im Admin-Tab hinterlegen.');
+    alert('Bitte zuerst KI-Token im Admin-Tab unter "UnderlyingIQ KI-Zugang" eintragen.');
     showPanel('admin');
     return;
   }
@@ -14434,9 +14434,9 @@ async function openKiBriefing(defaultStrat) {
   var cfg = KI_STRAT_CONFIG[startStrat];
   if (cfg) document.getElementById('ki-strat-hint').textContent = cfg.hint || '';
 
-  const apiKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_anthropic_key');
-  if (!apiKey) {
-    content.innerHTML = '<div style="color:var(--red);padding:1rem">Kein Anthropic API-Key gesetzt. Bitte im Admin-Tab eintragen.</div>';
+  // KI-Call via ko-ai Worker — kein lokaler API-Key nötig
+  if (!getAiToken()) {
+    content.innerHTML = '<div style="color:var(--red);padding:1rem">KI-Token nicht gesetzt. Bitte im Admin-Tab unter "UnderlyingIQ KI-Zugang" eintragen.</div>';
     return;
   }
 
@@ -15999,9 +15999,8 @@ async function runOversoldScan() {
   const el = document.getElementById('backlog-oversold-list');
   if (!el) return;
 
-  const apiKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_anthropic_key');
-  if (!apiKey) {
-    el.innerHTML = '<div style="color:var(--red);padding:1rem">Kein Anthropic API-Key gesetzt.</div>';
+  if (!getAiToken()) {
+    el.innerHTML = '<div style="color:var(--red);padding:1rem">KI-Token nicht gesetzt — bitte im Admin-Tab eintragen.</div>';
     return;
   }
 
@@ -16151,8 +16150,7 @@ async function checkTrackingPerformance(entryId) {
   const entry = stored.data.find(function(e) { return e.id === entryId; });
   if (!entry) return;
 
-  const apiKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_anthropic_key');
-  if (!apiKey) return;
+  if (!getAiToken()) return;
 
   // Kurse für empfohlene Titel holen
   const syms = entry.recommendations.filter(function(r) { return !r.perfChecked && r.priceAtScan; });
@@ -16628,8 +16626,7 @@ async function runMetaAnalysis() {
   metaEl.style.display = 'block';
   metaEl.innerHTML = '<div style="text-align:center;color:var(--text3)"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Claude analysiert deine Backtesting-Daten...</div>';
 
-  const apiKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_anthropic_key');
-  if (!apiKey) { metaEl.innerHTML = '<div style="color:var(--red)">Kein API-Key gesetzt.</div>'; return; }
+  if (!getAiToken()) { metaEl.innerHTML = '<div style="color:var(--red)">KI-Token nicht gesetzt — bitte im Admin-Tab eintragen.</div>'; return; }
 
   const btStored = TrackingStore.load('backtest_results');
   const winners = TrackingStore.load('winners');
@@ -17005,7 +17002,7 @@ function renderDeepDiveMarket() {
 async function generateDeepDiveKI(sym, name, raw, state) {
   var antKey = typeof getAnthropicKey === 'function' ? getAnthropicKey() : localStorage.getItem('ko_ant_key') || '';
   if (!antKey) {
-    document.getElementById('dd-ki-text').innerHTML = '<div style="color:var(--amber);font-size:12px">⚠ Anthropic API-Key fehlt — bitte im Admin-Tab eintragen.</div>';
+    document.getElementById('dd-ki-text').innerHTML = '<div style="color:var(--amber);font-size:12px">⚠ KI-Token fehlt — bitte im Admin-Tab eintragen.</div>';
     return;
   }
 
@@ -19279,13 +19276,10 @@ async function generateDpKI(data, scoreObj, signal) {
     + '\nNur Messwerte. Keine Erfindungen. Kein Markdown.';
 
   try {
-    var antKey = getAnthropicKey ? getAnthropicKey() : localStorage.getItem('ko_ant_key') || '';
-    if (!antKey) {
-      contentEl.innerHTML = '<div style="color:var(--amber);font-size:12px">⚠ Anthropic API-Key fehlt — bitte im Admin-Tab eintragen.</div>';
+    if (!getAiToken()) {
+      contentEl.innerHTML = '<div style="color:var(--amber);font-size:12px">⚠ KI-Token fehlt — bitte im Admin-Tab eintragen.</div>';
       return;
     }
-
-    var proxyUrl = (typeof KoConfig !== 'undefined' ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev')
 
     var text;
     try {
