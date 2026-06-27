@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260627-v206">
+<meta name="app-version" content="20260627-v207">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3850,7 +3850,7 @@ async function ytAnalyze() {
     url = 'text://direct-input';
   }
 
-  const antKey = getAntKey ? getAntKey() : localStorage.getItem('ko_ant_key');
+  const antKey = getAiToken();
   if (!antKey) {
     ytShowError('KI-Token fehlt — Admin-Tab → UnderlyingIQ KI-Zugang → Token eintragen');
     return;
@@ -17000,7 +17000,7 @@ function renderDeepDiveMarket() {
 }
 
 async function generateDeepDiveKI(sym, name, raw, state) {
-  var antKey = typeof getAnthropicKey === 'function' ? getAnthropicKey() : localStorage.getItem('ko_ant_key') || '';
+  var antKey = getAiToken();
   if (!antKey) {
     document.getElementById('dd-ki-text').innerHTML = '<div style="color:var(--amber);font-size:12px">⚠ KI-Token fehlt — bitte im Admin-Tab eintragen.</div>';
     return;
@@ -17776,7 +17776,7 @@ async function runMorningBriefing() {
 
     // ── 9/9: Auto-Makro KI-Analyse ───────────────────────────────
     setStep('9/9 KI-Makro-Analyse…');
-    var antKey = typeof getAnthropicKey === 'function' ? getAnthropicKey() : localStorage.getItem('ko_ant_key') || '';
+    var antKey = getAiToken();
     if (antKey) {
       // Intermarket-Daten sammeln
       var intermarketScore = document.getElementById('intermarket-score')?.textContent || '—';
@@ -17910,8 +17910,34 @@ function showMorningTearsheet(results) {
   if (existing) existing.remove();
 
   var now     = new Date();
-  var dateStr = now.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
-  var timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+
+  // Wochenend/Stale-Data Erkennung: KV-Daten haben last_trading_day
+  var kvMeta       = _kvMasterData?.meta || null;
+  var lastTradingDay = kvMeta?.last_trading_day || null;
+  var kvGenerated    = kvMeta?.generated || null;
+  var dow            = now.getUTCDay(); // 0=So, 6=Sa
+  var isWeekendDay   = (dow === 0 || dow === 6);
+
+  // Datums-Anzeige: am Wochenende letzten Handelstag zeigen
+  var dateStr, timeStr, staleBadge = '';
+  if (isWeekendDay && lastTradingDay) {
+    // Letzten Handelstag als Datum anzeigen
+    var ltdDate = new Date(lastTradingDay + 'T00:00:00');
+    dateStr = ltdDate.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+    timeStr = 'Börsenschluss';
+    staleBadge = ' · <span style="background:rgba(251,191,36,0.15);color:var(--yellow);padding:1px 6px;border-radius:4px;font-size:10px">Handelsfrei · ' + now.toLocaleDateString('de-DE', {weekday:'long'}) + '</span>';
+  } else if (kvGenerated) {
+    var genDate = new Date(kvGenerated);
+    var ageH = Math.round((Date.now() - genDate.getTime()) / 3600000);
+    dateStr = now.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+    timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+    if (ageH > 20) {
+      staleBadge = ' · <span style="background:rgba(251,191,36,0.15);color:var(--yellow);padding:1px 6px;border-radius:4px;font-size:10px">Daten ' + ageH + 'h alt</span>';
+    }
+  } else {
+    dateStr = now.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+    timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  }
 
   // Regime-Daten
   var regime  = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '—';
@@ -17962,7 +17988,7 @@ function showMorningTearsheet(results) {
       '<div>' +
         '<div style="font-size:10px;color:#4f6080;letter-spacing:2px;margin-bottom:3px">UNDERLYINGIQ · MORNING BRIEFING</div>' +
         '<div style="font-size:20px;font-weight:700;color:#e8eaf0">' + dateStr + '</div>' +
-        '<div style="font-size:11px;color:#5a6a80;margin-top:2px">Stand: ' + timeStr + ' Uhr · Alle Angaben ohne Gewähr · §1 WpHG</div>' +
+        '<div style="font-size:11px;color:#5a6a80;margin-top:2px">Stand: ' + timeStr + ' Uhr · Alle Angaben ohne Gewähr · §1 WpHG' + staleBadge + '</div>' +
       '</div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
         '<button onclick="printTearsheet()" style="padding:6px 12px;border-radius:8px;border:1px solid #2a2f42;background:#1c2030;color:#8090b0;font-size:11px;cursor:pointer" title="Als PDF drucken"><i class="ti ti-printer"></i> PDF</button>' +
@@ -18021,7 +18047,7 @@ function showMorningTearsheet(results) {
     '<div style="padding:1rem 1.5rem;border-bottom:1px solid #1e2438">' +
       '<div style="font-size:9px;color:#4f6080;letter-spacing:1.5px;margin-bottom:.5rem">KI-MARKTANALYSE · CLAUDE SONNET</div>' +
       '<div style="font-size:12px;color:#c8d0e0;line-height:1.7;white-space:pre-wrap">' +
-        (results.kiBriefing || '<span style="color:#4f6080">Kein API-Key hinterlegt — KI-Analyse nicht verfügbar.</span>') +
+        (results.kiBriefing || '<span style="color:#4f6080">KI-Token nicht gesetzt — KI-Analyse nicht verfügbar.</span>') +
       '</div>' +
     '</div>' +
 
@@ -18551,13 +18577,50 @@ function renderAlphaCards(ms) {
           (c.price ? '<button data-sym="' + c.sym + '" onclick="useInRechner(this.dataset.sym)" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer"><i class="ti ti-calculator"></i></button>' : '') +
         '</div>' +
       '</div>' +
-      '<div style="font-size:11px;color:var(--text3);margin-bottom:.4rem">' +
-        '$' + (c.price || '—') + ' · RSI ' + (c.rsi ? Math.round(c.rsi) : '—') + ' · ATR ' + (c.atr ? c.atr.toFixed(2) : '—') +
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:.4rem" id="alpha-meta-' + c.sym + '">' +
+        '<span id="alpha-price-' + c.sym + '">$' + (c.price || '—') + '</span>' +
+        ' · RSI ' + (c.rsi ? Math.round(c.rsi) : '—') +
+        ' · ATR ' + (c.atr ? c.atr.toFixed(2) : '—') +
+        (c.grade ? ' · <span style="color:var(--accent)">' + c.grade + '</span>' : '') +
         (c.shortDir ? ' · <span style="color:var(--red)">' + c.shortDir + '</span>' : '') +
       '</div>' +
+      '<div id="alpha-er-' + c.sym + '" style="margin-bottom:.3rem"></div>' +
       kiBlock +
     '</div>';
   }).join('');
+
+  // ── Async: Earnings-Badge + Live-Preis für Alpha-Karten nachladen ───────────
+  if (window.currentMarket !== 'de' && typeof fetchEarningsDateLocal === 'function') {
+    filtered.forEach(function(c) {
+      fetchEarningsDateLocal(c.sym).then(function(er) {
+        var erEl = document.getElementById('alpha-er-' + c.sym);
+        if (!erEl) return;
+        if (er && er.daysUntil <= 45) {
+          erEl.innerHTML = earningsBadgeHtml(er);
+        }
+      }).catch(function() {});
+    });
+  }
+
+  // Live-Preise via Yahoo Finance aktualisieren
+  filtered.forEach(function(c) {
+    var priceEl = document.getElementById('alpha-price-' + c.sym);
+    if (!priceEl) return;
+    var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(c.sym) + '?interval=1d&range=1d';
+    fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url))
+      .then(function(r) { return r.json(); })
+      .then(function(j) {
+        var price = j?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        var prev  = j?.chart?.result?.[0]?.meta?.chartPreviousClose;
+        if (!price) return;
+        var chg = prev ? ((price - prev) / prev * 100) : 0;
+        var chgColor = chg >= 0 ? 'var(--green)' : 'var(--red)';
+        var chgSign  = chg >= 0 ? '+' : '';
+        priceEl.innerHTML = '<b>$' + price.toFixed(2) + '</b>'
+          + ' <span style="color:' + chgColor + '">' + chgSign + chg.toFixed(2) + '%</span>';
+      })
+      .catch(function() {});
+  });
 }
 
 // ── BEAR SCANNER ──────────────────────────────────────────────────────────────
