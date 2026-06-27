@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260627-v210">
+<meta name="app-version" content="20260627-v210b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -331,7 +331,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="main-content">
   <div class="topbar">
     <div class="topbar-title" id="topbar-panel-title"><i class="ti ti-radar"></i> Scanner</div>
-    <button onclick="showBearScanner()" style="padding:4px 10px;border-radius:6px;border:1px solid var(--red);background:rgba(239,68,68,0.1);color:var(--red);font-size:11px;font-weight:600;cursor:pointer"><i class="ti ti-trending-down"></i> Bear-Scan</button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <a href="/help" target="_blank" title="Bedienungsanleitung" style="padding:4px 9px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-help-circle"></i> Hilfe</a>
+      <button onclick="showBearScanner()" style="padding:4px 10px;border-radius:6px;border:1px solid var(--red);background:rgba(239,68,68,0.1);color:var(--red);font-size:11px;font-weight:600;cursor:pointer"><i class="ti ti-trending-down"></i> Bear-Scan</button>
+    </div>
   </div>
 
   <div class="content">
@@ -6157,7 +6160,20 @@ function processData(raw){
     emaStackScore:emaStackResult.score,emaStackLabel:emaStackResult.label,emaStackDetail:emaStackResult.detail,
     mtfScore:mtfResult.score,mtfLabel:mtfResult.label,mtfDetail:mtfResult.detail,
     pdhlScore:pdhlResult.score,pdhlLabel:pdhlResult.label,pdhlDetail:pdhlResult.detail,
-    newFactorPts:newFactorPts
+    newFactorPts:newFactorPts,
+    // Gemini-Strategie-Scores (v1.0) — alle 5 Strategien
+    strategyScores: (typeof KoScoring !== 'undefined' && KoScoring.calcAllStrategies)
+      ? KoScoring.calcAllStrategies(Object.assign({}, raw, {
+          ma50:  raw.ma50,
+          ma200: raw.ma200,
+          atr:   raw.atr,
+          bbPos: raw.bbPos,
+          dist52wHigh: raw.dist52wHigh,
+          volume_ratio: raw.volume_ratio,
+          _markov: raw._markov,
+          hvp: raw.hvp || null,
+        }))
+      : null,
   });
 }
 
