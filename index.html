@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260627-v209">
+<meta name="app-version" content="20260627-v210">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -424,7 +424,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <button onclick="openKiBriefing('meanrev');hideKiDropdown()" class="ki-dd-btn">↩️ Mean Reversion</button>
             <button onclick="openKiBriefing('breakout');hideKiDropdown()" class="ki-dd-btn">🚀 Breakout</button>
             <button onclick="openKiBriefing('dividend');hideKiDropdown()" class="ki-dd-btn">💰 Dividend Growth</button>
-            <button onclick="openKiBriefing('ludwig');hideKiDropdown()" class="ki-dd-btn" style="color:#a371f7">⚙️ Options-Wheel (EIC)</button>
+            <button onclick="openKiBriefing('ludwig');hideKiDropdown()" class="ki-dd-btn" style="color:#a371f7">⚙️ Options ATM/NA</button>
             <button onclick="openKiBriefing('weekly_income');hideKiDropdown()" class="ki-dd-btn" style="color:#34d399">📅 Options Weekly</button>
             <div style="border-top:0.5px solid var(--border);margin-top:4px;padding-top:4px">
               <button onclick="openKiBriefing();hideKiDropdown()" class="ki-dd-btn" style="color:var(--text3);font-size:10px">🧠 Alle Strategien (Modal)</button>
@@ -1320,7 +1320,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <i class="ti ti-currency-dollar"></i> Kursrahmen für Options-Kandidaten
         </div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;line-height:1.5">
-          Options-Wheel (EIC): ATM-CSP-Strategie · Titel außerhalb des Kursrahmens werden als ungeeignet ausgeschlossen.
+          Options ATM/NA: ATM-CSP · No Assignment
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem">
           <div>
@@ -2022,7 +2022,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div style="display:flex;align-items:center;justify-content:space-between">
       <div>
         <div style="font-size:10px;color:var(--accent);letter-spacing:1.5px;font-weight:600">UNDERLYINGIQ · ALPHA TRADING DESK</div>
-        <div style="font-size:16px;font-weight:700;margin-top:1px">✨ Master Shortlist</div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button id="alpha-tab-shortlist" onclick="switchAlphaTab('shortlist')"
+            style="font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-weight:600">
+            &#x2728; Master Shortlist
+          </button>
+          <button id="alpha-tab-options" onclick="switchAlphaTab('options')"
+            style="font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer">
+            &#x1F3AF; Options-Desk
+          </button>
+        </div>
       </div>
       <button onclick="loadAlphaDashboard(true)" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer">
         <i class="ti ti-refresh"></i> Refresh
@@ -2049,16 +2058,45 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
 
   <!-- Master Shortlist Cards -->
-  <div style="padding:.75rem 1rem">
+  <div id="alpha-panel-shortlist" style="padding:.75rem 1rem">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
-      <div style="font-size:10px;color:var(--text3);letter-spacing:1px">MASTER SHORTLIST — KI-ANGEREICHERT</div>
+      <div style="font-size:10px;color:var(--text3);letter-spacing:1px">MASTER SHORTLIST &mdash; KI-ANGEREICHERT</div>
       <div style="display:flex;gap:5px">
         <button onclick="filterAlpha('all')"   id="af-all"   style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--accent);color:#fff;cursor:pointer">Alle</button>
-        <button onclick="filterAlpha('long')"  id="af-long"  style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">🟢 Long</button>
-        <button onclick="filterAlpha('short')" id="af-short" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">🔴 Short</button>
+        <button onclick="filterAlpha('long')"  id="af-long"  style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">Long</button>
+        <button onclick="filterAlpha('short')" id="af-short" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">Short</button>
       </div>
     </div>
     <div id="alpha-cards" style="display:flex;flex-direction:column;gap:.6rem"></div>
+  </div>
+
+  <!-- Options-Desk Panel (hidden by default) -->
+  <div id="alpha-panel-options" style="display:none;padding:.75rem 1rem">
+    <div style="font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:.25rem">OPTIONS-DESK &mdash; EINKOMMENSSTRATEGIEN</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">Top-50 Kandidaten &middot; HVP-gewichtet &middot; t&auml;glich aktualisiert</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.6rem;padding:.5rem;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+      <div style="font-size:9px;color:var(--text3);width:100%;margin-bottom:2px">KI-ANALYSE:</div>
+      <button onclick="runOptionsKiBriefing('options')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer">Options-Wheel</button>
+      <button onclick="runOptionsKiBriefing('ludwig')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #a371f7;background:rgba(163,113,247,0.1);color:#a371f7;cursor:pointer">Options ATM/NA</button>
+      <button onclick="runOptionsKiBriefing('weekly_income')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #34d399;background:rgba(52,211,153,0.1);color:#34d399;cursor:pointer">Options Weekly</button>
+      <span id="options-ki-status" style="font-size:10px;color:var(--text3);align-self:center"></span>
+    </div>
+    <!-- Strategie-Tabs -->
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.5rem">
+      <button onclick="setOptionsSort('optsScore')" id="osort-all" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-weight:700">Alle</button>
+      <button onclick="setOptionsSort('scoreCsp')" id="osort-csp" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">CSP</button>
+      <button onclick="setOptionsSort('scoreCc')" id="osort-cc" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #06b6d4;background:rgba(6,182,212,0.08);color:#06b6d4;cursor:pointer">Covered Call</button>
+      <button onclick="setOptionsSort('scoreSpread')" id="osort-spread" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.08);color:var(--green);cursor:pointer">Credit Spread</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.6rem;align-items:center">
+      <span style="font-size:10px;color:var(--text3)">HVP-Filter:</span>
+      <button onclick="filterOptionsDesk(35)" id="odf-35" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">&ge;35%</button>
+      <button onclick="filterOptionsDesk(50)" id="odf-50" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer;font-weight:700">&ge;50%</button>
+      <button onclick="filterOptionsDesk(65)" id="odf-65" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--green);background:rgba(34,197,94,0.1);color:var(--green);cursor:pointer">&ge;65%</button>
+    </div>
+    <div id="options-desk-cards" style="display:flex;flex-direction:column;gap:.5rem">
+      <div style="color:var(--text3);font-size:12px;text-align:center;padding:1.5rem">Tab w&auml;hlen um zu laden.</div>
+    </div>
   </div>
 </div>
 
@@ -14436,7 +14474,7 @@ function toggleKiDropdown(anchorEl) {
     { strat:'meanrev',  label:'↩️ Mean Reversion' },
     { strat:'breakout', label:'🚀 Breakout' },
     { strat:'dividend', label:'💰 Dividend Growth' },
-    { strat:'ludwig',        label:'⚙️ Options-Wheel (EIC)' },
+    { strat:'ludwig',        label:'⚙️ Options ATM/NA' },
     { strat:'weekly_income',  label:'📅 Options Weekly' },
   ];
 
@@ -14583,7 +14621,7 @@ async function openKiBriefing(defaultStrat) {
     });
     if (filteredForKI.length === 0) {
       content.innerHTML = '<div style="color:var(--amber);padding:1.25rem;font-size:13px">'
-        + '<strong>Keine geeigneten Kandidaten</strong> für ' + (_kiStrat === 'ludwig' ? 'Options-Wheel (EIC)' : 'Options-Wheel') + ' gefunden.<br><br>'
+        + '<strong>Keine geeigneten Kandidaten</strong> für ' + (_kiStrat === 'ludwig' ? 'Options ATM/NA' : 'Options-Wheel') + ' gefunden.<br><br>'
         + 'Kriterien: Kurs $' + oCfg.minPrice + '–$' + oCfg.maxPrice
         + ' · HVP ≥ ' + oCfg.minHvp + '% · Kein ER in ' + oCfg.erDays + ' Tagen<br><br>'
         + '<span style="color:var(--text3);font-size:11px">Tipp: Konfiguration im Admin-Tab anpassen oder andere Watchlist scannen.</span></div>';
@@ -15208,8 +15246,8 @@ function csvSaveConfirm(tickers) {
         <button class="ki-strat-btn" data-strat="ludwig"
           onclick="setKiStrat(this)"
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #a371f7;background:transparent;color:#a371f7;cursor:pointer"
-          title="Options-Wheel (EIC): ATM-CSP · Systematisches Rollen · 3-Stufen-Roll">
-          ⚙️ Options-Wheel (EIC)
+          title="Options ATM/NA: ATM-CSP · No Assignment · 3-Stufen-Roll">
+          ⚙️ Options ATM/NA
         </button>
         <button class="ki-strat-btn" data-strat="weekly_income"
           onclick="setKiStrat(this)"
@@ -18247,6 +18285,166 @@ function renderSwingModal(candidates) {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ── OPTIONS-DESK (Einkommensstrategien) ──────────────────────────────────────
+var _optionsWatchlist = null;
+var _optionsDeskFilter = 50;
+var _optionsSortKey = 'optsScore';
+
+function setOptionsSort(key) {
+  _optionsSortKey = key;
+  var keyMap = { optsScore:'all', scoreCsp:'csp', scoreCc:'cc', scoreSpread:'spread' };
+  Object.keys(keyMap).forEach(function(k) {
+    var btn = document.getElementById('osort-' + keyMap[k]);
+    if (btn) { btn.style.fontWeight = (k===key) ? '700' : 'normal'; btn.style.opacity = (k===key) ? '1' : '0.6'; }
+  });
+  if (_optionsWatchlist) renderOptionsDeskCards(_optionsWatchlist);
+}
+
+function switchAlphaTab(tab) {
+  var sp = document.getElementById('alpha-panel-shortlist');
+  var op = document.getElementById('alpha-panel-options');
+  var ts = document.getElementById('alpha-tab-shortlist');
+  var to = document.getElementById('alpha-tab-options');
+  if (tab === 'options') {
+    if (sp) sp.style.display = 'none';
+    if (op) op.style.display = 'block';
+    if (ts) { ts.style.background = 'var(--bg2)'; ts.style.color = 'var(--text2)'; ts.style.borderColor = 'var(--border2)'; }
+    if (to) { to.style.background = '#34d399'; to.style.color = '#000'; to.style.borderColor = '#34d399'; }
+    loadOptionsDesk();
+  } else {
+    if (sp) sp.style.display = 'block';
+    if (op) op.style.display = 'none';
+    if (ts) { ts.style.background = 'var(--accent)'; ts.style.color = '#fff'; ts.style.borderColor = 'var(--accent)'; }
+    if (to) { to.style.background = 'var(--bg2)'; to.style.color = 'var(--text2)'; to.style.borderColor = 'var(--border2)'; }
+  }
+}
+
+async function loadOptionsDesk(force) {
+  var cardsEl = document.getElementById('options-desk-cards');
+  if (!cardsEl) return;
+  if (_optionsWatchlist && !force) { renderOptionsDeskCards(_optionsWatchlist); return; }
+  cardsEl.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:12px"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i><div style="margin-top:.4rem">Lade Options-Watchlist...</div></div>';
+  try {
+    var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
+    var r = await fetch(koSync + '/sync/options_watchlist', { cache: 'no-store' });
+    if (!r.ok) throw new Error('KV HTTP ' + r.status);
+    _optionsWatchlist = await r.json();
+    renderOptionsDeskCards(_optionsWatchlist);
+  } catch(e) {
+    console.warn('[OptionsDesk] KV-Fehler:', e.message);
+    cardsEl.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:12px">Options-Watchlist nicht verfuegbar (naechster Aggregator-Lauf abwarten).<br><span style="color:var(--text3)">' + e.message + '</span></div>';
+  }
+}
+
+function filterOptionsDesk(minHvp) {
+  _optionsDeskFilter = minHvp;
+  [35, 50, 65].forEach(function(v) {
+    var btn = document.getElementById('odf-' + v);
+    if (!btn) return;
+    btn.style.fontWeight = (v === minHvp) ? '700' : 'normal';
+    btn.style.opacity = (v === minHvp) ? '1' : '0.6';
+  });
+  if (_optionsWatchlist) renderOptionsDeskCards(_optionsWatchlist);
+}
+
+function renderOptionsDeskCards(data) {
+  var cardsEl = document.getElementById('options-desk-cards');
+  if (!cardsEl) return;
+  var tickers = (data && data.tickers) ? data.tickers : (Array.isArray(data) ? data : []);
+  var generated = (data && data.generated) ? data.generated.slice(0, 16) : '--';
+  var filtered = tickers
+    .filter(function(t) { return (t.hvp || 0) >= _optionsDeskFilter && (t[_optionsSortKey] || 0) > 0; })
+    .sort(function(a, b) { return (b[_optionsSortKey]||0) - (a[_optionsSortKey]||0); });
+  if (!filtered.length) {
+    cardsEl.innerHTML = '<div style="color:var(--text3);text-align:center;padding:1.5rem;font-size:12px">Keine Kandidaten mit HVP &ge; ' + _optionsDeskFilter + '% -- bitte Aggregator-Lauf abwarten</div>';
+    return;
+  }
+  var info = '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">' + filtered.length + ' Kandidaten &middot; Stand: ' + generated + ' &middot; HVP &ge;' + _optionsDeskFilter + '%</div>';
+  cardsEl.innerHTML = info + filtered.map(function(t, idx) {
+    var hvp = t.hvp || 0;
+    var hvpColor = hvp >= 65 ? 'var(--green)' : hvp >= 50 ? 'var(--amber)' : 'var(--text2)';
+    var hvpBadge = hvp >= 65 ? ' &starf;' : hvp >= 50 ? ' &check;' : '';
+    var rsi = t.rsi ? Math.round(t.rsi) : '--';
+    var rsiColor = t.rsi ? (t.rsi > 70 ? 'var(--red)' : t.rsi < 35 ? 'var(--green)' : 'var(--text2)') : 'var(--text3)';
+    var dist200 = (t.dist200 != null) ? ((t.dist200 > 0 ? '+' : '') + t.dist200 + '%') : '--';
+    var d200c = (t.dist200 != null) ? (Math.abs(t.dist200) > 30 ? 'var(--red)' : Math.abs(t.dist200) < 10 ? 'var(--green)' : 'var(--amber)') : 'var(--text3)';
+    var atmStrike = t.price ? ('~$' + (Math.round(t.price / 5) * 5)) : '--';
+    var stopHint = (t.price && t.atr) ? ('$' + (t.price - 2 * t.atr).toFixed(0)) : '--';
+    var grade = t.grade || '';
+    var gc = grade.startsWith('A') ? 'var(--green)' : grade.startsWith('B') ? 'var(--amber)' : 'var(--text3)';
+    return '<div style="background:var(--bg2);border-radius:10px;padding:.6rem .8rem;border:0.5px solid var(--border2)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">'
+      +   '<span style="font-size:14px;font-weight:700">' + (idx+1) + '. ' + t.sym + (grade ? ' <span style="font-size:9px;color:' + gc + '">' + grade + '</span>' : '') + '</span>'
+      +   '<span style="font-size:13px;font-weight:600">$' + (t.price ? t.price.toFixed(2) : '--') + '</span>'
+      + '</div>'
+      + '<div style="display:flex;gap:.8rem;flex-wrap:wrap;font-size:11px;margin-bottom:.2rem">'
+      +   '<span>HVP <b style="color:' + hvpColor + '">' + hvp + '%' + hvpBadge + '</b></span>'
+      +   '<span>RSI <b style="color:' + rsiColor + '">' + rsi + '</b></span>'
+      +   '<span>ATR <b>' + (t.atr ? t.atr.toFixed(2) : '--') + '</b></span>'
+      +   '<span>&Delta;EMA200 <b style="color:' + d200c + '">' + dist200 + '</b></span>'
+      + '</div>'
+      + '<div style="display:flex;gap:.5rem;font-size:10px;margin-top:.2rem">'
+      +   (t.scoreCsp    ? '<span style="color:var(--amber)">CSP <b>' + t.scoreCsp + '</b></span>' : '')
+      +   (t.scoreCc     ? '<span style="color:#06b6d4">CC <b>' + t.scoreCc + '</b></span>' : '')
+      +   (t.scoreSpread ? '<span style="color:var(--green)">Spread <b>' + t.scoreSpread + '</b></span>' : '')
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--text3)">ATM ~' + atmStrike + ' &middot; Stop ~' + stopHint + ' (2 ATR)</div>'
+      + '</div>';
+  }).join('');
+}
+
+async function runOptionsKiBriefing(strat) {
+  if (!getAiToken()) { showKoToast('KI-Token nicht gesetzt'); return; }
+  var statusEl = document.getElementById('options-ki-status');
+  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i>';
+  var tickers = (_optionsWatchlist && _optionsWatchlist.tickers)
+    ? _optionsWatchlist.tickers.filter(function(t){ return (t.hvp||0) >= _optionsDeskFilter; }).slice(0,20)
+    : [];
+  if (!tickers.length) { if (statusEl) statusEl.textContent = 'Keine Daten'; return; }
+  var stratCfg = KI_STRAT_CONFIG[strat];
+  if (!stratCfg) { if (statusEl) statusEl.textContent = 'Fehler: Strategie unbekannt'; return; }
+  var mkCtx = 'MARKTKONTEXT:' + '\n' + 'VIX: ' + (_getVixRobust() || '-') + '\n'
+    + 'Regime: ' + (window._lastQqqRegime || 'neutral') + '\n\n'
+    + 'OPTIONS-WATCHLIST (Top-' + tickers.length + ', HVP>=' + _optionsDeskFilter + '%):' + '\n'
+    + tickers.map(function(t,i){
+        return (i+1) + '. ' + t.sym
+          + ' Kurs:$' + (t.price||'--')
+          + ' HVP:' + (t.hvp||'--') + '%'
+          + ' RSI:' + (t.rsi ? Math.round(t.rsi) : '--')
+          + ' ATR:' + (t.atr||'--')
+          + ' D200:' + (t.dist200!=null ? t.dist200+'%' : '--')
+          + ' Grade:' + (t.grade||'--');
+      }).join('\n');
+  var ctx = { marktkontext: mkCtx, optsCfg: { minPrice:15, maxPrice:150, minHvp:_optionsDeskFilter, goodHvp:50, idealHvp:65, erDays:30, dte:30 }, vixStr: String(_getVixRobust()||'--') };
+  var prompt = stratCfg.prompt(ctx);
+  // Open modal
+  var existing = document.getElementById('ki-modal');
+  if (existing) existing.remove();
+  var label = strat==='ludwig' ? 'Options ATM/NA' : strat==='weekly_income' ? 'Options Weekly' : 'Options-Wheel';
+  var modal = document.createElement('div');
+  modal.id = 'ki-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = '<div style="background:var(--bg);border-radius:16px 16px 0 0;width:100%;max-width:680px;max-height:85vh;overflow-y:auto;padding:1.25rem">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'
+    + '<div><div style="font-size:13px;font-weight:700">KI-Briefing &mdash; Options-Desk</div><div style="font-size:11px;color:var(--text3)">' + label + '</div></div>'
+    + '<button onclick="document.getElementById(\'ki-modal\').remove()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer">&times;</button>'
+    + '</div><div id="ki-content" style="font-size:12px;color:var(--text2)">'
+    + '<div style="text-align:center;padding:2rem;color:var(--text3)"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;font-size:1.5rem"></i><div style="margin-top:.5rem">Analysiere...</div></div>'
+    + '</div><div style="margin-top:.75rem;font-size:10px;color:var(--text3);text-align:center">Keine Anlageberatung &middot; Eigene Pruefung erforderlich</div></div>';
+  document.body.appendChild(modal);
+  try {
+    var text = await koAiCall('ki_briefing', prompt, strat === 'ludwig');
+    var contentEl = document.getElementById('ki-content');
+    if (contentEl) contentEl.innerHTML = '<div style="white-space:pre-wrap;font-size:12px;line-height:1.6">' + text + '</div>';
+    if (statusEl) statusEl.textContent = '';
+  } catch(e) {
+    var contentEl = document.getElementById('ki-content');
+    if (contentEl) contentEl.innerHTML = '<div style="color:var(--red)">Fehler: ' + e.message + '</div>';
+    if (statusEl) statusEl.textContent = '';
+  }
+}
+
 // ALPHA TRADING DESK — Executive Dashboard (M2)
 // Liest masterShortlist + leaderboards aus Cloudflare KV
 // ══════════════════════════════════════════════════════════════════════════════
