@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260627-v210b">
+<meta name="app-version" content="20260627-v211">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -52,7 +52,34 @@
   --radius-sm: 8px;
   --font: 'DM Sans', sans-serif;
   --mono: 'DM Mono', monospace;
+  --font-scale: 1;
 }
+
+/* ── LIGHT MODE ─────────────────────────────────────────────────────────────── */
+body.light-mode {
+  --bg: #f4f6fa;
+  --bg2: #ffffff;
+  --bg3: #eaecf2;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --text: #111827;
+  --text2: #4b5563;
+  --text3: #9ca3af;
+  --accent: #2563eb;
+  --accent2: #1d4ed8;
+  --green: #16a34a;
+  --green-bg: rgba(22,163,74,0.1);
+  --amber: #d97706;
+  --amber-bg: rgba(217,119,6,0.1);
+  --red: #dc2626;
+  --red-bg: rgba(220,38,38,0.1);
+  --blue-bg: rgba(37,99,235,0.1);
+}
+
+/* ── FONT SCALE ──────────────────────────────────────────────────────────────── */
+body { font-size: calc(14px * var(--font-scale)); }
+body.font-lg  { --font-scale: 1.15; }
+body.font-xl  { --font-scale: 1.30; }
 html{cursor:default}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;cursor:inherit}
 button:disabled{cursor:default !important;}
@@ -1597,6 +1624,42 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <i class="ti ti-bug"></i> DE Symbol-Format testen
         </button>
         <div id="td-test-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
+      </div>
+
+      <!-- DARSTELLUNG -->
+      <div class="sec">Darstellung</div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:13px;font-weight:500">Erscheinungsbild</div>
+            <div style="font-size:11px;color:var(--text3)">Dark / Light Mode</div>
+          </div>
+          <div style="display:flex;gap:5px">
+            <button id="theme-dark-btn" onclick="setTheme('dark')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer">🌙 Dark</button>
+            <button id="theme-light-btn" onclick="setTheme('light')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">☀️ Light</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:13px;font-weight:500">Schriftgröße</div>
+            <div style="font-size:11px;color:var(--text3)">Standard / Groß / Sehr groß</div>
+          </div>
+          <div style="display:flex;gap:5px">
+            <button id="font-normal-btn" onclick="setFontSize('normal')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer">A</button>
+            <button id="font-lg-btn" onclick="setFontSize('lg')" style="font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">A</button>
+            <button id="font-xl-btn" onclick="setFontSize('xl')" style="font-size:15px;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">A</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:13px;font-weight:500">KI-Analysesprache</div>
+            <div style="font-size:11px;color:var(--text3)">Fachsprache / Einfache Sprache</div>
+          </div>
+          <button id="simple-lang-toggle" onclick="toggleSimpleLanguage(this)"
+            style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">
+            💬 Einfache Sprache
+          </button>
+        </div>
       </div>
 
       <div class="sec">UnderlyingIQ KI-Zugang</div>
@@ -4368,6 +4431,62 @@ window.pinSubmit = function(){
   if(window._pinEntry === getPin()){ unlockApp(); }
   else { document.getElementById('pin-error').classList.add('show'); window._pinEntry=''; for(var i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'; setTimeout(()=>document.getElementById('pin-error').classList.remove('show'),2000); }
 };
+
+// ── DARSTELLUNG: Theme + Schriftgröße ────────────────────────────────────────
+function setTheme(mode) {
+  document.body.classList.toggle('light-mode', mode === 'light');
+  localStorage.setItem('ko_theme', mode);
+  var db = document.getElementById('theme-dark-btn');
+  var lb = document.getElementById('theme-light-btn');
+  if (db) { db.style.background = mode==='dark' ? 'var(--accent)' : 'var(--bg3)'; db.style.color = mode==='dark' ? '#fff' : 'var(--text2)'; db.style.borderColor = mode==='dark' ? 'var(--accent)' : 'var(--border2)'; }
+  if (lb) { lb.style.background = mode==='light' ? 'var(--accent)' : 'var(--bg3)'; lb.style.color = mode==='light' ? '#fff' : 'var(--text2)'; lb.style.borderColor = mode==='light' ? 'var(--accent)' : 'var(--border2)'; }
+}
+
+function setFontSize(size) {
+  document.body.classList.remove('font-lg', 'font-xl');
+  if (size === 'lg') document.body.classList.add('font-lg');
+  if (size === 'xl') document.body.classList.add('font-xl');
+  localStorage.setItem('ko_fontsize', size);
+  ['normal','lg','xl'].forEach(function(s) {
+    var btn = document.getElementById('font-' + s + '-btn');
+    if (btn) { btn.style.background = s===size ? 'var(--accent)' : 'var(--bg3)'; btn.style.color = s===size ? '#fff' : 'var(--text2)'; btn.style.borderColor = s===size ? 'var(--accent)' : 'var(--border2)'; }
+  });
+}
+
+function _initTheme() {
+  var theme = localStorage.getItem('ko_theme') || 'dark';
+  var fsize = localStorage.getItem('ko_fontsize') || 'normal';
+  setTheme(theme);
+  setFontSize(fsize);
+  // Einfache Sprache wiederherstellen
+  _simpleLanguage = localStorage.getItem('ko_simple_lang') === '1';
+  var slBtn = document.getElementById('simple-lang-toggle');
+  if (slBtn && _simpleLanguage) {
+    slBtn.style.background = 'var(--green)'; slBtn.style.color = '#fff';
+    slBtn.style.borderColor = 'var(--green)'; slBtn.textContent = '✓ Einfache Sprache AN';
+  }
+}
+
+// ── EINFACHE SPRACHE Toggle ──────────────────────────────────────────────────
+var _simpleLanguage = false;
+
+function toggleSimpleLanguage(btn) {
+  _simpleLanguage = !_simpleLanguage;
+  localStorage.setItem('ko_simple_lang', _simpleLanguage ? '1' : '0');
+  if (btn) {
+    btn.style.background = _simpleLanguage ? 'var(--green)' : 'var(--bg3)';
+    btn.style.color = _simpleLanguage ? '#fff' : 'var(--text2)';
+    btn.style.borderColor = _simpleLanguage ? 'var(--green)' : 'var(--border2)';
+    btn.textContent = _simpleLanguage ? '✓ Einfache Sprache AN' : '💬 Einfache Sprache';
+  }
+  showKoToast(_simpleLanguage ? '✓ KI schreibt jetzt in einfacher Sprache' : 'KI schreibt jetzt in Fachsprache');
+}
+
+function getSimpleLangSuffix() {
+  if (!_simpleLanguage) return '';
+  return '\n\n== SPRACHE ==\nSchreibe diese Analyse in einfacher, verständlicher Alltagssprache. Vermeide Fachbegriffe wo möglich. Wenn du Fachbegriffe verwendest, erkläre sie kurz in Klammern. Halte Sätze kurz. Ziel: auch Börseneinsteiger sollen die Analyse verstehen.';
+}
+
 function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
@@ -4376,6 +4495,7 @@ function unlockApp(){
   // KoPrompts + UI-Cache initialisieren
   _initKoPrompts();
   _initUICache();
+  _initTheme();
   // User-Tier via ko-auth verifizieren (non-blocking, Fallback admin in Phase 1)
   verifyUserToken().catch(e => console.warn('[Auth] verifyUserToken:', e.message));
   // Expert-Modus Status wiederherstellen
