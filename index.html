@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260627-v207">
+<meta name="app-version" content="20260627-v208">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -424,7 +424,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <button onclick="openKiBriefing('meanrev');hideKiDropdown()" class="ki-dd-btn">↩️ Mean Reversion</button>
             <button onclick="openKiBriefing('breakout');hideKiDropdown()" class="ki-dd-btn">🚀 Breakout</button>
             <button onclick="openKiBriefing('dividend');hideKiDropdown()" class="ki-dd-btn">💰 Dividend Growth</button>
-            <button onclick="openKiBriefing('ludwig');hideKiDropdown()" class="ki-dd-btn" style="color:#a371f7">⚙️ Optionen (E. Ludwig)</button>
+            <button onclick="openKiBriefing('ludwig');hideKiDropdown()" class="ki-dd-btn" style="color:#a371f7">⚙️ Options-Wheel (EIC)</button>
+            <button onclick="openKiBriefing('weekly_income');hideKiDropdown()" class="ki-dd-btn" style="color:#34d399">📅 Options Weekly</button>
             <div style="border-top:0.5px solid var(--border);margin-top:4px;padding-top:4px">
               <button onclick="openKiBriefing();hideKiDropdown()" class="ki-dd-btn" style="color:var(--text3);font-size:10px">🧠 Alle Strategien (Modal)</button>
             </div>
@@ -1319,7 +1320,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <i class="ti ti-currency-dollar"></i> Kursrahmen für Options-Kandidaten
         </div>
         <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;line-height:1.5">
-          Ludwig & Options-Wheel: Titel außerhalb dieses Kursrahmens werden als ungeeignet ausgeschlossen.
+          Options-Wheel (EIC): ATM-CSP-Strategie · Titel außerhalb des Kursrahmens werden als ungeeignet ausgeschlossen.
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem">
           <div>
@@ -4330,6 +4331,8 @@ function unlockApp(){
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
   window._appUnlocked = true;
+  // KoPrompts initialisieren (Strategie-Config aus ko-prompts.js Modul)
+  _initKoPrompts();
   // User-Tier via ko-auth verifizieren (non-blocking, Fallback admin in Phase 1)
   verifyUserToken().catch(e => console.warn('[Auth] verifyUserToken:', e.message));
   // Expert-Modus Status wiederherstellen
@@ -5104,7 +5107,13 @@ async function runScan(){
   document.getElementById('scan-progress').style.display='block';
 
   // ── KV-Daten vorladen (im Hintergrund) ───────────────────────
-  loadKVMasterData(false); // Non-blocking — Daten stehen beim processData() bereit
+  loadKVMasterData(false).then(function() {
+    // Nach KV-Load: VIX-Fallback prüfen falls noch nicht gesetzt
+    if (_vixLevel === null) {
+      var kvVix = _vixFallbackFromKV();
+      if (kvVix) renderVixAmpel(kvVix);
+    }
+  }).catch(function() {});
 
   // VIX und QQQ nur laden wenn noch nicht geladen
   if (_vixLevel === null) fetchVix().then(function(vix){ renderVixAmpel(vix); });
@@ -13017,13 +13026,16 @@ async function fetchVix() {
   const now = Date.now();
   if (_vixLevel !== null && now - _vixLastFetch < VIX_TTL) return _vixLevel;
   const key = getTwelveKey();
-  if (!key) return null;
+  if (!key) {
+    // Fallback: KV-Daten aus letztem Aggregator-Lauf
+    return _vixFallbackFromKV();
+  }
   try {
     // VIX via Yahoo Finance (^VIX) - Twelve Data Free Plan hat keinen VIX
     const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/%5EVIX?interval=1d&range=5d';
     const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(yfUrl);
     const r = await fetch(proxy);
-    if (!r.ok) return null;
+    if (!r.ok) return _vixFallbackFromKV();
     const j = await r.json();
     const result = j.chart && j.chart.result && j.chart.result[0];
     if (result && result.indicators && result.indicators.quote) {
@@ -13032,7 +13044,6 @@ async function fetchVix() {
         _vixLevel = parseFloat(closes[closes.length - 1].toFixed(2));
         _vixLastFetch = now;
         // Einheitliche VIX-Quelle: #m-vix DOM mit echtem ^VIX-Wert befüllen
-        // (ersetzt den alten VIXY-ETF-Wert der erheblich abwich)
         const vixDomEl = document.getElementById('m-vix');
         if (vixDomEl) {
           vixDomEl.textContent = _vixLevel.toFixed(2);
@@ -13042,6 +13053,27 @@ async function fetchVix() {
       }
     }
   } catch(e) { console.log('VIX fetch error:', e.message); }
+  // Fallback: letzter bekannter VIX aus KV-Aggregator
+  return _vixFallbackFromKV();
+}
+
+function _vixFallbackFromKV() {
+  // Versuche VIX aus geladenen KV-Daten zu holen (letzter Handelstag)
+  var kvVix = _kvMasterData?.market?.vixTerm?.vix || null;
+  if (kvVix) {
+    var vixVal = parseFloat(kvVix);
+    if (!isNaN(vixVal)) {
+      var lastTD = _kvMasterData?.meta?.last_trading_day || '';
+      var vixDomEl = document.getElementById('m-vix');
+      if (vixDomEl) {
+        vixDomEl.textContent = vixVal.toFixed(2) + (lastTD ? ' *' : '');
+        vixDomEl.title = lastTD ? 'Stand: ' + lastTD + ' (letzter Handelstag)' : '';
+        vixDomEl.style.color = vixVal < 16 ? 'var(--green)' : vixVal > 25 ? 'var(--red)' : 'var(--amber)';
+      }
+      console.log('[VIX] Fallback aus KV: ' + vixVal + ' (Stand: ' + lastTD + ')');
+      return vixVal;
+    }
+  }
   return null;
 }
 
@@ -14364,7 +14396,8 @@ function toggleKiDropdown(anchorEl) {
     { strat:'meanrev',  label:'↩️ Mean Reversion' },
     { strat:'breakout', label:'🚀 Breakout' },
     { strat:'dividend', label:'💰 Dividend Growth' },
-    { strat:'ludwig',   label:'⚙️ Optionen (E. Ludwig)' },
+    { strat:'ludwig',        label:'⚙️ Options-Wheel (EIC)' },
+    { strat:'weekly_income',  label:'📅 Options Weekly' },
   ];
 
   var html = '<div style="font-size:10px;color:var(--text3);padding:2px 8px 5px;border-bottom:0.5px solid var(--border);margin-bottom:3px">KI-ANALYSE STARTEN:</div>';
@@ -14418,7 +14451,8 @@ async function openKiBriefing(defaultStrat) {
   var activeBtn = document.querySelector('.ki-strat-btn[data-strat="' + startStrat + '"]');
   if (activeBtn) {
     var stratColors = {
-      ludwig:   { bg:'rgba(163,113,247,0.15)', border:'#a371f7', color:'#a371f7' },
+      ludwig:        { bg:'rgba(163,113,247,0.15)', border:'#a371f7', color:'#a371f7' },
+      weekly_income: { bg:'rgba(52,211,153,0.15)',  border:'#34d399', color:'#34d399' },
       options:  { bg:'rgba(240,169,58,0.15)',  border:'var(--amber)', color:'var(--amber)' },
       momentum: { bg:'rgba(52,194,110,0.15)',  border:'var(--green)', color:'var(--green)' },
       swing:    { bg:'rgba(6,182,212,0.15)',   border:'#06b6d4',      color:'#06b6d4' },
@@ -14492,10 +14526,10 @@ async function openKiBriefing(defaultStrat) {
   // Sortierung: Score absteigend
   topResults.sort(function(a, b) { return b.score - a.score; });
 
-  // ── Pre-Filter für Options/Ludwig: Kursrahmen + ER-Schutz im JS anwenden ──
+  // ── Pre-Filter für Options-Wheel/EIC: Kursrahmen + ER-Schutz im JS anwenden ──
   // So kommt kein ungeeigneter Titel in den Prompt — KI muss nichts ausschließen
   var filteredForKI = topResults;
-  if (_kiStrat === 'options' || _kiStrat === 'ludwig') {
+  if (_kiStrat === 'options' || _kiStrat === 'ludwig' || _kiStrat === 'weekly_income') {
     var oCfg = getOptionsCfg();
     filteredForKI = topResults.filter(function(r) {
       var price = r.price || 0;
@@ -14509,7 +14543,7 @@ async function openKiBriefing(defaultStrat) {
     });
     if (filteredForKI.length === 0) {
       content.innerHTML = '<div style="color:var(--amber);padding:1.25rem;font-size:13px">'
-        + '<strong>Keine geeigneten Kandidaten</strong> für ' + (_kiStrat === 'ludwig' ? 'E. Ludwig-Strategie' : 'Options-Wheel') + ' gefunden.<br><br>'
+        + '<strong>Keine geeigneten Kandidaten</strong> für ' + (_kiStrat === 'ludwig' ? 'Options-Wheel (EIC)' : 'Options-Wheel') + ' gefunden.<br><br>'
         + 'Kriterien: Kurs $' + oCfg.minPrice + '–$' + oCfg.maxPrice
         + ' · HVP ≥ ' + oCfg.minHvp + '% · Kein ER in ' + oCfg.erDays + ' Tagen<br><br>'
         + '<span style="color:var(--text3);font-size:11px">Tipp: Konfiguration im Admin-Tab anpassen oder andere Watchlist scannen.</span></div>';
@@ -14781,259 +14815,26 @@ let _kiStrat = 'ko';
 // ══════════════════════════════════════════════════════════════════════════════
 // ANTI-HALLUZINATIONS-DIREKTIVE — wird jedem KI-Prompt vorangestellt
 // ══════════════════════════════════════════════════════════════════════════════
-const KI_ANTI_HALLUZINATION = '\n'
-  + '== BULL-MARKET FRÜHINDIKATOR — PFLICHTREGELN ==\n'
-  + 'Wenn Bull-Market Frühindikator Score in MARKTKONTEXT vorhanden:\n'
-  + '  • Score 0-100: Confluence mehrerer unkorrelierter Frühindikatoren (KEINE Erfindung)\n'
-  + '  • ≥80: STARKES BULL-SIGNAL → explizit als mögliche Trendwende erwähnen\n'
-  + '  • 65-79: Bullische Confluence → selektiv long mit engem Stop empfehlen\n'
-  + '  • 45-64: Gemischt → abwarten, kein klarer Boden\n'
-  + '  • <45: Bärisch → defensiv bleiben\n'
-  + '  • ★ Signale (Breadth Thrust, HYG-Divergenz, Regime-Wechsel): IMMER explizit nennen\n'
-  + '  • Wenn kein Bull-Score in den Daten: ABSOLUTES SCHWEIGEN\n'
-  + '== ENDE BULL-REGELN ==\n\n'
-  + '== MARKOV 2.0 & IV-PERCENTILE — PFLICHTREGELN ==\n'
-  + 'Wenn Markov2:REG(X%) σ±Y Filter:MODE in den Ticker-Daten steht:\n'
-  + '  • IMMER explizit in der Analyse erwähnen — das ist ein Premium-Feature\n'
-  + '  • Stickiness X%: Persistenz des Regimes (>65%=sehr stark, 50-65%=mittel, <50%=instabil)\n'
-  + '  • Signal σ: statistisch korrektes Markov-Signal (Stride-sampled). >+0.2=bullisch, <-0.2=bärisch\n'
-  + '  • Filter:LONG_OK + HVP>50% = ★CSP-SETUP → explizit als Kaufgelegenheit für Prämienverkauf nennen\n'
-  + '  • Filter:FLAT = kein klares Signal → keine neuen Direktionaltrades empfehlen\n'
-  + '  • ⚡LabelWarn = Regime-Verifikation unsicher → Vorsicht erwähnen\n'
-  + 'Wenn kein Markov2-Feld: ABSOLUTES SCHWEIGEN. Niemals erfinden.\n'
-  + '== ENDE MARKOV-REGELN ==\n\n'
-  + '⛔ STRENGE DATENDISZIPLIN — KEINE AUSNAHMEN:\n\n'  + 'Du erhältst unten EXAKTE Scanner-Daten. Diese Daten sind die EINZIGE Wahrheit.\n\n'  + 'VERBOTEN:\n'  + '• Kurse, Strikes, Prämien oder Prozentzahlen erfinden oder schätzen\n'  + '• Den EMA200-Kurs (Feld "EMA200-Kurs:$XX") als aktuellen Handelskurs verwenden\n'  + '• Historische Preise aus deinem Training verwenden\n'  + '• Aussagen wie "typischerweise" oder "ungefähr" bei Kursen\n\n'  + 'PFLICHTREGELN:\n'  + '• Aktueller Kurs = NUR der Wert nach "Kurs:$" im Datensatz\n'  + '• EMA200-Kurs = NUR nach "EMA200-Kurs:$" — NICHT der Handelskurs\n'  + '• Fehlende Felder: "Kurs nicht verfügbar — in IBKR prüfen" schreiben\n'  + '• Prämien-Schätzungen immer als "(Schätzung — in IBKR prüfen)" kennzeichnen\\n'  + 'HVP = Historical Vol Percentile — kein echter IV-Rank. Wenn kein HVP: NIEMALS IV erfinden.\\n\\n'  + 'SELBSTKONTROLLE: Kurs aus "Kurs:$XX"? EMA200 nicht verwechselt? Keine Trainingsdaten?\n'
-  + 'VOLLSTÄNDIGKEIT: Jede Analyse MUSS alle Punkte vollständig abschließen. Niemals mittendrin abbrechen. Lieber kürzer pro Punkt als unvollständig.\n\n';
+// KI_ANTI_HALLUZINATION + KI_STRAT_CONFIG → ausgelagert in ko-prompts.js (ko-modules CDN)
+// Rückwärts-Alias wird nach KoPrompts-Load gesetzt (siehe unlockApp)
+// KI_STRAT_CONFIG → jetzt in ko-prompts.js (ko-modules)
+// Alias für Rückwärtskompatibilität — wird nach KoPrompts-Load befüllt
+var KI_STRAT_CONFIG = {};
+var KI_ANTI_HALLUZINATION = '';
 
-const KI_STRAT_CONFIG = {
-  ko: {
-    hint: '⚡ KO-Trading: Hebel 3–8x · KO-Abstand · Positionsgröße max. €2.000',
-    color: '#818cf8',
-    prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Knock-out-Trading-Experte (Hebelprodukte auf Aktien, EUR-basiert).\n\n'
-        + ctx.marktkontext
-        + '\n\nAUFGABE:\n'
-        + '1. MARKTUMFELD: Ist jetzt ein günstiger Zeitpunkt für neue KO-Long-Positionen? (2-3 Sätze)\n'
-        + '2. TOP 3 KO-KANDIDATEN: (HVP-Wert irrelevant für KO-Zertifikate — ignorieren). Welche 3 Titel wählst du? Für jeden: Begründung, Hebel (3-8x), '
-        + 'KO-Abstand in %, Positionsgröße (Starter/Aufstockung, max. €2.000 gesamt), Stop-Loss-Kriterium.\n'
-        + '3. WATCHLIST: Welche Titel haben Potenzial aber brauchen besseres Timing?\n'
-        + '4. HAUPTRISIKEN: Was könnte die Long-These gefährden?\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 400 Wörter. Jeden Punkt vollständig abschließen.';
-    }
-  },
-  momentum: {
-    hint: '📈 Momentum: SEPA/Minervini Stage-2 · Direktinvestment ohne Hebel',
-    color: 'var(--green)',
-    prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Momentum-Investor nach Minervini/SEPA-Methode.\n\n'
-        + ctx.marktkontext
-        + '\n\nAUFGABE:\n'
-        + '1. MARKTPHASE: Ist jetzt ein günstiger Zeitpunkt für neue Momentum-Positionen? (2-3 Sätze)\n'
-        + '2. TOP 3 MOMENTUM-KANDIDATEN: Welche 3 Titel zeigen das stärkste Stage-2-Setup? '
-        + 'Für jeden: SEPA-Bewertung aus Scandaten, Buy-Point NUR aus "Kurs:$" und "52W-H:"-Feldern ableiten. Stop-Loss als % unter Kurs. HVP aus Scandaten: bei HVP>50% erhöhte Vola → engerer Stop empfohlen. Kein Kursziel erfinden.\n'
-        + '3. WATCHLIST: Titel mit Potenzial aber noch nicht kaufbar.\n'
-        + '4. RISIKEN: Sektoren oder Makro-Faktoren die Momentum gefährden.\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 400 Wörter. Jeden Punkt vollständig abschließen.';
-    }
-  },
-  options: {
-    hint: '🎯 Options-Wheel: CSP / Covered Call · CapTrader/IBKR · Theta-Strategie',
-    color: 'var(--amber)',
-    prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Options-Trader mit Fokus auf Wheel-Strategie (CSP + Covered Calls).\\n\\n'
-        + '⚠️ WICHTIG: Du gibst keine Anlageberatung. Alle Empfehlungen sind informativer Natur.\\n\\n'
-        + '🚫 SCHRITT 1 — HARTES AUSSCHLUSS-KRITERIUM (ZWINGEND VOR JEDER ANALYSE!):\\n'
-        + '   Diese Titel KOMPLETT IGNORIEREN — weder als Kandidaten noch als ausgeschlossen erwähnen:\\n'
-        + '   • Kurs < $' + ctx.optsCfg.minPrice + ' oder > $' + ctx.optsCfg.maxPrice + ': AUSSCHLUSS\\n'
-        + '   • HVP < ' + ctx.optsCfg.minHvp + '%: AUSSCHLUSS (Prämien zu niedrig)\\n'
-        + '   • ER innerhalb ' + ctx.optsCfg.erDays + ' Tage: AUSSCHLUSS\\n'
-        + '   Weniger als 3 übrig: NUR verbleibende empfehlen, NICHT auffüllen!\\n\\n'
-        + '✅ SCHRITT 2 — Verbleibende Kandidaten bewerten:\\n'
-        + '   Kein HVP verfügbar: "IV in IBKR prüfen" schreiben\\n'
-        + '  1. HVP-Bewertung (Feld "HVP:XX%" aus Scandaten — kein echter IV-Rank, NUR Näherung!):\n'
-        + '     HVP ≥ ' + ctx.optsCfg.idealHvp + '%: ⭐ Ideal für CSP-Verkauf\n'
-        + '     HVP ' + ctx.optsCfg.goodHvp + '–' + (ctx.optsCfg.idealHvp-1) + '%: ✅ Gut\n'
-        + '     HVP ' + ctx.optsCfg.minHvp + '–' + (ctx.optsCfg.goodHvp-1) + '%: ⚠️ Grenzwertig — exakt in IBKR prüfen\n'
-        + '     HVP < ' + ctx.optsCfg.minHvp + '%: ❌ Ausgeschlossen (siehe oben)\n'
-        + '     Kein HVP: ❓ IV in IBKR prüfen — NICHT schätzen\n'
-        + '  2. Open Interest am gewählten Strike > 500 Kontrakte (Slippage-Schutz) — in IBKR/CapTrader prüfen\n'
-        + '  3. Bid-Ask-Spread der Option < 10% der Prämie\n'
-        + '  4. Kein Earnings-Event innerhalb der Laufzeit\n\n'
-        + ctx.marktkontext
-        + '\n\nAUFGABE:\n'
-        + '1. MARKTUMFELD: Günstig für neue CSPs? VIX-Niveau und Implikation für Prämien. (2-3 Sätze)\n'
-        + '2. TOP 3 OPTIONS-KANDIDATEN: Für jeden Titel:\n'
-        + '   a) EMA200-Abstand aus den Daten: Strike-Empfehlung nahe/unter EMA200 in $\n'
-        + '   b) Strike-Bereich in $ und % OTM vom aktuellen Kurs\n'
-        + '   c) Laufzeit (bevorzugt 30-45 DTE)\n'
-        + '   d) Prämien-SCHÄTZUNG: Nutze HVP-Wert aus Scandaten falls vorhanden (⚠️ kein echter IV-Rank — nur HV-Näherung!). Bei VIX ' + ctx.vixStr + ' und HVP aus Daten grobe Einschätzung möglich. IMMER: "→ exakt in IBKR Option Chain prüfen". Wenn kein HVP: NICHT erfinden.\n'
-        + '   e) PFLICHT-CHECKS (immer einzeln auflisten):\n'
-        + '      - "IV Rank in IBKR prüfen → Ziel: >30%"\n'
-        + '      - "OI am Strike $XX prüfen → Ziel: >500 Kontrakte"\n'
-        + '      - "Bid-Ask-Spread prüfen → Ziel: <10% der Prämie"\n'
-        + '3. WATCHLIST: Titel die nach dem nächsten ER oder bei höherem IV interessant werden.\n'
-        + '4. RISIKEN: IV-Crush, ER-Überraschungen, Titel unter 200d EMA (kein CSP empfohlen).\n'
-        + '\n⚠️ ABSCHLUSS-HINWEIS: Immer mit Pflicht-Checks in IBKR/CapTrader abschließen bevor eine Position eröffnet wird.\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 500 Wörter. Vollständig abschließen.';
-    }
-  },
-  swing: {
-    hint: '🔄 Swing-Trading: 5–20 Tage Haltedauer · Technische Muster',
-    color: '#06b6d4',
-    prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Swing-Trader mit Fokus auf 5-20 Tage Haltedauer.\n\n'
-        + ctx.marktkontext
-        + '\n\nAUFGABE:\n'
-        + '1. MARKTUMFELD: Günstig für Swing-Trades? Volatilität und Trendqualität. (2-3 Sätze)\n'
-        + '2. TOP 3 SWING-KANDIDATEN: Beste Risk/Reward-Setups für 5-20 Tage. Bei HVP>60% aus Scandaten: erhöhte Vola → kürzere Haltedauer empfehlen. '
-        + 'Für jeden: technisches Muster, Einstieg, Kursziel (+%), Stop-Loss, '
-        + 'Haltedauer-Erwartung, ER-Risiko im Zeitfenster.\n'
-        + '3. WATCHLIST: Titel die einen besseren Einstiegspunkt brauchen.\n'
-        + '4. RISIKEN: Was könnte die Setups invalidieren?\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 450 Wörter. Vollständig abschließen.';
-    }
-  },
-  dividend: {
-    hint: '💰 Dividend Growth: Steigende Ausschüttungen · Qualitäts-Momentum',
-    color: 'var(--green)',
-    prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Dividend-Growth-Investor (Fokus: steigende Dividenden + technische Stärke).\n\n'
-        + ctx.marktkontext
-        + '\n\nHINWEIS: Dividendenrenditen und Ausschüttungsquoten sind im Scanner noch nicht direkt verfügbar. '
-        + 'WICHTIG: Dividendenrenditen, Ausschüttungsquoten und Dividendenhistorie sind NICHT im Scanner. '
-        + 'NIEMALS Dividendenzahlen aus Trainingswissen nennen. Nur technische Kriterien aus den Scandaten verwenden.\n\n'
-        + 'AUFGABE:\n'
-        + '1. MARKTUMFELD: Defensive oder Growth-Dividenden bevorzugen? (2-3 Sätze)\n'
-        + '2. TOP 3 DIVIDEND-KANDIDATEN: Titel mit starkem Trend UND typischen Dividend-Growth-Charakteristika '
-        + '(stabile Branchen: Health, Finance, Consumer Staples, REITs). '
-        + 'Für jeden: Branchenzugehörigkeit, warum Dividend-Growth-Kandidat, technisches Setup.\n'
-        + '3. WATCHLIST: Weitere interessante Titel.\n'
-        + '4. HINWEIS: Empfehle explizit Koyfin-Prüfung der Fundamentaldaten vor Kauf.\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-4. Max. 450 Wörter. Vollständig abschließen.';
-    }
-  },
-  value: {
-    hint: '🔍 Value: Fundamentaldaten (KGV, FCF, ROIC) noch nicht im Scanner — Koyfin-Integration geplant',
-    color: 'var(--text3)',
-    prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'HINWEIS: Der Scanner enthält noch keine Fundamentaldaten (KGV, FCF, ROIC, Verschuldung). '
-        + 'Eine echte Value-Analyse ist daher noch nicht möglich.\n\n'
-        + 'Was ich trotzdem tun kann: Die Scanner-Ergebnisse als TECHNISCHES PRE-SCREENING für Value-Kandidaten nutzen — '
-        + 'also Titel identifizieren die technisch intakt sind und in typischen Value-Sektoren liegen.\n\n'
-        + ctx.marktkontext
-        + '\n\nAUFGABE (mit expliziter Einschränkung):\n'
-        + '1. EINSCHRÄNKUNG: Erkläre kurz warum echtes Value-Investing andere Daten braucht.\n'
-        + '2. TECHNISCHES PRE-SCREENING: Welche 3-5 Titel könnten Value-Potenzial haben? '
-        + 'Kriterien: stabile Branchen (Health, Finance, Energy, Consumer Staples), '
-        + 'solider Trend, keine extreme Überbewertung sichtbar.\n'
-        + '3. NÄCHSTE SCHRITTE: Welche Fundamentaldaten sollte man für jeden Kandidaten in Koyfin prüfen?\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-3. Max. 350 Wörter. Vollständig abschließen.'
-        + 'Sei explizit über die Grenzen dieser Analyse.';
-    }
-  },
-  ludwig: {
-    hint: '⚙️ Optionen (E. Ludwig)-Strategie: ATM-CSP · Systematisches Rollen · 3-Stufen-Roll · Eric Ludwig',
-    color: '#a371f7',
-    prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'Du bist ein erfahrener Options-Trader der die "Unschlagbare Optionsstrategie" nach Eric Ludwig anwendet.\n\n'
-        + '## STRATEGIE-GRUNDLAGEN (Eric Ludwig):\n'
-        + '- CSP wird AT-THE-MONEY verkauft (nicht OTM wie bei klassischer Wheel) — maximaler Zeitwert\n'
-        + '- Laufzeit: ~30 Tage, bevorzugt 3. Freitag des Monats (monatliche Optionen)\n'
-        + '- Frühausstieg: Bei 70% Gewinn in ersten 50% der Laufzeit → Position schließen\n'
-        + '- Prüfung: 5 Tage vor Verfall — 3 mögliche Situationen (oben/seitwärts/unten)\n'
-        + '- Andienung vermeiden durch systematisches 3-Stufen-Rollen:\n'
-        + '  Stufe 1: Niedrigerer Strike, 30-60 DTE, prämienneutral\n'
-        + '  Stufe 2: Gleicher Strike, neue Laufzeit, prämienneutral\n'
-        + '  Stufe 3: Niedrigerer Strike, doppelte Kontrakte (nur wenn Kapital vorhanden!)\n'
-        + '- Maximale Roll-Laufzeit: 90 Tage\n\n'
-        + '## AKTIEN-CHECKLISTE (Ludwig-Kriterien):\n'
-        + '- Kurs $15–$80 (Kapitaleffizienz für 200-Aktien-Szenario)\n'
-        + '- KGV/Umsatz/EPS: ⚠️ NICHT im Scanner verfügbar — nur in Koyfin/IBKR prüfbar. NIEMALS aus Trainingswissen schätzen!\n'
-        + '- Keine hochvolatilen oder medial überhypten Aktien\n'
-        + '- Strike-Staffelung ≤2.5% des Kurses (Flexibilität beim Rollen)\n'
-        + '- OI/Volumen mindestens dreistellig pro Strike\n'
-        + '- Weekly Options verfügbar (Roll-Flexibilität)\n\n'
-        + '⚠️ WICHTIG: Du gibst keine Anlageberatung. Alle Empfehlungen sind informativer Natur.\n'
-        + 'Pflicht-Checks vor jedem Trade in IBKR/CapTrader:\n'
-        + '  1. Strike-Staffelung prüfen (≤2.5% des Kurses)\n'
-        + '  2. OI am ATM-Strike prüfen (Ziel: >300 Kontrakte)\n'
-        + '  3. Weekly Options verfügbar? (Roll-Notfall)\n'
-        + '  4. Kein ER innerhalb der 30-Tage-Laufzeit\n\n'
-        + ctx.marktkontext
-        + '\n\nAUFGABE:\n'
-        + '1. MARKTUMFELD: ATM-CSPs sinnvoll? VIX-Level und Implikation. (2-3 Sätze)\n'
-        + '2. TOP 3 LUDWIG-KANDIDATEN — VORAUSWAHL (PFLICHT!):\n'
-        + '   SCHRITT 1 — HARTES AUSSCHLUSS-KRITERIUM (vor jeder weiteren Prüfung!):\n'
-        + '   • HVP < ' + ctx.optsCfg.minHvp + '%: Titel IGNORIEREN (Prämien zu niedrig)\n'
-        + '   • Kurs außerhalb $' + ctx.optsCfg.minPrice + '–$' + ctx.optsCfg.maxPrice + ': Titel IGNORIEREN\n'
-        + '   • ER innerhalb ' + ctx.optsCfg.erDays + ' Tage: Titel IGNORIEREN\n'
-        + '   • Weniger als 3 übrig nach Ausschluss: NUR diese empfehlen, NIEMALS mit anderen auffüllen!\n'
-        + '   SCHRITT 2 — Für jeden verbleibenden Kandidaten:\n'
-        + '   a) Ludwig-Eignung: Kurs=$XX (aus "Kurs:$"-Feld). EMA200-Abstand. HVP-Wert aus Scandaten mit Bewertung:\n'
-        + '      HVP ≥ ' + ctx.optsCfg.idealHvp + '%: ⭐ Ideal — hohe Prämien erwartet\n'
-        + '      HVP ' + ctx.optsCfg.goodHvp + '–' + (ctx.optsCfg.idealHvp-1) + '%: ✅ Gut — ausreichende Prämienqualität\n'
-        + '      HVP ' + ctx.optsCfg.minHvp + '–' + (ctx.optsCfg.goodHvp-1) + '%: ⚠️ Grenzwertig — Prämie genau prüfen\n'
-        + '      HVP < ' + ctx.optsCfg.minHvp + '%: ❌ Nicht empfohlen — wurde in Schritt 1 bereits ausgeschlossen\n'
-        + '      Kein HVP: "HVP nicht verfügbar — IV in IBKR prüfen" ZWINGEND schreiben\n'
-        + '   b) ATM-Strike Empfehlung in $ (nahe aktuellem Kurs)\n'
-        + '   c) Laufzeit: nächster 3. Freitag des Monats (~' + ctx.optsCfg.dte + ' DTE)\n'
-        + '   d) Prämien-SCHÄTZUNG: HVP aus Scandaten verwenden falls vorhanden (⚠️ kein echter IV-Rank!). Bei VIX ' + ctx.vixStr + ' und ATM-Strike: IMMER als Schätzung kennzeichnen + "→ exakt in IBKR Option Chain prüfen". 70%-Gewinn-Ziel = 0.30 × Prämie. Wenn kein HVP: NICHT erfinden.\n'
-        + '   e) Roll-Szenario (⚠️ SCHÄTZUNG — exakte Strikes nur in IBKR sichtbar!): Stufe-1-Roll ≈ Kurs − 2.5% des aktuellen Kurses aus "Kurs:$"-Feld. Nur Kurs aus Scandaten verwenden, keine Kursziele erfinden.\n'
-        + '   f) PFLICHT-CHECKS:\n'
-        + '      - "Strike-Staffelung in IBKR prüfen → Ziel: ≤2.5%"\n'
-        + '      - "OI am ATM-Strike prüfen → Ziel: >300"\n'
-        + '      - "Weekly Options verfügbar? → für Roll-Notfall"\n'
-        + '      - "ER-Datum prüfen → kein ER in 30-Tage-Laufzeit"\n'
-        + '3. NICHT GEEIGNET: Welche Top-Titel sind für Ludwig NICHT geeignet und warum?\n'
-        + '   (zu hoher Kurs, zu volatil, schlechte Strike-Staffelung, ER zu nah)\n'
-        + '4. ROLLSTRATEGIE-HINWEIS: Kurze Erinnerung an die 3 Roll-Stufen.\n'
-        + '\n⚠️ ABSCHLUSS: Ludwig-Strategie vermeidet Andienung durch systematisches Rollen — '
-        + 'nie auf Ausübung warten ohne Roll-Plan.\n'
-        + '\nAntworte auf Deutsch, strukturiert 1-3. Max. 550 Wörter. Vollständig abschließen.';
-    }
-  },
-  meanrev: {
-    hint: '↩️ Mean Reversion: Rückkehr zum Mittelwert · Überverkauft/Überhitzt · ATR-Abstand',
-    color: 'var(--amber)',
-    prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'Du bist ein quantitativer Analyst mit Fokus auf Mean-Reversion-Strategien.\n\n'
-        + ctx.marktkontext
-        + '\n\nAUFGABE (NUR auf Basis der Scandaten — keine Erfindungen):\n'
-        + '1. LONG-KANDIDATEN (überverkauft): Welche Titel sind >2 ATR unter EMA200 bei RSI<35? Rücklauf-Potential zum EMA50/EMA200?\n'
-        + '2. SHORT-KANDIDATEN (überhitzt): Welche Titel sind >3.5 ATR über EMA200 bei RSI>75 und Überhitzungs-Score>60? Top-Fading Potential?\n'
-        + '3. RISIKEN: Short-Squeeze-Potential, Markov-Regime-Stabilität, VIX-Umfeld.\n'
-        + '4. TIMING: Welche Parameter sollte der Anwender vor einem Einstieg zusätzlich prüfen?\n'
-        + '\nKein Anlageberatung gem. §1 WpHG. Auf Deutsch, strukturiert 1-4. Max. 400 Wörter.';
-    }
-  },
-  breakout: {
-    hint: '🚀 Breakout: 52W-Hoch · Volumenbestätigung · OBV-Akkumulation · Stage-2',
-    color: '#06b6d4',
-    prompt: function(ctx) {
-      return KI_ANTI_HALLUZINATION + 'Du bist ein Breakout-Trader nach ONeil/Minervini-Methode.\n\n'
-        + ctx.marktkontext
-        + '\n\nAUFGABE (NUR auf Basis der Scandaten — keine Erfindungen):\n'
-        + '1. BREAKOUT-KANDIDATEN: Welche Titel sind nahe ihrem 52W-Hoch (<5% Abstand) mit Volumen >1.5x Durchschnitt und positivem OBV?\n'
-        + '2. AKKUMULATIONS-PHASE: Welche Titel zeigen OBV-Stärke ohne Kursausbruch — potenzielle Breakouts in Vorbereitung?\n'
-        + '3. MARKTUMFELD: Unterstützt das aktuelle Regime (VIX, Breadth, Markov) Breakout-Trades?\n'
-        + '4. RISIKEN: Falschausbrüche, Earnings-Nähe, fehlende Volumenbestätigung.\n'
-        + '\nKein Anlageberatung gem. §1 WpHG. Auf Deutsch, strukturiert 1-4. Max. 400 Wörter.';
-    }
-  },
-
-  // ── Trennlinie + YouTube/Text Analyzer ──
-  '_divider': { label: '──────────────', color: 'var(--border)', prompt: null },
-  'youtube': {
-    label: '▶ YouTube / Text Analyzer',
-    color: '#ef4444',
-    prompt: null, // wird separat behandelt
-    isYt: true
+// Initialisierung nach KoPrompts-Load
+function _initKoPrompts() {
+  if (typeof KoPrompts === 'undefined') {
+    console.warn('[KoPrompts] Modul nicht geladen — Fallback auf leere Config');
+    return;
   }
-
-};
+  KI_STRAT_CONFIG = KoPrompts.STRATEGIES;
+  KI_ANTI_HALLUZINATION = KoPrompts.KI_ANTI_HALLUZINATION;
+  console.log('[KoPrompts] v' + KoPrompts.VERSION + ' geladen — ' + KoPrompts.ids().length + ' Strategien');
+}
 
 function setKiStrat(btn) {
-  // Alle Buttons zurücksetzen - Ludwig behält lila, Value bleibt gedimmt
+  // Alle Buttons zurücksetzen - Options-EIC behält lila, Value bleibt gedimmt
   document.querySelectorAll('.ki-strat-btn').forEach(function(b) {
     b.classList.remove('active-strat');
     b.style.background = 'transparent';
@@ -15345,8 +15146,14 @@ function csvSaveConfirm(tickers) {
         <button class="ki-strat-btn" data-strat="ludwig"
           onclick="setKiStrat(this)"
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #a371f7;background:transparent;color:#a371f7;cursor:pointer"
-          title="Options-Strategie nach Eric Ludwig: ATM-CSP · Systematisches Rollen · 3-Stufen-Roll">
-          ⚙️ Optionen (E. Ludwig)
+          title="Options-Wheel (EIC): ATM-CSP · Systematisches Rollen · 3-Stufen-Roll">
+          ⚙️ Options-Wheel (EIC)
+        </button>
+        <button class="ki-strat-btn" data-strat="weekly_income"
+          onclick="setKiStrat(this)"
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #34d399;background:transparent;color:#34d399;cursor:pointer"
+          title="Options Weekly: Diagonal Put-Spread · ATM-Short + Long-Versicherung · Weekly Income">
+          📅 Options Weekly
         </button>
       </div>
       <div id="ki-strat-hint" style="font-size:10px;color:var(--text3);margin-top:.4rem">
@@ -17910,34 +17717,8 @@ function showMorningTearsheet(results) {
   if (existing) existing.remove();
 
   var now     = new Date();
-
-  // Wochenend/Stale-Data Erkennung: KV-Daten haben last_trading_day
-  var kvMeta       = _kvMasterData?.meta || null;
-  var lastTradingDay = kvMeta?.last_trading_day || null;
-  var kvGenerated    = kvMeta?.generated || null;
-  var dow            = now.getUTCDay(); // 0=So, 6=Sa
-  var isWeekendDay   = (dow === 0 || dow === 6);
-
-  // Datums-Anzeige: am Wochenende letzten Handelstag zeigen
-  var dateStr, timeStr, staleBadge = '';
-  if (isWeekendDay && lastTradingDay) {
-    // Letzten Handelstag als Datum anzeigen
-    var ltdDate = new Date(lastTradingDay + 'T00:00:00');
-    dateStr = ltdDate.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
-    timeStr = 'Börsenschluss';
-    staleBadge = ' · <span style="background:rgba(251,191,36,0.15);color:var(--yellow);padding:1px 6px;border-radius:4px;font-size:10px">Handelsfrei · ' + now.toLocaleDateString('de-DE', {weekday:'long'}) + '</span>';
-  } else if (kvGenerated) {
-    var genDate = new Date(kvGenerated);
-    var ageH = Math.round((Date.now() - genDate.getTime()) / 3600000);
-    dateStr = now.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
-    timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
-    if (ageH > 20) {
-      staleBadge = ' · <span style="background:rgba(251,191,36,0.15);color:var(--yellow);padding:1px 6px;border-radius:4px;font-size:10px">Daten ' + ageH + 'h alt</span>';
-    }
-  } else {
-    dateStr = now.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
-    timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
-  }
+  var dateStr = now.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+  var timeStr = now.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
 
   // Regime-Daten
   var regime  = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '—';
@@ -17988,7 +17769,7 @@ function showMorningTearsheet(results) {
       '<div>' +
         '<div style="font-size:10px;color:#4f6080;letter-spacing:2px;margin-bottom:3px">UNDERLYINGIQ · MORNING BRIEFING</div>' +
         '<div style="font-size:20px;font-weight:700;color:#e8eaf0">' + dateStr + '</div>' +
-        '<div style="font-size:11px;color:#5a6a80;margin-top:2px">Stand: ' + timeStr + ' Uhr · Alle Angaben ohne Gewähr · §1 WpHG' + staleBadge + '</div>' +
+        '<div style="font-size:11px;color:#5a6a80;margin-top:2px">Stand: ' + timeStr + ' Uhr · Alle Angaben ohne Gewähr · §1 WpHG</div>' +
       '</div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
         '<button onclick="printTearsheet()" style="padding:6px 12px;border-radius:8px;border:1px solid #2a2f42;background:#1c2030;color:#8090b0;font-size:11px;cursor:pointer" title="Als PDF drucken"><i class="ti ti-printer"></i> PDF</button>' +
@@ -18577,50 +18358,13 @@ function renderAlphaCards(ms) {
           (c.price ? '<button data-sym="' + c.sym + '" onclick="useInRechner(this.dataset.sym)" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer"><i class="ti ti-calculator"></i></button>' : '') +
         '</div>' +
       '</div>' +
-      '<div style="font-size:11px;color:var(--text3);margin-bottom:.4rem" id="alpha-meta-' + c.sym + '">' +
-        '<span id="alpha-price-' + c.sym + '">$' + (c.price || '—') + '</span>' +
-        ' · RSI ' + (c.rsi ? Math.round(c.rsi) : '—') +
-        ' · ATR ' + (c.atr ? c.atr.toFixed(2) : '—') +
-        (c.grade ? ' · <span style="color:var(--accent)">' + c.grade + '</span>' : '') +
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:.4rem">' +
+        '$' + (c.price || '—') + ' · RSI ' + (c.rsi ? Math.round(c.rsi) : '—') + ' · ATR ' + (c.atr ? c.atr.toFixed(2) : '—') +
         (c.shortDir ? ' · <span style="color:var(--red)">' + c.shortDir + '</span>' : '') +
       '</div>' +
-      '<div id="alpha-er-' + c.sym + '" style="margin-bottom:.3rem"></div>' +
       kiBlock +
     '</div>';
   }).join('');
-
-  // ── Async: Earnings-Badge + Live-Preis für Alpha-Karten nachladen ───────────
-  if (window.currentMarket !== 'de' && typeof fetchEarningsDateLocal === 'function') {
-    filtered.forEach(function(c) {
-      fetchEarningsDateLocal(c.sym).then(function(er) {
-        var erEl = document.getElementById('alpha-er-' + c.sym);
-        if (!erEl) return;
-        if (er && er.daysUntil <= 45) {
-          erEl.innerHTML = earningsBadgeHtml(er);
-        }
-      }).catch(function() {});
-    });
-  }
-
-  // Live-Preise via Yahoo Finance aktualisieren
-  filtered.forEach(function(c) {
-    var priceEl = document.getElementById('alpha-price-' + c.sym);
-    if (!priceEl) return;
-    var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(c.sym) + '?interval=1d&range=1d';
-    fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url))
-      .then(function(r) { return r.json(); })
-      .then(function(j) {
-        var price = j?.chart?.result?.[0]?.meta?.regularMarketPrice;
-        var prev  = j?.chart?.result?.[0]?.meta?.chartPreviousClose;
-        if (!price) return;
-        var chg = prev ? ((price - prev) / prev * 100) : 0;
-        var chgColor = chg >= 0 ? 'var(--green)' : 'var(--red)';
-        var chgSign  = chg >= 0 ? '+' : '';
-        priceEl.innerHTML = '<b>$' + price.toFixed(2) + '</b>'
-          + ' <span style="color:' + chgColor + '">' + chgSign + chg.toFixed(2) + '%</span>';
-      })
-      .catch(function() {});
-  });
 }
 
 // ── BEAR SCANNER ──────────────────────────────────────────────────────────────
@@ -19385,6 +19129,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-darkpool.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c03899c/ko-prompts.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
