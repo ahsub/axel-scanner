@@ -5806,6 +5806,14 @@ function kvToScannerState(r) {
     // SEPA-Proxy
     sepaScore:    sepaProxy,
     stickyness:   50,
+    // IOS Foundation v1.2 (Einzeltitel)
+    iosScore:     r.iosScore,
+    iosRating:    r.iosRating,
+    iosDecision:  r.iosDecision,
+    iosQuality:   r.iosQuality,
+    iosEntry:     r.iosEntry,
+    iosIsLeader:  r.iosIsLeader,
+    iosSummary:   r.iosSummary,
     // KV-Metadaten
     _fromKv:      true,
     _kvUpdated:   r.updated || null,
@@ -18142,6 +18150,9 @@ async function runMorningBriefing() {
       await updateMarketWeatherWidget(dpCache, null, null);
     }
     results.vix = _getVixRobust(); // Gemini-Fix: Fallback-Kaskade
+    // IOS Market Score aus KV
+    results.iosMarket = (window._alphaData && _alphaData.market && _alphaData.market.iosMarket)
+                       ? _alphaData.market.iosMarket : null;
     await new Promise(function(r){ setTimeout(r, 500); });
 
     // ── 2/9: Live-Preise (S&P, Nasdaq, DAX, Öl, Gold) ────────────
@@ -18487,6 +18498,7 @@ function showMorningTearsheet(results) {
 
       // Volatilität & Flow
       '<div style="padding:1rem 1.5rem;border-right:1px solid var(--border)">' +
+        (results.iosMarket ? '<div style="margin:0 0 10px;padding:7px 10px;border-radius:7px;border-left:3px solid ' + (results.iosMarket.iosMarketScore>=85?'#22c55e':results.iosMarket.iosMarketScore>=70?'#f0a93a':'#ef4444') + ';background:rgba(0,0,0,0.06)"><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1px">IOS MARKET</span><b style="font-size:15px;color:' + (results.iosMarket.iosMarketScore>=85?'#22c55e':results.iosMarket.iosMarketScore>=70?'#f0a93a':'#ef4444') + '">' + results.iosMarket.iosMarketScore + '</b><span style="font-size:10px;padding:1px 5px;border-radius:4px;background:' + (results.iosMarket.iosMarketScore>=85?'#22c55e':results.iosMarket.iosMarketScore>=70?'#f0a93a':'#ef4444') + ';color:#fff;font-weight:700">' + (results.iosMarket.iosMarketRating||'') + '</span></div><div style="font-size:11px;font-weight:700;color:' + (results.iosMarket.iosMarketScore>=85?'#22c55e':results.iosMarket.iosMarketScore>=70?'#f0a93a':'#ef4444') + '">' + (results.iosMarket.iosMarketDecision||'—') + '</div><div style="font-size:10px;color:var(--text3);margin-top:2px">Trend ' + results.iosMarket.iosMarketTrend + '/35 · Breadth ' + results.iosMarket.iosMarketBreadth + '/25 · Risk ' + results.iosMarket.iosMarketRisk + '/20</div></div>' : '') +
         '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.5rem">VOLATILITÄT & FLOW</div>' +
         '<table style="width:100%;border-collapse:collapse">' +
           metricRow('VIX', val(results.vix), scoreColor(results.vix, 12, 20) === 'var(--green)' ? '#22c55e' : results.vix < 20 ? '#f0a93a' : '#ef4444') +
@@ -19282,6 +19294,13 @@ function renderAlphaCards(ms) {
         '<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:' + bgBorder + ';color:' + accentCol + ';flex-shrink:0">' + icon + ' ' + label + '</span>' +
         '<span class="ticker-price">$' + (price ? price.toFixed(2) : '—') + '</span>' +
         '<span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;background:' + scoreColor + ';color:#fff;margin-left:2px;flex-shrink:0">' + c.grade + ' ' + c.score + '</span>' +
+        (c.iosRating ? (function(){
+          var iD = c.iosDecision||'';
+          var iC = iD==='BUY FIRST TRANCHE' ? '#22c55e' : iD==='LEADER WAIT PULLBACK' ? '#f0a93a' : iD==='SELECTIVE ENTRY' ? '#4f8ef7' : iD==='WATCHLIST' ? '#9ca3af' : '#ef4444';
+          var iL = c.iosIsLeader ? '★ ' : '';
+          var tt = 'IOS v1.2: ' + iD + (c.iosQuality ? ' | Q:'+c.iosQuality+' E:'+c.iosEntry : '') + (c.iosSummary ? ' | '+c.iosSummary : '');
+          return c.iosRating !== 'NO' ? '<span title="'+tt+'" style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:3px;border:0.5px solid '+iC+';color:'+iC+';background:rgba(0,0,0,0.06)">' + iL + 'IOS ' + c.iosRating + '</span>' : '';
+        })() : '') +
         hvpBadge +
         '<span style="margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0">' +
           '<button class="btn btn-sm tv-chart-btn" data-sym="' + c.sym + '" data-name="' + encodeURIComponent(c.sym) + '" data-de="0" style="padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c" title="TradingView Chart"><i class="ti ti-chart-candle"></i> TV</button>' +
