@@ -155,6 +155,22 @@ input,select,button,textarea{font-family:var(--font);font-size:14px}
 
 /* CARDS */
 .card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:.75rem}
+/* ── EXPANDABLE CARD SYSTEM — programmweit ───────────────────────────────── */
+.card { transition: box-shadow .2s; }
+.card .card-detail { display: none; }
+.card.expanded .card-detail { display: block; }
+.card-summary { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 2px 0; }
+.card-summary:hover { opacity: .85; }
+.card-expand-icon { font-size: 11px; color: var(--text3); margin-left: auto; transition: transform .2s; flex-shrink: 0; }
+.card.expanded .card-expand-icon { transform: rotate(180deg); }
+.card-summary-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+/* Scanner-Karten im Collapsed-Modus: sig-grid + verdict ausblenden */
+.card:not(.expanded) .sig-grid,
+.card:not(.expanded) .verdict,
+.card:not(.expanded) .card-detail { display: none; }
+.card.expanded .sig-grid,
+.card.expanded .verdict { display: grid; }
+.card.expanded .verdict { display: flex; }
 .card-accent{border-color:var(--accent);box-shadow:0 0 0 1px rgba(79,142,247,0.15)}
 
 /* SECTION TITLES */
@@ -436,6 +452,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options"></optgroup>
         </select>
         <!-- KV-Modus Badge -->
+        <button onclick="expandAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="expand-all-btn" title="Alle aufklappen"><i class="ti ti-chevrons-down"></i></button>
+        <button onclick="collapseAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="collapse-all-btn" title="Alle zuklappen"><i class="ti ti-chevrons-up"></i></button>
         <span id="kv-mode-badge" style="display:none;font-size:10px;padding:3px 8px;border-radius:6px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green);white-space:nowrap" title="Daten aus Nacht-Aggregator (04:00 UTC)">
           <i class="ti ti-database"></i> <span id="kv-mode-date">KV</span>
         </span>
@@ -4543,7 +4561,7 @@ function unlockApp(){
   if (!styleTag) {
     styleTag = document.createElement('style');
     styleTag.id = '_cursor_fix';
-    styleTag.textContent = '*, *::before, *::after { cursor: default !important; } button, a, [onclick], select, input[type=checkbox], input[type=radio], label { cursor: pointer !important; } input[type=text], input[type=number], input[type=password], input[type=search], textarea { cursor: text !important; } canvas { cursor: default !important; }';
+    styleTag.textContent = 'html, body { cursor: default !important; } *, *::before, *::after { cursor: default !important; } button, a, [onclick], select, input[type=checkbox], input[type=radio], label { cursor: pointer !important; } input[type=text], input[type=number], input[type=password], input[type=search], textarea { cursor: text !important; } canvas { cursor: default !important; } :not(button):not(a):not([onclick]):not(select):not(input):not(textarea) { cursor: default !important; }';
     document.head.appendChild(styleTag);
   }
   setTimeout(function(){ fetchQqqRegime(); }, 800);
@@ -5685,6 +5703,11 @@ async function runScan(){
   sortAndRenderCards(activeTickers);
 
   document.getElementById('scan-label').textContent='Scan abgeschlossen ✓';
+  var expBtn = document.getElementById('expand-all-btn');
+  var colBtn = document.getElementById('collapse-all-btn');
+  if (expBtn) expBtn.style.display = 'inline-block';
+  if (colBtn) colBtn.style.display = 'inline-block';
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // KV-SCANNER MODE — Single Source of Truth Architektur
@@ -5859,6 +5882,10 @@ async function loadScannerFromKV() {
   if (liveBtn){ liveBtn.style.display = 'inline-block'; }
   if (btn)    { btn.disabled = false; }
 
+  var expBtn2 = document.getElementById('expand-all-btn');
+  var colBtn2 = document.getElementById('collapse-all-btn');
+  if (expBtn2) expBtn2.style.display = 'inline-block';
+  if (colBtn2) colBtn2.style.display = 'inline-block';
   window._scannerKvMode = true;
   var hint = document.getElementById('scanner-market-hint');
   if (hint) hint.innerHTML = '<i class="ti ti-database"></i> '
@@ -6505,6 +6532,10 @@ function processData(raw){
 function renderCard(t,state){
   var el=document.getElementById('card-'+t.sym);
   if(!el) return;
+  el.addEventListener('click', function(ev){
+    if(!ev.target.closest('button') && !ev.target.closest('a') && !ev.target.closest('canvas'))
+      el.classList.toggle('expanded');
+  }, false);
   // state.sym aus t befüllen falls processData es nicht setzt
   if(state && typeof state === 'object' && !state.sym) state.sym = t.sym;
   if(state==='loading'){
@@ -18304,6 +18335,23 @@ function _applyMorningResults(results) {
   }
 }
 
+// ── EXPANDABLE CARD TOGGLE — programmweit ────────────────────────────────
+function toggleCard(sym) {
+  var el = document.getElementById("card-" + sym);
+  if (!el) return;
+  el.classList.toggle("expanded");
+  // Auto-scroll: expanded card soll sichtbar bleiben
+  if (el.classList.contains("expanded")) {
+    setTimeout(function(){ el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, 50);
+  }
+}
+function expandAllCards() {
+  document.querySelectorAll(".card").forEach(function(c){ c.classList.add("expanded"); });
+}
+function collapseAllCards() {
+  document.querySelectorAll(".card").forEach(function(c){ c.classList.remove("expanded"); });
+}
+
 function closeTearsheet() {
   var m = document.getElementById('tearsheet-modal');
   if (m) m.remove();
@@ -19236,8 +19284,8 @@ function renderAlphaCards(ms) {
         '<span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;background:' + scoreColor + ';color:#fff;margin-left:2px;flex-shrink:0">' + c.grade + ' ' + c.score + '</span>' +
         hvpBadge +
         '<span style="margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0">' +
-          '<button class="btn btn-sm tv-chart-btn" data-sym="' + c.sym + '" data-name="' + encodeURIComponent(c.sym) + '" data-de="0" style="padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c" title="TradingView Chart"><i class="ti ti-chart-candle"></i></button>' +
-          '<button class="btn btn-sm" data-sym="' + c.sym + '" onclick="openWatchlistModal(this.dataset.sym)" style="padding:3px 8px;font-size:11px" title="Zu Watchlist hinzufügen"><i class="ti ti-star"></i></button>' +
+          '<button class="btn btn-sm tv-chart-btn" data-sym="' + c.sym + '" data-name="' + encodeURIComponent(c.sym) + '" data-de="0" style="padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c" title="TradingView Chart"><i class="ti ti-chart-candle"></i> TV</button>' +
+          '<button class="btn btn-sm" data-sym="' + c.sym + '" onclick="openWatchlistModal(this.dataset.sym)" style="padding:3px 8px;font-size:11px" title="Zu Watchlist hinzufügen"><i class="ti ti-star"></i> WL</button>' +
         '</span>' +
       '</div>' +
 
