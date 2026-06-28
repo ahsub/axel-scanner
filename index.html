@@ -2691,7 +2691,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <button onclick="closeEicModal()" style="padding:14px;font-size:14px;background:var(--bg3);border:1px solid var(--border2);color:var(--text3);border-radius:10px;cursor:pointer">✕</button>
     </div>
     <div id="eic-pin-error" style="font-size:12px;color:#ef4444;min-height:18px;transition:opacity .2s;opacity:0"></div>
-  </div>0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<window._pinEntry.length?' filled':'');
+</div>
+</div>
+
+<!-- PIN-Funktionen früh definieren (vor externen Modulen) damit onclick sofort verfügbar -->
+<script>
+window._pinEntry = '';
+window.pinPress = function(d){
+  if(window._pinEntry.length >= 4) return;
+  window._pinEntry += d;
+  for(var i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<window._pinEntry.length?' filled':'');
   if(window._pinEntry.length === 4) setTimeout(window.pinSubmit, 100);
 };
 window.pinClear = function(){ window._pinEntry=window._pinEntry.slice(0,-1); for(var i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot'+(i<window._pinEntry.length?' filled':''); };
