@@ -19468,6 +19468,39 @@ function filterAlpha(f) {
 }
 
 function renderAlphaCards(ms) {
+  // ── Scope-Safe: kvToScannerState aus globalem Scope oder Fallback ──────────
+  var _kvToState = (typeof kvToScannerState === "function") ? kvToScannerState
+                 : (typeof window.kvToScannerState === "function") ? window.kvToScannerState
+                 : null;
+  if (!_kvToState) {
+    console.error("[Alpha] kvToScannerState nicht verfügbar — Fallback aktiv");
+    // Minimal-Fallback: gibt ein einfaches State-Objekt zurück
+    _kvToState = function(r) {
+      return { sym: r.sym, price: r.price||0, ma50: r.ema50||null, ma200: r.ema200||null,
+               atr: r.atr||null, rsi: r.rsi||null, histVal: r.macdHist||null,
+               compositeScore: r.score||0, scoreLabel: r.grade||"?",
+               scoreColor: "var(--accent)", bullCount: 0, above50: false,
+               macdBull: null, obvBull: null, obvSlope: null, volRatio: null,
+               bbPos: r.bbPos||null, hvp: r.hvp||null, hv10: r.hv10||null,
+               high52w: r.high52||null, low52w: r.low52||null,
+               dist52wHigh: r.pctFromHigh52||null, _fromKv: true,
+               sepaScore:0, backtest:null, buyPointScore:0, buyPointSignals:[],
+               sepa1:false,sepa2:false,sepa3:false,sepa4:false,
+               sepa5:false,sepa6:false,sepa7:false,sepa8:false,
+               sepaPts:0,techPts:0,bpPts:0,stkPts:0,volPts:0,
+               emaStackScore:0,mtfScore:0,pdhlScore:0,consecutive:0,
+               stickyness:50,trendDir:"neutral",sessionNote:null,
+               dist10wMA:null,rs:null,_currency:"USD",_er:null,
+               closes:[],hist:[],obvNorm:[],dates:[], _fromTdCache:false,
+               overheat: r.overheat!=null?{score:r.overheat,signals:[],icon:""}:null,
+               strategyScores:{long_minervini:{score:r.sMinervini||0},
+                 long_swing:{score:r.sSwing||0},long_mr:{score:r.sMrLong||0},
+                 short_breakdown:{score:r.sBreakdown||0},short_fading:{score:r.sFading||0}},
+               iosRating:r.iosRating||null,iosDecision:r.iosDecision||null,
+               iosQuality:r.iosQuality||null,iosEntry:r.iosEntry||null,
+               iosIsLeader:r.iosIsLeader||false,iosSummary:r.iosSummary||null };
+    };
+  }
   // ── Alpha Desk Karten — einheitliches Stylesheet via renderCard() ──────────
   // Verwendet dieselbe renderCard()-Funktion wie der Scanner-Tab.
   // Alpha-spezifische Elemente (IOS-Badge, KI-Trade-Setup) werden danach injiziert.
@@ -19482,7 +19515,7 @@ function renderAlphaCards(ms) {
   // Für jeden Titel: kvToScannerState → renderCard → Alpha-Extras injizieren
   ms.forEach(function(r, idx) {
     var ticker = { sym: r.sym, name: r.name || r.sym };
-    var state  = kvToScannerState(r);
+    var state  = _kvToState(r);
 
     // Standard-Karte rendern (gleich wie Scanner-Tab) — mit Fehlerbehandlung
     try { renderCard(ticker, state); } catch(e) { console.error('[Alpha]', r.sym, e.message); return; }
