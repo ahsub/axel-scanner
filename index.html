@@ -6620,6 +6620,10 @@ function renderCard(t,state){
     '</span>'+
     (state.sessionNote?'<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,0.08);color:var(--text3);margin-left:4px">'+state.sessionNote+'</span>':'')+
     earningsBadgeHtml(state._er||null)+
+    (state.iosRating&&state.iosRating!=='NO'?(function(){
+      var iD=state.iosDecision||'',iC=iD==='BUY FIRST TRANCHE'?'#22c55e':iD==='LEADER WAIT PULLBACK'?'#f0a93a':iD==='SELECTIVE ENTRY'?'#4f8ef7':'#9ca3af';
+      return '<span title="IOS v1.2: '+iD+(state.iosQuality?' Q:'+state.iosQuality+'/E:'+state.iosEntry:'')+'" style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:3px;border:0.5px solid '+iC+';color:'+iC+'">'+(state.iosIsLeader?'★ ':'')+' IOS '+iD.replace('BUY FIRST TRANCHE','BFT').replace('LEADER WAIT PULLBACK','LWP').replace('SELECTIVE ENTRY','SE').replace('WATCHLIST','WL').replace('NO BUY','NO')+'</span>';
+    })():'') +
     (function(){
       var oh = state.overheat;
       if (!oh || oh.score < 15) return ''; // Zeige ab 15% Überhitzung
@@ -19440,193 +19444,113 @@ function filterAlpha(f) {
 }
 
 function renderAlphaCards(ms) {
-  // ── Alpha Desk Karten · Scanner-Parität v2 ────────────────────────────────
-  // Felder ab Aggregator-Lauf nach Patch: ema50/200, macdHist, obvTrend,
-  // bbPos, volRatio, hvp, pctFromHigh52, high52, low52, bullSignals, dist200
-  var el = document.getElementById('alpha-cards');
-  if (!el) return;
+  // ── Alpha Desk Karten — einheitliches Stylesheet via renderCard() ──────────
+  // Verwendet dieselbe renderCard()-Funktion wie der Scanner-Tab.
+  // Alpha-spezifische Elemente (IOS-Badge, KI-Trade-Setup) werden danach injiziert.
+  var cont = document.getElementById('alpha-cards');
+  if (!cont) return;
 
-  var filtered = ms.filter(function(c) {
-    if (_alphaFilter === 'long')  return c.strategy.startsWith('long');
-    if (_alphaFilter === 'short') return c.strategy.startsWith('short');
-    return true;
-  });
-
-  if (!filtered.length) {
-    el.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:1rem;text-align:center">Keine Kandidaten für diesen Filter.</div>';
-    return;
-  }
-
-  var stratIcons = {
-    long_minervini: '🚀', long_swing: '🔄', long_mr: '↩️',
-    short_breakdown: '📉', short_fading: '🔝'
-  };
-  var stratLabels = {
-    long_minervini: 'Minervini SEPA', long_swing: 'Swing-Pullback', long_mr: 'Mean Rev. Long',
-    short_breakdown: 'Short Breakdown', short_fading: 'Short Fading'
-  };
-
-  el.innerHTML = filtered.map(function(c) {
-    var isShort   = c.strategy.startsWith('short');
-    var ki        = c.ki || {};
-    var accentCol = isShort ? 'var(--red)' : 'var(--green)';
-    var bgBorder  = isShort ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.1)';
-    var icon      = stratIcons[c.strategy] || '◆';
-    var label     = stratLabels[c.strategy] || c.strategy;
-    var price     = c.price || 0;
-
-    // ── Sig-Grid Metriken (Scanner-Parität) ───────────────────────────────────
-    var above50  = c.ema50 && price > c.ema50;
-    var m50cls   = above50 ? 'pill-green' : 'pill-red';
-    var m50txt   = above50 ? 'bullisch' : 'bärisch';
-    var m50val   = c.ema50 ? '$' + c.ema50.toFixed(0) : 'n/a';
-
-    var macdBull = c.macdHist != null ? c.macdHist > 0 : null;
-    var mmcls    = macdBull === true ? 'pill-green' : macdBull === false ? 'pill-red' : 'pill-gray';
-    var mmtxt    = macdBull === true ? 'bullisch'   : macdBull === false ? 'bärisch'  : 'n/a';
-    var mmval    = c.macdHist != null ? c.macdHist.toFixed(3) : 'n/a';
-
-    var obvBull  = c.obvTrend != null ? c.obvTrend > 0 : null;
-    var mocls    = obvBull === true ? 'pill-green' : obvBull === false ? 'pill-red' : 'pill-gray';
-    var motxt    = obvBull === true ? 'bullisch'   : obvBull === false ? 'bärisch'  : 'n/a';
-    var obvm     = c.obvTrend != null ? (c.obvTrend / 1e6).toFixed(1) + 'M' : 'n/a';
-
-    var vrPct    = c.volRatio != null ? Math.round(c.volRatio * 100) : null;
-    var vRatioTxt= vrPct != null ? vrPct + '% Ø' : 'n/a';
-    var vRatioCls= vrPct != null ? (vrPct > 120 ? 'pill-green' : vrPct < 80 ? 'pill-red' : 'pill-amber') : 'pill-gray';
-
-    // ── 52W-Range Bar ─────────────────────────────────────────────────────────
-    var rangeBar = '';
-    if (c.high52 && c.low52 && price) {
-      var range = c.high52 - c.low52;
-      var pos   = range > 0 ? Math.max(0, Math.min(100, (price - c.low52) / range * 100)) : 50;
-      var rCol  = pos >= 80 ? 'var(--green)' : pos >= 50 ? 'var(--accent)' : pos >= 30 ? 'var(--amber)' : 'var(--red)';
-      rangeBar =
-        '<div style="margin-bottom:8px;padding:0 2px">' +
-          '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px">' +
-            '<span>52W-T: $' + c.low52 + '</span>' +
-            '<span style="color:' + rCol + ';font-weight:500">$' + price.toFixed(2) + ' (' + pos.toFixed(0) + '%)</span>' +
-            '<span>52W-H: $' + c.high52 + '</span>' +
-          '</div>' +
-          '<div style="height:5px;background:var(--bg3);border-radius:3px;position:relative">' +
-            '<div style="position:absolute;left:0;top:0;height:100%;width:' + pos + '%;background:' + rCol + ';border-radius:3px;transition:width .3s"></div>' +
-            '<div style="position:absolute;top:-2px;left:' + pos + '%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;background:' + rCol + ';border:2px solid var(--bg1)"></div>' +
-          '</div>' +
-        '</div>';
-    }
-
-    // ── HVP Badge ─────────────────────────────────────────────────────────────
-    var hvpBadge = '';
-    if (c.hvp != null) {
-      var hvpCol = c.hvp >= 75 ? 'var(--red)' : c.hvp >= 50 ? 'var(--amber)' : 'var(--green)';
-      var hvpLbl = c.hvp >= 75 ? 'Hohe Vola' : c.hvp >= 50 ? 'Moderate Vola' : 'Vola-Kontraktion';
-      hvpBadge = '<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,0.05);color:' + hvpCol + ';border:0.5px solid ' + hvpCol + ';margin-left:4px" title="Historical Volatility Percentile">HVP ' + c.hvp + ' · ' + hvpLbl + '</span>';
-    }
-
-    // ── Score-Farbe + Verdict ──────────────────────────────────────────────────
-    var scoreColor = c.score >= 80 ? '#22c55e' : c.score >= 60 ? '#4f8ef7' : c.score >= 40 ? '#f0a93a' : '#ef4444';
-    var bsCount   = c.bullSignals != null ? c.bullSignals : (above50 ? 1 : 0) + (macdBull ? 1 : 0) + (obvBull ? 1 : 0);
-    var verdictCl = bsCount === 3 ? 'v-bull' : bsCount === 2 ? 'v-neu' : 'v-bear';
-    var verdictTx = bsCount === 3 ? 'Alle 3 Signale bullisch' : bsCount === 2 ? '2 von 3 bullisch' : bsCount === 1 ? '1 von 3 bullisch' : 'Keine bullischen Signale';
-    var verdictIc = bsCount === 3 ? 'ti-trending-up' : bsCount === 2 ? 'ti-minus' : 'ti-trending-down';
-    if (isShort) { verdictCl = 'v-bear'; verdictTx = 'Short-Setup'; verdictIc = 'ti-trending-down'; }
-
-    // ── KI-Block ──────────────────────────────────────────────────────────────
-    var kiBlock = '';
-    if (ki.trigger) {
-      var crvColor = ki.crv >= 2.5 ? 'var(--green)' : ki.crv >= 2 ? 'var(--amber)' : 'var(--red)';
-      kiBlock =
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin:.5rem 0;font-size:11px">' +
-          '<div style="background:rgba(34,197,94,0.08);border-radius:5px;padding:4px 6px"><div style="font-size:9px;color:var(--text3)">TRIGGER</div><div style="font-weight:700;color:var(--green)">$' + ki.trigger + '</div></div>' +
-          '<div style="background:rgba(239,68,68,0.08);border-radius:5px;padding:4px 6px"><div style="font-size:9px;color:var(--text3)">STOP-LOSS</div><div style="font-weight:700;color:var(--red)">$' + ki.stopLoss + '</div></div>' +
-          '<div style="background:rgba(79,142,247,0.08);border-radius:5px;padding:4px 6px"><div style="font-size:9px;color:var(--text3)">TARGET</div><div style="font-weight:700;color:var(--accent)">$' + (ki.target || '—') + '</div></div>' +
-        '</div>' +
-        '<div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px;margin-bottom:.3rem">' +
-          '<span style="background:var(--bg2);padding:2px 6px;border-radius:4px">CRV <b style="color:' + crvColor + '">' + ki.crv + ':1</b></span>' +
-          '<span style="background:var(--bg2);padding:2px 6px;border-radius:4px">⏱ ' + ki.holdingDays + 'd</span>' +
-          '<span style="background:var(--bg2);padding:2px 6px;border-radius:4px">⚖️ ' + ki.positionPct + '% Depot</span>' +
-          (ki.leverageRec ? '<span style="background:var(--bg2);padding:2px 6px;border-radius:4px;color:var(--text3)">' + ki.leverageRec + '</span>' : '') +
-        '</div>' +
-        (ki.keyRisk ? '<div style="font-size:10px;color:var(--amber);margin-bottom:3px">⚠️ ' + ki.keyRisk + '</div>' : '') +
-        (ki.note    ? '<div style="font-size:10px;color:var(--text3)">' + ki.note + '</div>' : '');
-    } else {
-      kiBlock = '<div style="font-size:10px;color:var(--text3);padding:.25rem 0">Kein KI-Enrichment — wird nach Aggregator-Lauf befüllt</div>';
-    }
-
-    // ── Karte zusammenbauen (Scanner-Parität) ─────────────────────────────────
-    return (
-      '<div class="card' + (bsCount === 3 && !isShort ? ' card-accent' : '') + '" style="border-left:3px solid ' + accentCol + '">' +
-
-      // Header: Sym + Preis (ticker-price) + Score
-      '<div class="ticker-head">' +
-        '<span class="ticker-sym">' + c.sym + '</span>' +
-        '<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:' + bgBorder + ';color:' + accentCol + ';flex-shrink:0">' + icon + ' ' + label + '</span>' +
-        '<span class="ticker-price">$' + (price ? price.toFixed(2) : '—') + '</span>' +
-        '<span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;background:' + scoreColor + ';color:#fff;margin-left:2px;flex-shrink:0">' + c.grade + ' ' + c.score + '</span>' +
-        (c.iosRating ? (function(){
-          var iD = c.iosDecision||'';
-          var iC = iD==='BUY FIRST TRANCHE' ? '#22c55e' : iD==='LEADER WAIT PULLBACK' ? '#f0a93a' : iD==='SELECTIVE ENTRY' ? '#4f8ef7' : iD==='WATCHLIST' ? '#9ca3af' : '#ef4444';
-          var iL = c.iosIsLeader ? '★ ' : '';
-          var tt = 'IOS v1.2: ' + iD + (c.iosQuality ? ' | Q:'+c.iosQuality+' E:'+c.iosEntry : '') + (c.iosSummary ? ' | '+c.iosSummary : '');
-          return c.iosRating !== 'NO' ? '<span title="'+tt+'" style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:3px;border:0.5px solid '+iC+';color:'+iC+';background:rgba(0,0,0,0.06)">' + iL + 'IOS ' + c.iosRating + '</span>' : '';
-        })() : '') +
-        hvpBadge +
-        '<span style="margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0">' +
-          '<button class="btn btn-sm tv-chart-btn" data-sym="' + c.sym + '" data-name="' + encodeURIComponent(c.sym) + '" data-de="0" style="padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c" title="TradingView Chart"><i class="ti ti-chart-candle"></i> TV</button>' +
-          '<button class="btn btn-sm" data-sym="' + c.sym + '" onclick="openWatchlistModal(this.dataset.sym)" style="padding:3px 8px;font-size:11px" title="Zu Watchlist hinzufügen"><i class="ti ti-star"></i> WL</button>' +
-        '</span>' +
-      '</div>' +
-
-      // Info-Zeile: RSI farbig · ATR · EMA200
-      '<div style="font-size:11px;color:var(--text3);margin-bottom:6px;display:flex;gap:8px;flex-wrap:wrap">' +
-        (c.rsi ? '<span>RSI <b style="color:' + (c.rsi>70?'var(--red)':c.rsi<30?'var(--green)':'var(--text2)') + '">' + Math.round(c.rsi) + '</b></span>' : '') +
-        (c.atr ? '<span style="color:var(--border2)">·</span><span>ATR <b style="color:var(--text2)">$' + c.atr.toFixed(2) + '</b></span>' : '') +
-        (c.dist200 != null ? '<span style="color:var(--border2)">·</span><span>EMA200 <b style="color:' + (c.dist200>=0?'var(--green)':'var(--red)') + '">' + (c.dist200>=0?'+':'') + c.dist200.toFixed(1) + '%</b></span>' : '') +
-        (c.shortDir ? '<span style="color:var(--border2)">·</span><span style="color:var(--red);font-weight:600">' + c.shortDir + '</span>' : '') +
-      '</div>' +
-
-      // Sig-Grid (identisch Scanner-Tab)
-      '<div class="sig-grid">' +
-        '<div class="sig-box"><div class="sig-label">50d MA ' + m50val + '</div>' +
-          '<div class="sig-val">Kurs ' + (above50 ? '&gt; MA' : '&lt; MA') + '</div>' +
-          '<div class="sig-sub"><span class="pill ' + m50cls + '">' + m50txt + '</span></div></div>' +
-        '<div class="sig-box"><div class="sig-label">MACD Hist.</div>' +
-          '<div class="sig-val">' + mmval + '</div>' +
-          '<div class="sig-sub"><span class="pill ' + mmcls + '">' + mmtxt + '</span></div></div>' +
-        '<div class="sig-box"><div class="sig-label">OBV-Trend 5d</div>' +
-          '<div class="sig-val">' + obvm + '</div>' +
-          '<div class="sig-sub"><span class="pill ' + mocls + '">' + motxt + '</span></div></div>' +
-        '<div class="sig-box"><div class="sig-label">Volumen</div>' +
-          '<div class="sig-val"><span class="pill ' + vRatioCls + '">' + vRatioTxt + '</span></div></div>' +
-      '</div>' +
-
-      // Verdict-Banner
-      '<div class="verdict ' + verdictCl + '">' +
-        '<span><i class="ti ' + verdictIc + '" style="margin-right:4px"></i>' + verdictTx + '</span>' +
-        '<span style="font-size:11px;opacity:.7">' + bsCount + '/3</span>' +
-      '</div>' +
-
-      // 52W-Range Bar
-      rangeBar +
-
-      // KI-Block
-      kiBlock +
-
-      // Action-Buttons (Scanner-Parität)
-      '<div style="display:flex;gap:8px;margin-top:8px">' +
-        '<button class="btn btn-sm" data-sym="' + c.sym + '" onclick="useInRechner(this.dataset.sym)" style="padding:3px 8px;font-size:11px"><i class="ti ti-calculator"></i> Rechner</button>' +
-        '<button class="btn btn-sm" data-sym="' + c.sym + '" onclick="openDeepDive(this.dataset.sym,this.dataset.sym)" style="padding:3px 8px;font-size:11px;background:rgba(139,92,246,0.12);border-color:rgba(139,92,246,0.4);color:#8b5cf6" title="KI Deep Dive"><i class="ti ti-brain"></i> Deep Dive</button>' +
-      '</div>' +
-
-      '</div>'
-    );
+  // Container mit Card-Shells füllen
+  cont.innerHTML = ms.map(function(r) {
+    return '<div class="card" id="card-' + r.sym + '"></div>';
   }).join('');
+
+  // Für jeden Titel: kvToScannerState → renderCard → Alpha-Extras injizieren
+  ms.forEach(function(r, idx) {
+    var ticker = { sym: r.sym, name: r.name || r.sym };
+    var state  = kvToScannerState(r);
+
+    // Standard-Karte rendern (gleich wie Scanner-Tab)
+    renderCard(ticker, state);
+
+    // ── ALPHA-EXTRAS: nach renderCard in die Karte injizieren ────────────────
+    var el = document.getElementById('card-' + r.sym);
+    if (!el) return;
+
+    // 1. Strategie-Label in den Header injizieren
+    var head = el.querySelector('.ticker-head');
+    if (head && r.strategy) {
+      var stratBadge = document.createElement('span');
+      stratBadge.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:12px;background:rgba(79,142,247,0.15);border:0.5px solid rgba(79,142,247,0.4);color:var(--accent);margin-left:4px;flex-shrink:0';
+      stratBadge.textContent = r.strategy;
+      var firstBtn = head.querySelector('button');
+      if (firstBtn) head.insertBefore(stratBadge, firstBtn);
+    }
+
+    // 2. KI-Trade-Setup (TRIGGER/STOP/TARGET) wenn vorhanden
+    if (r.ki && r.ki.trigger) {
+      var ki = r.ki;
+      var crv = (ki.target && ki.trigger && ki.stop)
+        ? ((ki.target - ki.trigger) / (ki.trigger - ki.stop)).toFixed(1)
+        : null;
+      var setupHtml = '<div style="margin:8px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">' +
+        '<div style="text-align:center;padding:6px;border-radius:8px;background:rgba(52,194,110,0.08);border:0.5px solid rgba(52,194,110,0.25)">' +
+          '<div style="font-size:9px;color:var(--text3);letter-spacing:1px">TRIGGER</div>' +
+          '<div style="font-size:14px;font-weight:700;color:var(--green)">$' + ki.trigger.toFixed(2) + '</div>' +
+        '</div>' +
+        '<div style="text-align:center;padding:6px;border-radius:8px;background:rgba(239,68,68,0.08);border:0.5px solid rgba(239,68,68,0.25)">' +
+          '<div style="font-size:9px;color:var(--text3);letter-spacing:1px">STOP-LOSS</div>' +
+          '<div style="font-size:14px;font-weight:700;color:var(--red)">$' + ki.stop.toFixed(2) + '</div>' +
+        '</div>' +
+        '<div style="text-align:center;padding:6px;border-radius:8px;background:rgba(79,142,247,0.08);border:0.5px solid rgba(79,142,247,0.25)">' +
+          '<div style="font-size:9px;color:var(--text3);letter-spacing:1px">TARGET</div>' +
+          '<div style="font-size:14px;font-weight:700;color:var(--accent)">$' + ki.target.toFixed(2) + '</div>' +
+        '</div>' +
+      '</div>';
+
+      if (crv) {
+        setupHtml += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px">' +
+          '<b style="color:' + (parseFloat(crv)>=2?'var(--green)':'var(--amber)') + '">CRV ' + crv + ':1</b>' +
+          (ki.dte ? ' · <i class="ti ti-clock"></i> ' + ki.dte + 'd' : '') +
+          (ki.size ? ' · ' + ki.size : '') +
+          (ki.vehicle ? ' · ' + ki.vehicle : '') +
+        '</div>';
+      }
+
+      // KI-Text
+      if (ki.warning) {
+        setupHtml += '<div style="font-size:11px;color:var(--amber);margin-bottom:4px"><i class="ti ti-alert-triangle"></i> ' + ki.warning + '</div>';
+      }
+      if (ki.text) {
+        setupHtml += '<div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:6px">' + ki.text + '</div>';
+      }
+
+      // Buttons
+      setupHtml += '<div style="display:flex;gap:8px;margin-top:4px">' +
+        '<button onclick="openCalc(\'' + r.sym + '\')" class="btn btn-sm" style="font-size:11px">Rechner</button>' +
+        '<button onclick="openDeepDive(\'' + r.sym + '\',\'' + r.sym + '\')" class="btn btn-sm" style="font-size:11px;background:rgba(163,113,247,0.1);border-color:#a371f7;color:#a371f7">Deep Dive</button>' +
+      '</div>';
+
+      var setupDiv = document.createElement('div');
+      setupDiv.style.cssText = 'padding:0 12px 12px';
+      setupDiv.innerHTML = setupHtml;
+      el.appendChild(setupDiv);
+    }
+
+    // TV + WL Buttons in Header (Alpha Desk spezifisch)
+    if (head) {
+      var tvBtn = document.createElement('button');
+      tvBtn.className = 'btn btn-sm';
+      tvBtn.style.cssText = 'font-size:10px;padding:2px 7px;background:rgba(52,194,110,0.1);border-color:var(--green);color:var(--green)';
+      tvBtn.innerHTML = 'TV';
+      tvBtn.onclick = (function(sym){ return function(){ window.open('https://www.tradingview.com/chart/?symbol=' + sym, '_blank'); }; })(r.sym);
+
+      var wlBtn = document.createElement('button');
+      wlBtn.className = 'btn btn-sm';
+      wlBtn.style.cssText = 'font-size:10px;padding:2px 7px';
+      wlBtn.innerHTML = 'WL';
+      wlBtn.onclick = (function(sym){ return function(){ addToWatchlist(sym); }; })(r.sym);
+
+      // Vor den anderen Buttons einfügen
+      var firstBtn2 = head.querySelector('button');
+      if (firstBtn2) {
+        head.insertBefore(wlBtn, firstBtn2);
+        head.insertBefore(tvBtn, wlBtn);
+      }
+    }
+  });
 }
 
-// ── BEAR SCANNER ──────────────────────────────────────────────────────────────
-// Symmetrischer Gegenpart zu Long-Strategien (Gemini-Blueprint)
-// 4 Short-Gates: Markov Bear-Regime · EMA200-Überdehnung · RSI-Divergenz · BB-Breakdown
-// Zusatz: Short-Squeeze-Risiko als Warnflag
 
 function showBearScanner(forceList) {
   var candidates = [];
