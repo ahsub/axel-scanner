@@ -18319,7 +18319,11 @@ async function runMorningBriefing() {
       messwerteLines.push('Intermarket Risk Score: ' + intermarketScore);
       messwerteLines.push('NDX Breadth (>50d MA): ' + breadthVal);
       messwerteLines.push('Bull-Market Frühindikator: ' + bullScore);
-      if (sektorRsTxt !== '—') messwerteLines.push('Sektor RS vs. SPY: ' + sektorRsTxt);
+      if (sektorTxt !== '—') messwerteLines.push('Sektor RS vs. SPY: ' + sektorTxt);
+      messwerteLines.push(''); messwerteLines.push('--- SENTIMENT & BEWERTUNG ---');
+      if (results.fearGreed){var _fg=results.fearGreed;messwerteLines.push('Fear & Greed: '+_fg.score+'/100 ('+(_fg.rating||'')+')'+(_fg.previous?' Vortag:'+_fg.previous:'')+(_fg.proxy?' [Proxy]':' [CNN]'));}else messwerteLines.push('Fear & Greed: n/v');
+      if (results.shillerCape){var _sc=results.shillerCape;messwerteLines.push('Shiller CAPE: '+_sc.cape+(_sc.cape>35?' (stark überbewertet)':_sc.cape>28?' (überbewertet)':_sc.cape>22?' (moderat erhöht)':' (fair)')+' | Hist.Ø ~17');}else messwerteLines.push('Shiller CAPE: n/v');
+      if (results.iosMarket){var _im=results.iosMarket;messwerteLines.push('IOS Market: '+_im.iosMarketScore+'/100 → '+(_im.iosMarketDecision||'')+' T:'+_im.iosMarketTrend+' B:'+_im.iosMarketBreadth+' R:'+_im.iosMarketRisk);}
 
       var KI_HALLU_SCHUTZ =
         'ABSOLUTE REGELN — KEINE AUSNAHMEN:\n'
@@ -18627,7 +18631,24 @@ function showMorningTearsheet(results) {
 
   // Sektor RS
   var sektorEl = document.getElementById('sektor-rs-content');
-  var sektorTxt = sektorEl ? sektorEl.innerText.trim().slice(0, 400) : '—';
+  var sektorTxt = '—', sektorHTML = '';
+  if (window._sektorData && _sektorData.length) {
+    var _sd=_sektorData.slice(0,8),_max=Math.max.apply(null,_sd.map(function(r){return Math.abs(r.rs5d||0);})) ||1,_txtp=[];
+    sektorHTML='<table style="width:100%;border-collapse:collapse;font-size:11px">';
+    _sd.forEach(function(r){
+      var p=r.rs5d||0,c=p>=2?'#22c55e':p>=0?'#4f8ef7':p>=-2?'#f0a93a':'#ef4444';
+      var bw=Math.min(Math.abs(p)/_max*60,60),a=(r.rs1d||0)>=0.3?'↑':(r.rs1d||0)<=-0.3?'↓':'→';
+      var ac=(r.rs1d||0)>=0.3?'#22c55e':(r.rs1d||0)<=-0.3?'#ef4444':'var(--text3)';
+      sektorHTML+='<tr style="border-bottom:0.5px solid var(--border)">';
+      sektorHTML+='<td style="padding:3px 6px;font-weight:700;width:40px">'+r.sym+'</td>';
+      sektorHTML+='<td style="padding:3px 6px;font-size:10px;color:var(--text2);width:85px">'+(r.name||r.sym)+'</td>';
+      sektorHTML+='<td style="padding:3px 4px"><div style="height:5px;background:var(--bg3);border-radius:3px"><div style="height:100%;width:'+bw+'%;background:'+c+';border-radius:3px"></div></div></td>';
+      sektorHTML+='<td style="padding:3px 6px;text-align:right;font-weight:600;color:'+c+';width:52px">'+(p>=0?'+':'')+p.toFixed(2)+'%</td>';
+      sektorHTML+='<td style="padding:3px 4px;text-align:center;color:'+ac+'">'+a+'</td></tr>';
+      _txtp.push(r.sym+(p>=0?'+':'')+p.toFixed(1)+'%'+a);
+    });
+    sektorHTML+='</table>';sektorTxt=_txtp.join(' | ');
+  } else if(sektorEl){sektorTxt=sektorEl.innerText.trim().slice(0,300);}
 
   // Farb-Helper
   function scoreColor(v, lo, hi) {
@@ -18657,7 +18678,7 @@ function showMorningTearsheet(results) {
   }
 
   var html = '<div id="tearsheet-modal" style="position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,0.88);backdrop-filter:blur(6px);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1rem 1rem 3rem">' +
-    '<div id="tearsheet-body" style="width:min(680px,100%);background:var(--bg);border-radius:16px;border:1px solid var(--border2);overflow:visible;margin:0 auto">' +
+    '<div id="tearsheet-body" style="width:min(780px,100%);background:var(--bg);border-radius:16px;border:1px solid var(--border2);overflow:visible;margin:0 auto;max-height:calc(100vh - 2rem);overflow-y:auto;-webkit-overflow-scrolling:touch">' +
 
     // Header
     '<div style="background:linear-gradient(135deg,var(--bg3),var(--bg));padding:1.25rem 1.5rem;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between">' +
@@ -18750,7 +18771,7 @@ function showMorningTearsheet(results) {
         + '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px">KI-MARKTANALYSE · CLAUDE SONNET</div>'
         + (results.kiBriefing ? '<button id="ts-simple-btn" onclick="generateSimpleTearsheet()" style="font-size:10px;padding:3px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer" title="Allgemeinverständliche Umformulierung"><i class=\"ti ti-text-size\"></i> Einfache Sprache</button>' : '')
       + '</div>'
-      + '<div id="ts-ki-text" style="font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap">'
+      + '<div id="ts-ki-text" style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap;min-height:120px">'
         + (results.kiBriefing || '<span style="color:var(--text3)">KI-Token nicht gesetzt — KI-Analyse nicht verfügbar.</span>')
       + '</div>'
       + '<div id="ts-simple-result" style="display:none;margin-top:.75rem;padding:.75rem;background:var(--bg3);border-radius:8px;border-left:2px solid var(--accent)">'
