@@ -5838,7 +5838,7 @@ function kvToScannerState(r) {
     backtest:     null,
     buyPointScore:   0,
     buyPointSignals: [],
-    sepaScore:    0,
+    // sepaScore via sepaProxy gesetzt — kein Überschreiben
     sepa1: false, sepa2: false, sepa3: false, sepa4: false,
     sepa5: false, sepa6: false, sepa7: false, sepa8: false,
     sepaPts: 0, techPts: 0, bpPts: 0, stkPts: 0, volPts: 0,
@@ -15760,6 +15760,218 @@ function csvSaveConfirm(tickers) {
      BACKLOG-SYSTEM: TrackingStore · Longtime-Winners · Oversold · KI-QK
      ═══════════════════════════════════════════════════════════════════════ -->
 <script>
+// kvToScannerState — hier kopiert für Scope-Isolation
+function kvToScannerState(r) {
+  // Adapter: KV masterShortlist-Item → processData()-kompatibles State-Objekt
+  // Ermöglicht renderCard() mit KV-Daten ohne Änderung am Render-Layer.
+  var price   = r.price || 0;
+  var ema50   = r.ema50 || null;
+  var ema200  = r.ema200 || null;
+  var above50 = ema50  ? price > ema50  : null;
+  var above200= ema200 ? price > ema200 : null;
+  var macdBull= r.macdHist != null ? r.macdHist > 0   : null;
+  var obvBull = r.obvTrend != null ? r.obvTrend > 0   : null;
+  var bullCnt = [above50, macdBull, obvBull].filter(function(v){return v===true;}).length;
+
+  // Composite Score + Grade (aus KV, Python-berechnet)
+  var cscore  = r.score || 0;
+  var grade   = r.grade || (cscore>=80?'A+':cscore>=70?'A':cscore>=60?'B+':cscore>=50?'B':cscore>=40?'C':'D');
+  var scoreColor = cscore>=70?'var(--green)':cscore>=50?'var(--accent)':cscore>=40?'var(--amber)':'var(--red)';
+
+  // Markov-Adapter: regime-String + pBull2Bear → Scanner _markov-Objekt
+  var regStr  = (r.regime||'').toUpperCase();
+  var p2b     = r.pBull2Bear || 0;
+  var markov  = (regStr || p2b) ? {
+    regime:    regStr==='BULL' ? 1 : regStr==='BEAR' ? -1 : 0,
+    warnLevel: p2b > 0.25 ? 3 : p2b > 0.15 ? 2 : p2b > 0.08 ? 1 : 0,
+    pBull2Bear: p2b,
+    label:     regStr || 'NEUTRAL',
+  } : null;
+
+  // OBV: KV-Wert ist normalisiert (Ratio × avg-vol). Sign bleibt korrekt.
+  // obvSlope wird im renderCard als M-Zahl dargestellt — bei KV als Ratio anzeigen.
+  var obvSlope = r.obvTrend != null ? r.obvTrend : null;
+
+  // Volumen: KV=Dezimal (1.45), Scanner=Prozent (145)
+  var volRatio = r.volRatio != null ? Math.round(r.volRatio * 100) : null;
+
+  // Strategie-Scores (Python-berechnet → direkt übergeben, kein JS-Scoring)
+  var stratScores = {
+    long_minervini: { score: r.sMinervini || 0, label: 'Minervini SEPA' },
+    long_swing:     { score: r.sSwing     || 0, label: 'Swing-Pullback' },
+    long_mr:        { score: r.sMrLong    || 0, label: 'Mean Rev. Long' },
+    short_breakdown:{ score: r.sBreakdown || 0, label: 'Short Breakdown' },
+    short_fading:   { score: r.sFading    || 0, label: 'Short Fading'   },
+  };
+
+  // SEPA-Proxy aus Minervini-Score (renderCard erwartet 0-8)
+  var sepaProxy = Math.round((r.sMinervini || 0) / 100 * 8);
+
+  return {
+    // Kerndaten
+    sym:          r.sym,
+    price:        price,
+    // EMA (Scanner nutzt ma50/ma200)
+    ma50:         ema50,
+    ma200:        ema200,
+    // Signal-Felder
+    above50:      above50,
+    macdBull:     macdBull,
+    obvBull:      obvBull,
+    bullCount:    bullCnt,
+    // MACD
+    macd_hist:    r.macdHist,
+    histVal:      r.macdHist,
+    // OBV
+    obv_slope_5d: obvSlope,
+    obvSlope:     obvSlope,
+    // Volumen
+    volume_ratio: volRatio,
+    volRatio:     volRatio,
+    // Bollinger + HVP
+    bbPos:        r.bbPos,
+    hvp:          r.hvp,
+    hv10:         r.hv10,
+    // 52W Range
+    high52w:      r.high52,
+    low52w:       r.low52,
+    dist52wHigh:  r.pctFromHigh52,
+    dist52h:      r.pctFromHigh52,
+    // Score
+    compositeScore: cscore,
+    scoreLabel:   grade,
+    scoreColor:   scoreColor,
+    // Weitere Metriken
+    rsi:          r.rsi,
+    atr:          r.atr,
+    overheat:     r.overheat != null ? { score: r.overheat, signals: [], icon: r.overheat>70?'🔥':r.overheat>40?'⚠️':'✅' } : null,
+    _markov:      markov,
+    // Strategie-Scores (Python-berechnet, kein JS-Scoring nötig)
+    strategyScores: stratScores,
+    // SEPA-Proxy
+    sepaScore:    sepaProxy,
+    stickyness:   50,
+    // IOS Foundation v1.2 (Einzeltitel)
+    iosScore:     r.iosScore,
+    iosRating:    r.iosRating,
+    iosDecision:  r.iosDecision,
+    iosQuality:   r.iosQuality,
+    iosEntry:     r.iosEntry,
+    iosIsLeader:  r.iosIsLeader,
+    iosSummary:   r.iosSummary,
+    // KV-Metadaten
+    _fromKv:      true,
+    _kvUpdated:   r.updated || null,
+    // Leer: Sparkline-Daten nicht in KV (Charts zeigen Placeholder)
+    closes:       [],
+    hist:         [],
+    obvNorm:      [],
+    dates:        [],
+    // renderCard braucht diese Felder — sichere Defaults für KV-Modus
+    backtest:     null,
+    buyPointScore:   0,
+    buyPointSignals: [],
+    // sepaScore via sepaProxy gesetzt — kein Überschreiben
+    sepa1: false, sepa2: false, sepa3: false, sepa4: false,
+    sepa5: false, sepa6: false, sepa7: false, sepa8: false,
+    sepaPts: 0, techPts: 0, bpPts: 0, stkPts: 0, volPts: 0,
+    emaStackScore: 0, mtfScore: 0, pdhlScore: 0,
+    consecutive:  0,
+    stickyness:   50,
+    trendDir:     'neutral',
+    dist10wMA:    null,
+    sessionNote:  null,
+    rs:           null,
+    scoreColor:   scoreColor,
+    _currency:    'USD',
+    _er:          null,
+    _fromTdCache: false,
+    currency:     'USD',
+    closes_full:  [],
+  };
+}
+
+async function loadScannerFromKV() {
+  window.loadScannerFromKV = loadScannerFromKV;
+  // ── KV-Modus: Scanner-Tab aus Aggregator-Daten (masterShortlist) befüllen ──
+  var btn  = document.getElementById('scan-btn');
+  var cont = document.getElementById('scan-container');
+  var badge= document.getElementById('kv-mode-badge');
+  var dateEl = document.getElementById('kv-mode-date');
+  var liveBtn = document.getElementById('kv-live-btn');
+  if (!cont) return;
+
+  if (btn) { btn.disabled = true; }
+  document.getElementById('scan-progress').style.display = 'block';
+  document.getElementById('scan-label').textContent = 'Lade KV-Daten…';
+  cont.innerHTML = '';
+
+  // Daten laden (Alpha Desk nutzt dieselbe Quelle)
+  if (!window._alphaData || !_alphaData.masterShortlist) {
+    await loadAlphaDashboard(false);
+  }
+
+  var ms = (window._alphaData && _alphaData.masterShortlist) ? _alphaData.masterShortlist : [];
+  if (!ms.length) {
+    cont.innerHTML = '<div style="color:var(--text3);padding:1rem;font-size:12px">'
+      + '<i class="ti ti-database-off"></i> Keine KV-Daten verfügbar — bitte Live-Scan verwenden.</div>';
+    document.getElementById('scan-progress').style.display = 'none';
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  // Karten-Shell für alle Ticker erstellen
+  var html = ms.map(function(r) {
+    return '<div class="card" id="card-' + r.sym + '"></div>';
+  }).join('');
+  cont.innerHTML = html;
+
+  // KV-Datum ermitteln
+  var kvDate = (ms[0] && ms[0].updated)
+    ? new Date(ms[0].updated).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'})
+    : 'nightly';
+
+  // Karten rendern
+  var total = ms.length;
+  var bar   = document.getElementById('scan-bar');
+  for (var i = 0; i < ms.length; i++) {
+    var r = ms[i];
+    var ticker = { sym: r.sym, name: r.sym };
+    var state  = kvToScannerState(r);
+    renderCard(ticker, state);
+    if (bar) bar.style.width = Math.round((i+1) / total * 100) + '%';
+    document.getElementById('scan-label').textContent =
+      'KV-Modus: ' + (i+1) + ' / ' + total + ' Karten…';
+    // Alle 10 Karten kurz yielden damit Browser nicht einfriert
+    if (i % 10 === 9) await new Promise(function(r){ setTimeout(r, 0); });
+  }
+
+  // UI aktualisieren
+  sortAndRenderCards(ms.map(function(r){ return { sym: r.sym, name: r.sym }; }));
+  document.getElementById('scan-label').textContent = 'KV-Modus · ' + ms.length + ' Ticker · Stand: ' + kvDate;
+  document.getElementById('scan-progress').style.display = 'none';
+
+  if (badge)  { badge.style.display  = 'inline-flex'; }
+  if (dateEl) { dateEl.textContent   = kvDate; }
+  if (liveBtn){ liveBtn.style.display = 'inline-block'; }
+  if (btn)    { btn.disabled = false; }
+
+  var expBtn2 = document.getElementById('expand-all-btn');
+  var colBtn2 = document.getElementById('collapse-all-btn');
+  if (expBtn2) expBtn2.style.display = 'inline-block';
+  if (colBtn2) colBtn2.style.display = 'inline-block';
+  window._scannerKvMode = true;
+  var hint = document.getElementById('scanner-market-hint');
+  if (hint) hint.innerHTML = '<i class="ti ti-database"></i> '
+    + '<span style="color:var(--green)">KV-Modus</span> · Nightly Aggregator 04:00 UTC · '
+    + ms.length + ' Titel · <button onclick="runScan()" style="background:none;border:none;'
+    + 'color:var(--accent);cursor:pointer;font-size:11px;text-decoration:underline;padding:0">'
+    + 'Live-Scan</button> für Echtzeit-Daten';
+}
+
+window.kvToScannerState = kvToScannerState; // Global-Bindung für renderAlphaCards
+
+
 // ── TrackingStore: saubere localStorage-Abstraktion (späterer Backend-Swap möglich) ──
 const TrackingStore = {
   _key: function(scope) { return 'ko_backlog_' + scope; },
@@ -19520,8 +19732,10 @@ function renderAlphaCards(ms) {
     // Standard-Karte rendern (gleich wie Scanner-Tab) — mit Fehlerbehandlung
     try { renderCard(ticker, state); } catch(e) { console.error('[Alpha]', r.sym, e.message); return; }
 
-    // ── ALPHA-EXTRAS: nach renderCard in die Karte injizieren ────────────────
-    var el = document.getElementById('card-' + r.sym);
+    // ── ALPHA-EXTRAS: setTimeout(0) sichert DOM-Bereitschaft (Gemini Fix) ────
+    (function(r_cap) {
+      setTimeout(function() {
+    var el = document.getElementById('card-' + r_cap.sym);
     if (!el) return;
 
     // 1. Strategie-Label in den Header injizieren
@@ -19530,8 +19744,7 @@ function renderAlphaCards(ms) {
       var stratBadge = document.createElement('span');
       stratBadge.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:12px;background:rgba(79,142,247,0.15);border:0.5px solid rgba(79,142,247,0.4);color:var(--accent);margin-left:4px;flex-shrink:0';
       stratBadge.textContent = r.strategy;
-      var firstBtn = head.querySelector('button');
-      if (firstBtn) head.insertBefore(stratBadge, firstBtn);
+      head.appendChild(stratBadge);
     }
 
     // 2. KI-Trade-Setup (TRIGGER/STOP/TARGET) wenn vorhanden
@@ -19599,12 +19812,12 @@ function renderAlphaCards(ms) {
       wlBtn.onclick = (function(sym){ return function(){ addToWatchlist(sym); }; })(r.sym);
 
       // Vor den anderen Buttons einfügen
-      var firstBtn2 = head.querySelector('button');
-      if (firstBtn2) {
-        head.insertBefore(wlBtn, firstBtn2);
-        head.insertBefore(tvBtn, wlBtn);
-      }
+      // Buttons ans Ende des Headers anfügen
+      head.appendChild(tvBtn);
+      head.appendChild(wlBtn);
     }
+      }, 0); // setTimeout Ende — DOM sicher bereit
+    })(r);   // IIFE mit r_cap Closure
   });
 }
 
