@@ -454,7 +454,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <!-- KV-Modus Badge -->
         <button onclick="expandAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="expand-all-btn" title="Alle aufklappen"><i class="ti ti-chevrons-down"></i></button>
         <button onclick="collapseAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="collapse-all-btn" title="Alle zuklappen"><i class="ti ti-chevrons-up"></i></button>
-        <span id="kv-mode-badge" style="display:none;font-size:10px;padding:3px 8px;border-radius:6px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green);white-space:nowrap" title="Daten aus Nacht-Aggregator (04:00 UTC)">
+        <span id="kv-mode-badge" onclick="loadScannerFromKV()" style="display:none;font-size:10px;padding:3px 8px;border-radius:6px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green);white-space:nowrap;cursor:pointer" title="Klicken: Aggregator-Ergebnisse laden (Nacht-Scan)">
           <i class="ti ti-database"></i> <span id="kv-mode-date">KV</span>
         </span>
         <button class="btn btn-primary" onclick="runScanAuto()" id="scan-btn">
@@ -3343,18 +3343,30 @@ async function koAiCall(action, payload, expertMode) {
   const token = getAiToken();
   if (!token) throw new Error('KI-Token nicht gesetzt — bitte im Admin-Tab eintragen');
 
-  const resp = await fetch(KO_AI_WORKER, {
-    method:  'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': 'Bearer ' + token,
-    },
-    body: JSON.stringify({
-      action,
-      payload,
-      expert_mode: expertMode || false,
-    }),
-  });
+  // Timeout 90s — verhindert ewiges Hängen bei langsamen KI-Antworten
+  const _abort = new AbortController();
+  const _timer = setTimeout(function(){ _abort.abort(); }, 90000);
+  let resp;
+  try {
+    resp = await fetch(KO_AI_WORKER, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify({
+        action,
+        payload,
+        expert_mode: expertMode || false,
+      }),
+      signal: _abort.signal,
+    });
+  } catch(e) {
+    if (e.name === 'AbortError') throw new Error('KI-Timeout (90s) — Server antwortet nicht. Bitte erneut versuchen.');
+    throw e;
+  } finally {
+    clearTimeout(_timer);
+  }
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status }));
@@ -6641,6 +6653,7 @@ function renderCard(t,state){
     '<div class="sig-val">'+(obvSlope!=null?(obvSlope>0?'+':'')+obvSlope.toFixed(1)+'M':'n/a')+'</div>'+
     '<div class="sig-sub"><span class="pill '+mocls+'">'+motxt+'</span></div></div>'+
     '<div class="sig-box"><div class="sig-label">Volumen</div>'+
+    (c.atr?'<div class="sig-box"><div class="sig-label">ATR</div><div class="sig-val" style="font-weight:700">$'+c.atr.toFixed(2)+'</div><div class="sig-sub" style="font-size:9px;color:var(--text3)">'+(c.price?(c.atr/c.price*100).toFixed(1)+'%':'—')+' vom Kurs</div></div>':'') +
     '<div class="sig-val"><span class="pill '+vRatioCls+'">'+vRatioTxt+'</span></div></div>'+
     '</div>'+
     '<div class="verdict '+vC+'">'+
@@ -6709,6 +6722,12 @@ function renderCard(t,state){
         +'<span style="font-size:10px;color:'+col+'">'+'EMA200: '+_cs+ma200.toFixed(0)+' · '+hint+'</span>'
         +'</div>';
     }())+
+    // ATR + RSI Info-Zeile (Options-Relevanz)
+    (state.atr || state.rsi ? '<div style="display:flex;gap:10px;font-size:11px;color:var(--text2);padding:3px 0;margin-bottom:2px">'
+      + (state.rsi != null ? '<span>RSI <b style="color:'+(state.rsi>70?'var(--red)':state.rsi<30?'var(--green)':'var(--text2)')+'">'+Math.round(state.rsi)+'</b></span>' : '')
+      + (state.atr && state.price ? '<span style="color:var(--border2)">·</span><span>ATR <b style="color:var(--text2)">$'+state.atr.toFixed(2)+'</b> <span style="color:var(--text3);font-size:10px">'+(state.atr/state.price*100).toFixed(1)+'%</span></span>' : '')
+      + (state.histVal != null ? '<span style="color:var(--border2)">·</span><span>MACD <b style="color:'+(state.histVal>0?'var(--green)':'var(--red)')+'">'+( state.histVal>0?'+':'')+state.histVal.toFixed(3)+'</b></span>' : '')
+    + '</div>' : '') +
     (function(){
       // IVP-Badge — wird async befüllt, daher Platzhalter mit Klasse
       var ivpData = state._ivp;
@@ -11393,7 +11412,7 @@ async function loadMoverModalCards(){
       // US: Yahoo day-gainers + day-losers kombiniert
       var [gainers, losers] = await Promise.all([
         fetchYFScreener('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_gainers&count=15', 'gainers'),
-        fetchYFScreener('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_losers&count=15', 'losers'),
+        fetchYFScreener('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_losers&count=15', 'losers').catch(function(){ return []; }),
       ]);
       // After-Hours: sortiere nach postMarketChangePercent wenn verfügbar, sonst Tagesperformance
       results = [...gainers, ...losers]
@@ -11408,7 +11427,7 @@ async function loadMoverModalCards(){
     if(title) title.textContent = modeLabel2;
     if(status) status.innerHTML = '<i class="ti ti-loader"></i> Lade Gewinner…';
     if (!isDE) {
-      results = await fetchYFScreener('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_gainers&count=25', 'winners');
+      results = await fetchYFScreener('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_gainers&count=25', 'winners').catch(function(e){ console.warn('Winners load error:', e); return []; });
       results.sort(function(a,b){ return b.chg - a.chg; });
     }
   }
@@ -11426,6 +11445,11 @@ async function loadMoverModalCards(){
 
   results = results.slice(0, count);
   if(status) status.textContent = modeLabel2 + ' · MarketCap >2 Mrd · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' Uhr';
+  if (!results || results.length === 0) {
+    if(status) status.innerHTML = '<span style="color:var(--amber)">⚠ Keine Daten — Yahoo Finance Screener momentan nicht verfügbar. Versuche es später erneut.</span>';
+    if(cards) cards.innerHTML = '';
+    return;
+  }
   renderMoverModalCards(results, isDE);
 }
 
