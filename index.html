@@ -5839,6 +5839,7 @@ function kvToScannerState(r) {
 }
 
 async function loadScannerFromKV() {
+  window.loadScannerFromKV = loadScannerFromKV;
   // ── KV-Modus: Scanner-Tab aus Aggregator-Daten (masterShortlist) befüllen ──
   var btn  = document.getElementById('scan-btn');
   var cont = document.getElementById('scan-container');
@@ -6470,6 +6471,9 @@ async function fetchMtfData(sym, tdKey, proxy) {
 }
 
 function processData(raw){
+  // KV-Shortcut: gecachter State aus loadScannerFromKV
+  if (raw && raw._fromKv && raw._kvState) return raw._kvState;
+
   const above50=raw.price>raw.ma50;
   const macdBull=raw.macd_hist!=null&&raw.macd_hist_prev!=null?(raw.macd_hist>raw.macd_hist_prev&&raw.macd_hist>0):null;
   const obvBull=raw.obv_slope_5d!=null?raw.obv_slope_5d>0:null;
@@ -6653,7 +6657,7 @@ function renderCard(t,state){
     '<div class="sig-val">'+(obvSlope!=null?(obvSlope>0?'+':'')+obvSlope.toFixed(1)+'M':'n/a')+'</div>'+
     '<div class="sig-sub"><span class="pill '+mocls+'">'+motxt+'</span></div></div>'+
     '<div class="sig-box"><div class="sig-label">Volumen</div>'+
-    (c.atr?'<div class="sig-box"><div class="sig-label">ATR</div><div class="sig-val" style="font-weight:700">$'+c.atr.toFixed(2)+'</div><div class="sig-sub" style="font-size:9px;color:var(--text3)">'+(c.price?(c.atr/c.price*100).toFixed(1)+'%':'—')+' vom Kurs</div></div>':'') +
+    (state.atr?'<div class="sig-box"><div class="sig-label">ATR</div><div class="sig-val" style="font-weight:700">$'+state.atr.toFixed(2)+'</div><div class="sig-sub" style="font-size:9px;color:var(--text3)">'+(state.price?(state.atr/state.price*100).toFixed(1)+'%':'—')+' vom Kurs</div></div>':'') +
     '<div class="sig-val"><span class="pill '+vRatioCls+'">'+vRatioTxt+'</span></div></div>'+
     '</div>'+
     '<div class="verdict '+vC+'">'+
@@ -18317,6 +18321,13 @@ async function runMorningBriefing() {
       // Sektor-RS Top/Flop aus DOM
       var sektorRsEl   = document.getElementById('sektor-rs-content');
       var sektorRsTxt  = sektorRsEl ? sektorRsEl.innerText.slice(0, 200).replace(/\n/g, ' · ') : '—';
+      // sektorTxt aus _sektorData (kompakter Text für KI-Prompt)
+      var sektorTxt = '—';
+      if (window._sektorData && _sektorData.length) {
+        sektorTxt = _sektorData.slice(0,8).map(function(r){
+          var p=r.rs5d||0; return r.sym+(p>=0?'+':'')+p.toFixed(1)+'%'+(r.rs1d>=0.3?'↑':r.rs1d<=-0.3?'↓':'→');
+        }).join(' | ');
+      } else { sektorTxt = sektorRsTxt; }
 
       // Nur vorhandene Werte in den Prompt aufnehmen
       var messwerteLines = [];
