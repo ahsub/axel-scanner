@@ -18151,8 +18151,9 @@ async function runMorningBriefing() {
     }
     results.vix = _getVixRobust(); // Gemini-Fix: Fallback-Kaskade
     // IOS Market Score aus KV
-    results.iosMarket = (window._alphaData && _alphaData.market && _alphaData.market.iosMarket)
-                       ? _alphaData.market.iosMarket : null;
+    results.iosMarket   = (window._alphaData && _alphaData.market) ? (_alphaData.market.iosMarket   || null) : null;
+    results.fearGreed   = (window._alphaData && _alphaData.market) ? (_alphaData.market.fearGreed   || null) : null;
+    results.shillerCape = (window._alphaData && _alphaData.market) ? (_alphaData.market.shillerCape || null) : null;
     await new Promise(function(r){ setTimeout(r, 500); });
 
     // ── 2/9: Live-Preise (S&P, Nasdaq, DAX, Öl, Gold) ────────────
@@ -18499,6 +18500,30 @@ function showMorningTearsheet(results) {
       // Volatilität & Flow
       '<div style="padding:1rem 1.5rem;border-right:1px solid var(--border)">' +
         (results.iosMarket ? '<div style="margin:0 0 10px;padding:7px 10px;border-radius:7px;border-left:3px solid ' + (results.iosMarket.iosMarketScore>=85?'#22c55e':results.iosMarket.iosMarketScore>=70?'#f0a93a':'#ef4444') + ';background:rgba(0,0,0,0.06)"><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1px">IOS MARKET</span><b style="font-size:15px;color:' + (results.iosMarket.iosMarketScore>=85?'#22c55e':results.iosMarket.iosMarketScore>=70?'#f0a93a':'#ef4444') + '">' + results.iosMarket.iosMarketScore + '</b><span style="font-size:10px;padding:1px 5px;border-radius:4px;background:' + (results.iosMarket.iosMarketScore>=85?'#22c55e':results.iosMarket.iosMarketScore>=70?'#f0a93a':'#ef4444') + ';color:#fff;font-weight:700">' + (results.iosMarket.iosMarketRating||'') + '</span></div><div style="font-size:11px;font-weight:700;color:' + (results.iosMarket.iosMarketScore>=85?'#22c55e':results.iosMarket.iosMarketScore>=70?'#f0a93a':'#ef4444') + '">' + (results.iosMarket.iosMarketDecision||'—') + '</div><div style="font-size:10px;color:var(--text3);margin-top:2px">Trend ' + results.iosMarket.iosMarketTrend + '/35 · Breadth ' + results.iosMarket.iosMarketBreadth + '/25 · Risk ' + results.iosMarket.iosMarketRisk + '/20</div></div>' : '') +
+        (results.fearGreed ? (function(fg){
+          var fgc = fg.score>=75?'#22c55e':fg.score>=55?'#4f8ef7':fg.score>=40?'#f0a93a':fg.score>=25?'#f97316':'#ef4444';
+          var fgL = fg.score>=75?'😀 Extreme Greed':fg.score>=55?'🙂 Greed':fg.score>=40?'😐 Neutral':fg.score>=25?'😟 Fear':'😱 Extreme Fear';
+          return '<div style="margin-bottom:10px;padding:7px 10px;border-radius:7px;border-left:3px solid '+fgc+';background:rgba(0,0,0,0.06)">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">' +
+            '<span style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1px">FEAR & GREED</span>' +
+            '<b style="font-size:15px;color:'+fgc+'">'+fg.score+'</b>' +
+            '<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:'+fgc+';color:#fff;font-weight:700">'+fgL+'</span>' +
+            '</div>' +
+            (fg.previous?'<div style="font-size:10px;color:var(--text3)">Vortag: '+fg.previous+'</div>':'') +
+          '</div>';
+        })(results.fearGreed) : '') +
+        (results.shillerCape ? (function(sc){
+          var cc = sc.cape>35?'#ef4444':sc.cape>28?'#f97316':sc.cape>22?'#f0a93a':'#22c55e';
+          var cl = sc.cape>35?'Stark überbewertet':sc.cape>28?'Überbewertet':sc.cape>22?'Erhöht':'Fair';
+          return '<div style="margin-bottom:10px;padding:7px 10px;border-radius:7px;border-left:3px solid '+cc+';background:rgba(0,0,0,0.06)">' +
+            '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1px">SHILLER CAPE</span>' +
+            '<b style="font-size:15px;color:'+cc+'">'+sc.cape+'</b>' +
+            '<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:'+cc+';color:#fff;font-weight:700">'+cl+'</span>' +
+            '</div>' +
+            '<div style="font-size:9px;color:var(--text3);margin-top:2px">Hist. Ø ~17 · Dot-com: 44 · 2009: 13</div>' +
+          '</div>';
+        })(results.shillerCape) : '') +
         '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.5rem">VOLATILITÄT & FLOW</div>' +
         '<table style="width:100%;border-collapse:collapse">' +
           metricRow('VIX', val(results.vix), scoreColor(results.vix, 12, 20) === 'var(--green)' ? '#22c55e' : results.vix < 20 ? '#f0a93a' : '#ef4444') +
