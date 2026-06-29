@@ -5834,6 +5834,26 @@ function kvToScannerState(r) {
     hist:         [],
     obvNorm:      [],
     dates:        [],
+    // renderCard braucht diese Felder — sichere Defaults für KV-Modus
+    backtest:     null,
+    buyPointScore:   0,
+    buyPointSignals: [],
+    sepaScore:    0,
+    sepa1: false, sepa2: false, sepa3: false, sepa4: false,
+    sepa5: false, sepa6: false, sepa7: false, sepa8: false,
+    sepaPts: 0, techPts: 0, bpPts: 0, stkPts: 0, volPts: 0,
+    emaStackScore: 0, mtfScore: 0, pdhlScore: 0,
+    consecutive:  0,
+    stickyness:   50,
+    trendDir:     'neutral',
+    dist10wMA:    null,
+    sessionNote:  null,
+    rs:           null,
+    scoreColor:   scoreColor,
+    _currency:    'USD',
+    _er:          null,
+    _fromTdCache: false,
+    currency:     'USD',
     closes_full:  [],
   };
 }
@@ -5915,6 +5935,8 @@ async function loadScannerFromKV() {
     + 'color:var(--accent);cursor:pointer;font-size:11px;text-decoration:underline;padding:0">'
     + 'Live-Scan</button> für Echtzeit-Daten';
 }
+
+window.kvToScannerState = kvToScannerState; // Global-Bindung für renderAlphaCards
 
 function runScanAuto() {
   // Smart Scan: KV-Modus wenn Aggregator-Daten vorhanden, sonst Live-Scan
@@ -6889,6 +6911,8 @@ function renderCard(t,state){
     });
   }
 }
+
+window.renderCard = renderCard; // Global-Bindung
 
 function useInRechner(sym){
   const d=tickerData[sym];if(!d) return;
@@ -19460,8 +19484,8 @@ function renderAlphaCards(ms) {
     var ticker = { sym: r.sym, name: r.name || r.sym };
     var state  = kvToScannerState(r);
 
-    // Standard-Karte rendern (gleich wie Scanner-Tab)
-    renderCard(ticker, state);
+    // Standard-Karte rendern (gleich wie Scanner-Tab) — mit Fehlerbehandlung
+    try { renderCard(ticker, state); } catch(e) { console.error('[Alpha]', r.sym, e.message); return; }
 
     // ── ALPHA-EXTRAS: nach renderCard in die Karte injizieren ────────────────
     var el = document.getElementById('card-' + r.sym);
@@ -19517,7 +19541,7 @@ function renderAlphaCards(ms) {
 
       // Buttons
       setupHtml += '<div style="display:flex;gap:8px;margin-top:4px">' +
-        '<button onclick="openCalc(\'' + r.sym + '\')" class="btn btn-sm" style="font-size:11px">Rechner</button>' +
+        '<button onclick="useInRechner && useInRechner(\'' + r.sym + '\')" class="btn btn-sm" style="font-size:11px">Rechner</button>' +
         '<button onclick="openDeepDive(\'' + r.sym + '\',\'' + r.sym + '\')" class="btn btn-sm" style="font-size:11px;background:rgba(163,113,247,0.1);border-color:#a371f7;color:#a371f7">Deep Dive</button>' +
       '</div>';
 
