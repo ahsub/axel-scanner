@@ -15066,6 +15066,11 @@ async function openKiBriefing(defaultStrat) {
 
   // Ticker-Liste kompakt (max 10 Titel für Prompt-Größe)
   const top10 = top25.slice(0, 10);
+  // Parameter-Pool-Modul: vollständige Daten für KI-Selektion
+  const poolData = top10.map(function(r, i) {
+    var pool = buildParameterPool(r);
+    return (i+1) + '. ' + pool.sym + ':\n' + formatPoolForPrompt(pool, activeStrategy || 'CSP/Wheel');
+  }).join('\n\n');
   const tickerList = top10.map(function(r, i) {
     var line = (i+1) + '. ' + r.sym
       + ' Kurs:$' + (r.price ? r.price.toFixed(2) : '?')
@@ -15094,8 +15099,51 @@ async function openKiBriefing(defaultStrat) {
     }
     // RS-Rating vs S&P500 (nur wenn vorhanden)
     if(r.rs != null) line += ' RS:' + r.rs;
-    // 52W-Hoch Abstand (nur wenn vorhanden)
+    // ATR + Strike-Berechnung (für EIC Options-Empfehlung)
+    if(r.atr && r.price) {
+      var strikeCSP = r.ma200 ? (r.ma200 - 1.5 * r.atr).toFixed(2) : null;
+      line += ' ATR:$' + r.atr.toFixed(2);
+      if(strikeCSP) line += ' Strike(EMA200-1.5×ATR):$' + strikeCSP;
+    }
+    // 52W Range
     if(r.dist52wHigh != null) line += ' 52W-H:' + (r.dist52wHigh >= 0 ? '+' : '') + r.dist52wHigh + '%';
+    if(r.high52w && r.low52w) line += ' [52W:$'+r.low52w.toFixed(0)+'-$'+r.high52w.toFixed(0)+']';
+    // KRITISCH: RSI + MACD + Bollinger + EMA50 + Volumen + Overheat
+    if(r.rsi != null)       line += ' RSI:' + r.rsi.toFixed(1);
+    if(r.histVal != null)   line += ' MACD:' + (r.histVal > 0 ? '+' : '') + r.histVal.toFixed(3);
+    if(r.bbPos != null)     line += ' BB:' + Math.round(r.bbPos*100) + '%';
+    if(r.ma50 && r.price)   { var d50 = ((r.price-r.ma50)/r.ma50*100).toFixed(1); line += ' EMA50:$'+r.ma50.toFixed(0)+'('+d50+'%)'; }
+    if(r.volRatio != null)  line += ' VolR:' + (r.volRatio/100).toFixed(2) + 'x';
+    if(r.overheat != null && r.overheat > 0) line += ' 🔥Overheat:' + r.overheat;
+    if(r.obvSlope != null)  line += ' OBV:' + (r.obvSlope > 0 ? '▲' : '▼') + Math.abs(r.obvSlope).toFixed(2);
+    // HOCH: hv10 + Strategie-Scores + IOS
+    if(r.hv10 != null)      line += ' hv10:' + r.hv10;
+    // Strategie-Scores (kompakt)
+    var stratParts = [];
+    if(r.strategyScores) {
+      var ss = r.strategyScores;
+      if(ss.long_minervini && ss.long_minervini.score > 30) stratParts.push('SEPA:'+ss.long_minervini.score);
+      if(ss.long_swing     && ss.long_swing.score > 30)     stratParts.push('Swing:'+ss.long_swing.score);
+      if(ss.long_mr        && ss.long_mr.score > 30)        stratParts.push('MR:'+ss.long_mr.score);
+      if(ss.short_breakdown && ss.short_breakdown.score > 30) stratParts.push('Short⬇:'+ss.short_breakdown.score);
+      if(ss.short_fading   && ss.short_fading.score > 30)   stratParts.push('Fade:'+ss.short_fading.score);
+    } else {
+      // KV-Modus: direkte Score-Felder
+      if(r.sMinervini > 30) stratParts.push('SEPA:'+r.sMinervini);
+      if(r.sSwing     > 30) stratParts.push('Swing:'+r.sSwing);
+      if(r.sMrLong    > 30) stratParts.push('MR:'+r.sMrLong);
+      if(r.sBreakdown > 30) stratParts.push('Short⬇:'+r.sBreakdown);
+      if(r.sFading    > 30) stratParts.push('Fade:'+r.sFading);
+    }
+    if(stratParts.length) line += ' [Strat:' + stratParts.join('|') + ']';
+    // IOS Foundation v1.2
+    if(r.iosRating) {
+      line += ' IOS:' + r.iosRating;
+      if(r.iosDecision) line += '(' + r.iosDecision.replace('LEADER WAIT PULLBACK','LWP').replace('BUY FIRST TRANCHE','BFT').replace('SELECTIVE ENTRY','SE').replace('WATCHLIST','WL').replace('NO BUY','NO') + ')';
+      if(r.iosQuality != null) line += ' Q:'+r.iosQuality+'/E:'+r.iosEntry;
+    }
+    // Grade
+    if(r.scoreLabel) line += ' Grade:' + r.scoreLabel;
     // Fibo-Zone (nur wenn vorhanden)
     if(r.fibo) line += ' Fibo:' + r.fibo.zone + '(' + r.fibo.retrace + '%)';
     // IV-Percentile mit Markov-Kombination
@@ -18363,6 +18411,146 @@ function expandAllCards() {
 function collapseAllCards() {
   document.querySelectorAll(".card").forEach(function(c){ c.classList.remove("expanded"); });
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PARAMETER-POOL-MODUL v1.0 — UIQ v2.0 Vorbereitung
+// Stellt ALLE verfügbaren Ticker-Parameter strukturiert bereit.
+// KI selektiert selbst welche Parameter für die jeweilige Strategie relevant sind.
+// Fehlende Parameter werden von der KI als Gap gemeldet → Pool-Erweiterung.
+// ══════════════════════════════════════════════════════════════════════════════
+function buildParameterPool(r) {
+  if (!r) return null;
+  var price = r.price || r.ma200 && null;
+
+  return {
+    // ── KERN ──────────────────────────────────────────────────────────────────
+    sym:          r.sym,
+    price:        r.price,
+    grade:        r.scoreLabel || r.grade,
+    compositeScore: r.compositeScore || r.score,
+
+    // ── TREND & MOVING AVERAGES ───────────────────────────────────────────────
+    ema50:        r.ma50  || r.ema50,
+    ema200:       r.ma200 || r.ema200,
+    dist50pct:    r.ma50  && r.price ? +((r.price - r.ma50)  / r.ma50  * 100).toFixed(1) : null,
+    dist200pct:   r.ma200 && r.price ? +((r.price - r.ma200) / r.ma200 * 100).toFixed(1) : null,
+    above50:      r.above50,
+    above200:     r.ma200 ? r.price > r.ma200 : null,
+    ema50Rising:  null,   // TODO: Steigung EMA50 (future)
+    ema200Rising: null,   // TODO: Steigung EMA200 (future)
+
+    // ── MOMENTUM ──────────────────────────────────────────────────────────────
+    rsi:          r.rsi,
+    macdHist:     r.histVal || r.macdHist || r.macd_hist,
+    macdBull:     r.macdBull,
+    obvTrend:     r.obvSlope || r.obvTrend || r.obv_slope_5d,
+    obvBull:      r.obvBull,
+
+    // ── VOLATILITÄT ───────────────────────────────────────────────────────────
+    atr:          r.atr,
+    atrPct:       r.atr && r.price ? +((r.atr / r.price) * 100).toFixed(2) : null,
+    hvp:          r.hvp || r.ivp,        // Historical Vol Percentile 0-100
+    hv10:         r.hv10,                // 10-Tage HV (Weeklies)
+    bbPos:        r.bbPos,               // Bollinger Position 0-1
+    overheat:     r.overheat,            // Überhitzungs-Score 0-100
+
+    // ── OPTIONS-RELEVANTE PARAMETER ───────────────────────────────────────────
+    strikeCSP:    r.ma200 && r.atr ? +((r.ma200 - 1.5 * r.atr).toFixed(2)) : null,
+    strikeCC:     r.ma50  && r.atr ? +((r.ma50  + 1.0 * r.atr).toFixed(2)) : null,
+    strikeMR:     r.ma200 && r.atr ? +((r.ma200 - 2.0 * r.atr).toFixed(2)) : null,
+
+    // ── VOLUMEN & FLOW ────────────────────────────────────────────────────────
+    volRatio:     r.volRatio != null ? (r.volRatio > 10 ? r.volRatio/100 : r.volRatio) : null,
+    bullSignals:  r.bullCount || r.bullSignals,   // 0-3 Bull-Signale
+
+    // ── 52-WOCHEN RANGE ───────────────────────────────────────────────────────
+    high52:       r.high52w || r.high52,
+    low52:        r.low52w  || r.low52,
+    dist52wHigh:  r.dist52wHigh || r.dist52h || r.pctFromHigh52,
+
+    // ── MARKOV REGIME ─────────────────────────────────────────────────────────
+    regime:       r._markov ? (r._markov.regime===1?'BULL':r._markov.regime===-1?'BEAR':'SIDE') : r.regime,
+    pBull2Bear:   r._markov ? r._markov.pBull2Bear : r.pBull2Bear,
+    regimeWarn:   r._markov ? r._markov.warnLevel  : null,
+
+    // ── STRATEGIE-SCORES (Python-berechnet) ───────────────────────────────────
+    sMinervini:   r.sMinervini || (r.strategyScores && r.strategyScores.long_minervini ? r.strategyScores.long_minervini.score : null),
+    sSwing:       r.sSwing     || (r.strategyScores && r.strategyScores.long_swing     ? r.strategyScores.long_swing.score     : null),
+    sMrLong:      r.sMrLong    || (r.strategyScores && r.strategyScores.long_mr        ? r.strategyScores.long_mr.score        : null),
+    sBreakdown:   r.sBreakdown || (r.strategyScores && r.strategyScores.short_breakdown? r.strategyScores.short_breakdown.score: null),
+    sFading:      r.sFading    || (r.strategyScores && r.strategyScores.short_fading   ? r.strategyScores.short_fading.score   : null),
+
+    // ── IOS FOUNDATION v1.2 (Club-Integration) ────────────────────────────────
+    iosScore:     r.iosScore,
+    iosRating:    r.iosRating,
+    iosDecision:  r.iosDecision,
+    iosQuality:   r.iosQuality,
+    iosEntry:     r.iosEntry,
+    iosIsLeader:  r.iosIsLeader,
+    iosSummary:   r.iosSummary,
+
+    // ── META ──────────────────────────────────────────────────────────────────
+    _source:      r._fromKv ? 'KV-Aggregator' : 'Live-Scan',
+    _updated:     r._kvUpdated || null,
+
+    // ── POOL-VERSION (für Gap-Tracking) ───────────────────────────────────────
+    _poolVersion: '1.0',
+    _missingFields: []   // wird von KI befüllt wenn Parameter fehlen
+  };
+}
+
+function formatPoolForPrompt(pool, strategy) {
+  // Kompakte Textdarstellung für KI-Prompt
+  // Nur nicht-null Felder werden übergeben
+  if (!pool) return 'KEIN PARAMETER-POOL VERFÜGBAR';
+
+  var lines = [];
+  lines.push('PARAMETER-POOL v' + pool._poolVersion + ' | Quelle: ' + pool._source);
+  lines.push('');
+
+  var sections = {
+    'KERN':          ['sym','price','grade','compositeScore'],
+    'TREND/MAs':     ['ema50','ema200','dist50pct','dist200pct','above50','above200'],
+    'MOMENTUM':      ['rsi','macdHist','macdBull','obvTrend','obvBull'],
+    'VOLATILITÄT':   ['atr','atrPct','hvp','hv10','bbPos','overheat'],
+    'OPTIONS-STRIKES':['strikeCSP','strikeCC','strikeMR'],
+    'VOLUMEN/FLOW':  ['volRatio','bullSignals'],
+    '52W-RANGE':     ['high52','low52','dist52wHigh'],
+    'MARKOV-REGIME': ['regime','pBull2Bear','regimeWarn'],
+    'STRAT-SCORES':  ['sMinervini','sSwing','sMrLong','sBreakdown','sFading'],
+    'IOS-FOUNDATION':['iosScore','iosRating','iosDecision','iosQuality','iosEntry','iosIsLeader','iosSummary'],
+  };
+
+  for (var section in sections) {
+    var fields = sections[section];
+    var parts = [];
+    for (var i = 0; i < fields.length; i++) {
+      var k = fields[i];
+      var v = pool[k];
+      if (v !== null && v !== undefined && v !== '') {
+        if (typeof v === 'number') {
+          parts.push(k + ':' + (Number.isInteger(v) ? v : v.toFixed(2)));
+        } else {
+          parts.push(k + ':' + v);
+        }
+      }
+    }
+    if (parts.length > 0) {
+      lines.push('[' + section + '] ' + parts.join(' | '));
+    }
+  }
+
+  lines.push('');
+  lines.push('ANWEISUNG AN KI:');
+  lines.push('1. Nutze NUR die für Strategie "' + (strategy||'?') + '" relevanten Parameter.');
+  lines.push('2. Falls ein benötigter Parameter fehlt (null/nicht vorhanden): liste ihn unter FEHLENDE PARAMETER.');
+  lines.push('3. Format: FEHLENDE PARAMETER: [param1, param2, ...] — [Begründung warum benötigt]');
+
+  return lines.join('\n');
+}
+
+
 
 function closeTearsheet() {
   var m = document.getElementById('tearsheet-modal');
