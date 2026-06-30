@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v219">
+<meta name="app-version" content="20260630-v220">
+<!-- v220 (30.06.2026): KRITISCHER FIX — _initKoPrompts() lief bei mehreren PIN-
+     Eingabeversuchen mehrfach parallel und endlos (kein Retry-Cap, keine Sperre
+     gegen Mehrfachstart) → exponentiell verschachtelte Konsolen-Logs. Jetzt:
+     Sperre gegen parallele Polling-Ketten + 10s-Obergrenze mit klarer
+     Fehlermeldung statt endlosem stillen Retry. -->
 <!-- v219 (30.06.2026): Extra-Ticker already_in_universe Status behandelt (Dedupe-Fix
      gegen known_universe_tickers im ko-ai Worker v1.2, market_aggregator.py v3.3). -->
 <!-- v218 (30.06.2026): Extra-Ticker-Vorschlag-Feature — Fibo-Tab-Button "Zur Aggregator-Liste
@@ -15628,16 +15633,43 @@ var KI_STRAT_CONFIG = {};
 var KI_ANTI_HALLUZINATION = '';
 
 // Initialisierung nach KoPrompts-Load
+// NEU (30.06.2026): Sperre gegen mehrfach gestartete Polling-Ketten (z.B. bei
+// mehreren PIN-Eingabeversuchen) + Retry-Obergrenze statt endlosem Polling.
+var _koPromptsPolling = false;
+var _koPromptsAttempts = 0;
+var KO_PROMPTS_MAX_ATTEMPTS = 20; // 20 × 500ms = 10s
+
 function _initKoPrompts() {
-  if (typeof KoPrompts === 'undefined') {
-    // CDN noch nicht geladen — kurz warten und retry
-    console.warn('[KoPrompts] Modul noch nicht geladen — retry in 500ms');
-    setTimeout(_initKoPrompts, 500);
+  if (typeof KoPrompts !== 'undefined') {
+    _koPromptsPolling = false;
+    KI_STRAT_CONFIG = KoPrompts.STRATEGIES;
+    KI_ANTI_HALLUZINATION = KoPrompts.KI_ANTI_HALLUZINATION;
+    console.log('[KoPrompts] v' + KoPrompts.VERSION + ' geladen — ' + KoPrompts.ids().length + ' Strategien');
     return;
   }
-  KI_STRAT_CONFIG = KoPrompts.STRATEGIES;
-  KI_ANTI_HALLUZINATION = KoPrompts.KI_ANTI_HALLUZINATION;
-  console.log('[KoPrompts] v' + KoPrompts.VERSION + ' geladen — ' + KoPrompts.ids().length + ' Strategien');
+
+  if (_koPromptsPolling) return; // bereits eine aktive Polling-Kette — keine zweite starten
+  _koPromptsPolling = true;
+  _koPromptsAttempts = 0;
+  _pollKoPrompts();
+}
+
+function _pollKoPrompts() {
+  if (typeof KoPrompts !== 'undefined') {
+    _koPromptsPolling = false;
+    KI_STRAT_CONFIG = KoPrompts.STRATEGIES;
+    KI_ANTI_HALLUZINATION = KoPrompts.KI_ANTI_HALLUZINATION;
+    console.log('[KoPrompts] v' + KoPrompts.VERSION + ' geladen — ' + KoPrompts.ids().length + ' Strategien');
+    return;
+  }
+  _koPromptsAttempts++;
+  if (_koPromptsAttempts >= KO_PROMPTS_MAX_ATTEMPTS) {
+    _koPromptsPolling = false;
+    console.error('[KoPrompts] Modul nach ' + KO_PROMPTS_MAX_ATTEMPTS + ' Versuchen (10s) nicht geladen — CDN nicht erreichbar oder blockiert (https://cdn.jsdelivr.net/gh/ahsub/ko-modules@.../ko-prompts.js). KI-Strategie-Buttons funktionieren nicht, bis die Seite neu geladen wird.');
+    return;
+  }
+  console.warn('[KoPrompts] Modul noch nicht geladen — retry ' + _koPromptsAttempts + '/' + KO_PROMPTS_MAX_ATTEMPTS + ' in 500ms');
+  setTimeout(_pollKoPrompts, 500);
 }
 
 // ── UI-ELEMENT CACHE (Gemini-Fix: DOM-Abfrage-Optimierung) ───────────────────
