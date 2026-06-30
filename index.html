@@ -3,7 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v226">
+<meta name="app-version" content="20260630-v227">
+<!-- v227 (30.06.2026): HOTFIX — stratCfg.prompt() war nach dem Umbau auf
+     ko-strategies.js v2.0.0 nicht mehr aufrufbar (Strategien sind jetzt reine
+     Regelwerk-Daten ohne eigene .prompt()-Methode). 2 Stellen betroffen:
+     openKiBriefing() und runOptionsKiBriefing() — beide jetzt auf
+     KoPrompts.get(id, ctx) umgestellt (gemeinsamer Prompt-Builder).
+     "TypeError: stratCfg.prompt is not a function" beim KI-Briefing behoben. -->
 <!-- v226 (30.06.2026): Strategie-Modul-Architektur (Axels 5 Anforderungen:
      Erweiterbarkeit, Regelwerk-basiert, einheitliche No-Hallu-Prompts, ES6,
      Multi-Modul-Zugriff) — ko-prompts.js ersetzt durch ko-strategies.js v2.0.0
@@ -15604,8 +15610,10 @@ async function openKiBriefing(defaultStrat) {
   const stratCfg = KI_STRAT_CONFIG[_kiStrat] || KI_STRAT_CONFIG.ko;
   const vixForPrompt = (typeof vixStr !== 'undefined' && vixStr) ? vixStr : (_vixLevel ? _vixLevel.toFixed(1) : 'unbekannt');
   const optsCfg = getOptionsCfg();
-  const prompt = stratCfg.prompt({ marktkontext: marktkontext, vixStr: vixForPrompt, optsCfg: optsCfg });
-  const dummy = 'Du bist ein erfahrener Knock-out-Trading-Experte'; // ersetzt durch stratCfg.prompt
+  // NEU (30.06.2026, ko-strategies.js v2.0.0): Strategien sind jetzt reine
+  // Regelwerk-Daten ohne eigene .prompt()-Methode — Prompt-Text kommt aus dem
+  // gemeinsamen Builder via KoPrompts.get(id, ctx) statt stratCfg.prompt(ctx).
+  const prompt = KoPrompts.get((_kiStrat && KI_STRAT_CONFIG[_kiStrat]) ? _kiStrat : 'ko', { marktkontext: marktkontext, vixStr: vixForPrompt, optsCfg: optsCfg });
 
   try {
         // KI-Call via ko-ai Worker
@@ -19932,7 +19940,7 @@ async function runOptionsKiBriefing(strat) {
           + ' Grade:' + (t.grade||'--');
       }).join('\n');
   var ctx = { marktkontext: mkCtx, optsCfg: { minPrice:15, maxPrice:(_optionsMaxPrice != null ? _optionsMaxPrice : 150), minHvp:_optionsDeskFilter, goodHvp:50, idealHvp:65, erDays:30, dte:30 }, vixStr: String(_getVixRobust()||'--') };
-  var prompt = stratCfg.prompt(ctx);
+  var prompt = KoPrompts.get(strat, ctx);
   // Open modal
   var existing = document.getElementById('ki-modal');
   if (existing) existing.remove();
