@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v216">
+<meta name="app-version" content="20260630-v217">
 <!-- v212 (30.06.2026): Fibonacci-Screening-Modul v1.0 (Gemini-Blueprint) — renderFiboBar() in renderCard(),
      _fibo-Feld in kvToScannerState(), Fibo-Sektion in Parameter-Pool fuer KI-Prompts. -->
 <!-- v213 (30.06.2026): KRITISCHER BUGFIX — runScan() hatte fehlende schliessende Klammer;
@@ -25,6 +25,15 @@
      Filter-Ergebnis nur "bitte Aggregator-Lauf abwarten" ohne erkennbar zu machen ob die KV-
      Daten leer sind oder nur der HVP-Filter zu streng ist. Jetzt: Diagnose-Zeile (Ticker-Anzahl,
      max. HVP, Anzahl mit Score>0, Generated-Stand) + Konsolen-Log bei jedem Options-Desk-Load. -->
+<!-- v217 (30.06.2026): ROOT-CAUSE-FIX Options-Desk leer — Diagnose (v216) zeigte
+     "0 Ticker geladen, generated:undefined": der separate Cloudflare-KV-Key
+     "options_watchlist" wurde vom Aggregator nicht zuverlaessig geschrieben, obwohl der
+     Hauptlauf (master_market_data) und dessen EINGEBETTETES optionsWatchlist-Array (50
+     valide Kandidaten, verifiziert per Artifact-JSON) erfolgreich waren. Fix: loadOptionsDesk()
+     liest jetzt primaer aus dem bereits geladenen _alphaData.optionsWatchlist (Single Source
+     of Truth, kein Extra-Fetch noetig) statt dem fragilen separaten Key. Fallback-Kette:
+     _alphaData -> Master-Reload -> Legacy-Key. Python-seitig: push_to_cloudflare_kv() hat
+     jetzt einen Retry fuer mehr Robustheit. -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -19526,14 +19535,57 @@ async function loadOptionsDesk(force) {
   var cardsEl = document.getElementById('options-desk-cards');
   if (!cardsEl) return;
   if (_optionsWatchlist && !force) { renderOptionsDeskCards(_optionsWatchlist); return; }
+
+  // PRIMÄRER PFAD (Single Source of Truth): _alphaData wurde beim Laden von
+  // "Master Shortlist" bereits vollständig geladen und enthält optionsWatchlist
+  // eingebettet (master_market_data.optionsWatchlist). Kein zusätzlicher
+  // Netzwerk-Call nötig — vermeidet den separaten, fragilen KV-Key
+  // "options_watchlist", dessen Zweit-Push im Aggregator gelegentlich
+  // fehlschlägt obwohl der Hauptlauf erfolgreich war (30.06.2026 Diagnose).
+  if (!force && window._alphaData && Array.isArray(_alphaData.optionsWatchlist) && _alphaData.optionsWatchlist.length) {
+    _optionsWatchlist = {
+      tickers:   _alphaData.optionsWatchlist,
+      generated: (_alphaData.meta && _alphaData.meta.generated) || null,
+      count:     _alphaData.optionsWatchlist.length,
+      _source:   'embedded',
+    };
+    console.log('[OptionsDesk] ' + _optionsWatchlist.tickers.length + ' Ticker aus _alphaData (embedded, kein Extra-Fetch) · generated:' + _optionsWatchlist.generated);
+    renderOptionsDeskCards(_optionsWatchlist);
+    return;
+  }
+
   cardsEl.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text3);font-size:12px"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i><div style="margin-top:.4rem">Lade Options-Watchlist...</div></div>';
+
+  // FALLBACK: falls _alphaData noch nicht geladen ist (z.B. Direktaufruf ohne
+  // vorherigen Master-Shortlist-Load) — zuerst versuchen _alphaData nachzuladen,
+  // dann erst auf den separaten (potenziell leeren) KV-Key zurückfallen.
   try {
     var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
+    if (!window._alphaData) {
+      var rMaster = await fetch(koSync + '/sync/master_market_data', { cache: 'no-store' });
+      if (rMaster.ok) {
+        var respMaster = await rMaster.json();
+        var dataMaster = respMaster.data || respMaster;
+        if (dataMaster && Array.isArray(dataMaster.optionsWatchlist) && dataMaster.optionsWatchlist.length) {
+          window._alphaData = dataMaster;
+          _optionsWatchlist = {
+            tickers:   dataMaster.optionsWatchlist,
+            generated: (dataMaster.meta && dataMaster.meta.generated) || null,
+            count:     dataMaster.optionsWatchlist.length,
+            _source:   'embedded-fallback',
+          };
+          console.log('[OptionsDesk] ' + _optionsWatchlist.tickers.length + ' Ticker via Fallback-Master-Load · generated:' + _optionsWatchlist.generated);
+          renderOptionsDeskCards(_optionsWatchlist);
+          return;
+        }
+      }
+    }
+    // Letzter Fallback: separater Legacy-KV-Key (kann leer sein, siehe oben)
     var r = await fetch(koSync + '/sync/options_watchlist', { cache: 'no-store' });
     if (!r.ok) throw new Error('KV HTTP ' + r.status);
     _optionsWatchlist = await r.json();
     var _diagT = (_optionsWatchlist && _optionsWatchlist.tickers) || [];
-    console.log('[OptionsDesk] ' + _diagT.length + ' Ticker geladen · generated:' + (_optionsWatchlist && _optionsWatchlist.generated) + ' · max HVP:' + (_diagT.length ? Math.max.apply(null,_diagT.map(function(t){return t.hvp||0;})) : '--'));
+    console.log('[OptionsDesk] ' + _diagT.length + ' Ticker geladen (Legacy-Key) · generated:' + (_optionsWatchlist && _optionsWatchlist.generated) + ' · max HVP:' + (_diagT.length ? Math.max.apply(null,_diagT.map(function(t){return t.hvp||0;})) : '--'));
     renderOptionsDeskCards(_optionsWatchlist);
   } catch(e) {
     console.warn('[OptionsDesk] KV-Fehler:', e.message);
