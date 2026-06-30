@@ -3,9 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v212">
+<meta name="app-version" content="20260630-v213">
 <!-- v212 (30.06.2026): Fibonacci-Screening-Modul v1.0 (Gemini-Blueprint) — renderFiboBar() in renderCard(),
      _fibo-Feld in kvToScannerState(), Fibo-Sektion in Parameter-Pool fuer KI-Prompts. -->
+<!-- v213 (30.06.2026): KRITISCHER BUGFIX — runScan() hatte fehlende schliessende Klammer;
+     kvToScannerState/loadScannerFromKV/runScanAuto waren dadurch lokal in runScan() statt global
+     gescoped ("X is not defined" beim Klick). Tail-Block (Alert-Dispatch) korrekt vor KV-Scanner-
+     Funktionen verschoben. AUSSERDEM: KI-Trade-Setup in renderAlphaCards() nutzte falsche Feldnamen
+     (ki.stop statt ki.stopLoss etc.) -> TypeError beim Laden von Alpha Desk. Beide behoben. -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -5721,6 +5726,36 @@ async function runScan(){
   var colBtn = document.getElementById('collapse-all-btn');
   if (expBtn) expBtn.style.display = 'inline-block';
   if (colBtn) colBtn.style.display = 'inline-block';
+  setTimeout(function(){ document.getElementById('scan-progress').style.display='none'; },2000);
+  btn.disabled=false;
+  try { autoSaveShortlist(); } catch(e) { console.warn('[Shortlist] autoSave Fehler:', e.message); }
+
+  // IV-Toolbar-Button nach Scan immer anzeigen
+  var _ivTb = document.getElementById('iv-toolbar-btn');
+  if (_ivTb) _ivTb.style.display = 'inline-flex';
+
+  // Smart Alert-Routing: Überhitzte Titel melden
+  setTimeout(async function() {
+    try {
+      // Makro-State zuerst updaten
+      await sendMacroState();
+      // Dann Einzeltitel-Alerts
+      var alertCount = 0;
+      for (var ai = 0; ai < activeTickers.length; ai++) {
+        var t    = activeTickers[ai];
+        var data = tickerData[t.sym];
+        if (!data || data.error) continue;
+        var state = processData(data);
+        if (state.overheat && state.overheat.score >= 25) {
+          await sendKoAlert(t.sym, state);
+          alertCount++;
+          if (alertCount >= 10) break; // Max 10 Alerts pro Scan
+          await new Promise(function(r){ setTimeout(r, 300); }); // Rate limit
+        }
+      }
+    } catch(alertErr) { console.warn('Alert dispatch:', alertErr.message); }
+  }, 2000); // 2s nach Scan-Ende
+}
 
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -5959,36 +5994,6 @@ function runScanAuto() {
   } else {
     runScan(); // Fallback: Live-Scan
   }
-}
-  setTimeout(function(){ document.getElementById('scan-progress').style.display='none'; },2000);
-  btn.disabled=false;
-  try { autoSaveShortlist(); } catch(e) { console.warn('[Shortlist] autoSave Fehler:', e.message); }
-
-  // IV-Toolbar-Button nach Scan immer anzeigen
-  var _ivTb = document.getElementById('iv-toolbar-btn');
-  if (_ivTb) _ivTb.style.display = 'inline-flex';
-
-  // Smart Alert-Routing: Überhitzte Titel melden
-  setTimeout(async function() {
-    try {
-      // Makro-State zuerst updaten
-      await sendMacroState();
-      // Dann Einzeltitel-Alerts
-      var alertCount = 0;
-      for (var ai = 0; ai < activeTickers.length; ai++) {
-        var t    = activeTickers[ai];
-        var data = tickerData[t.sym];
-        if (!data || data.error) continue;
-        var state = processData(data);
-        if (state.overheat && state.overheat.score >= 25) {
-          await sendKoAlert(t.sym, state);
-          alertCount++;
-          if (alertCount >= 10) break; // Max 10 Alerts pro Scan
-          await new Promise(function(r){ setTimeout(r, 300); }); // Rate limit
-        }
-      }
-    } catch(alertErr) { console.warn('Alert dispatch:', alertErr.message); }
-  }, 2000); // 2s nach Scan-Ende
 }
 
 // ── ALERT FUNCTIONS ─────────────────────────────────────────────────────────
@@ -19826,41 +19831,44 @@ function renderAlphaCards(ms) {
     }
 
     // 2. KI-Trade-Setup (TRIGGER/STOP/TARGET) wenn vorhanden
-    if (r.ki && r.ki.trigger) {
+    // Feld-Namen entsprechen exakt dem Python-Prompt-Schema in enrich_shortlist_with_ai()
+    // (trigger, stopLoss, target, crv, holdingDays, positionPct, leverageRec, keyRisk, note)
+    if (r.ki && r.ki.trigger != null) {
       var ki = r.ki;
-      var crv = (ki.target && ki.trigger && ki.stop)
-        ? ((ki.target - ki.trigger) / (ki.trigger - ki.stop)).toFixed(1)
-        : null;
+      var crv = ki.crv != null ? parseFloat(ki.crv).toFixed(1)
+        : (ki.target != null && ki.trigger != null && ki.stopLoss != null && (ki.trigger - ki.stopLoss) !== 0)
+          ? Math.abs((ki.target - ki.trigger) / (ki.trigger - ki.stopLoss)).toFixed(1)
+          : null;
       var setupHtml = '<div style="margin:8px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">' +
         '<div style="text-align:center;padding:6px;border-radius:8px;background:rgba(52,194,110,0.08);border:0.5px solid rgba(52,194,110,0.25)">' +
           '<div style="font-size:9px;color:var(--text3);letter-spacing:1px">TRIGGER</div>' +
-          '<div style="font-size:14px;font-weight:700;color:var(--green)">$' + ki.trigger.toFixed(2) + '</div>' +
+          '<div style="font-size:14px;font-weight:700;color:var(--green)">$' + (Number(ki.trigger)||0).toFixed(2) + '</div>' +
         '</div>' +
         '<div style="text-align:center;padding:6px;border-radius:8px;background:rgba(239,68,68,0.08);border:0.5px solid rgba(239,68,68,0.25)">' +
           '<div style="font-size:9px;color:var(--text3);letter-spacing:1px">STOP-LOSS</div>' +
-          '<div style="font-size:14px;font-weight:700;color:var(--red)">$' + ki.stop.toFixed(2) + '</div>' +
+          '<div style="font-size:14px;font-weight:700;color:var(--red)">$' + (Number(ki.stopLoss)||0).toFixed(2) + '</div>' +
         '</div>' +
         '<div style="text-align:center;padding:6px;border-radius:8px;background:rgba(79,142,247,0.08);border:0.5px solid rgba(79,142,247,0.25)">' +
           '<div style="font-size:9px;color:var(--text3);letter-spacing:1px">TARGET</div>' +
-          '<div style="font-size:14px;font-weight:700;color:var(--accent)">$' + ki.target.toFixed(2) + '</div>' +
+          '<div style="font-size:14px;font-weight:700;color:var(--accent)">$' + (Number(ki.target)||0).toFixed(2) + '</div>' +
         '</div>' +
       '</div>';
 
       if (crv) {
         setupHtml += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px">' +
           '<b style="color:' + (parseFloat(crv)>=2?'var(--green)':'var(--amber)') + '">CRV ' + crv + ':1</b>' +
-          (ki.dte ? ' · <i class="ti ti-clock"></i> ' + ki.dte + 'd' : '') +
-          (ki.size ? ' · ' + ki.size : '') +
-          (ki.vehicle ? ' · ' + ki.vehicle : '') +
+          (ki.holdingDays != null ? ' · <i class="ti ti-clock"></i> ' + ki.holdingDays + 'd' : '') +
+          (ki.positionPct != null ? ' · ' + ki.positionPct + '% Depot' : '') +
+          (ki.leverageRec ? ' · ' + ki.leverageRec : '') +
         '</div>';
       }
 
-      // KI-Text
-      if (ki.warning) {
-        setupHtml += '<div style="font-size:11px;color:var(--amber);margin-bottom:4px"><i class="ti ti-alert-triangle"></i> ' + ki.warning + '</div>';
+      // KI-Text (Hauptrisiko + Beobachtung)
+      if (ki.keyRisk) {
+        setupHtml += '<div style="font-size:11px;color:var(--amber);margin-bottom:4px"><i class="ti ti-alert-triangle"></i> ' + ki.keyRisk + '</div>';
       }
-      if (ki.text) {
-        setupHtml += '<div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:6px">' + ki.text + '</div>';
+      if (ki.note) {
+        setupHtml += '<div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:6px">' + ki.note + '</div>';
       }
 
       // Buttons
