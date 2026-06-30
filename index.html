@@ -3,7 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v221">
+<meta name="app-version" content="20260630-v223">
+<!-- v223 (30.06.2026): Options-Desk Fibo-Badge — Karten zeigen jetzt "Fibo CSP-Zone"
+     bzw. "Fibo Extension" mit Confluence-Score, wenn fSetup/fScore im optionsWatchlist-
+     Eintrag vorhanden sind (market_aggregator.py v3.5). Macht den Fibo-Score-Boost aus
+     v3.4 im UI sichtbar/nachvollziehbar statt nur intern in scoreCsp/scoreCc verrechnet. -->
+<!-- v222 (30.06.2026): Options-Desk Preisfilter (Margin-Proxy) — neues Eingabefeld
+     "Max. Kurs ($)" blendet Kandidaten mit zu hoher Kapitalbindung aus (z.B. COST
+     ~$950 -> ~95.000€ Margin/Kontrakt). setOptionsMaxPrice(), persistiert in
+     localStorage, fliesst auch in den KI-Prompt-Kontext (optsCfg.maxPrice) ein. -->
 <!-- v221 (30.06.2026): Options-Desk "0 Ticker geladen" Diagnose-Logging ergaenzt
      (analog v216-Strategie) — zeigt beim naechsten Auftreten sofort, ob der
      Fallback-Fetch (koSync/sync/master_market_data) ueberhaupt ein optionsWatchlist-
@@ -2251,6 +2259,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <button onclick="filterOptionsDesk(35)" id="odf-35" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">&ge;35%</button>
       <button onclick="filterOptionsDesk(50)" id="odf-50" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer;font-weight:700">&ge;50%</button>
       <button onclick="filterOptionsDesk(65)" id="odf-65" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--green);background:rgba(34,197,94,0.1);color:var(--green);cursor:pointer">&ge;65%</button>
+    </div>
+    <!-- Preisfilter (NEU 30.06.2026) — Kurs als Proxy fuer CSP-Margin-Bedarf (Kurs x 100 ~ Kapitalbindung) -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.6rem;align-items:center">
+      <span style="font-size:10px;color:var(--text3)">Max. Kurs ($, Margin-Proxy):</span>
+      <input type="number" id="options-max-price-input" placeholder="z.B. 500" oninput="setOptionsMaxPrice(this.value)"
+        style="width:70px;font-size:11px;padding:3px 6px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px">
+      <button onclick="setOptionsMaxPrice('')" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text3);cursor:pointer">Zuruecksetzen</button>
+      <span id="options-max-price-hint" style="font-size:9px;color:var(--text3)"></span>
     </div>
     <div id="options-desk-cards" style="display:flex;flex-direction:column;gap:.5rem">
       <div style="color:var(--text3);font-size:12px;text-align:center;padding:1.5rem">Tab w&auml;hlen um zu laden.</div>
@@ -19684,6 +19700,11 @@ function renderSwingModal(candidates) {
 // ── OPTIONS-DESK (Einkommensstrategien) ──────────────────────────────────────
 var _optionsWatchlist = null;
 var _optionsDeskFilter = 50;
+// NEU (30.06.2026): Max-Kurs-Filter als Margin-Proxy fuer CSP (Kurs x 100 ~ Kapitalbindung)
+var _optionsMaxPrice = (function() {
+  try { var v = localStorage.getItem('ko_options_max_price'); return v ? parseFloat(v) : null; }
+  catch(e) { return null; }
+})();
 var _optionsSortKey = 'optsScore';
 
 function setOptionsSort(key) {
@@ -19718,6 +19739,15 @@ function switchAlphaTab(tab) {
 async function loadOptionsDesk(force) {
   var cardsEl = document.getElementById('options-desk-cards');
   if (!cardsEl) return;
+  // Eingabefeld mit persistiertem Wert vorbefuellen (NEU 30.06.2026)
+  var maxPriceInput = document.getElementById('options-max-price-input');
+  if (maxPriceInput && document.activeElement !== maxPriceInput) {
+    maxPriceInput.value = (_optionsMaxPrice != null) ? _optionsMaxPrice : '';
+    var hint = document.getElementById('options-max-price-hint');
+    if (hint) hint.textContent = _optionsMaxPrice != null
+      ? ('~ max. €' + Math.round(_optionsMaxPrice * 100).toLocaleString('de-DE') + ' Kapitalbindung pro CSP-Kontrakt')
+      : '';
+  }
   if (_optionsWatchlist && !force) { renderOptionsDeskCards(_optionsWatchlist); return; }
 
   // PRIMÄRER PFAD (Single Source of Truth): _alphaData wurde beim Laden von
@@ -19800,31 +19830,56 @@ function filterOptionsDesk(minHvp) {
   if (_optionsWatchlist) renderOptionsDeskCards(_optionsWatchlist);
 }
 
+// NEU (30.06.2026): Max-Kurs-Filter — blendet Kandidaten mit zu hoher
+// Margin-Bindung aus (z.B. COST ~$950 -> ~95.000€ Margin bei 1 CSP-Kontrakt).
+function setOptionsMaxPrice(val) {
+  var num = parseFloat(val);
+  _optionsMaxPrice = (val === '' || isNaN(num)) ? null : num;
+  try {
+    if (_optionsMaxPrice != null) localStorage.setItem('ko_options_max_price', String(_optionsMaxPrice));
+    else localStorage.removeItem('ko_options_max_price');
+  } catch(e) {}
+  var hint = document.getElementById('options-max-price-hint');
+  if (hint) hint.textContent = _optionsMaxPrice != null
+    ? ('~ max. €' + Math.round(_optionsMaxPrice * 100).toLocaleString('de-DE') + ' Kapitalbindung pro CSP-Kontrakt')
+    : '';
+  if (_optionsWatchlist) renderOptionsDeskCards(_optionsWatchlist);
+}
+window.setOptionsMaxPrice = setOptionsMaxPrice;
+
 function renderOptionsDeskCards(data) {
   var cardsEl = document.getElementById('options-desk-cards');
   if (!cardsEl) return;
   var tickers = (data && data.tickers) ? data.tickers : (Array.isArray(data) ? data : []);
   var generated = (data && data.generated) ? data.generated.slice(0, 16) : '--';
   var filtered = tickers
-    .filter(function(t) { return (t.hvp || 0) >= _optionsDeskFilter && (t[_optionsSortKey] || 0) > 0; })
+    .filter(function(t) {
+      return (t.hvp || 0) >= _optionsDeskFilter
+        && (t[_optionsSortKey] || 0) > 0
+        && (_optionsMaxPrice == null || (t.price || 0) <= _optionsMaxPrice);
+    })
     .sort(function(a, b) { return (b[_optionsSortKey]||0) - (a[_optionsSortKey]||0); });
   if (!filtered.length) {
     // Diagnose-Info statt generischer Meldung — zeigt sofort ob Daten ueberhaupt
     // vorhanden sind oder ob nur der Filter zu streng ist (Gemini-Empfehlung).
     var maxHvp = tickers.length ? Math.max.apply(null, tickers.map(function(t){ return t.hvp||0; })) : null;
     var withScore = tickers.filter(function(t){ return (t[_optionsSortKey]||0) > 0; }).length;
+    var priceFilteredOut = (_optionsMaxPrice != null) ? tickers.filter(function(t){ return (t.price||0) > _optionsMaxPrice; }).length : 0;
     cardsEl.innerHTML = '<div style="color:var(--text3);text-align:center;padding:1.5rem;font-size:12px">'
-      + 'Keine Kandidaten mit HVP &ge; ' + _optionsDeskFilter + '%<br>'
+      + 'Keine Kandidaten mit HVP &ge; ' + _optionsDeskFilter + '%'
+      + (_optionsMaxPrice != null ? ' und Kurs &le; $' + _optionsMaxPrice : '') + '<br>'
       + '<span style="font-size:10px">Diagnose: ' + tickers.length + ' Ticker insgesamt geladen'
       + (tickers.length ? ' &middot; max. HVP: ' + (maxHvp!=null?maxHvp:'--') + '%'
-                          + ' &middot; mit ' + _optionsSortKey + '&gt;0: ' + withScore : '')
+                          + ' &middot; mit ' + _optionsSortKey + '&gt;0: ' + withScore
+                          + (_optionsMaxPrice != null ? ' &middot; durch Preisfilter ausgeblendet: ' + priceFilteredOut : '') : '')
       + ' &middot; Stand: ' + generated + '</span>'
       + (tickers.length === 0 ? '<br><span style="font-size:10px;color:var(--amber)">'
           + 'KV liefert leeres Array -- naechsten Aggregator-Lauf abwarten oder Worker pruefen.</span>' : '')
       + '</div>';
     return;
   }
-  var info = '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">' + filtered.length + ' Kandidaten &middot; Stand: ' + generated + ' &middot; HVP &ge;' + _optionsDeskFilter + '%</div>';
+  var info = '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">' + filtered.length + ' Kandidaten &middot; Stand: ' + generated + ' &middot; HVP &ge;' + _optionsDeskFilter + '%'
+    + (_optionsMaxPrice != null ? ' &middot; Kurs &le; $' + _optionsMaxPrice : '') + '</div>';
   cardsEl.innerHTML = info + filtered.map(function(t, idx) {
     var hvp = t.hvp || 0;
     var hvpColor = hvp >= 65 ? 'var(--green)' : hvp >= 50 ? 'var(--amber)' : 'var(--text2)';
@@ -19837,11 +19892,19 @@ function renderOptionsDeskCards(data) {
     var stopHint = (t.price && t.atr) ? ('$' + (t.price - 2 * t.atr).toFixed(0)) : '--';
     var grade = t.grade || '';
     var gc = grade.startsWith('A') ? 'var(--green)' : grade.startsWith('B') ? 'var(--amber)' : 'var(--text3)';
+    // Fibo-Badge (NEU 30.06.2026) — zeigt, ob der Boost in scoreCsp/scoreCc gegriffen hat
+    var fiboBadge = '';
+    if (t.fSetup === 'CSP_ZONE') {
+      fiboBadge = '<span title="Fibo-Confluence ' + (t.fScore||0) + '/100 — fliesst als Boost in CSP-Score ein" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green)">&#x1F3AF; Fibo CSP-Zone (' + (t.fScore||0) + ')</span>';
+    } else if (t.fSetup === 'EXTENSION') {
+      fiboBadge = '<span title="Fibo-Confluence ' + (t.fScore||0) + '/100 — fliesst als Boost in CC-Score ein" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(245,158,11,0.12);border:0.5px solid var(--amber);color:var(--amber)">&#x1F534; Fibo Extension (' + (t.fScore||0) + ')</span>';
+    }
     return '<div style="background:var(--bg2);border-radius:10px;padding:.6rem .8rem;border:0.5px solid var(--border2)">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">'
       +   '<span style="font-size:14px;font-weight:700">' + (idx+1) + '. ' + t.sym + (grade ? ' <span style="font-size:9px;color:' + gc + '">' + grade + '</span>' : '') + '</span>'
       +   '<span style="font-size:13px;font-weight:600">$' + (t.price ? t.price.toFixed(2) : '--') + '</span>'
       + '</div>'
+      + (fiboBadge ? '<div style="margin-bottom:.3rem">' + fiboBadge + '</div>' : '')
       + '<div style="display:flex;gap:.8rem;flex-wrap:wrap;font-size:11px;margin-bottom:.2rem">'
       +   '<span>HVP <b style="color:' + hvpColor + '">' + hvp + '%' + hvpBadge + '</b></span>'
       +   '<span>RSI <b style="color:' + rsiColor + '">' + rsi + '</b></span>'
@@ -19880,7 +19943,7 @@ async function runOptionsKiBriefing(strat) {
           + ' D200:' + (t.dist200!=null ? t.dist200+'%' : '--')
           + ' Grade:' + (t.grade||'--');
       }).join('\n');
-  var ctx = { marktkontext: mkCtx, optsCfg: { minPrice:15, maxPrice:150, minHvp:_optionsDeskFilter, goodHvp:50, idealHvp:65, erDays:30, dte:30 }, vixStr: String(_getVixRobust()||'--') };
+  var ctx = { marktkontext: mkCtx, optsCfg: { minPrice:15, maxPrice:(_optionsMaxPrice != null ? _optionsMaxPrice : 150), minHvp:_optionsDeskFilter, goodHvp:50, idealHvp:65, erDays:30, dte:30 }, vixStr: String(_getVixRobust()||'--') };
   var prompt = stratCfg.prompt(ctx);
   // Open modal
   var existing = document.getElementById('ki-modal');
