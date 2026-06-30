@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v215">
+<meta name="app-version" content="20260630-v216">
 <!-- v212 (30.06.2026): Fibonacci-Screening-Modul v1.0 (Gemini-Blueprint) — renderFiboBar() in renderCard(),
      _fibo-Feld in kvToScannerState(), Fibo-Sektion in Parameter-Pool fuer KI-Prompts. -->
 <!-- v213 (30.06.2026): KRITISCHER BUGFIX — runScan() hatte fehlende schliessende Klammer;
@@ -21,6 +21,10 @@
      openKiBriefing() las _vixLevel direkt (ohne fetchVix()-Aufruf) -> immer "unbekannt" im
      KI-Prompt, obwohl der echte Wert vorlag. KI antwortete entsprechend korrekt aber unnoetig
      mit "VIX nicht verfuegbar". Fix: _vixLevel = vixVal; im Fallback-Pfad ergaenzt. -->
+<!-- v216 (30.06.2026): DIAGNOSE-ERWEITERUNG (kein Bugfix) — Options-Desk zeigte bei leerem
+     Filter-Ergebnis nur "bitte Aggregator-Lauf abwarten" ohne erkennbar zu machen ob die KV-
+     Daten leer sind oder nur der HVP-Filter zu streng ist. Jetzt: Diagnose-Zeile (Ticker-Anzahl,
+     max. HVP, Anzahl mit Score>0, Generated-Stand) + Konsolen-Log bei jedem Options-Desk-Load. -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -19528,6 +19532,8 @@ async function loadOptionsDesk(force) {
     var r = await fetch(koSync + '/sync/options_watchlist', { cache: 'no-store' });
     if (!r.ok) throw new Error('KV HTTP ' + r.status);
     _optionsWatchlist = await r.json();
+    var _diagT = (_optionsWatchlist && _optionsWatchlist.tickers) || [];
+    console.log('[OptionsDesk] ' + _diagT.length + ' Ticker geladen · generated:' + (_optionsWatchlist && _optionsWatchlist.generated) + ' · max HVP:' + (_diagT.length ? Math.max.apply(null,_diagT.map(function(t){return t.hvp||0;})) : '--'));
     renderOptionsDeskCards(_optionsWatchlist);
   } catch(e) {
     console.warn('[OptionsDesk] KV-Fehler:', e.message);
@@ -19555,7 +19561,19 @@ function renderOptionsDeskCards(data) {
     .filter(function(t) { return (t.hvp || 0) >= _optionsDeskFilter && (t[_optionsSortKey] || 0) > 0; })
     .sort(function(a, b) { return (b[_optionsSortKey]||0) - (a[_optionsSortKey]||0); });
   if (!filtered.length) {
-    cardsEl.innerHTML = '<div style="color:var(--text3);text-align:center;padding:1.5rem;font-size:12px">Keine Kandidaten mit HVP &ge; ' + _optionsDeskFilter + '% -- bitte Aggregator-Lauf abwarten</div>';
+    // Diagnose-Info statt generischer Meldung — zeigt sofort ob Daten ueberhaupt
+    // vorhanden sind oder ob nur der Filter zu streng ist (Gemini-Empfehlung).
+    var maxHvp = tickers.length ? Math.max.apply(null, tickers.map(function(t){ return t.hvp||0; })) : null;
+    var withScore = tickers.filter(function(t){ return (t[_optionsSortKey]||0) > 0; }).length;
+    cardsEl.innerHTML = '<div style="color:var(--text3);text-align:center;padding:1.5rem;font-size:12px">'
+      + 'Keine Kandidaten mit HVP &ge; ' + _optionsDeskFilter + '%<br>'
+      + '<span style="font-size:10px">Diagnose: ' + tickers.length + ' Ticker insgesamt geladen'
+      + (tickers.length ? ' &middot; max. HVP: ' + (maxHvp!=null?maxHvp:'--') + '%'
+                          + ' &middot; mit ' + _optionsSortKey + '&gt;0: ' + withScore : '')
+      + ' &middot; Stand: ' + generated + '</span>'
+      + (tickers.length === 0 ? '<br><span style="font-size:10px;color:var(--amber)">'
+          + 'KV liefert leeres Array -- naechsten Aggregator-Lauf abwarten oder Worker pruefen.</span>' : '')
+      + '</div>';
     return;
   }
   var info = '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">' + filtered.length + ' Kandidaten &middot; Stand: ' + generated + ' &middot; HVP &ge;' + _optionsDeskFilter + '%</div>';
