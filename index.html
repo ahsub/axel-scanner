@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260627-v211">
+<meta name="app-version" content="20260630-v212">
+<!-- v212 (30.06.2026): Fibonacci-Screening-Modul v1.0 (Gemini-Blueprint) — renderFiboBar() in renderCard(),
+     _fibo-Feld in kvToScannerState(), Fibo-Sektion in Parameter-Pool fuer KI-Prompts. -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -5826,6 +5828,11 @@ function kvToScannerState(r) {
     iosEntry:     r.iosEntry,
     iosIsLeader:  r.iosIsLeader,
     iosSummary:   r.iosSummary,
+    // Fibonacci-Screening-Modul v1.0
+    _fibo:        (r.f_setup ? {
+      setup: r.f_setup, score: r.f_score, nextName: r.f_next_name,
+      nextP: r.f_next_p, distAtr: r.f_dist_atr, strike: r.f_strike, lvls: r.f_lvls
+    } : null),
     // KV-Metadaten
     _fromKv:      true,
     _kvUpdated:   r.updated || null,
@@ -6575,6 +6582,63 @@ function processData(raw){
   });
 }
 
+// ===============================================================================
+// FIBONACCI-SCREENING-MODUL v1.0 (Gemini-Blueprint, 30.06.2026)
+// Visualisiert die Fibo-Daten aus state._fibo (gesetzt via kvToScannerState).
+// ===============================================================================
+function renderFiboBar(state) {
+  if (!state || !state._fibo || !state.high52w || !state.low52w) return '';
+  var f = state._fibo;
+  var high = state.high52w, low = state.low52w, price = state.price || 0;
+  if (high === low) return '';
+
+  var pct = ((price - low) / (high - low) * 100);
+  pct = Math.max(0, Math.min(100, pct));
+
+  var setupColors = {
+    CSP_ZONE:  'var(--green)',
+    BREAKOUT:  'var(--accent)',
+    EXTENSION: 'var(--amber)',
+    NO_SETUP:  'var(--text3)',
+  };
+  var setupLabels = {
+    CSP_ZONE:  '\uD83C\uDFAF CSP-Zone',
+    BREAKOUT:  '\u26A1 Breakout',
+    EXTENSION: '\uD83D\uDD34 Extension',
+    NO_SETUP:  'Kein Setup',
+  };
+  var setup = f.setup || 'NO_SETUP';
+  var setupColor = setupColors[setup] || 'var(--text3)';
+  var setupLabel = setupLabels[setup] || setup;
+  var scoreColor = (f.score >= 70) ? 'var(--green)' : (f.score >= 40) ? 'var(--amber)' : 'var(--text3)';
+
+  var html = '<div class="fibo-container" style="padding:10px 12px;border-top:1px solid var(--border)">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text2);margin-bottom:5px">';
+  html += '<span>Next: <b>' + (f.nextName||'-') + '</b> (@ $' + (f.nextP!=null?f.nextP.toFixed(2):'-') + ')</span>';
+  html += '<span style="display:flex;align-items:center;gap:6px">';
+  html += '<span style="color:' + scoreColor + '">Conf: <b>' + (f.score||0) + '</b></span>';
+  if (setup !== 'NO_SETUP') {
+    html += '<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;border:0.5px solid ' + setupColor + ';color:' + setupColor + '">' + setupLabel + '</span>';
+  }
+  html += '</span></div>';
+
+  // Fibo-Track: Gradient von Low (rot) ueber 61.8% (gruen) bis High (blau)
+  html += '<div class="fibo-track" style="position:relative;height:6px;background:linear-gradient(to right, var(--red) 0%, var(--amber) 30%, var(--green) 61.8%, var(--accent) 100%);border-radius:3px;margin:8px 0">';
+  html += '<div class="fibo-pin" style="position:absolute;left:' + pct.toFixed(1) + '%;top:-4px;width:4px;height:14px;background:var(--text1);border-radius:2px;transform:translateX(-50%)"></div>';
+  html += '</div>';
+
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--text3)">';
+  html += '<span>Low: $' + low.toFixed(2) + '</span>';
+  if (f.strike != null) {
+    html += '<span style="background:rgba(52,194,110,0.15);color:var(--green);font-weight:700;padding:2px 7px;border-radius:4px">\uD83C\uDFAF Strike: $' + f.strike.toFixed(2) + '</span>';
+  }
+  html += '<span>High: $' + high.toFixed(2) + '</span>';
+  html += '</div></div>';
+
+  return html;
+}
+
+
 function renderCard(t,state){
   var el=document.getElementById('card-'+t.sym);
   if(!el) return;
@@ -6881,6 +6945,7 @@ function renderCard(t,state){
         :'')+
       '</div>';
     }():'')+ 
+    renderFiboBar(state)+
     '<div class="chart-wrap"><canvas id="ch-'+t.sym+'" role="img" aria-label="Chart '+t.sym+'"></canvas></div>';
   el.innerHTML=s;
 
@@ -6913,6 +6978,7 @@ function renderCard(t,state){
 }
 
 window.renderCard = renderCard; // Global-Bindung
+window.renderFiboBar = renderFiboBar; // Global-Bindung (Fibonacci-Modul)
 
 function useInRechner(sym){
   const d=tickerData[sym];if(!d) return;
@@ -15859,6 +15925,11 @@ function kvToScannerState(r) {
     iosEntry:     r.iosEntry,
     iosIsLeader:  r.iosIsLeader,
     iosSummary:   r.iosSummary,
+    // Fibonacci-Screening-Modul v1.0
+    _fibo:        (r.f_setup ? {
+      setup: r.f_setup, score: r.f_score, nextName: r.f_next_name,
+      nextP: r.f_next_p, distAtr: r.f_dist_atr, strike: r.f_strike, lvls: r.f_lvls
+    } : null),
     // KV-Metadaten
     _fromKv:      true,
     _kvUpdated:   r.updated || null,
@@ -18770,6 +18841,12 @@ function buildParameterPool(r) {
     iosSummary:   r.iosSummary,
 
     // ── META ──────────────────────────────────────────────────────────────────
+    // Fibonacci-Screening-Modul v1.0
+    fiboSetup:    r.f_setup,
+    fiboScore:    r.f_score,
+    fiboNextLvl:  r.f_next_name,
+    fiboStrike:   r.f_strike,
+
     _source:      r._fromKv ? 'KV-Aggregator' : 'Live-Scan',
     _updated:     r._kvUpdated || null,
 
@@ -18799,6 +18876,7 @@ function formatPoolForPrompt(pool, strategy) {
     'MARKOV-REGIME': ['regime','pBull2Bear','regimeWarn'],
     'STRAT-SCORES':  ['sMinervini','sSwing','sMrLong','sBreakdown','sFading'],
     'IOS-FOUNDATION':['iosScore','iosRating','iosDecision','iosQuality','iosEntry','iosIsLeader','iosSummary'],
+    'FIBONACCI':     ['fiboSetup','fiboScore','fiboNextLvl','fiboStrike'],
   };
 
   for (var section in sections) {
