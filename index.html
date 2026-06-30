@@ -3,7 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v217">
+<meta name="app-version" content="20260630-v219">
+<!-- v219 (30.06.2026): Extra-Ticker already_in_universe Status behandelt (Dedupe-Fix
+     gegen known_universe_tickers im ko-ai Worker v1.2, market_aggregator.py v3.3). -->
+<!-- v218 (30.06.2026): Extra-Ticker-Vorschlag-Feature — Fibo-Tab-Button "Zur Aggregator-Liste
+     vorschlagen" (proposeTickerForAggregator) sendet Custom-Ticker an ko-ai Worker /extra-ticker
+     (Pending-Liste in KV). Admin-Tab neue Review-Sektion (loadExtraTickerReview/approveExtraTicker/
+     rejectExtraTicker) zur Freigabe. Aggregator (market_aggregator.py v3.2) liest freigegebene
+     Ticker via fetch_approved_extra_tickers() und mergt sie in build_ticker_universe(). -->
 <!-- v212 (30.06.2026): Fibonacci-Screening-Modul v1.0 (Gemini-Blueprint) — renderFiboBar() in renderCard(),
      _fibo-Feld in kvToScannerState(), Fibo-Sektion in Parameter-Pool fuer KI-Prompts. -->
 <!-- v213 (30.06.2026): KRITISCHER BUGFIX — runScan() hatte fehlende schliessende Klammer;
@@ -1172,6 +1179,24 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="panel-admin" class="panel">
       <div class="admin-warn">
         <i class="ti ti-lock"></i> Admin-Bereich — Konfiguration &amp; Datenverwaltung
+      </div>
+
+      <!-- ═══ EXTRA-TICKER REVIEW (NEU 30.06.2026) ═══════════════════════════ -->
+      <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
+        <span><i class="ti ti-list-check"></i> Extra-Ticker-Vorschläge</span>
+        <button class="btn btn-sm" onclick="loadExtraTickerReview()" style="font-size:11px;padding:3px 9px">
+          <i class="ti ti-refresh"></i> Aktualisieren
+        </button>
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:.6rem;line-height:1.5">
+          Aus dem Fibo-Tab vorgeschlagene Ticker (Button "Zur Aggregator-Liste vorschlagen").
+          Erst nach Freigabe hier nimmt der nächtliche Aggregator-Lauf sie in die Universe auf.
+        </div>
+        <div id="extra-ticker-pending-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:.5rem">
+          <div style="font-size:11px;color:var(--text3);text-align:center;padding:.5rem">Noch nicht geladen — "Aktualisieren" klicken.</div>
+        </div>
+        <div id="extra-ticker-approved-summary" style="font-size:10px;color:var(--text3);margin-top:.4rem"></div>
       </div>
 
       <!-- ═══ AUTO-TOP + SCHEDULER ═════════════════════════════════════════ -->
@@ -3360,6 +3385,53 @@ async function verifyUserToken() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  EXTRA-TICKER VORSCHLAG (NEU 30.06.2026)
+//  Sendet einen Custom-Ticker aus dem Fibo-Tab als Vorschlag fuer die
+//  naechtliche Aggregator-Universe. Landet zunaechst in einer Pending-
+//  Liste (KV) und muss im Admin-Tab freigegeben werden, bevor der
+//  Python-Aggregator ihn beim naechsten Lauf mitnimmt.
+// ═══════════════════════════════════════════════════════════════
+async function proposeTickerForAggregator(sym, note) {
+  const btn = document.getElementById('fibo-propose-' + sym);
+  const token = getAiToken();
+  if (!token) { alert('KI-Token nicht gesetzt — bitte im Admin-Tab eintragen'); return; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Sende...'; }
+
+  try {
+    const resp = await fetch(KO_AI_WORKER + '/extra-ticker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ sym: sym, note: note || '' }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'HTTP ' + resp.status);
+
+    if (btn) {
+      if (data.status === 'already_in_universe') {
+        btn.innerHTML = '<i class="ti ti-check"></i> Bereits im Aggregator-Universum';
+        btn.style.background = 'var(--green-bg)'; btn.style.borderColor = 'var(--green)'; btn.style.color = 'var(--green)';
+      } else if (data.status === 'already_approved') {
+        btn.innerHTML = '<i class="ti ti-check"></i> Bereits im Aggregator';
+        btn.style.background = 'var(--green-bg)'; btn.style.borderColor = 'var(--green)'; btn.style.color = 'var(--green)';
+      } else if (data.status === 'already_pending') {
+        btn.innerHTML = '<i class="ti ti-clock"></i> Bereits vorgeschlagen';
+        btn.style.background = 'var(--amber-bg)'; btn.style.borderColor = 'var(--amber)'; btn.style.color = 'var(--amber)';
+      } else {
+        btn.innerHTML = '<i class="ti ti-check"></i> Vorgeschlagen — wartet auf Review';
+        btn.style.background = 'var(--amber-bg)'; btn.style.borderColor = 'var(--amber)'; btn.style.color = 'var(--amber)';
+      }
+    }
+  } catch(e) {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-plus"></i> Zur Aggregator-Liste vorschlagen';
+    }
+    alert('Vorschlag fehlgeschlagen: ' + e.message);
+  }
+}
+window.proposeTickerForAggregator = proposeTickerForAggregator;
+
 // Token für Phase 1 (statischer Bearer) — in ko-config.js oder localStorage
 function getAiToken() {
   if (typeof KoConfig !== 'undefined' && KoConfig.api && KoConfig.api.aiToken) {
@@ -3367,6 +3439,72 @@ function getAiToken() {
   }
   return localStorage.getItem('ko_ai_token') || '';
 }
+
+// ── Admin-Review: Pending-Liste laden + freigeben/verwerfen ─────────────────
+async function loadExtraTickerReview() {
+  const el = document.getElementById('extra-ticker-pending-list');
+  const sumEl = document.getElementById('extra-ticker-approved-summary');
+  const token = getAiToken();
+  if (!el) return;
+  if (!token) { el.innerHTML = '<div style="color:var(--red);font-size:11px">KI-Token fehlt — oben im Admin-Tab eintragen.</div>'; return; }
+
+  el.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:.5rem"><i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Lade...</div>';
+
+  try {
+    const resp = await fetch(KO_AI_WORKER + '/extra-tickers?token=' + encodeURIComponent(token));
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    const pending = data.pending || [];
+    const approved = data.approved || [];
+
+    if (!pending.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:.5rem">Keine offenen Vorschläge.</div>';
+    } else {
+      el.innerHTML = pending.map(function(p) {
+        return '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border-radius:6px;padding:6px 10px">' +
+          '<div><b style="font-size:12px">'+p.sym+'</b>' +
+          (p.note ? ' <span style="font-size:10px;color:var(--text3)">— '+p.note+'</span>' : '') +
+          ' <span style="font-size:9px;color:var(--text3)">('+(p.addedAt||'').substring(0,10)+')</span></div>' +
+          '<div style="display:flex;gap:4px">' +
+            '<button class="btn btn-sm" onclick="approveExtraTicker(\''+p.sym+'\')" style="font-size:10px;padding:2px 7px;background:var(--green-bg);border-color:var(--green);color:var(--green)"><i class="ti ti-check"></i></button>' +
+            '<button class="btn btn-sm" onclick="rejectExtraTicker(\''+p.sym+'\')" style="font-size:10px;padding:2px 7px;background:var(--red-bg);border-color:var(--red);color:var(--red)"><i class="ti ti-x"></i></button>' +
+          '</div></div>';
+      }).join('');
+    }
+    if (sumEl) sumEl.textContent = approved.length + ' Ticker bereits freigegeben und aktiv in der Aggregator-Universe.';
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--red);font-size:11px">Fehler beim Laden: ' + e.message + '</div>';
+  }
+}
+window.loadExtraTickerReview = loadExtraTickerReview;
+
+async function approveExtraTicker(sym) {
+  const token = getAiToken();
+  if (!token) return;
+  try {
+    const resp = await fetch(KO_AI_WORKER + '/extra-tickers/approve?token=' + encodeURIComponent(token), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ syms: [sym] }),
+    });
+    if (!resp.ok) { const d = await resp.json().catch(()=>({})); throw new Error(d.error || 'HTTP '+resp.status); }
+    loadExtraTickerReview();
+  } catch(e) { alert('Freigabe fehlgeschlagen: ' + e.message); }
+}
+window.approveExtraTicker = approveExtraTicker;
+
+async function rejectExtraTicker(sym) {
+  const token = getAiToken();
+  if (!token) return;
+  try {
+    const resp = await fetch(KO_AI_WORKER + '/extra-tickers/reject?token=' + encodeURIComponent(token), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ syms: [sym] }),
+    });
+    if (!resp.ok) { const d = await resp.json().catch(()=>({})); throw new Error(d.error || 'HTTP '+resp.status); }
+    loadExtraTickerReview();
+  } catch(e) { alert('Verwerfen fehlgeschlagen: ' + e.message); }
+}
+window.rejectExtraTicker = rejectExtraTicker;
 
 // Zentraler KI-Call — ersetzt alle direkten Anthropic-Proxy-Aufrufe
 async function koAiCall(action, payload, expertMode) {
@@ -4687,6 +4825,7 @@ function showPanel(id){
     if(aiTokInp&&localStorage.getItem('ko_ai_token')) aiTokInp.placeholder='Token gesetzt ✓ (neu eingeben zum Ändern)';
     loadPortfolioSettings();
     renderAdminWLList();
+    try{ loadExtraTickerReview(); }catch(e){}
     try{ schedulerLoadUI(); }catch(e){}
     try{ autoTopLoadUI(); }catch(e){}
     try{ loadOptionsCfgUI(); }catch(e){}
@@ -13585,6 +13724,12 @@ function renderFiboCards(filter) {
       // Empfehlung
       (d.zone==='buy'||d.zone==='watch' ? '<div style="font-size:11px;color:var(--text2);border-top:.5px solid var(--border);padding-top:.5rem;margin-top:.2rem;line-height:1.5">' : '<div style="font-size:11px;color:var(--text3);border-top:.5px solid var(--border);padding-top:.4rem">') +
         advice +
+      '</div>' +
+      // Vorschlag fuer Aggregator-Universe (NEU 30.06.2026)
+      '<div style="margin-top:.5rem;border-top:.5px solid var(--border);padding-top:.5rem;display:flex;justify-content:flex-end">' +
+        '<button class="btn btn-sm" id="fibo-propose-'+d.sym+'" onclick="proposeTickerForAggregator(\''+d.sym+'\')" ' +
+          'style="font-size:11px;padding:3px 9px;background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">' +
+          '<i class="ti ti-plus"></i> Zur Aggregator-Liste vorschlagen</button>' +
       '</div>' +
     '</div>';
   }).join('');
