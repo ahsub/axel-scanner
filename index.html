@@ -3,7 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v223">
+<meta name="app-version" content="20260630-v226">
+<!-- v226 (30.06.2026): Strategie-Modul-Architektur (Axels 5 Anforderungen:
+     Erweiterbarkeit, Regelwerk-basiert, einheitliche No-Hallu-Prompts, ES6,
+     Multi-Modul-Zugriff) — ko-prompts.js ersetzt durch ko-strategies.js v2.0.0
+     (echtes ES-Module mit window.KoPrompts-Alias fuer Rueckwaertskompatibilitaet).
+     Script-Tag auf type="module" umgestellt. DD_STRATEGIES (separates Duplikat
+     in dieser Datei) komplett entfernt — DeepDive liest jetzt direkt aus
+     KI_STRAT_CONFIG (= KoPrompts.STRATEGIES), derselben Quelle wie Scanner-Tab/
+     Alpha-Desk. Kein Sync-Risiko zwischen den Modulen mehr (siehe Batch-2-Luecke
+     v224, die genau aus der Duplikation entstand). -->
+<!-- v225 (30.06.2026): Copyright-Fix — interner Strategie-Schluessel 'ludwig'
+     ueberall zu 'atmna' umbenannt (16 Code-Stellen, keine sichtbaren UI-Texte
+     betroffen, die zeigten schon vorher "Options ATM/NA"). Haengt zusammen mit
+     ko-prompts.js v1.1.0 (externes ko-modules-Repo) — der Script-Tag-Commit-Hash
+     weiter unten MUSS nach Axels Push dort aktualisiert werden, siehe TODO-
+     Kommentar an der Stelle. Siehe auch ko-ai-worker.js v1.3 (LUDWIG-URTEIL
+     -> EIC-FAZIT im sichtbaren KI-Output). -->
+<!-- v224 (30.06.2026): DeepDive Batch-2 — 5 fehlende Strategien ergaenzt (ko,
+     weekly_income, dividend, value, atmna), Fokus-Listen inhaltlich aus den
+     jeweiligen KoPrompts-Prompt-Texten abgeleitet. DD_STRATEGIES jetzt 10/10
+     wie Scanner-Tab (bis auf 'value' im Scanner-Dropdown, dort bewusst
+     weggelassen bis Koyfin-Fundamentaldaten-Integration steht). Neue Buttons
+     im DeepDive-Modal. IOS-Leader-Boost siehe market_aggregator.py v3.6. -->
 <!-- v223 (30.06.2026): Options-Desk Fibo-Badge — Karten zeigen jetzt "Fibo CSP-Zone"
      bzw. "Fibo Extension" mit Confluence-Score, wenn fSetup/fScore im optionsWatchlist-
      Eintrag vorhanden sind (market_aggregator.py v3.5). Macht den Fibo-Score-Boost aus
@@ -536,7 +558,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <button onclick="openKiBriefing('meanrev');hideKiDropdown()" class="ki-dd-btn">↩️ Mean Reversion</button>
             <button onclick="openKiBriefing('breakout');hideKiDropdown()" class="ki-dd-btn">🚀 Breakout</button>
             <button onclick="openKiBriefing('dividend');hideKiDropdown()" class="ki-dd-btn">💰 Dividend Growth</button>
-            <button onclick="openKiBriefing('ludwig');hideKiDropdown()" class="ki-dd-btn" style="color:#a371f7">⚙️ Options ATM/NA</button>
+            <button onclick="openKiBriefing('atmna');hideKiDropdown()" class="ki-dd-btn" style="color:#a371f7">⚙️ Options ATM/NA</button>
             <button onclick="openKiBriefing('weekly_income');hideKiDropdown()" class="ki-dd-btn" style="color:#34d399">📅 Options Weekly</button>
             <div style="border-top:0.5px solid var(--border);margin-top:4px;padding-top:4px">
               <button onclick="openKiBriefing();hideKiDropdown()" class="ki-dd-btn" style="color:var(--text3);font-size:10px">🧠 Alle Strategien (Modal)</button>
@@ -2243,7 +2265,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.6rem;padding:.5rem;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
       <div style="font-size:9px;color:var(--text3);width:100%;margin-bottom:2px">KI-ANALYSE:</div>
       <button onclick="runOptionsKiBriefing('options')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer">Options-Wheel</button>
-      <button onclick="runOptionsKiBriefing('ludwig')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #a371f7;background:rgba(163,113,247,0.1);color:#a371f7;cursor:pointer">Options ATM/NA</button>
+      <button onclick="runOptionsKiBriefing('atmna')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #a371f7;background:rgba(163,113,247,0.1);color:#a371f7;cursor:pointer">Options ATM/NA</button>
       <button onclick="runOptionsKiBriefing('weekly_income')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #34d399;background:rgba(52,211,153,0.1);color:#34d399;cursor:pointer">Options Weekly</button>
       <span id="options-ki-status" style="font-size:10px;color:var(--text3);align-self:center"></span>
     </div>
@@ -2463,6 +2485,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <button onclick="setDdStrategy('meanrev')" id="dd-strat-top-meanrev" class="btn btn-sm" style="font-size:11px;padding:3px 8px">↩️ Mean Rev.</button>
         <button onclick="setDdStrategy('swing')" id="dd-strat-top-swing" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🔄 Swing</button>
         <button onclick="setDdStrategy('breakout')" id="dd-strat-top-breakout" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🚀 Breakout</button>
+        <!-- NEU (30.06.2026, Batch-2) — 5 fehlende Strategien ergaenzt -->
+        <button onclick="setDdStrategy('ko')" id="dd-strat-top-ko" class="btn btn-sm" style="font-size:11px;padding:3px 8px">⚡ KO</button>
+        <button onclick="setDdStrategy('weekly_income')" id="dd-strat-top-weekly_income" class="btn btn-sm" style="font-size:11px;padding:3px 8px">📅 Weekly</button>
+        <button onclick="setDdStrategy('dividend')" id="dd-strat-top-dividend" class="btn btn-sm" style="font-size:11px;padding:3px 8px">💰 Dividend</button>
+        <button onclick="setDdStrategy('value')" id="dd-strat-top-value" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🔍 Value</button>
+        <button onclick="setDdStrategy('atmna')" id="dd-strat-top-atmna" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:#a371f7">⚙️ ATM/NA</button>
       </div>
     </div>
 
@@ -2833,7 +2861,10 @@ window.pinSubmit = function(){
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-data.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-prompts.js"></script>
+<!-- ko-strategies.js v2.0.0 — Commit-Hash 16996a0 (30.06.2026, Regelwerk-
+     Architektur + 'ludwig'->'atmna' Copyright-Fix). type="module" ist
+     erforderlich, da die Datei echte ES6-export-Syntax nutzt. -->
+<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@16996a04e6d85e7d782c77d9d8c57615cec8f2a0/ko-strategies.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -15181,7 +15212,7 @@ function toggleKiDropdown(anchorEl) {
     { strat:'meanrev',  label:'↩️ Mean Reversion' },
     { strat:'breakout', label:'🚀 Breakout' },
     { strat:'dividend', label:'💰 Dividend Growth' },
-    { strat:'ludwig',        label:'⚙️ Options ATM/NA' },
+    { strat:'atmna',        label:'⚙️ Options ATM/NA' },
     { strat:'weekly_income',  label:'📅 Options Weekly' },
   ];
 
@@ -15236,7 +15267,7 @@ async function openKiBriefing(defaultStrat) {
   var activeBtn = document.querySelector('.ki-strat-btn[data-strat="' + startStrat + '"]');
   if (activeBtn) {
     var stratColors = {
-      ludwig:        { bg:'rgba(163,113,247,0.15)', border:'#a371f7', color:'#a371f7' },
+      atmna:        { bg:'rgba(163,113,247,0.15)', border:'#a371f7', color:'#a371f7' },
       weekly_income: { bg:'rgba(52,211,153,0.15)',  border:'#34d399', color:'#34d399' },
       options:  { bg:'rgba(240,169,58,0.15)',  border:'var(--amber)', color:'var(--amber)' },
       momentum: { bg:'rgba(52,194,110,0.15)',  border:'var(--green)', color:'var(--green)' },
@@ -15314,7 +15345,7 @@ async function openKiBriefing(defaultStrat) {
   // ── Pre-Filter für Options-Wheel/EIC: Kursrahmen + ER-Schutz im JS anwenden ──
   // So kommt kein ungeeigneter Titel in den Prompt — KI muss nichts ausschließen
   var filteredForKI = topResults;
-  if (_kiStrat === 'options' || _kiStrat === 'ludwig' || _kiStrat === 'weekly_income') {
+  if (_kiStrat === 'options' || _kiStrat === 'atmna' || _kiStrat === 'weekly_income') {
     var oCfg = getOptionsCfg();
     filteredForKI = topResults.filter(function(r) {
       var price = r.price || 0;
@@ -15328,7 +15359,7 @@ async function openKiBriefing(defaultStrat) {
     });
     if (filteredForKI.length === 0) {
       content.innerHTML = '<div style="color:var(--amber);padding:1.25rem;font-size:13px">'
-        + '<strong>Keine geeigneten Kandidaten</strong> für ' + (_kiStrat === 'ludwig' ? 'Options ATM/NA' : 'Options-Wheel') + ' gefunden.<br><br>'
+        + '<strong>Keine geeigneten Kandidaten</strong> für ' + (_kiStrat === 'atmna' ? 'Options ATM/NA' : 'Options-Wheel') + ' gefunden.<br><br>'
         + 'Kriterien: Kurs $' + oCfg.minPrice + '–$' + oCfg.maxPrice
         + ' · HVP ≥ ' + oCfg.minHvp + '% · Kein ER in ' + oCfg.erDays + ' Tagen<br><br>'
         + '<span style="color:var(--text3);font-size:11px">Tipp: Konfiguration im Admin-Tab anpassen oder andere Watchlist scannen.</span></div>';
@@ -15720,7 +15751,7 @@ function setKiStrat(btn) {
   document.querySelectorAll('.ki-strat-btn').forEach(function(b) {
     b.classList.remove('active-strat');
     b.style.background = 'transparent';
-    if (b.dataset.strat === 'ludwig') {
+    if (b.dataset.strat === 'atmna') {
       b.style.color = '#a371f7';
       b.style.borderColor = '#a371f7';
       b.style.opacity = '1';
@@ -15737,8 +15768,8 @@ function setKiStrat(btn) {
   // Aktiven Button hervorheben
   const strat = btn.dataset.strat;
   const cfg = KI_STRAT_CONFIG[strat];
-  const activeColor = strat === 'ludwig' ? '#a371f7' : '#818cf8';
-  btn.style.background = strat === 'ludwig' ? 'rgba(163,113,247,0.15)' : 'rgba(99,102,241,0.15)';
+  const activeColor = strat === 'atmna' ? '#a371f7' : '#818cf8';
+  btn.style.background = strat === 'atmna' ? 'rgba(163,113,247,0.15)' : 'rgba(99,102,241,0.15)';
   btn.style.color = activeColor;
   btn.style.borderColor = activeColor;
   btn.style.opacity = '1';
@@ -16025,7 +16056,7 @@ function csvSaveConfirm(tickers) {
           title="Breakout: 52W-Hoch · Volumenbestätigung · OBV-Akkumulation">
           🚀 Breakout
         </button>
-        <button class="ki-strat-btn" data-strat="ludwig"
+        <button class="ki-strat-btn" data-strat="atmna"
           onclick="setKiStrat(this)"
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #a371f7;background:transparent;color:#a371f7;cursor:pointer"
           title="Options ATM/NA: ATM-CSP · No Assignment · 3-Stufen-Roll">
@@ -17642,60 +17673,17 @@ var _ddCurrentStrategy = 'momentum';
 var _ddCurrentRaw      = null;
 var _ddCurrentName     = null;
 
-var DD_STRATEGIES = {
-  momentum: {
-    label: 'Momentum/SEPA',
-    focus: [
-      '1. Trendstruktur: Ist der Titel in einer Stage-2-Aufwärtsbewegung (Minervini)?',
-      '2. Momentum-Qualität: RSI, MACD und OBV im Einklang?',
-      '3. Überhitzung: Besteht Rückschlagsrisiko durch Überdehnung?',
-      '4. Setup-Qualität für Momentum-Einstieg bewerten.',
-    ],
-  },
-  options: {
-    label: 'Options/Wheel',
-    focus: [
-      '1. IV-Umfeld: Ist die Überhitzung (Score) hoch genug für attraktive Prämien?',
-      '2. Trendrichtung: Bull/Bear/Sideways für Put- oder Call-Selling?',
-      '3. Strike-Überlegung: EMA50/EMA200 als natürliche Support-Zonen für CSPs?',
-      '4. Risiko: Earnings-Nähe, ATR-basiertes Stop-Niveau.',
-    ],
-  },
-  meanrev: {
-    label: 'Mean Reversion',
-    focus: [
-      '1. Überdehnung: Wie weit ist der Titel vom EMA200 entfernt (in ATR)?',
-      '2. Erschöpfungssignale: RSI-Divergenz, OBV-Schwäche, BB-Position?',
-      '3. Rückkehr-Potential: Ist ein Rücklauf zum EMA50/EMA200 realistisch?',
-      '4. Risiko eines Short-Squeezes oder weiterer Trendfortsetzung.',
-    ],
-  },
-  swing: {
-    label: 'Swing-Trading',
-    focus: [
-      '1. Swing-Struktur: Higher Highs / Higher Lows erkennbar?',
-      '2. Einstiegszeitpunkt: Nähe zu EMA50 als Pullback-Zone?',
-      '3. MACD-Signal: Histogramm-Wende als Timing-Signal?',
-      '4. Kursziel und Stop-Niveau basierend auf ATR und 52W-Range.',
-    ],
-  },
-  breakout: {
-    label: 'Breakout',
-    focus: [
-      '1. Breakout-Setup: Abstand zum 52-Wochen-Hoch und Volumenbestätigung?',
-      '2. OBV-Akkumulation: Zeigt OBV institutionelles Kaufinteresse vor dem Breakout?',
-      '3. Markov-Regime: Bull-Regime als Voraussetzung für nachhaltigen Breakout?',
-      '4. Flaschenhals-Niveau und potenzielles Kursziel nach Ausbruch.',
-    ],
-  },
-};
+// DD_STRATEGIES ENTFERNT (30.06.2026) — DeepDive nutzt jetzt direkt
+// KI_STRAT_CONFIG (= KoPrompts.STRATEGIES aus ko-strategies.js), dieselbe
+// Quelle wie Scanner-Tab/Alpha-Desk. Kein separates Duplikat mehr, das aus
+// dem Takt geraten kann (siehe Batch-2-Lücke, die genau daraus entstand).
 
 function setDdStrategy(strategy) {
   _ddCurrentStrategy = strategy;
   // Button-Highlighting
   // Beide Button-Reihen highlighten (Mitte + Header)
   ['dd-strat-', 'dd-strat-top-'].forEach(function(prefix) {
-    Object.keys(DD_STRATEGIES).forEach(function(k) {
+    Object.keys(KI_STRAT_CONFIG).forEach(function(k) {
       var btn = document.getElementById(prefix + k);
       if (!btn) return;
       if (k === strategy) {
@@ -17711,7 +17699,7 @@ function setDdStrategy(strategy) {
   });
   // KI neu generieren wenn Daten bereits geladen
   if (_ddCurrentRaw && _ddCurrentState) {
-    document.getElementById('dd-ki-text').innerHTML = '<div style="color:var(--text3);display:flex;align-items:center;gap:6px"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analyse für ' + DD_STRATEGIES[strategy].label + '…</div>';
+    document.getElementById('dd-ki-text').innerHTML = '<div style="color:var(--text3);display:flex;align-items:center;gap:6px"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analyse für ' + (KI_STRAT_CONFIG[strategy]?.label || strategy) + '…</div>';
     document.getElementById('dd-action-box').style.display = 'none';
     generateDeepDiveKI(_ddCurrentSym, _ddCurrentName, _ddCurrentRaw, _ddCurrentState);
   }
@@ -17930,7 +17918,7 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     'Marktkontext — VIX: ' + (vix||'n/a') + ' | Institutional Flow Score: ' + (dpScore||'n/a'),
   ];
 
-  var strat = DD_STRATEGIES[_ddCurrentStrategy] || DD_STRATEGIES.momentum;
+  var strat = KI_STRAT_CONFIG[_ddCurrentStrategy] || KI_STRAT_CONFIG.momentum || { label: _ddCurrentStrategy, focus: [] };
   var prompt_context = strat.focus.join('\n');
   var isExpert = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
 
@@ -19948,7 +19936,7 @@ async function runOptionsKiBriefing(strat) {
   // Open modal
   var existing = document.getElementById('ki-modal');
   if (existing) existing.remove();
-  var label = strat==='ludwig' ? 'Options ATM/NA' : strat==='weekly_income' ? 'Options Weekly' : 'Options-Wheel';
+  var label = strat==='atmna' ? 'Options ATM/NA' : strat==='weekly_income' ? 'Options Weekly' : 'Options-Wheel';
   var modal = document.createElement('div');
   modal.id = 'ki-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
@@ -19961,7 +19949,7 @@ async function runOptionsKiBriefing(strat) {
     + '</div><div style="margin-top:.75rem;font-size:10px;color:var(--text3);text-align:center">Keine Anlageberatung &middot; Eigene Pruefung erforderlich</div></div>';
   document.body.appendChild(modal);
   try {
-    var text = await koAiCall('ki_briefing', prompt, strat === 'ludwig');
+    var text = await koAiCall('ki_briefing', prompt, strat === 'atmna');
     var contentEl = document.getElementById('ki-content');
     if (contentEl) contentEl.innerHTML = '<div style="white-space:pre-wrap;font-size:12px;line-height:1.6">' + text + '</div>';
     if (statusEl) statusEl.textContent = '';
