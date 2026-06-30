@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v213">
+<meta name="app-version" content="20260630-v214">
 <!-- v212 (30.06.2026): Fibonacci-Screening-Modul v1.0 (Gemini-Blueprint) — renderFiboBar() in renderCard(),
      _fibo-Feld in kvToScannerState(), Fibo-Sektion in Parameter-Pool fuer KI-Prompts. -->
 <!-- v213 (30.06.2026): KRITISCHER BUGFIX — runScan() hatte fehlende schliessende Klammer;
@@ -11,6 +11,11 @@
      gescoped ("X is not defined" beim Klick). Tail-Block (Alert-Dispatch) korrekt vor KV-Scanner-
      Funktionen verschoben. AUSSERDEM: KI-Trade-Setup in renderAlphaCards() nutzte falsche Feldnamen
      (ki.stop statt ki.stopLoss etc.) -> TypeError beim Laden von Alpha Desk. Beide behoben. -->
+<!-- v214 (30.06.2026): KRITISCHER BUGFIX — openKiBriefing() referenzierte die nie definierte
+     Variable "activeStrategy" im Parameter-Pool-Mapping (poolData-Aufbau). Das warf einen
+     unbehandelten ReferenceError AUSSERHALB des try/catch-Blocks -> KI-Briefing blieb fuer
+     immer bei "Analysiere Top-Ergebnisse..." haengen (kein Fehler sichtbar, da unhandled
+     promise rejection). Fix: activeStrategy -> _kiStrat (echte Strategie-Variable). -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15196,7 +15201,7 @@ async function openKiBriefing(defaultStrat) {
   // Parameter-Pool-Modul: vollständige Daten für KI-Selektion
   const poolData = top10.map(function(r, i) {
     var pool = buildParameterPool(r);
-    return (i+1) + '. ' + pool.sym + ':\n' + formatPoolForPrompt(pool, activeStrategy || 'CSP/Wheel');
+    return (i+1) + '. ' + pool.sym + ':\n' + formatPoolForPrompt(pool, _kiStrat || 'CSP/Wheel');
   }).join('\n\n');
   const tickerList = top10.map(function(r, i) {
     var line = (i+1) + '. ' + r.sym
