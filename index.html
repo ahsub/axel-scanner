@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260630-v214">
+<meta name="app-version" content="20260630-v215">
 <!-- v212 (30.06.2026): Fibonacci-Screening-Modul v1.0 (Gemini-Blueprint) — renderFiboBar() in renderCard(),
      _fibo-Feld in kvToScannerState(), Fibo-Sektion in Parameter-Pool fuer KI-Prompts. -->
 <!-- v213 (30.06.2026): KRITISCHER BUGFIX — runScan() hatte fehlende schliessende Klammer;
@@ -16,6 +16,11 @@
      unbehandelten ReferenceError AUSSERHALB des try/catch-Blocks -> KI-Briefing blieb fuer
      immer bei "Analysiere Top-Ergebnisse..." haengen (kein Fehler sichtbar, da unhandled
      promise rejection). Fix: activeStrategy -> _kiStrat (echte Strategie-Variable). -->
+<!-- v215 (30.06.2026): BUGFIX — _vixFallbackFromKV() las VIX korrekt aus KV-Daten (sichtbar als
+     "[VIX] Fallback aus KV: X.XX" im Log) aber setzte NIE die globale Variable _vixLevel.
+     openKiBriefing() las _vixLevel direkt (ohne fetchVix()-Aufruf) -> immer "unbekannt" im
+     KI-Prompt, obwohl der echte Wert vorlag. KI antwortete entsprechend korrekt aber unnoetig
+     mit "VIX nicht verfuegbar". Fix: _vixLevel = vixVal; im Fallback-Pfad ergaenzt. -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13640,6 +13645,10 @@ function _vixFallbackFromKV() {
         vixDomEl.title = lastTD ? 'Stand: ' + lastTD + ' (letzter Handelstag)' : '';
         vixDomEl.style.color = vixVal < 16 ? 'var(--green)' : vixVal > 25 ? 'var(--red)' : 'var(--amber)';
       }
+      // Bugfix: _vixLevel global setzen, sonst bleibt es null und KI-Prompts
+      // (openKiBriefing) lesen "unbekannt" obwohl der Wert hier vorlag.
+      _vixLevel = vixVal;
+      _vixLastFetch = Date.now();
       console.log('[VIX] Fallback aus KV: ' + vixVal + ' (Stand: ' + lastTD + ')');
       return vixVal;
     }
