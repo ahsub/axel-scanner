@@ -3,40 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260701-v234">
-<!-- v234 (01.07.2026): BaFin-Compliance-Fix Public-Modus — v233 hatte im
-     Public-Prompt die Strategie-Ampel mit deskriptiver Formulierung behalten,
-     was gem. §34b WpHG / §1 WpHG trotzdem als implizite Anlageempfehlung
-     gelten kann (KO-Zertifikate, Optionen = Wertpapiere). Public-Modus jetzt
-     komplett ohne Strategie-Ampel, ohne Instrumenten-Nennungen, ohne Handlungs-
-     ableitungen — nur neutrale Marktlage-Beschreibung. Strategie-Ampel
-     ausschließlich im EIC-Expert-Modus (verifizierter Eigengebrauch). -->
-<!-- v233 (01.07.2026): Morning Briefing Strategie-Ampel-Matrix (Expert-Modus).
-     werden jetzt als Pflicht-Abschnitt mit Ampelfarbe (🟢🟡🔴⬜) + 1-Satz-
-     Begruendung aus Messwerten bewertet. No-hallucination-konform: Regelwerk
-     explizit im Prompt (Regime, VIX, Fear&Greed, SKEW, Breadth als Entscheidungs-
-     kriterien), ⬜ bei fehlenden Daten statt Schätzung. Expert- und Public-Modus.
-     ko-ai-worker.js v1.5 parallel deployen. -->
-<!-- v232 (01.07.2026): Short-Strategien Phase 1 (Gemini-Blueprint).
-     - DeepDive: fading_short-Strategie-Button (⚠️ KO-Short) im Modal.
-     - Bear-Scanner DeepDive: Strategie auf fading_short geaendert (statt meanrev).
-     - squeezeRisk-Badge in Bear-Scanner-Karten (🚨 rot ≥70, ⚠️ amber ≥40).
-     - Alpha-Desk Leaderboard: neuer ⚠️ KO-Short-Tab (short_fading_ko → fading_short).
-     - _lbToStrat um fading_short erweitert.
-     Aggregator v3.7 + ko-strategies.js v2.1.0 + ko-ai-worker.js v1.4 parallel deployen. -->
+<meta name="app-version" content="20260701-v236">
+<!-- v236 (01.07.2026): Fundamental-Flag-Engine (Gemini-Blueprint):
+     evaluateFundamentalQuality() + renderFundamentalFlags() — 5 regelbasierte
+     Flags aus Fundamental-Daten: FCF-Warnung (CSP-Schutz), Short-Confluence
+     (D/E>150 + Analyst negativ), Quality-Badge (ROE>15% + FCF>3%),
+     PEG-Warnung (>3), Analyst-Upside-Badge (>20%). Sichtbar als Badges in
+     renderCard() (Scanner/Alpha Desk) und Options-Desk-Karten. Aggregator v3.9
+     liefert die Datenbasis (debtToEquity neu ergaenzt). -->
+<!-- v234 (01.07.2026): BaFin-Compliance Public-Modus — keine Strategie-Ampel. -->
+<!-- v233 (01.07.2026): Morning Briefing Strategie-Ampel-Matrix (Expert-Modus). -->
+<!-- v232 (01.07.2026): Short-Strategien Phase 1 — fading_short, squeezeRisk. -->
 <!-- v231 (01.07.2026): Morning Briefing Alpha Desk, Leaderboard-KI-Trigger,
-     Leaderboard-Karten, Sektor-Treiber WL, Bear-Scanner SIRI-Bug. -->
-     1. Morning-Briefing in Alpha Desk Header als prominenter Start-Button.
-     2. Leaderboard-Klick triggert KI-Briefing passender Strategie (Mapping-Tabelle).
-     3. Leaderboard-Karten unter Chips — Ticker mit Score-Balken + DeepDive-Link.
-     4. Sektor-Treiber: Top-Performer der RS-Outperformer-Sektoren als dynamische
-        Momentum-WL ladbar (loadSektorDriverWL).
-     5. switchAlphaLB() setzt Strategie vor DeepDive-Call (doppelter KI-Call Fix).
-     6. Bear-Scanner: _ddCurrentStrategy direkt setzen vor openDeepDive() (SIRI-Bug).
-     Offen (naechste Session): Short-Strategien Regelwerk (breakdown/fading) in
-     ko-strategies.js, KO-Leaderboard im Aggregator, Sektor-Treiber als persistente WL. -->
+     Leaderboard-Karten, Sektor-Treiber WL, Bear-Scanner SIRI-Bug-Fix. -->
 <!-- v230 (30.06.2026): Bear-Scanner Doppel-KI-Call-Bug, setKiStrat-Fix,
-     Preisfilter-Init, Race-Condition _initKoPrompts. -->
+     Preisfilter-Init, Race-Condition _initKoPrompts.
      1. setKiStrat() triggert jetzt direkt openKiBriefing() nach Strategiewahl
         (vorher nur Button-Style + _kiStrat gesetzt, aber keine Analyse gestartet —
         Scanner-Tab-Dropdown hat dagegen immer sofort analysiert, war inkonsistent).
@@ -452,6 +433,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="sidebar-time" id="topbar-time"></div>
     </div>
     <div class="sidebar-section">Trading</div>
+    <!-- Morning Briefing — Vorgeschalteter Tagesstart (NEU 01.07.2026) -->
+    <button class="nav-btn" id="nav-morning" onclick="showPanel('scanner');setTimeout(runMorningBriefing,150)"
+      style="border-left:3px solid var(--accent);background:rgba(79,142,247,0.06)">
+      <i class="ti ti-sunrise" aria-hidden="true" style="color:var(--accent)"></i>
+      <span class="nav-btn-label" style="color:var(--accent)">Morning Briefing<span class="nav-btn-sub">Marktbeurteilung &amp; Strategie-Ampel</span></span>
+    </button>
     <button class="nav-btn alpha-btn" id="nav-alpha" onclick="showPanel('alpha');setTimeout(loadAlphaDashboard,80)">
       <i class="ti ti-sparkles" aria-hidden="true"></i>
       <span class="nav-btn-label">Alpha Desk<span class="nav-btn-sub">Technische Filterung · Algorithmus-Ergebnisse</span></span>
@@ -2280,7 +2267,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="alpha-meta" style="margin-top:.5rem;font-size:11px;color:var(--text3)">Lade Daten…</div>
     <!-- Morning Briefing Button (NEU 01.07.2026) — Vorgeschalteter Analyse-Start -->
     <div style="margin-top:.5rem;padding-top:.5rem;border-top:.5px solid var(--border2)">
-      <button onclick="runMorningBriefing()" style="width:100%;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
+      <button onclick="showPanel('scanner');setTimeout(runMorningBriefing,150)" style="width:100%;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
         <i class="ti ti-sunrise"></i> Morning Briefing — Marktbeurteilung vor Analyse starten
       </button>
     </div>
@@ -3552,6 +3539,87 @@ async function proposeTickerForAggregator(sym, note) {
   }
 }
 window.proposeTickerForAggregator = proposeTickerForAggregator;
+
+// ═══════════════════════════════════════════════════════════════
+//  FUNDAMENTAL-QUALITÄTSPRÜFUNG (Gemini-Blueprint, 01.07.2026)
+//  Übersetzt Fundamental-Daten in handelbare Flags für Cards,
+//  Options-Desk und DeepDive. Kein Freitext — nur strukturierte
+//  Signale, die No-Halluzination-Anforderungen erfüllen.
+// ═══════════════════════════════════════════════════════════════
+function evaluateFundamentalQuality(state) {
+  var flags = [];
+  var fcfYield = state.fcfYield    != null ? state.fcfYield    : null;
+  var debtEq   = state.debtToEquity!= null ? state.debtToEquity: null;
+  var upside   = state.analystUpside!= null? state.analystUpside: null;
+
+  // 1. CSP/Wheel-Schutz: kein Put auf Cash-Burner schreiben
+  if (fcfYield !== null && fcfYield < 0) {
+    flags.push({
+      type: 'warning',
+      tag:  '⚠️ FCF negativ',
+      text: 'Negativer Free Cashflow — erhöhtes Andienungsrisiko beim Wheel/CSP.',
+      scope: ['csp', 'options', 'card'],
+    });
+  }
+
+  // 2. Short-Confluence: Verschuldung + negativer Analystenkonsens
+  //    (debtToEquity ist für Versorger/REITs bereits server-seitig auf null gesetzt)
+  if (debtEq !== null && debtEq > 150 && upside !== null && upside < -10) {
+    flags.push({
+      type: 'short',
+      tag:  '🔴 Short-Confluence',
+      text: 'Hohe Verschuldung (D/E ' + debtEq + ') + Analyst-Konsens ' + upside.toFixed(1) + '% unter Kurs.',
+      scope: ['short', 'bear', 'card'],
+    });
+  }
+
+  // 3. Analyst-Upside — Sentiment-Resonanz für Long-Setups
+  if (upside !== null && upside > 20) {
+    flags.push({
+      type: 'upside',
+      tag:  '🎯 +' + Math.round(upside) + '% Konsens',
+      text: 'Analyst-Konsens sieht ' + upside.toFixed(1) + '% Upside — stützt Long-Setup.',
+      scope: ['momentum', 'options', 'card'],
+    });
+  } else if (upside !== null && upside < -10) {
+    flags.push({
+      type: 'caution',
+      tag:  '📉 ' + Math.round(upside) + '% Konsens',
+      text: 'Analyst-Konsens ' + upside.toFixed(1) + '% unter Kurs — Gegenwind für Long.',
+      scope: ['momentum', 'options', 'card'],
+    });
+  }
+
+  return flags;
+}
+
+// Rendert Fundamental-Flags als kompakte Badges (HTML-String)
+function renderFundamentalFlags(state, scopeFilter) {
+  if (!state) return '';
+  var flags = evaluateFundamentalQuality(state);
+  if (!flags.length) return '';
+  var relevant = scopeFilter
+    ? flags.filter(function(f){ return f.scope.indexOf(scopeFilter) >= 0; })
+    : flags;
+  if (!relevant.length) return '';
+  var colors = {
+    warning: { bg: 'rgba(245,158,11,0.12)', border: 'var(--amber)', color: 'var(--amber)' },
+    short:   { bg: 'rgba(239,68,68,0.12)',  border: 'var(--red)',   color: 'var(--red)'   },
+    quality: { bg: 'rgba(34,197,94,0.10)',  border: 'var(--green)', color: 'var(--green)' },
+    caution: { bg: 'rgba(245,158,11,0.10)', border: '#f97316',      color: '#f97316'      },
+    upside:  { bg: 'rgba(99,102,241,0.10)', border: 'var(--accent)','color': 'var(--accent)' },
+  };
+  return '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'
+    + relevant.map(function(f) {
+        var c = colors[f.type] || colors.caution;
+        return '<span title="' + f.text + '" style="font-size:9px;padding:1px 6px;border-radius:4px;'
+          + 'background:' + c.bg + ';border:0.5px solid ' + c.border + ';color:' + c.color
+          + ';cursor:help">' + f.tag + '</span>';
+      }).join('')
+    + '</div>';
+}
+window.evaluateFundamentalQuality = evaluateFundamentalQuality;
+window.renderFundamentalFlags = renderFundamentalFlags;
 
 // Token für Phase 1 (statischer Bearer) — in ko-config.js oder localStorage
 function getAiToken() {
@@ -7244,6 +7312,10 @@ function renderCard(t,state){
       '</div>';
     }():'')+ 
     renderFiboBar(state)+
+    // Fundamental-Flags (NEU 01.07.2026): nur wenn Daten vorhanden (Top-50 Enrichment)
+    (state.fcfYield != null || state.analystUpside != null || state.debtToEquity != null
+      ? renderFundamentalFlags(state, 'card')
+      : '')+
     '<div class="chart-wrap"><canvas id="ch-'+t.sym+'" role="img" aria-label="Chart '+t.sym+'"></canvas></div>';
   el.innerHTML=s;
 
@@ -20048,6 +20120,7 @@ function renderOptionsDeskCards(data) {
       +   '<span style="font-size:13px;font-weight:600">$' + (t.price ? t.price.toFixed(2) : '--') + '</span>'
       + '</div>'
       + (fiboBadge ? '<div style="margin-bottom:.3rem">' + fiboBadge + '</div>' : '')
+      + renderFundamentalFlags(t, 'csp')
       + '<div style="display:flex;gap:.8rem;flex-wrap:wrap;font-size:11px;margin-bottom:.2rem">'
       +   '<span>HVP <b style="color:' + hvpColor + '">' + hvp + '%' + hvpBadge + '</b></span>'
       +   '<span>RSI <b style="color:' + rsiColor + '">' + rsi + '</b></span>'
