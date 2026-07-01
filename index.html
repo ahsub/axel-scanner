@@ -3,8 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260701-v236">
-<!-- v236 (01.07.2026): Fundamental-Flag-Engine (Gemini-Blueprint):
+<meta name="app-version" content="20260701-v239">
+<!-- v239 (01.07.2026): Sektor-Filter im Scanner via sectors-Tag aus KV-Daten.
+     loadScannerFromKV() filtert bei fixed:DEFENSE/ROBOTICS/AI_TECH/SEMIS/
+     BIOTECH/FINTECH direkt aus _alphaData.tickers nach sectors-Feld statt
+     aus masterShortlist — zeigt ALLE getaggten Titel (nicht nur Top-20).
+     FIXED_LISTS[DEFENSE] auf korrekte Heimatboersen-Symbole aktualisiert.
+     FIXED_LISTS[ROBOTICS] neu. Dropdown: 🤖 Robotics & AI-Hardware Option. -->
+     (europäische Defence-Heimatboersen-Symbole) + DE-Ticker-Fixes aus v237. -->
+     1. Fallback-Kette unbekannter DE-Ticker: 8 Kandidaten → 3 (.DE/.F/plain).
+        Vorher: 8 × ~2.5s = bis zu 20s bei Nicht-Verfügbarkeit (GXI, ADS etc.).
+     2. AbortController-Timeout 5s pro YF-Fetch-Versuch statt Browser-Default.
+     3. GXI + 7 weitere fehlende DE-Ticker in EU_TICKER_MAP eingetragen →
+        direktes .DE-Mapping statt Fallback-Kette (GXI war Haupt-Täter im Log). -->
      evaluateFundamentalQuality() + renderFundamentalFlags() — 5 regelbasierte
      Flags aus Fundamental-Daten: FCF-Warnung (CSP-Schutz), Short-Confluence
      (D/E>150 + Analyst negativ), Quality-Badge (ROE>15% + FCF>3%),
@@ -560,6 +571,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           </optgroup>
           <optgroup label="── 🏭 Sektoren ──">
             <option value="fixed:DEFENSE">🛡️ Defense &amp; Aerospace</option>
+            <option value="fixed:ROBOTICS">🤖 Robotics &amp; AI-Hardware</option>
             <option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>
             <option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>
             <option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>
@@ -5324,6 +5336,7 @@ function setMarket(mkt){
         '</optgroup>'+
         '<optgroup label="── 🏭 Sektoren ──">'+
           '<option value="fixed:DEFENSE">🛡️ Defense &amp; Aerospace</option>'+
+          '<option value="fixed:ROBOTICS">🤖 Robotics &amp; AI-Hardware</option>'+
           '<option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>'+
           '<option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>'+
           '<option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>'+
@@ -5373,6 +5386,7 @@ function setMarket(mkt){
         '</optgroup>'+
         '<optgroup label="── 🏭 Sektoren ──">'+
           '<option value="fixed:DEFENSE">🛡️ Defense &amp; Aerospace</option>'+
+          '<option value="fixed:ROBOTICS">🤖 Robotics &amp; AI-Hardware</option>'+
           '<option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>'+
           '<option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>'+
           '<option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>'+
@@ -5540,6 +5554,20 @@ window._EU_TICKER_MAP = {
   'ADS':   {sym:'ADS',   sfx:'DE'},  // Adidas → ADS.DE (explizit)
   'SY1':   {sym:'SY1',   sfx:'DE'},  // Symrise → SY1.DE
   'HAG':   {sym:'HAG',   sfx:'DE'},  // Hensoldt → HAG.DE
+  // NEU (01.07.2026): Fehlende DE-Ticker die vorher in die 8er-Fallback-Kette fielen
+  'GXI':   {sym:'GXI',   sfx:'DE'},  // Gerresheimer AG
+  'KGX':   {sym:'KGX',   sfx:'DE'},  // Kion Group
+  'NDX1':  {sym:'NDX1',  sfx:'DE'},  // Nordex
+  'PUM':   {sym:'PUM',   sfx:'DE'},  // Puma
+  'DMP':   {sym:'DMP',   sfx:'DE'},  // Dermapharm
+  'SGL':   {sym:'SGL',   sfx:'DE'},  // SGL Carbon
+  'EVT':   {sym:'EVT',   sfx:'DE'},  // Evotec
+  'TRGP':  {sym:'TGR',   sfx:'DE'},  // Traton
+  // Europäische Defence-Titel (Heimatbörsen-Symbole, 01.07.2026)
+  'RHM':    {sym:'RHM',    sfx:'DE'},  // Rheinmetall AG (XETRA)
+  'HO':     {sym:'HO',     sfx:'PA'},  // Thales SA (Euronext Paris)
+  'LDO':    {sym:'LDO',    sfx:'MI'},  // Leonardo SpA (Borsa Italiana)
+  'SAAB-B': {sym:'SAAB-B', sfx:'ST'},  // Saab AB (Stockholm)
 };
 
 
@@ -5800,8 +5828,11 @@ async function runScan(){
         var fallbacks = yfBaseSfx !== 'DE' ? [yfBaseSym+'.DE', t.sym+'.'+yfBaseSfx, t.sym+'.DE', t.sym] : [t.sym+'.DE', t.sym];
         yfSymCandidates = [primary].concat(fallbacks.filter(function(s){ return s !== primary; }));
       } else {
-        // Unbekannter DE-Ticker: Standard-Fallback-Kette
-        yfSymCandidates = [t.sym+'.DE', t.sym+'.SG', t.sym+'.F', t.sym+'.PA', t.sym+'.AS', t.sym+'.MI', t.sym+'.MC', t.sym+'.L', t.sym];
+        // Unbekannter DE-Ticker: kurze Fallback-Kette (max 3 Versuche).
+        // Vorher: 8 Kandidaten × ~2.5s = bis zu 20s bei Nicht-Verfügbarkeit.
+        // Fix (01.07.2026): auf die 3 wahrscheinlichsten begrenzt + schnelles
+        // Timeout nach dem ersten 404 (kein sinnloser Retry-Stack mehr).
+        yfSymCandidates = [t.sym+'.DE', t.sym+'.F', t.sym];
       }
       const interval=intervalMapTD[effectiveTF]||'1day';
       const outputsize=outputMap[effectiveTF]||220;
@@ -5860,7 +5891,17 @@ async function runScan(){
           try {
             const yfUrl='https://query1.finance.yahoo.com/v7/finance/chart/'+_trySym
               +'?interval='+yInterval+'&period1='+from+'&period2='+to+'&includePrePost=false';
-            const r=await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl));
+            // NEU (01.07.2026): AbortController-Timeout (5s) damit DE-Ticker-
+            // Fallback-Kette bei 404/Netzwerkproblemen nicht ewig haengt.
+            const _yfAbort = new AbortController();
+            const _yfTimeout = setTimeout(function(){ _yfAbort.abort(); }, 5000);
+            let r;
+            try {
+              r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url='+encodeURIComponent(yfUrl),
+                { signal: _yfAbort.signal });
+            } finally {
+              clearTimeout(_yfTimeout);
+            }
             if(!r.ok){ console.warn('YF HTTP error',r.status,'for',_trySym); continue; }
             const _rawText = await r.text();
             let j;
@@ -6263,7 +6304,6 @@ function kvToScannerState(r) {
 
 async function loadScannerFromKV() {
   window.loadScannerFromKV = loadScannerFromKV;
-  // ── KV-Modus: Scanner-Tab aus Aggregator-Daten (masterShortlist) befüllen ──
   var btn  = document.getElementById('scan-btn');
   var cont = document.getElementById('scan-container');
   var badge= document.getElementById('kv-mode-badge');
@@ -6276,12 +6316,28 @@ async function loadScannerFromKV() {
   document.getElementById('scan-label').textContent = 'Lade KV-Daten…';
   cont.innerHTML = '';
 
-  // Daten laden (Alpha Desk nutzt dieselbe Quelle)
   if (!window._alphaData || !_alphaData.masterShortlist) {
     await loadAlphaDashboard(false);
   }
 
-  var ms = (window._alphaData && _alphaData.masterShortlist) ? _alphaData.masterShortlist : [];
+  // Sektor-Filter via sectors-Tag (NEU 01.07.2026)
+  var presetVal = (document.getElementById('ticker-preset') || {}).value || '';
+  var SECTOR_PRESET_MAP = {
+    'fixed:DEFENSE':'DEFENSE','fixed:ROBOTICS':'ROBOTICS',
+    'fixed:AI_TECH':'AI_TECH','fixed:SEMIS':'SEMIS',
+    'fixed:BIOTECH':'BIOTECH','fixed:FINTECH':'FINTECH',
+  };
+  var sectorFilter = SECTOR_PRESET_MAP[presetVal] || null;
+  var allTickers = (window._alphaData && _alphaData.tickers) ? _alphaData.tickers : [];
+  var ms;
+  if (sectorFilter && allTickers.length) {
+    ms = allTickers
+      .filter(function(r){ return (r.sectors||[]).indexOf(sectorFilter) >= 0; })
+      .sort(function(a,b){ return (b.score||0)-(a.score||0); });
+  } else {
+    ms = (window._alphaData && _alphaData.masterShortlist) ? _alphaData.masterShortlist : [];
+  }
+
   if (!ms.length) {
     cont.innerHTML = '<div style="color:var(--text3);padding:1rem;font-size:12px">'
       + '<i class="ti ti-database-off"></i> Keine KV-Daten verfügbar — bitte Live-Scan verwenden.</div>';
@@ -13216,14 +13272,25 @@ var FIXED_LISTS = {
     {sym:'CEG',name:'Constellation Energy'},{sym:'VST',name:'Vistra Corp.'},
   ],
   'DEFENSE': [
+    // US Defence
     {sym:'LMT',name:'Lockheed Martin'},{sym:'NOC',name:'Northrop Grumman'},{sym:'RTX',name:'RTX Corp.'},
-    {sym:'GD',name:'General Dynamics'},{sym:'BA',name:'Boeing'},{sym:'L3H',name:'L3Harris Tech.'},
-    {sym:'HEI',name:'HEICO Corp.'},{sym:'AXON',name:'Axon Enterprise'},{sym:'LDOS',name:'Leidos Holdings'},
-    {sym:'SAIC',name:'Science Applications'},{sym:'DRS',name:'Leonardo DRS'},{sym:'KTOS',name:'Kratos Defense'},
-    {sym:'AVAV',name:'AeroVironment'},{sym:'CACI',name:'CACI Int\'l'},{sym:'HII',name:'Huntington Ingalls'},
-    {sym:'TDG',name:'TransDigm Group'},{sym:'SPR',name:'Spirit AeroSystems'},{sym:'RHM',name:'Rheinmetall AG'},
-    {sym:'AIR',name:'Airbus SE'},{sym:'HAG',name:'Hensoldt AG'},{sym:'MTX',name:'MTU Aero Engines'},
-    {sym:'BAESY',name:'BAE Systems'},{sym:'SAAB.B',name:'SAAB AB'},{sym:'THLLY',name:'Thales SA'},
+    {sym:'GD',name:'General Dynamics'},{sym:'BA',name:'Boeing'},{sym:'HII',name:'Huntington Ingalls'},
+    {sym:'AXON',name:'Axon Enterprise'},{sym:'LDOS',name:'Leidos Holdings'},{sym:'SAIC',name:'Science Applications'},
+    {sym:'DRS',name:'Leonardo DRS'},{sym:'KTOS',name:'Kratos Defense'},{sym:'CACI',name:'CACI Int\'l'},
+    {sym:'TDG',name:'TransDigm Group'},{sym:'HWM',name:'Howmet Aerospace'},{sym:'TXT',name:'Textron Inc.'},
+    {sym:'CW',name:'Curtiss-Wright'},{sym:'MOOG',name:'Moog Inc.'},
+    // Europa — Heimatbörsen (NEU 01.07.2026: korrekte Symbole statt OTC-ADRs)
+    {sym:'RHM.DE',name:'Rheinmetall AG'},{sym:'BA.L',name:'BAE Systems'},
+    {sym:'SAAB-B.ST',name:'Saab AB'},{sym:'HO.PA',name:'Thales SA'},{sym:'LDO.MI',name:'Leonardo SpA'},
+    {sym:'AIR.PA',name:'Airbus SE'},{sym:'HAG.DE',name:'Hensoldt AG'},{sym:'MTX.DE',name:'MTU Aero Engines'},
+  ],
+  // NEU (01.07.2026): Robotics & AI-Hardware als eigener Sektor
+  'ROBOTICS': [
+    {sym:'NVDA',name:'NVIDIA Corp.'},{sym:'ABB',name:'ABB Ltd.'},{sym:'ISRG',name:'Intuitive Surgical'},
+    {sym:'FANUY',name:'Fanuc ADR'},{sym:'KEYS',name:'Keysight Tech.'},{sym:'TER',name:'Teradyne Inc.'},
+    {sym:'BRKS',name:'Brooks Automation'},{sym:'ONTO',name:'Onto Innovation'},{sym:'NDSN',name:'Nordson Corp.'},
+    {sym:'BOTZ',name:'Global Robotics ETF'},{sym:'ROBO',name:'ROBO Global ETF'},{sym:'IRBO',name:'iShares Robotics ETF'},
+    {sym:'KUKA.DE',name:'KUKA AG'},{sym:'6954.T',name:'Fanuc (Tokio)'},
   ],
   'REIT': [
     {sym:'PLD',name:'Prologis'},{sym:'AMT',name:'American Tower'},{sym:'EQIX',name:'Equinix'},
@@ -16428,7 +16495,6 @@ function kvToScannerState(r) {
 
 async function loadScannerFromKV() {
   window.loadScannerFromKV = loadScannerFromKV;
-  // ── KV-Modus: Scanner-Tab aus Aggregator-Daten (masterShortlist) befüllen ──
   var btn  = document.getElementById('scan-btn');
   var cont = document.getElementById('scan-container');
   var badge= document.getElementById('kv-mode-badge');
@@ -16441,12 +16507,28 @@ async function loadScannerFromKV() {
   document.getElementById('scan-label').textContent = 'Lade KV-Daten…';
   cont.innerHTML = '';
 
-  // Daten laden (Alpha Desk nutzt dieselbe Quelle)
   if (!window._alphaData || !_alphaData.masterShortlist) {
     await loadAlphaDashboard(false);
   }
 
-  var ms = (window._alphaData && _alphaData.masterShortlist) ? _alphaData.masterShortlist : [];
+  // Sektor-Filter via sectors-Tag (NEU 01.07.2026)
+  var presetVal = (document.getElementById('ticker-preset') || {}).value || '';
+  var SECTOR_PRESET_MAP = {
+    'fixed:DEFENSE':'DEFENSE','fixed:ROBOTICS':'ROBOTICS',
+    'fixed:AI_TECH':'AI_TECH','fixed:SEMIS':'SEMIS',
+    'fixed:BIOTECH':'BIOTECH','fixed:FINTECH':'FINTECH',
+  };
+  var sectorFilter = SECTOR_PRESET_MAP[presetVal] || null;
+  var allTickers = (window._alphaData && _alphaData.tickers) ? _alphaData.tickers : [];
+  var ms;
+  if (sectorFilter && allTickers.length) {
+    ms = allTickers
+      .filter(function(r){ return (r.sectors||[]).indexOf(sectorFilter) >= 0; })
+      .sort(function(a,b){ return (b.score||0)-(a.score||0); });
+  } else {
+    ms = (window._alphaData && _alphaData.masterShortlist) ? _alphaData.masterShortlist : [];
+  }
+
   if (!ms.length) {
     cont.innerHTML = '<div style="color:var(--text3);padding:1rem;font-size:12px">'
       + '<i class="ti ti-database-off"></i> Keine KV-Daten verfügbar — bitte Live-Scan verwenden.</div>';
