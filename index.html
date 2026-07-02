@@ -3,134 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260701-v239">
-<!-- v239 (01.07.2026): Sektor-Filter im Scanner via sectors-Tag aus KV-Daten.
-     loadScannerFromKV() filtert bei fixed:DEFENSE/ROBOTICS/AI_TECH/SEMIS/
-     BIOTECH/FINTECH direkt aus _alphaData.tickers nach sectors-Feld statt
-     aus masterShortlist — zeigt ALLE getaggten Titel (nicht nur Top-20).
-     FIXED_LISTS[DEFENSE] auf korrekte Heimatboersen-Symbole aktualisiert.
-     FIXED_LISTS[ROBOTICS] neu. Dropdown: 🤖 Robotics & AI-Hardware Option. -->
-     (europäische Defence-Heimatboersen-Symbole) + DE-Ticker-Fixes aus v237. -->
-     1. Fallback-Kette unbekannter DE-Ticker: 8 Kandidaten → 3 (.DE/.F/plain).
-        Vorher: 8 × ~2.5s = bis zu 20s bei Nicht-Verfügbarkeit (GXI, ADS etc.).
-     2. AbortController-Timeout 5s pro YF-Fetch-Versuch statt Browser-Default.
-     3. GXI + 7 weitere fehlende DE-Ticker in EU_TICKER_MAP eingetragen →
-        direktes .DE-Mapping statt Fallback-Kette (GXI war Haupt-Täter im Log). -->
-     evaluateFundamentalQuality() + renderFundamentalFlags() — 5 regelbasierte
-     Flags aus Fundamental-Daten: FCF-Warnung (CSP-Schutz), Short-Confluence
-     (D/E>150 + Analyst negativ), Quality-Badge (ROE>15% + FCF>3%),
-     PEG-Warnung (>3), Analyst-Upside-Badge (>20%). Sichtbar als Badges in
-     renderCard() (Scanner/Alpha Desk) und Options-Desk-Karten. Aggregator v3.9
-     liefert die Datenbasis (debtToEquity neu ergaenzt). -->
-<!-- v234 (01.07.2026): BaFin-Compliance Public-Modus — keine Strategie-Ampel. -->
-<!-- v233 (01.07.2026): Morning Briefing Strategie-Ampel-Matrix (Expert-Modus). -->
-<!-- v232 (01.07.2026): Short-Strategien Phase 1 — fading_short, squeezeRisk. -->
-<!-- v231 (01.07.2026): Morning Briefing Alpha Desk, Leaderboard-KI-Trigger,
-     Leaderboard-Karten, Sektor-Treiber WL, Bear-Scanner SIRI-Bug-Fix. -->
-<!-- v230 (30.06.2026): Bear-Scanner Doppel-KI-Call-Bug, setKiStrat-Fix,
-     Preisfilter-Init, Race-Condition _initKoPrompts.
-     1. setKiStrat() triggert jetzt direkt openKiBriefing() nach Strategiewahl
-        (vorher nur Button-Style + _kiStrat gesetzt, aber keine Analyse gestartet —
-        Scanner-Tab-Dropdown hat dagegen immer sofort analysiert, war inkonsistent).
-     2. Preisfilter-Feld wird beim App-Start (_initUICache) aus gespeichertem
-        localStorage-Wert vorbefuellt, damit aktiver Filter sofort sichtbar ist
-        ohne erst den Options-Desk-Tab oeffnen zu muessen. -->
-<!-- v228 (30.06.2026): Defensiv-Fix — unlockApp() rief _initKoPrompts() direkt
-     auf, die Funktion ist aber erst spaeter im Dokument definiert (~Zeile 15700).
-     Bei sehr schneller PIN-Eingabe oder langsamem Laden der externen ko-*.js-
-     Skripte konnte das zu "ReferenceError: _initKoPrompts is not defined"
-     fuehren (Lade-Reihenfolge-Race, unabhaengig von v227). Jetzt: kurzer Retry
-     (bis 10s), bis die Funktion verfuegbar ist, statt hartem Absturz. -->
-<!-- v227 (30.06.2026): HOTFIX — stratCfg.prompt() war nach dem Umbau auf
-     ko-strategies.js v2.0.0 nicht mehr aufrufbar (Strategien sind jetzt reine
-     Regelwerk-Daten ohne eigene .prompt()-Methode). 2 Stellen betroffen:
-     openKiBriefing() und runOptionsKiBriefing() — beide jetzt auf
-     KoPrompts.get(id, ctx) umgestellt (gemeinsamer Prompt-Builder).
-     "TypeError: stratCfg.prompt is not a function" beim KI-Briefing behoben. -->
-<!-- v226 (30.06.2026): Strategie-Modul-Architektur (Axels 5 Anforderungen:
-     Erweiterbarkeit, Regelwerk-basiert, einheitliche No-Hallu-Prompts, ES6,
-     Multi-Modul-Zugriff) — ko-prompts.js ersetzt durch ko-strategies.js v2.0.0
-     (echtes ES-Module mit window.KoPrompts-Alias fuer Rueckwaertskompatibilitaet).
-     Script-Tag auf type="module" umgestellt. DD_STRATEGIES (separates Duplikat
-     in dieser Datei) komplett entfernt — DeepDive liest jetzt direkt aus
-     KI_STRAT_CONFIG (= KoPrompts.STRATEGIES), derselben Quelle wie Scanner-Tab/
-     Alpha-Desk. Kein Sync-Risiko zwischen den Modulen mehr (siehe Batch-2-Luecke
-     v224, die genau aus der Duplikation entstand). -->
-<!-- v225 (30.06.2026): Copyright-Fix — interner Strategie-Schluessel 'ludwig'
-     ueberall zu 'atmna' umbenannt (16 Code-Stellen, keine sichtbaren UI-Texte
-     betroffen, die zeigten schon vorher "Options ATM/NA"). Haengt zusammen mit
-     ko-prompts.js v1.1.0 (externes ko-modules-Repo) — der Script-Tag-Commit-Hash
-     weiter unten MUSS nach Axels Push dort aktualisiert werden, siehe TODO-
-     Kommentar an der Stelle. Siehe auch ko-ai-worker.js v1.3 (LUDWIG-URTEIL
-     -> EIC-FAZIT im sichtbaren KI-Output). -->
-<!-- v224 (30.06.2026): DeepDive Batch-2 — 5 fehlende Strategien ergaenzt (ko,
-     weekly_income, dividend, value, atmna), Fokus-Listen inhaltlich aus den
-     jeweiligen KoPrompts-Prompt-Texten abgeleitet. DD_STRATEGIES jetzt 10/10
-     wie Scanner-Tab (bis auf 'value' im Scanner-Dropdown, dort bewusst
-     weggelassen bis Koyfin-Fundamentaldaten-Integration steht). Neue Buttons
-     im DeepDive-Modal. IOS-Leader-Boost siehe market_aggregator.py v3.6. -->
-<!-- v223 (30.06.2026): Options-Desk Fibo-Badge — Karten zeigen jetzt "Fibo CSP-Zone"
-     bzw. "Fibo Extension" mit Confluence-Score, wenn fSetup/fScore im optionsWatchlist-
-     Eintrag vorhanden sind (market_aggregator.py v3.5). Macht den Fibo-Score-Boost aus
-     v3.4 im UI sichtbar/nachvollziehbar statt nur intern in scoreCsp/scoreCc verrechnet. -->
-<!-- v222 (30.06.2026): Options-Desk Preisfilter (Margin-Proxy) — neues Eingabefeld
-     "Max. Kurs ($)" blendet Kandidaten mit zu hoher Kapitalbindung aus (z.B. COST
-     ~$950 -> ~95.000€ Margin/Kontrakt). setOptionsMaxPrice(), persistiert in
-     localStorage, fliesst auch in den KI-Prompt-Kontext (optsCfg.maxPrice) ein. -->
-<!-- v221 (30.06.2026): Options-Desk "0 Ticker geladen" Diagnose-Logging ergaenzt
-     (analog v216-Strategie) — zeigt beim naechsten Auftreten sofort, ob der
-     Fallback-Fetch (koSync/sync/master_market_data) ueberhaupt ein optionsWatchlist-
-     Array liefert, dessen Laenge, sowie meta.generated/meta.version. Bestaetigt:
-     Aggregator-Daten selbst sind korrekt befuellt (50 Ticker in optionsWatchlist),
-     Ursache liegt im Frontend-Ladepfad oder Sync-Worker-Cache (ko-sync, separates
-     Cloudflare-Worker-Script, nicht in unseren Dateien). -->
-<!-- v220 (30.06.2026): KRITISCHER FIX — _initKoPrompts() lief bei mehreren PIN-
-     Eingabeversuchen mehrfach parallel und endlos (kein Retry-Cap, keine Sperre
-     gegen Mehrfachstart) → exponentiell verschachtelte Konsolen-Logs. Jetzt:
-     Sperre gegen parallele Polling-Ketten + 10s-Obergrenze mit klarer
-     Fehlermeldung statt endlosem stillen Retry. -->
-<!-- v219 (30.06.2026): Extra-Ticker already_in_universe Status behandelt (Dedupe-Fix
-     gegen known_universe_tickers im ko-ai Worker v1.2, market_aggregator.py v3.3). -->
-<!-- v218 (30.06.2026): Extra-Ticker-Vorschlag-Feature — Fibo-Tab-Button "Zur Aggregator-Liste
-     vorschlagen" (proposeTickerForAggregator) sendet Custom-Ticker an ko-ai Worker /extra-ticker
-     (Pending-Liste in KV). Admin-Tab neue Review-Sektion (loadExtraTickerReview/approveExtraTicker/
-     rejectExtraTicker) zur Freigabe. Aggregator (market_aggregator.py v3.2) liest freigegebene
-     Ticker via fetch_approved_extra_tickers() und mergt sie in build_ticker_universe(). -->
-<!-- v212 (30.06.2026): Fibonacci-Screening-Modul v1.0 (Gemini-Blueprint) — renderFiboBar() in renderCard(),
-     _fibo-Feld in kvToScannerState(), Fibo-Sektion in Parameter-Pool fuer KI-Prompts. -->
-<!-- v213 (30.06.2026): KRITISCHER BUGFIX — runScan() hatte fehlende schliessende Klammer;
-     kvToScannerState/loadScannerFromKV/runScanAuto waren dadurch lokal in runScan() statt global
-     gescoped ("X is not defined" beim Klick). Tail-Block (Alert-Dispatch) korrekt vor KV-Scanner-
-     Funktionen verschoben. AUSSERDEM: KI-Trade-Setup in renderAlphaCards() nutzte falsche Feldnamen
-     (ki.stop statt ki.stopLoss etc.) -> TypeError beim Laden von Alpha Desk. Beide behoben. -->
-<!-- v214 (30.06.2026): KRITISCHER BUGFIX — openKiBriefing() referenzierte die nie definierte
-     Variable "activeStrategy" im Parameter-Pool-Mapping (poolData-Aufbau). Das warf einen
-     unbehandelten ReferenceError AUSSERHALB des try/catch-Blocks -> KI-Briefing blieb fuer
-     immer bei "Analysiere Top-Ergebnisse..." haengen (kein Fehler sichtbar, da unhandled
-     promise rejection). Fix: activeStrategy -> _kiStrat (echte Strategie-Variable). -->
-<!-- v215 (30.06.2026): BUGFIX — _vixFallbackFromKV() las VIX korrekt aus KV-Daten (sichtbar als
-     "[VIX] Fallback aus KV: X.XX" im Log) aber setzte NIE die globale Variable _vixLevel.
-     openKiBriefing() las _vixLevel direkt (ohne fetchVix()-Aufruf) -> immer "unbekannt" im
-     KI-Prompt, obwohl der echte Wert vorlag. KI antwortete entsprechend korrekt aber unnoetig
-     mit "VIX nicht verfuegbar". Fix: _vixLevel = vixVal; im Fallback-Pfad ergaenzt. -->
-<!-- v216 (30.06.2026): DIAGNOSE-ERWEITERUNG (kein Bugfix) — Options-Desk zeigte bei leerem
-     Filter-Ergebnis nur "bitte Aggregator-Lauf abwarten" ohne erkennbar zu machen ob die KV-
-     Daten leer sind oder nur der HVP-Filter zu streng ist. Jetzt: Diagnose-Zeile (Ticker-Anzahl,
-     max. HVP, Anzahl mit Score>0, Generated-Stand) + Konsolen-Log bei jedem Options-Desk-Load. -->
-<!-- v217 (30.06.2026): ROOT-CAUSE-FIX Options-Desk leer — Diagnose (v216) zeigte
-     "0 Ticker geladen, generated:undefined": der separate Cloudflare-KV-Key
-     "options_watchlist" wurde vom Aggregator nicht zuverlaessig geschrieben, obwohl der
-     Hauptlauf (master_market_data) und dessen EINGEBETTETES optionsWatchlist-Array (50
-     valide Kandidaten, verifiziert per Artifact-JSON) erfolgreich waren. Fix: loadOptionsDesk()
-     liest jetzt primaer aus dem bereits geladenen _alphaData.optionsWatchlist (Single Source
-     of Truth, kein Extra-Fetch noetig) statt dem fragilen separaten Key. Fallback-Kette:
-     _alphaData -> Master-Reload -> Legacy-Key. Python-seitig: push_to_cloudflare_kv() hat
-     jetzt einen Retry fuer mehr Robustheit. -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0a0a0a">
-<title>UnderlyingIQ</title>
+<meta name="app-version" content="20260702-v240">
+<!-- CHANGELOG (neueste zuerst):
+     v240: Kommentar-Bug endgültig behoben (kompakter Block), setFontSize Diagnose-Log,
+           squeezeRisk-Badge im Options-Desk (🚨 ≥70, ⚠️ ≥40).
+     v239: Sektor-Filter Scanner via sectors-Tag, FIXED_LISTS DEFENSE/ROBOTICS aktualisiert.
+     v238: EU_TICKER_MAP Defense-Symbole (RHM.DE, HO.PA, LDO.MI, SAAB-B.ST).
+     v237: Scanner-Speed-Fix DE-Ticker (Fallback 8→3, AbortController 5s, EU_TICKER_MAP).
+     v236: Fundamental-Flag-Engine (FCF-Warnung, Short-Confluence, Analyst-Upside).
+     v235: Morning Briefing Nav, Alpha-Desk Button Scanner-Redirect, Kommentar-Bug-Fix.
+     v234: BaFin-Compliance Public-Modus (keine Strategie-Ampel ohne EIC-PIN).
+     v233: Morning Briefing Strategie-Ampel (Expert-Modus, 10 Strategien, 🟢🟡🔴⬜).
+     v232: Short Phase 1 — fading_short, squeezeRisk-Badge, KO-Short Tab.
+     v231: Morning Briefing Alpha Desk, Leaderboard-Karten, Sektor-Treiber WL.
+     v230: Bear-Scanner SIRI-Bug, setKiStrat-Fix, Preisfilter-Init.
+     v228/v227: _initKoPrompts Race-Condition, stratCfg.prompt Hotfix.
+     v226: ko-strategies.js v2.0.0 Architektur, DD_STRATEGIES entfernt.
+     v225: Copyright-Fix ludwig→atmna.
+-->
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d0f12'/><text y='72' x='10' font-size='75' font-family='sans-serif'>📡</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -4849,6 +4739,7 @@ function setTheme(mode) {
 }
 
 function setFontSize(size) {
+  console.log('[setFontSize] aufgerufen mit:', size);
   document.body.classList.remove('font-lg', 'font-xl');
   if (size === 'lg') document.body.classList.add('font-lg');
   if (size === 'xl') document.body.classList.add('font-xl');
@@ -4857,7 +4748,9 @@ function setFontSize(size) {
     var btn = document.getElementById('font-' + s + '-btn');
     if (btn) { btn.style.background = s===size ? 'var(--accent)' : 'var(--bg3)'; btn.style.color = s===size ? '#fff' : 'var(--text2)'; btn.style.borderColor = s===size ? 'var(--accent)' : 'var(--border2)'; }
   });
+  console.log('[setFontSize] body classList:', document.body.className);
 }
+window.setFontSize = setFontSize;
 
 function _initTheme() {
   var theme = localStorage.getItem('ko_theme') || 'dark';
@@ -20196,12 +20089,20 @@ function renderOptionsDeskCards(data) {
     } else if (t.fSetup === 'EXTENSION') {
       fiboBadge = '<span title="Fibo-Confluence ' + (t.fScore||0) + '/100 — fliesst als Boost in CC-Score ein" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(245,158,11,0.12);border:0.5px solid var(--amber);color:var(--amber)">&#x1F534; Fibo Extension (' + (t.fScore||0) + ')</span>';
     }
+    // squeezeRisk-Badge (NEU 02.07.2026) — Warnung bei erhöhtem Squeeze-Risiko
+    var sqRisk = t.squeezeRisk || 0;
+    var sqBadge = '';
+    if (sqRisk >= 70) {
+      sqBadge = '<span title="Squeeze-Risiko ' + sqRisk + '/100 — Fading-Short gesperrt, CSP mit Vorsicht" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(239,68,68,0.12);border:0.5px solid var(--red);color:var(--red)">&#x1F6A8; Squeeze-Risk ' + sqRisk + '</span>';
+    } else if (sqRisk >= 40) {
+      sqBadge = '<span title="Squeeze-Risiko ' + sqRisk + '/100 — moderat erhöht" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(245,158,11,0.1);border:0.5px solid var(--amber);color:var(--amber)">&#x26A0;&#xFE0F; Sq-Risk ' + sqRisk + '</span>';
+    }
     return '<div style="background:var(--bg2);border-radius:10px;padding:.6rem .8rem;border:0.5px solid var(--border2)">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">'
       +   '<span style="font-size:14px;font-weight:700">' + (idx+1) + '. ' + t.sym + (grade ? ' <span style="font-size:9px;color:' + gc + '">' + grade + '</span>' : '') + '</span>'
       +   '<span style="font-size:13px;font-weight:600">$' + (t.price ? t.price.toFixed(2) : '--') + '</span>'
       + '</div>'
-      + (fiboBadge ? '<div style="margin-bottom:.3rem">' + fiboBadge + '</div>' : '')
+      + (fiboBadge || sqBadge ? '<div style="margin-bottom:.3rem;display:flex;gap:4px;flex-wrap:wrap">' + fiboBadge + sqBadge + '</div>' : '')
       + renderFundamentalFlags(t, 'csp')
       + '<div style="display:flex;gap:.8rem;flex-wrap:wrap;font-size:11px;margin-bottom:.2rem">'
       +   '<span>HVP <b style="color:' + hvpColor + '">' + hvp + '%' + hvpBadge + '</b></span>'
