@@ -450,7 +450,7 @@
       <div class="feature-card">
         <div class="fc-label">Stufe 1</div>
         <div class="fc-name">Regime-Erkennung</div>
-        <div class="fc-desc">Die Market State Engine klassifiziert den Gesamtmarkt anhand Z-Score-normalisierter Volatilitäts-, Breiten- und Trenddaten in vier Regime: BULL_QUIET, BULL_FRAGILE, STRESS_UNSTABLE, POST_CRACK_REVERSION.</div>
+        <div class="fc-desc">Die Market State Engine klassifiziert den Gesamtmarkt anhand Z-Score-normalisierter Volatilitäts-, Breiten- und Trenddaten in vier Regime: BULL_QUIET, BULL_FRAGILE, STRESS_UNSTABLE, POST_PANIC_REVERSION.</div>
       </div>
       <div class="feature-card">
         <div class="fc-label">Stufe 2</div>
@@ -472,6 +472,9 @@
     <div class="info-box">
       <p><strong>Kurz gesagt:</strong> UnderlyingIQ ist kein Tipp-Generator, sondern ein strukturierter Entscheidungs-Trichter — vom Marktzustand über die Strategie zum Kandidaten. Die finale Due Diligence bleibt immer beim Nutzer.</p>
     </div>
+
+    <h3>UI-Prinzip: Form follows Function</h3>
+    <p>Seit v243 folgt die Oberfläche konsequent dem Tages-Workflow: Die Seitenleiste ist in <strong>Tagesstart</strong> (Morning Briefing, Alpha Desk), <strong>Markt-Kontext</strong> (Makro inkl. Dark Pool & Institutional Flow), <strong>Trading</strong> (Scanner, Fibonacci, KO-Rechner) und <strong>Verwaltung</strong> (Backlog, Einstellungen) gegliedert. Jede UI-Änderung folgt diesem Prinzip.</p>
 
     <h3>Wozu dient die App?</h3>
     <div class="feature-grid">
@@ -587,36 +590,43 @@
       <div class="step">
         <div class="step-num">1</div>
         <div class="step-content">
-          <strong>Morning Briefing aufrufen (7–9 Uhr)</strong>
-          <span>Scanner → Briefing-Button. Lädt automatisch Marktdaten (VIX, Sektoren, Breadth, Treasury Stress) und generiert eine KI-Markteinschätzung.</span>
+          <strong>Morning Briefing (7–9 Uhr)</strong>
+          <span>Sidebar → <em>Tagesstart</em> → Morning Briefing. Lädt automatisch die Nachtlauf-Daten (Regime, VIX, Sektoren, Breadth, Fear &amp; Greed, Treasury Stress) und generiert eine KI-Markteinschätzung mit Strategie-Ampel.</span>
         </div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
         <div class="step-content">
           <strong>Marktregime prüfen</strong>
-          <span>Market State Engine oben im Scanner: BULL_QUIET / BULL_FRAGILE / STRESS_UNSTABLE / POST_PANIC. Bestimmt welche Strategien heute aktiv sind.</span>
+          <span>Kopfzeile im Alpha Desk: BULL_QUIET / BULL_FRAGILE / STRESS_UNSTABLE / POST_PANIC_REVERSION. Das Regime bestimmt, welche Strategien der Router heute überhaupt aktiviert.</span>
         </div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
         <div class="step-content">
-          <strong>Scan starten</strong>
-          <span>Gewünschte Watchlist wählen → "Scan" klicken → Ergebnisse nach Score sortiert. Titel mit Score ≥70 und Grade A/A+ sind bevorzugte Kandidaten.</span>
+          <strong>Alpha Desk: Master-Shortlist sichten</strong>
+          <span>Die regime-gerouteten Top-Kandidaten des Nachtlaufs (inkl. KI-Parametern) — der schnellste Weg zu handelbaren Ideen, ohne selbst zu scannen.</span>
         </div>
       </div>
       <div class="step">
         <div class="step-num">4</div>
         <div class="step-content">
-          <strong>KI-Briefing für Top-Ergebnisse</strong>
-          <span>KI-Icon → Strategie wählen → Analyse der gefilterten Top-Kandidaten. Immer als Entscheidungshilfe, nicht als Entscheidung selbst verstehen.</span>
+          <strong>Makro-Kontext vertiefen (bei Bedarf)</strong>
+          <span>Sidebar → <em>Markt-Kontext</em> → Makro: Sektor-Überhitzung, Intermarket-Analyse, Treasury Stress, Bull-Frühindikator — und ganz unten Dark Pool &amp; Institutional Flow (DIX/GEX).</span>
         </div>
       </div>
       <div class="step">
         <div class="step-num">5</div>
         <div class="step-content">
-          <strong>Deep Dive & Due Diligence</strong>
-          <span>Interessante Titel: "Deep Dive" Button → detaillierte Einzelanalyse → anschließend in IBKR/CapTrader die Optionskette und aktuelle Kurse verifizieren.</span>
+          <strong>Scanner für eigene Ideen</strong>
+          <span>Watchlist oder Sektor-Preset wählen (inkl. Supercycle-Sektoren wie Grid, Precious Metals, Agriculture, Water) → Scan → Titel mit Score ≥70 und Grade A/A+ sind bevorzugte Kandidaten.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <strong>KI-Briefing, Deep Dive & Broker-Verifikation</strong>
+          <span>Top-Kandidaten per KI-Briefing/Deep Dive analysieren — immer als Entscheidungshilfe, nie als Entscheidung. Anschließend Optionskette und aktuelle Kurse in IBKR/CapTrader verifizieren.</span>
         </div>
       </div>
     </div>
@@ -990,7 +1000,7 @@
       und KI-Systemkonfigurationen.
     </p>
     <p style="margin-top:.4rem">Alle Inhalte dienen ausschließlich zur Information. Keine Anlageberatung gem. §1 WpHG. Investitionen in Finanzinstrumente sind mit Risiken verbunden. Handeln auf eigenes Risiko.</p>
-    <p style="margin-top:.4rem">Version v210 · Stand: Juli 2026 · underlyingiq.com</p>
+    <p style="margin-top:.4rem">Version v243 · Stand: 05. Juli 2026 · underlyingiq.com</p>
   </footer>
 
 </main>
