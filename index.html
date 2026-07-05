@@ -3,8 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260702-v240">
+<meta name="app-version" content="20260705-v241">
 <!-- CHANGELOG (neueste zuerst):
+     v241: Morning Briefing lädt KV-Daten selbst (loadAlphaDashboard-Guard statt _alphaData-Erbe),
+           Shiller-CAPE-Reste entfernt (Feld seit Aggregator v4.3 gestrichen), 5 neue Sektor-Listen
+           (MATERIALS/CYBERSECURITY/NUCLEAR_ENERGY/SPACE/BIOTECH_LONGEVITY) in Dropdown/FIXED_LISTS/
+           Preset-Maps (2x); DEFENSE/ROBOTICS auf v4.2-Stand; tote Ticker: MOOG→MOG-A, BRKS→AZTA, SQ→XYZ (3 Listen).
      v240: Kommentar-Bug endgültig behoben (kompakter Block), setFontSize Diagnose-Log,
            squeezeRisk-Badge im Options-Desk (🚨 ≥70, ⚠️ ≥40).
      v239: Sektor-Filter Scanner via sectors-Tag, FIXED_LISTS DEFENSE/ROBOTICS aktualisiert.
@@ -462,6 +466,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <optgroup label="── 🏭 Sektoren ──">
             <option value="fixed:DEFENSE">🛡️ Defense &amp; Aerospace</option>
             <option value="fixed:ROBOTICS">🤖 Robotics &amp; AI-Hardware</option>
+            <option value="fixed:MATERIALS">🧱 Materials &amp; Mining</option>
+            <option value="fixed:CYBERSECURITY">🔐 Cybersecurity</option>
+            <option value="fixed:NUCLEAR_ENERGY">☢️ Nuclear Energy</option>
+            <option value="fixed:SPACE">🚀 Space</option>
+            <option value="fixed:BIOTECH_LONGEVITY">🧬 Biotech &amp; Longevity</option>
             <option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>
             <option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>
             <option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>
@@ -5230,6 +5239,11 @@ function setMarket(mkt){
         '<optgroup label="── 🏭 Sektoren ──">'+
           '<option value="fixed:DEFENSE">🛡️ Defense &amp; Aerospace</option>'+
           '<option value="fixed:ROBOTICS">🤖 Robotics &amp; AI-Hardware</option>'+
+          '<option value="fixed:MATERIALS">🧱 Materials &amp; Mining</option>'+
+          '<option value="fixed:CYBERSECURITY">🔐 Cybersecurity</option>'+
+          '<option value="fixed:NUCLEAR_ENERGY">☢️ Nuclear Energy</option>'+
+          '<option value="fixed:SPACE">🚀 Space</option>'+
+          '<option value="fixed:BIOTECH_LONGEVITY">🧬 Biotech &amp; Longevity</option>'+
           '<option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>'+
           '<option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>'+
           '<option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>'+
@@ -5280,6 +5294,11 @@ function setMarket(mkt){
         '<optgroup label="── 🏭 Sektoren ──">'+
           '<option value="fixed:DEFENSE">🛡️ Defense &amp; Aerospace</option>'+
           '<option value="fixed:ROBOTICS">🤖 Robotics &amp; AI-Hardware</option>'+
+          '<option value="fixed:MATERIALS">🧱 Materials &amp; Mining</option>'+
+          '<option value="fixed:CYBERSECURITY">🔐 Cybersecurity</option>'+
+          '<option value="fixed:NUCLEAR_ENERGY">☢️ Nuclear Energy</option>'+
+          '<option value="fixed:SPACE">🚀 Space</option>'+
+          '<option value="fixed:BIOTECH_LONGEVITY">🧬 Biotech &amp; Longevity</option>'+
           '<option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>'+
           '<option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>'+
           '<option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>'+
@@ -6219,6 +6238,8 @@ async function loadScannerFromKV() {
     'fixed:DEFENSE':'DEFENSE','fixed:ROBOTICS':'ROBOTICS',
     'fixed:AI_TECH':'AI_TECH','fixed:SEMIS':'SEMIS',
     'fixed:BIOTECH':'BIOTECH','fixed:FINTECH':'FINTECH',
+    'fixed:MATERIALS':'MATERIALS','fixed:CYBERSECURITY':'CYBERSECURITY',
+    'fixed:NUCLEAR_ENERGY':'NUCLEAR_ENERGY','fixed:SPACE':'SPACE','fixed:BIOTECH_LONGEVITY':'BIOTECH_LONGEVITY',
   };
   var sectorFilter = SECTOR_PRESET_MAP[presetVal] || null;
   var allTickers = (window._alphaData && _alphaData.tickers) ? _alphaData.tickers : [];
@@ -10246,7 +10267,9 @@ function onPresetChange(){
       DAX40:'DAX 40', MDAX:'MDAX Top 20', TECDAX:'TecDAX Top 20',
       PICKS_SHOVELS:'Picks & Shovels', SP500:'S&P 500 Kern', NDX100:'NASDAQ 100',
       DEFENSE:'Defense & Aerospace', REIT:'REITs', ENERGY:'Energy',
-      HEALTH:'Healthcare', FINANCE:'Financials', CONSUMER:'Consumer'
+      HEALTH:'Healthcare', FINANCE:'Financials', CONSUMER:'Consumer',
+      MATERIALS:'Materials & Mining', CYBERSECURITY:'Cybersecurity', NUCLEAR_ENERGY:'Nuclear Energy',
+      SPACE:'Space', BIOTECH_LONGEVITY:'Biotech & Longevity'
     };
     // Market automatisch auf DE setzen bei deutschen Indizes
     const deKeys = ['DAX40','MDAX','TECDAX','SDAX','HDAX'];
@@ -13055,7 +13078,7 @@ var FIXED_LISTS = {
     {sym:'PANW',name:'Palo Alto Networks'},{sym:'CRWD',name:'CrowdStrike'},{sym:'FTNT',name:'Fortinet'},
     {sym:'SNPS',name:'Synopsys'},{sym:'CDNS',name:'Cadence Design'},{sym:'MRVL',name:'Marvell Tech.'},
     {sym:'PLTR',name:'Palantir Tech.'},{sym:'APP',name:'Applovin'},{sym:'COIN',name:'Coinbase'},
-    {sym:'SQ',name:'Block Inc.'},{sym:'PYPL',name:'PayPal Holdings'},{sym:'HOOD',name:'Robinhood'},
+    {sym:'XYZ',name:'Block Inc.'},{sym:'PYPL',name:'PayPal Holdings'},{sym:'HOOD',name:'Robinhood'},
     {sym:'WFC',name:'Wells Fargo'},{sym:'MS',name:'Morgan Stanley'},{sym:'BLK',name:'BlackRock'},
     {sym:'SCHW',name:'Charles Schwab'},{sym:'COF',name:'Capital One'},{sym:'USB',name:'U.S. Bancorp'},
     {sym:'MMM',name:'3M Company'},{sym:'DE',name:'Deere & Company'},{sym:'EMR',name:'Emerson Electric'},
@@ -13077,7 +13100,7 @@ var FIXED_LISTS = {
     {sym:'CRWD',name:'CrowdStrike'},{sym:'SNOW',name:'Snowflake'},
     {sym:'NET',name:'Cloudflare'},{sym:'DDOG',name:'Datadog'},
     {sym:'MDB',name:'MongoDB'},{sym:'SHOP',name:'Shopify'},
-    {sym:'SQ',name:'Block Inc.'},{sym:'HOOD',name:'Robinhood'},
+    {sym:'XYZ',name:'Block Inc.'},{sym:'HOOD',name:'Robinhood'},
     {sym:'RIVN',name:'Rivian'},{sym:'LCID',name:'Lucid Group'},
     {sym:'NIO',name:'NIO Inc.'},{sym:'XPEV',name:'XPeng'},
     {sym:'LI',name:'Li Auto'},{sym:'BIDU',name:'Baidu'},
@@ -13171,7 +13194,9 @@ var FIXED_LISTS = {
     {sym:'AXON',name:'Axon Enterprise'},{sym:'LDOS',name:'Leidos Holdings'},{sym:'SAIC',name:'Science Applications'},
     {sym:'DRS',name:'Leonardo DRS'},{sym:'KTOS',name:'Kratos Defense'},{sym:'CACI',name:'CACI Int\'l'},
     {sym:'TDG',name:'TransDigm Group'},{sym:'HWM',name:'Howmet Aerospace'},{sym:'TXT',name:'Textron Inc.'},
-    {sym:'CW',name:'Curtiss-Wright'},{sym:'MOOG',name:'Moog Inc.'},
+    {sym:'CW',name:'Curtiss-Wright'},{sym:'MOG-A',name:'Moog Inc.'},
+    // v241: v4.2-Aggregator-Sync (Gemini-Liste)
+    {sym:'AVAV',name:'AeroVironment'},{sym:'LHX',name:'L3Harris Tech.'},{sym:'BWXT',name:'BWX Technologies'},{sym:'PLTR',name:'Palantir Tech.'},
     // Europa — Heimatbörsen (NEU 01.07.2026: korrekte Symbole statt OTC-ADRs)
     {sym:'RHM.DE',name:'Rheinmetall AG'},{sym:'BA.L',name:'BAE Systems'},
     {sym:'SAAB-B.ST',name:'Saab AB'},{sym:'HO.PA',name:'Thales SA'},{sym:'LDO.MI',name:'Leonardo SpA'},
@@ -13181,9 +13206,36 @@ var FIXED_LISTS = {
   'ROBOTICS': [
     {sym:'NVDA',name:'NVIDIA Corp.'},{sym:'ABB',name:'ABB Ltd.'},{sym:'ISRG',name:'Intuitive Surgical'},
     {sym:'FANUY',name:'Fanuc ADR'},{sym:'KEYS',name:'Keysight Tech.'},{sym:'TER',name:'Teradyne Inc.'},
-    {sym:'BRKS',name:'Brooks Automation'},{sym:'ONTO',name:'Onto Innovation'},{sym:'NDSN',name:'Nordson Corp.'},
+    {sym:'AZTA',name:'Azenta (ex Brooks)'},{sym:'ONTO',name:'Onto Innovation'},{sym:'NDSN',name:'Nordson Corp.'},
     {sym:'BOTZ',name:'Global Robotics ETF'},{sym:'ROBO',name:'ROBO Global ETF'},{sym:'IRBO',name:'iShares Robotics ETF'},
     {sym:'KUKA.DE',name:'KUKA AG'},{sym:'6954.T',name:'Fanuc (Tokio)'},
+    // v241: v4.2-Aggregator-Sync (Automation/Vision/Chips)
+    {sym:'SYM',name:'Symbotic'},{sym:'ROK',name:'Rockwell Automation'},{sym:'MBLY',name:'Mobileye'},{sym:'TDY',name:'Teledyne'},
+    {sym:'CGNX',name:'Cognex'},{sym:'PATH',name:'UiPath'},{sym:'ZBRA',name:'Zebra Tech.'},{sym:'IR',name:'Ingersoll Rand'},
+    {sym:'ADI',name:'Analog Devices'},{sym:'NXPI',name:'NXP Semiconductors'},{sym:'MCHP',name:'Microchip Tech.'},
+  ],
+  // v241 (05.07.2026): 5 neue Sektoren — Sync mit Aggregator v4.2 SECTOR_WATCHLISTS
+  'MATERIALS': [
+    {sym:'FCX',name:'Freeport-McMoRan'},{sym:'ALB',name:'Albemarle'},{sym:'MP',name:'MP Materials'},
+    {sym:'TECK',name:'Teck Resources'},{sym:'CCJ',name:'Cameco'},{sym:'SCCO',name:'Southern Copper'},
+    {sym:'VALE',name:'Vale ADR'},{sym:'SQM',name:'SQM ADR'},{sym:'BHP',name:'BHP Group'},{sym:'RIO',name:'Rio Tinto'},
+  ],
+  'CYBERSECURITY': [
+    {sym:'PANW',name:'Palo Alto Networks'},{sym:'CRWD',name:'CrowdStrike'},{sym:'FTNT',name:'Fortinet'},
+    {sym:'NET',name:'Cloudflare'},{sym:'ZS',name:'Zscaler'},{sym:'OKTA',name:'Okta'},
+  ],
+  'NUCLEAR_ENERGY': [
+    {sym:'CEG',name:'Constellation Energy'},{sym:'VST',name:'Vistra'},{sym:'NRG',name:'NRG Energy'},
+    {sym:'TLN',name:'Talen Energy'},{sym:'SMR',name:'NuScale Power'},{sym:'OKLO',name:'Oklo'},
+    {sym:'ETN',name:'Eaton'},{sym:'PWR',name:'Quanta Services'},{sym:'HUBB',name:'Hubbell'},
+  ],
+  'SPACE': [
+    {sym:'RKLB',name:'Rocket Lab'},{sym:'ASTS',name:'AST SpaceMobile'},{sym:'HWM',name:'Howmet Aerospace'},{sym:'TDG',name:'TransDigm'},
+  ],
+  'BIOTECH_LONGEVITY': [
+    {sym:'CRSP',name:'CRISPR Therapeutics'},{sym:'BEAM',name:'Beam Therapeutics'},{sym:'NTLA',name:'Intellia'},
+    {sym:'EXAS',name:'Exact Sciences'},{sym:'ILMN',name:'Illumina'},{sym:'RXRX',name:'Recursion'},
+    {sym:'DXCM',name:'DexCom'},{sym:'ALGN',name:'Align Technology'},
   ],
   'REIT': [
     {sym:'PLD',name:'Prologis'},{sym:'AMT',name:'American Tower'},{sym:'EQIX',name:'Equinix'},
@@ -13223,7 +13275,7 @@ var FIXED_LISTS = {
     {sym:'SPGI',name:'S&P Global'},{sym:'MCO',name:'Moody\'s Corp.'},{sym:'ICE',name:'Intercontinental Exch.'},
     {sym:'CME',name:'CME Group'},{sym:'CB',name:'Chubb Ltd.'},{sym:'PGR',name:'Progressive Corp.'},
     {sym:'MET',name:'MetLife Inc.'},{sym:'PRU',name:'Prudential Financial'},{sym:'AFL',name:'Aflac Inc.'},
-    {sym:'COIN',name:'Coinbase'},{sym:'HOOD',name:'Robinhood'},{sym:'SQ',name:'Block Inc.'},
+    {sym:'COIN',name:'Coinbase'},{sym:'HOOD',name:'Robinhood'},{sym:'XYZ',name:'Block Inc.'},
   ],
   'CONSUMER': [
     {sym:'AMZN',name:'Amazon.com'},{sym:'TSLA',name:'Tesla Inc.'},{sym:'HD',name:'Home Depot'},
@@ -16410,6 +16462,8 @@ async function loadScannerFromKV() {
     'fixed:DEFENSE':'DEFENSE','fixed:ROBOTICS':'ROBOTICS',
     'fixed:AI_TECH':'AI_TECH','fixed:SEMIS':'SEMIS',
     'fixed:BIOTECH':'BIOTECH','fixed:FINTECH':'FINTECH',
+    'fixed:MATERIALS':'MATERIALS','fixed:CYBERSECURITY':'CYBERSECURITY',
+    'fixed:NUCLEAR_ENERGY':'NUCLEAR_ENERGY','fixed:SPACE':'SPACE','fixed:BIOTECH_LONGEVITY':'BIOTECH_LONGEVITY',
   };
   var sectorFilter = SECTOR_PRESET_MAP[presetVal] || null;
   var allTickers = (window._alphaData && _alphaData.tickers) ? _alphaData.tickers : [];
@@ -18959,10 +19013,16 @@ async function runMorningBriefing() {
       await updateMarketWeatherWidget(dpCache, null, null);
     }
     results.vix = _getVixRobust(); // Gemini-Fix: Fallback-Kaskade
+    // v241: Briefing lädt KV-Daten bei Bedarf selbst — zuvor wurden sie vom
+    // Alpha Desk geerbt; als erster Nav-Schritt war window._alphaData dann
+    // null und Fear&Greed/IOS erschienen fälschlich als 'n/v'.
+    if (!window._alphaData || !_alphaData.market) {
+      try { if (typeof loadAlphaDashboard === 'function') await loadAlphaDashboard(false); }
+      catch (_eAd) { console.warn('Briefing: KV-Daten nicht ladbar', _eAd); }
+    }
     // IOS Market Score aus KV
     results.iosMarket   = (window._alphaData && _alphaData.market) ? (_alphaData.market.iosMarket   || null) : null;
     results.fearGreed   = (window._alphaData && _alphaData.market) ? (_alphaData.market.fearGreed   || null) : null;
-    results.shillerCape = (window._alphaData && _alphaData.market) ? (_alphaData.market.shillerCape || null) : null;
     await new Promise(function(r){ setTimeout(r, 500); });
 
     // ── 2/9: Live-Preise (S&P, Nasdaq, DAX, Öl, Gold) ────────────
@@ -19090,7 +19150,6 @@ async function runMorningBriefing() {
       if (sektorTxt !== '—') messwerteLines.push('Sektor RS vs. SPY: ' + sektorTxt);
       messwerteLines.push(''); messwerteLines.push('--- SENTIMENT & BEWERTUNG ---');
       if (results.fearGreed){var _fg=results.fearGreed;messwerteLines.push('Fear & Greed: '+_fg.score+'/100 ('+(_fg.rating||'')+')'+(_fg.previous?' Vortag:'+_fg.previous:'')+(_fg.proxy?' [Proxy]':' [CNN]'));}else messwerteLines.push('Fear & Greed: n/v');
-      if (results.shillerCape){var _sc=results.shillerCape;messwerteLines.push('Shiller CAPE: '+_sc.cape+(_sc.cape>35?' (stark überbewertet)':_sc.cape>28?' (überbewertet)':_sc.cape>22?' (moderat erhöht)':' (fair)')+' | Hist.Ø ~17');}else messwerteLines.push('Shiller CAPE: n/v');
       if (results.iosMarket){var _im=results.iosMarket;messwerteLines.push('IOS Market: '+_im.iosMarketScore+'/100 → '+(_im.iosMarketDecision||'')+' T:'+_im.iosMarketTrend+' B:'+_im.iosMarketBreadth+' R:'+_im.iosMarketRisk);}
 
       var KI_HALLU_SCHUTZ =
