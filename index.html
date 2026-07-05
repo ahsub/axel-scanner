@@ -3,8 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260705-v242">
+<meta name="app-version" content="20260705-v243">
 <!-- CHANGELOG (neueste zuerst):
+     v243: UI-Reorg nach Form-follows-Function (STRATEGIE v1.5): Sidebar in Workflow-Reihenfolge
+           (Tagesstart → Markt-Kontext → Trading → Verwaltung); Dark Pool ohne eigenen Tab, lebt als
+           Sektion im Makro-Tab (loadDarkPool an Makro gekoppelt); Journal-Tab entfernt (80/20, JS
+           dormant + Guard, Git = Archiv); Container-Orphan-</div> behoben (alle Panels wieder auf
+           einer Ebene); Supercycle-Sektoren v4.7-Sync: PICKS_SHOVELS von Index- zu Sektor-Gruppe,
+           +GRID_ELECTRIFICATION/PRECIOUS_METALS/AGRICULTURE/WATER (Dropdown, Preset-Maps, FIXED_LISTS).
      v242: Treasury-Stress-Karte stand als DOM-Streuner AUSSERHALB aller Panels (dadurch in 6 fremden
            Tabs oben sichtbar, im Makro-Tab ganz unten) → in panel-makro hinter Intermarket-Analyse
            verschoben. Struktur-Audit: verwaistes </div> nach panel-admin dokumentiert (Reorg-Batch).
@@ -340,8 +346,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="sidebar-logo-title"><span class="topbar-dot"></span>UnderlyingIQ</div>
       <div class="sidebar-time" id="topbar-time"></div>
     </div>
-    <div class="sidebar-section">Trading</div>
-    <!-- Morning Briefing — Vorgeschalteter Tagesstart (NEU 01.07.2026) -->
+    <div class="sidebar-section">Tagesstart</div>
     <button class="nav-btn" id="nav-morning" onclick="showPanel('scanner');setTimeout(runMorningBriefing,150)"
       style="border-left:3px solid var(--accent);background:rgba(79,142,247,0.06)">
       <i class="ti ti-sunrise" aria-hidden="true" style="color:var(--accent)"></i>
@@ -351,37 +356,31 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <i class="ti ti-sparkles" aria-hidden="true"></i>
       <span class="nav-btn-label">Alpha Desk<span class="nav-btn-sub">Technische Filterung · Algorithmus-Ergebnisse</span></span>
     </button>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">Markt-Kontext</div>
+    <button class="nav-btn" id="nav-makro" onclick="showPanel('makro')">
+      <i class="ti ti-world" aria-hidden="true"></i>
+      <span class="nav-btn-label">Makro<span class="nav-btn-sub">VIX · Sektoren · Dark Pool</span></span>
+    </button>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">Trading</div>
     <button class="nav-btn active" id="nav-scanner" onclick="showPanel('scanner')">
       <i class="ti ti-radar" aria-hidden="true"></i>
       <span class="nav-btn-label">Scanner<span class="nav-btn-sub">Aktien scannen &amp; filtern</span></span>
     </button>
-    <div class="sidebar-divider"></div>
-    <div class="sidebar-section">Analyse</div>
-    <button class="nav-btn" id="nav-makro" onclick="showPanel('makro')">
-      <i class="ti ti-world" aria-hidden="true"></i>
-      <span class="nav-btn-label">Makro<span class="nav-btn-sub">VIX · Sektoren · Marktbreite</span></span>
-    </button>
-    <button class="nav-btn" id="nav-darkpool" onclick="showPanel('darkpool');loadDarkPool()">
-      <i class="ti ti-building-bank" aria-hidden="true"></i>
-      <span class="nav-btn-label">Dark Pool<span class="nav-btn-sub">DIX · GEX · Orderflow</span></span>
+    <button class="nav-btn" id="nav-fibo" onclick="showPanel('fibo');buildFiboTab()">
+      <i class="ti ti-chart-arrows-vertical" aria-hidden="true"></i>
+      <span class="nav-btn-label">Fibonacci<span class="nav-btn-sub">Levels &amp; Retracements</span></span>
     </button>
     <button class="nav-btn" id="nav-rechner" onclick="showPanel('rechner')">
       <i class="ti ti-calculator" aria-hidden="true"></i>
       <span class="nav-btn-label">KO-Rechner<span class="nav-btn-sub">Hebelprodukte berechnen</span></span>
-    </button>
-    <button class="nav-btn" id="nav-fibo" onclick="showPanel('fibo');buildFiboTab()">
-      <i class="ti ti-chart-arrows-vertical" aria-hidden="true"></i>
-      <span class="nav-btn-label">Fibonacci<span class="nav-btn-sub">Levels &amp; Retracements</span></span>
     </button>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">Verwaltung</div>
     <button class="nav-btn" id="nav-backlog" onclick="showPanel('backlog');renderBacklogPanel()">
       <i class="ti ti-archive" aria-hidden="true"></i>
       <span class="nav-btn-label">Backlog<span class="nav-btn-sub">Watchlist &amp; Tracking</span></span>
-    </button>
-    <button class="nav-btn" id="nav-journal" onclick="showPanel('journal')">
-      <i class="ti ti-notebook" aria-hidden="true"></i>
-      <span class="nav-btn-label">Journal<span class="nav-btn-sub">Trades &amp; Notizen</span></span>
     </button>
     <button class="nav-btn" id="nav-admin" onclick="showPanel('admin')">
       <i class="ti ti-settings" aria-hidden="true"></i>
@@ -462,7 +461,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <option value="fixed:TECDAX">💻 TecDAX Top 20</option>
           </optgroup>
           <optgroup label="── 🇺🇸 US-Indizes ──">
-            <option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>
             <option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>
             <option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>
           </optgroup>
@@ -474,6 +472,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <option value="fixed:NUCLEAR_ENERGY">☢️ Nuclear Energy</option>
             <option value="fixed:SPACE">🚀 Space</option>
             <option value="fixed:BIOTECH_LONGEVITY">🧬 Biotech &amp; Longevity</option>
+            <option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>
+            <option value="fixed:GRID_ELECTRIFICATION">🔌 Grid &amp; Electrification</option>
+            <option value="fixed:PRECIOUS_METALS">🥇 Precious Metals</option>
+            <option value="fixed:AGRICULTURE">🌾 Agriculture &amp; Food Security</option>
+            <option value="fixed:WATER">💧 Water &amp; Basic Resources</option>
             <option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>
             <option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>
             <option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>
@@ -1126,6 +1129,167 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div style="margin-top:.5rem;font-size:11px;color:var(--text3)">
         <i class="ti ti-info-circle"></i> Admin-Tab → Makro täglich aktualisieren · Keine Anlageberatung
       </div>
+
+      <!-- ── DARK POOL & INSTITUTIONAL FLOW (v243: aus eigenem Tab hierher — FFF) ── -->
+      <div class="sidebar-divider" style="margin:1rem 0"></div>
+  <div class="sec"><i class="ti ti-building-bank"></i> Dark Pool & Institutional Flow</div>
+
+  <!-- Score Card -->
+  <div class="card card-accent" id="dp-score-card" style="text-align:center;padding:1.25rem">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.5rem;font-family:var(--mono)">INSTITUTIONAL FLOW SCORE</div>
+    <div id="dp-score-val" style="font-size:48px;font-weight:700;font-family:var(--mono);line-height:1">—</div>
+    <div id="dp-score-label" style="font-size:14px;font-weight:600;margin-top:.4rem">Lädt…</div>
+    <div id="dp-score-desc" style="font-size:11px;color:var(--text3);margin-top:.4rem;line-height:1.5">—</div>
+  </div>
+
+  <!-- Reload Button -->
+  <div style="display:flex;gap:8px;margin-bottom:.75rem">
+    <button class="btn btn-sm" onclick="loadDarkPool(true)" id="dp-reload-btn" style="font-size:12px">
+      <i class="ti ti-refresh"></i> Aktualisieren
+    </button>
+    <div id="dp-timestamp" style="font-size:10px;color:var(--text3);display:flex;align-items:center"></div>
+  </div>
+
+  <!-- DIX / GEX -->
+  <div class="sec">Dark Index (DIX) & Gamma Exposure (GEX)</div>
+  <div class="card" id="dp-dix-card">
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-label">DIX</div>
+        <div class="sig-val" id="dp-dix">—</div>
+        <div class="sig-sub" id="dp-dix-trend" style="color:var(--text3)">—</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">DIX Ø20T</div>
+        <div class="sig-val" id="dp-dix-avg">—</div>
+        <div class="sig-sub" style="color:var(--text3);font-size:10px">20-Tage Basis</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">GEX (Mrd $)</div>
+        <div class="sig-val" id="dp-gex">—</div>
+        <div class="sig-sub" id="dp-gex-trend" style="color:var(--text3)">—</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">GEX Ø20T</div>
+        <div class="sig-val" id="dp-gex-avg">—</div>
+        <div class="sig-sub" style="color:var(--text3);font-size:10px">20-Tage Basis</div>
+      </div>
+    </div>
+    <div id="dp-dix-info" style="font-size:11px;color:var(--text3);margin-top:.5rem;line-height:1.5;padding:6px 8px;background:var(--bg3);border-radius:6px">
+      <b>DIX-Proxy</b> = OBV-basierter Institutional Flow auf SPY. Hoch (&gt;49%) = Institutionen kaufen → <span style="color:var(--green)">bullisch</span>.<br>
+      <b>GEX-Proxy</b> = Volumen-Anomalie SPY. Positiv = stabilisierend, Negativ = destabilisierend.<br>
+      <span style="color:var(--amber)">⚠ Echter DIX/GEX (squeezemetrics) seit 2024 Paywall-geschützt.</span>
+    </div>
+  </div>
+
+  <!-- VVIX / SKEW / PCR-Proxy -->
+  <div class="sec">Sentiment-Indikatoren (VVIX · SKEW · PCR-Proxy)</div>
+  <div class="card" id="dp-pcr-card">
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-label">VVIX</div>
+        <div class="sig-val" id="dp-vvix">—</div>
+        <div class="sig-sub" style="color:var(--text3)">VIX der VIX-Opts</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">SKEW</div>
+        <div class="sig-val" id="dp-skew">—</div>
+        <div class="sig-sub" style="color:var(--text3)">Tail-Risk Index</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">PCR-Proxy</div>
+        <div class="sig-val" id="dp-pcr">—</div>
+        <div class="sig-sub" id="dp-pcr-signal" style="color:var(--text3)">—</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">Signal</div>
+        <div class="sig-val" id="dp-pcr-avg" style="font-size:12px">—</div>
+        <div class="sig-sub" id="dp-pcr-trend" style="color:var(--text3)">—</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:.5rem;padding:8px 10px;background:var(--bg3);border-radius:6px;line-height:1.7">
+      <b>VVIX</b> (VIX of VIX): Misst die Volatilitat der VIX-Optionen. Normal: 80-95. &gt;100 = erhohte Unsicherheit. &gt;120 = Panik-Modus, starke Kursbewegungen erwartet.<br>
+      <b>SKEW</b> (CBOE Skew Index): Nachfrage nach weit aus-dem-Geld liegenden Puts (Tail-Risk Hedging). Normal: 100-130. &gt;135 = Institutionen sichern Risiken ab. &gt;145 = extremes Hedging, seltenes Warnsignal. Hoher SKEW ist kein sofortiges Verkaufssignal, zeigt aber dass Smart Money Risiken absichert.<br>
+      <b>PCR-Proxy</b> (synthetisch aus VVIX + SKEW): Naherung fur Put/Call-Verhaltnis. &lt;0.7 = Markt uberhitzt (kontr. barisch). &gt;1.0 = Angst dominiert &rarr; <span style="color:var(--green)">kontr. bullisch</span>.
+    </div>
+  </div>
+
+  <!-- VIX Term Structure -->
+  <div class="sec">VIX Term Structure</div>
+  <div class="card" id="dp-vix-card">
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-label">VIX (Spot)</div>
+        <div class="sig-val" id="dp-vix">—</div>
+        <div class="sig-sub" style="color:var(--text3)">kurzfristig</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">VIX 3M</div>
+        <div class="sig-val" id="dp-vix3m">—</div>
+        <div class="sig-sub" style="color:var(--text3)">mittelfristig</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">Spread</div>
+        <div class="sig-val" id="dp-vix-spread">—</div>
+        <div class="sig-sub" style="color:var(--text3)">3M minus Spot</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">Struktur</div>
+        <div class="sig-val" id="dp-vix-structure" style="font-size:11px">—</div>
+        <div class="sig-sub" id="dp-vix-signal" style="color:var(--text3)">—</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:.5rem;padding:6px 8px;background:var(--bg3);border-radius:6px;line-height:1.5">
+      <b>Contango</b> (VIX3M &gt; VIX) = normaler Markt, kein Stress. <b>Backwardation</b> (VIX &gt; VIX3M) = Stress, kurzfristige Angst dominiert → Vorsicht.
+    </div>
+  </div>
+
+  <!-- Score Komponenten -->
+  <div class="sec">Score-Komponenten</div>
+  <div class="card" id="dp-components-card">
+    <div id="dp-components-list">
+      <div style="color:var(--text3);font-size:12px;text-align:center;padding:.75rem">Lädt…</div>
+    </div>
+  </div>
+
+  <!-- ── KI-INTERPRETATION ─────────────────────────────────────────── -->
+  <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
+    <span><i class="ti ti-brain"></i> KI-Daten-Synthese <span style="font-size:10px;color:var(--text3);font-weight:400">(Statistische Kontextanalyse · keine Anlageberatung)</span></span>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);cursor:pointer">
+      <input type="checkbox" id="dp-ki-toggle" checked onchange="toggleDpKI(this.checked)"
+        style="width:14px;height:14px;accent-color:var(--accent)"> aktiv
+    </label>
+  </div>
+
+  <div id="dp-ki-box" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:1rem;margin-bottom:.75rem;overflow:visible;height:auto">
+    <!-- KI-Analyse Inhalt -->
+    <div id="dp-ki-content" style="overflow:visible;word-break:break-word;height:auto;max-height:none">
+      <div style="color:var(--text3);font-size:12px;text-align:center;padding:.5rem">
+        <i class="ti ti-brain"></i> Analyse wird nach dem Laden der Daten generiert…
+      </div>
+    </div>
+
+    <!-- Richtungspfeile-Legende -->
+    <div id="dp-ki-indicators" style="display:none;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border2)">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:.4rem;font-weight:600;letter-spacing:.5px">PARAMETER-TREND</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="dp-ki-arrows"></div>
+    </div>
+
+    <!-- Handlungsempfehlung -->
+    <div id="dp-ki-action" style="display:none;margin-top:.75rem;padding:.6rem .8rem;border-radius:8px;border-left:3px solid var(--accent)">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:600">STATISTISCHE KONTEXT-ANALYSE</div>
+      <div id="dp-ki-action-text" style="font-size:13px;font-weight:600;color:var(--text)"></div>
+    </div>
+
+    <div id="dp-ki-footer" style="display:none;margin-top:.6rem;font-size:10px;color:var(--text3);text-align:right">
+      <i class="ti ti-robot"></i> Claude Sonnet · <span id="dp-ki-time"></span> · Rein deskriptive Datenanalyse · Keine Anlageberatung gem. §1 WpHG
+    </div>
+  </div>
+
+  <div style="font-size:10px;color:var(--text3);text-align:center;padding:.5rem 0 .25rem;line-height:1.6">
+    Quellen: SPY/Yahoo Finance (DIX/GEX-Proxy*) · VVIX/SKEW/VIX via Yahoo Finance · *Synthetische Näherungswerte, kein echter DIX/GEX<br>
+    Alle Angaben ohne Gewähr · Keine Anlageberatung gem. §1 WpHG · Cache 30 Min
+  </div>
     </div>
 
     <!-- FIBO PANEL -->
@@ -1929,63 +2093,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="pin-change-msg" style="display:none;margin-top:.5rem;font-size:12px"></div>
       </div>
     </div>
-  </div>
-
-
-
-
-    <!-- JOURNAL PANEL -->
-    <div id="panel-journal" class="panel">
-      <div id="journal-summary" class="mc-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:.75rem">
-        <div class="mc"><div class="mcl">Positionen</div><div class="mcv" id="j-count">0</div></div>
-        <div class="mc"><div class="mcl">Einsatz (€)</div><div class="mcv" id="j-capital">—</div></div>
-        <div class="mc"><div class="mcl">P&amp;L (€)</div><div class="mcv" id="j-pnl">—</div></div>
-        <div class="mc"><div class="mcl">P&amp;L (%)</div><div class="mcv" id="j-pnl-pct">—</div></div>
-      </div>
-      <div class="sec">Neue Position erfassen</div>
-      <div class="card" id="j-add-card">
-        <div class="grid-2" style="margin-bottom:.65rem">
-          <div class="fg"><label>Ticker</label><input type="text" id="j-ticker" placeholder="VRT" oninput="this.value=this.value.toUpperCase()"></div>
-          <div class="fg"><label>ISIN</label><input type="text" id="j-isin" placeholder="DE000HM51L93"></div>
-        </div>
-        <div class="grid-3" style="margin-bottom:.65rem">
-          <div class="fg"><label>Einstieg Basis ($)</label><input type="number" id="j-entry" placeholder="318.19"></div>
-          <div class="fg"><label>KO-Schwelle ($)</label><input type="number" id="j-ko" placeholder="250.34"></div>
-          <div class="fg"><label>Ratio</label><input type="number" id="j-ratio" placeholder="0.01" step="0.001"></div>
-        </div>
-        <div class="grid-3" style="margin-bottom:.65rem">
-          <div class="fg"><label>Turbo-Einstieg (€)</label><input type="number" id="j-turbo-entry" placeholder="0.68" step="0.01"></div>
-          <div class="fg"><label>Anzahl Stück</label><input type="number" id="j-qty" placeholder="500"></div>
-          <div class="fg"><label>Stop-Kurs Basis ($)</label><input type="number" id="j-stop" placeholder="286.00"></div>
-        </div>
-        <div class="grid-2" style="margin-bottom:.65rem">
-          <div class="fg"><label>Status</label>
-            <select id="j-status"><option value="open">Offen</option><option value="closed">Geschlossen</option></select>
-          </div>
-          <div class="fg"><label>Emittent</label>
-            <select id="j-emittent">
-              <option value="">—</option><option value="HSBC">HSBC</option><option value="SocGen">SocGen</option>
-              <option value="Citi">Citi</option><option value="BNP">BNP</option><option value="DZ">DZ Bank</option>
-            </select>
-          </div>
-        </div>
-        <div class="fg" style="margin-bottom:.65rem"><label>Notiz / Setup-Beschreibung</label>
-          <input type="text" id="j-note" placeholder="z.B. Post-Earnings Gap, VCP Breakout, 3/3 Scanner-Signal">
-        </div>
-        <button class="btn btn-primary" onclick="addPosition()" style="width:100%">
-          <i class="ti ti-plus"></i> Position speichern
-        </button>
-      </div>
-      <div class="sec" style="display:flex;justify-content:space-between;align-items:center;margin-top:1.25rem">
-        <span>Positionen</span>
-        <button class="btn btn-sm" id="j-show-closed" onclick="toggleClosed()">Geschlossene anzeigen</button>
-      </div>
-      <div id="journal-list"></div>
-      <div id="journal-empty" style="text-align:center;padding:2rem;color:var(--text3);font-size:13px;display:none">
-        <i class="ti ti-notebook" style="font-size:32px;display:block;margin-bottom:.5rem"></i>
-        Noch keine Positionen — erste Position oben erfassen
-      </div>
-    </div>
     <!-- BACKLOG PANEL -->
     <div id="panel-backlog" class="panel">
       <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
@@ -2254,170 +2361,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div id="options-desk-cards" style="display:flex;flex-direction:column;gap:.5rem">
       <div style="color:var(--text3);font-size:12px;text-align:center;padding:1.5rem">Tab w&auml;hlen um zu laden.</div>
     </div>
-  </div>
-</div>
-
-
-
-
-<div id="panel-darkpool" class="panel">
-  <div class="sec"><i class="ti ti-building-bank"></i> Dark Pool & Institutional Flow</div>
-
-  <!-- Score Card -->
-  <div class="card card-accent" id="dp-score-card" style="text-align:center;padding:1.25rem">
-    <div style="font-size:11px;color:var(--text3);margin-bottom:.5rem;font-family:var(--mono)">INSTITUTIONAL FLOW SCORE</div>
-    <div id="dp-score-val" style="font-size:48px;font-weight:700;font-family:var(--mono);line-height:1">—</div>
-    <div id="dp-score-label" style="font-size:14px;font-weight:600;margin-top:.4rem">Lädt…</div>
-    <div id="dp-score-desc" style="font-size:11px;color:var(--text3);margin-top:.4rem;line-height:1.5">—</div>
-  </div>
-
-  <!-- Reload Button -->
-  <div style="display:flex;gap:8px;margin-bottom:.75rem">
-    <button class="btn btn-sm" onclick="loadDarkPool(true)" id="dp-reload-btn" style="font-size:12px">
-      <i class="ti ti-refresh"></i> Aktualisieren
-    </button>
-    <div id="dp-timestamp" style="font-size:10px;color:var(--text3);display:flex;align-items:center"></div>
-  </div>
-
-  <!-- DIX / GEX -->
-  <div class="sec">Dark Index (DIX) & Gamma Exposure (GEX)</div>
-  <div class="card" id="dp-dix-card">
-    <div class="sig-grid">
-      <div class="sig-box">
-        <div class="sig-label">DIX</div>
-        <div class="sig-val" id="dp-dix">—</div>
-        <div class="sig-sub" id="dp-dix-trend" style="color:var(--text3)">—</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">DIX Ø20T</div>
-        <div class="sig-val" id="dp-dix-avg">—</div>
-        <div class="sig-sub" style="color:var(--text3);font-size:10px">20-Tage Basis</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">GEX (Mrd $)</div>
-        <div class="sig-val" id="dp-gex">—</div>
-        <div class="sig-sub" id="dp-gex-trend" style="color:var(--text3)">—</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">GEX Ø20T</div>
-        <div class="sig-val" id="dp-gex-avg">—</div>
-        <div class="sig-sub" style="color:var(--text3);font-size:10px">20-Tage Basis</div>
-      </div>
-    </div>
-    <div id="dp-dix-info" style="font-size:11px;color:var(--text3);margin-top:.5rem;line-height:1.5;padding:6px 8px;background:var(--bg3);border-radius:6px">
-      <b>DIX-Proxy</b> = OBV-basierter Institutional Flow auf SPY. Hoch (&gt;49%) = Institutionen kaufen → <span style="color:var(--green)">bullisch</span>.<br>
-      <b>GEX-Proxy</b> = Volumen-Anomalie SPY. Positiv = stabilisierend, Negativ = destabilisierend.<br>
-      <span style="color:var(--amber)">⚠ Echter DIX/GEX (squeezemetrics) seit 2024 Paywall-geschützt.</span>
-    </div>
-  </div>
-
-  <!-- VVIX / SKEW / PCR-Proxy -->
-  <div class="sec">Sentiment-Indikatoren (VVIX · SKEW · PCR-Proxy)</div>
-  <div class="card" id="dp-pcr-card">
-    <div class="sig-grid">
-      <div class="sig-box">
-        <div class="sig-label">VVIX</div>
-        <div class="sig-val" id="dp-vvix">—</div>
-        <div class="sig-sub" style="color:var(--text3)">VIX der VIX-Opts</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">SKEW</div>
-        <div class="sig-val" id="dp-skew">—</div>
-        <div class="sig-sub" style="color:var(--text3)">Tail-Risk Index</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">PCR-Proxy</div>
-        <div class="sig-val" id="dp-pcr">—</div>
-        <div class="sig-sub" id="dp-pcr-signal" style="color:var(--text3)">—</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">Signal</div>
-        <div class="sig-val" id="dp-pcr-avg" style="font-size:12px">—</div>
-        <div class="sig-sub" id="dp-pcr-trend" style="color:var(--text3)">—</div>
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:.5rem;padding:8px 10px;background:var(--bg3);border-radius:6px;line-height:1.7">
-      <b>VVIX</b> (VIX of VIX): Misst die Volatilitat der VIX-Optionen. Normal: 80-95. &gt;100 = erhohte Unsicherheit. &gt;120 = Panik-Modus, starke Kursbewegungen erwartet.<br>
-      <b>SKEW</b> (CBOE Skew Index): Nachfrage nach weit aus-dem-Geld liegenden Puts (Tail-Risk Hedging). Normal: 100-130. &gt;135 = Institutionen sichern Risiken ab. &gt;145 = extremes Hedging, seltenes Warnsignal. Hoher SKEW ist kein sofortiges Verkaufssignal, zeigt aber dass Smart Money Risiken absichert.<br>
-      <b>PCR-Proxy</b> (synthetisch aus VVIX + SKEW): Naherung fur Put/Call-Verhaltnis. &lt;0.7 = Markt uberhitzt (kontr. barisch). &gt;1.0 = Angst dominiert &rarr; <span style="color:var(--green)">kontr. bullisch</span>.
-    </div>
-  </div>
-
-  <!-- VIX Term Structure -->
-  <div class="sec">VIX Term Structure</div>
-  <div class="card" id="dp-vix-card">
-    <div class="sig-grid">
-      <div class="sig-box">
-        <div class="sig-label">VIX (Spot)</div>
-        <div class="sig-val" id="dp-vix">—</div>
-        <div class="sig-sub" style="color:var(--text3)">kurzfristig</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">VIX 3M</div>
-        <div class="sig-val" id="dp-vix3m">—</div>
-        <div class="sig-sub" style="color:var(--text3)">mittelfristig</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">Spread</div>
-        <div class="sig-val" id="dp-vix-spread">—</div>
-        <div class="sig-sub" style="color:var(--text3)">3M minus Spot</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">Struktur</div>
-        <div class="sig-val" id="dp-vix-structure" style="font-size:11px">—</div>
-        <div class="sig-sub" id="dp-vix-signal" style="color:var(--text3)">—</div>
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--text3);margin-top:.5rem;padding:6px 8px;background:var(--bg3);border-radius:6px;line-height:1.5">
-      <b>Contango</b> (VIX3M &gt; VIX) = normaler Markt, kein Stress. <b>Backwardation</b> (VIX &gt; VIX3M) = Stress, kurzfristige Angst dominiert → Vorsicht.
-    </div>
-  </div>
-
-  <!-- Score Komponenten -->
-  <div class="sec">Score-Komponenten</div>
-  <div class="card" id="dp-components-card">
-    <div id="dp-components-list">
-      <div style="color:var(--text3);font-size:12px;text-align:center;padding:.75rem">Lädt…</div>
-    </div>
-  </div>
-
-  <!-- ── KI-INTERPRETATION ─────────────────────────────────────────── -->
-  <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
-    <span><i class="ti ti-brain"></i> KI-Daten-Synthese <span style="font-size:10px;color:var(--text3);font-weight:400">(Statistische Kontextanalyse · keine Anlageberatung)</span></span>
-    <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);cursor:pointer">
-      <input type="checkbox" id="dp-ki-toggle" checked onchange="toggleDpKI(this.checked)"
-        style="width:14px;height:14px;accent-color:var(--accent)"> aktiv
-    </label>
-  </div>
-
-  <div id="dp-ki-box" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:1rem;margin-bottom:.75rem;overflow:visible;height:auto">
-    <!-- KI-Analyse Inhalt -->
-    <div id="dp-ki-content" style="overflow:visible;word-break:break-word;height:auto;max-height:none">
-      <div style="color:var(--text3);font-size:12px;text-align:center;padding:.5rem">
-        <i class="ti ti-brain"></i> Analyse wird nach dem Laden der Daten generiert…
-      </div>
-    </div>
-
-    <!-- Richtungspfeile-Legende -->
-    <div id="dp-ki-indicators" style="display:none;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border2)">
-      <div style="font-size:10px;color:var(--text3);margin-bottom:.4rem;font-weight:600;letter-spacing:.5px">PARAMETER-TREND</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px" id="dp-ki-arrows"></div>
-    </div>
-
-    <!-- Handlungsempfehlung -->
-    <div id="dp-ki-action" style="display:none;margin-top:.75rem;padding:.6rem .8rem;border-radius:8px;border-left:3px solid var(--accent)">
-      <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:600">STATISTISCHE KONTEXT-ANALYSE</div>
-      <div id="dp-ki-action-text" style="font-size:13px;font-weight:600;color:var(--text)"></div>
-    </div>
-
-    <div id="dp-ki-footer" style="display:none;margin-top:.6rem;font-size:10px;color:var(--text3);text-align:right">
-      <i class="ti ti-robot"></i> Claude Sonnet · <span id="dp-ki-time"></span> · Rein deskriptive Datenanalyse · Keine Anlageberatung gem. §1 WpHG
-    </div>
-  </div>
-
-  <div style="font-size:10px;color:var(--text3);text-align:center;padding:.5rem 0 .25rem;line-height:1.6">
-    Quellen: SPY/Yahoo Finance (DIX/GEX-Proxy*) · VVIX/SKEW/VIX via Yahoo Finance · *Synthetische Näherungswerte, kein echter DIX/GEX<br>
-    Alle Angaben ohne Gewähr · Keine Anlageberatung gem. §1 WpHG · Cache 30 Min
   </div>
 </div>
 
@@ -4953,6 +4896,7 @@ function showPanel(id){
     refreshLivePrices();
     // VIX-Sync: echten ^VIX Wert in Makro-Tab laden (einheitliche Quelle)
     fetchVix().then(function(vix){ if(vix) renderVixAmpel(vix); });
+    try{ if(typeof loadDarkPool==='function') loadDarkPool(); }catch(_eDp){} // v243: DarkPool lebt im Makro-Tab
   }
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -5234,7 +5178,6 @@ function setMarket(mkt){
           '<option value="fixed:STOXX_EU">🌍 STOXX EU Wachstum Top 40</option>'+
         '</optgroup>'+
         '<optgroup label="── 🇺🇸 US-Indizes ──">'+
-          '<option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>'+
           '<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
           '<option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>'+
         '</optgroup>'+
@@ -5246,6 +5189,11 @@ function setMarket(mkt){
           '<option value="fixed:NUCLEAR_ENERGY">☢️ Nuclear Energy</option>'+
           '<option value="fixed:SPACE">🚀 Space</option>'+
           '<option value="fixed:BIOTECH_LONGEVITY">🧬 Biotech &amp; Longevity</option>'+
+          '<option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>'+
+          '<option value="fixed:GRID_ELECTRIFICATION">🔌 Grid &amp; Electrification</option>'+
+          '<option value="fixed:PRECIOUS_METALS">🥇 Precious Metals</option>'+
+          '<option value="fixed:AGRICULTURE">🌾 Agriculture &amp; Food Security</option>'+
+          '<option value="fixed:WATER">💧 Water &amp; Basic Resources</option>'+
           '<option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>'+
           '<option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>'+
           '<option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>'+
@@ -5290,7 +5238,7 @@ function setMarket(mkt){
           '<option value="fixed:TECDAX">💻 TecDAX Top 20</option>'+
         '</optgroup>'+
         '<optgroup label="── 🇺🇸 US-Indizes ──">'+
-          '<option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>'+'<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
+          '<option value="fixed:SP500">🇺🇸 S&amp;P 500 (Kern-100)</option>'+
           '<option value="fixed:NDX100">🇺🇸 NASDAQ 100</option>'+
         '</optgroup>'+
         '<optgroup label="── 🏭 Sektoren ──">'+
@@ -5301,6 +5249,11 @@ function setMarket(mkt){
           '<option value="fixed:NUCLEAR_ENERGY">☢️ Nuclear Energy</option>'+
           '<option value="fixed:SPACE">🚀 Space</option>'+
           '<option value="fixed:BIOTECH_LONGEVITY">🧬 Biotech &amp; Longevity</option>'+
+          '<option value="fixed:PICKS_SHOVELS">⛏ Picks &amp; Shovels (AI-Infra)</option>'+
+          '<option value="fixed:GRID_ELECTRIFICATION">🔌 Grid &amp; Electrification</option>'+
+          '<option value="fixed:PRECIOUS_METALS">🥇 Precious Metals</option>'+
+          '<option value="fixed:AGRICULTURE">🌾 Agriculture &amp; Food Security</option>'+
+          '<option value="fixed:WATER">💧 Water &amp; Basic Resources</option>'+
           '<option value="fixed:REIT">🏢 REITs &amp; Real Estate</option>'+
           '<option value="fixed:ENERGY">⚡ Energy &amp; Oil</option>'+
           '<option value="fixed:HEALTH">🏥 Healthcare &amp; Biotech</option>'+
@@ -6242,6 +6195,8 @@ async function loadScannerFromKV() {
     'fixed:BIOTECH':'BIOTECH','fixed:FINTECH':'FINTECH',
     'fixed:MATERIALS':'MATERIALS','fixed:CYBERSECURITY':'CYBERSECURITY',
     'fixed:NUCLEAR_ENERGY':'NUCLEAR_ENERGY','fixed:SPACE':'SPACE','fixed:BIOTECH_LONGEVITY':'BIOTECH_LONGEVITY',
+    'fixed:PICKS_SHOVELS':'PICKS_SHOVELS','fixed:GRID_ELECTRIFICATION':'GRID_ELECTRIFICATION',
+    'fixed:PRECIOUS_METALS':'PRECIOUS_METALS','fixed:AGRICULTURE':'AGRICULTURE','fixed:WATER':'WATER',
   };
   var sectorFilter = SECTOR_PRESET_MAP[presetVal] || null;
   var allTickers = (window._alphaData && _alphaData.tickers) ? _alphaData.tickers : [];
@@ -10271,7 +10226,9 @@ function onPresetChange(){
       DEFENSE:'Defense & Aerospace', REIT:'REITs', ENERGY:'Energy',
       HEALTH:'Healthcare', FINANCE:'Financials', CONSUMER:'Consumer',
       MATERIALS:'Materials & Mining', CYBERSECURITY:'Cybersecurity', NUCLEAR_ENERGY:'Nuclear Energy',
-      SPACE:'Space', BIOTECH_LONGEVITY:'Biotech & Longevity'
+      SPACE:'Space', BIOTECH_LONGEVITY:'Biotech & Longevity',
+      GRID_ELECTRIFICATION:'Grid & Electrification', PRECIOUS_METALS:'Precious Metals',
+      AGRICULTURE:'Agriculture', WATER:'Water'
     };
     // Market automatisch auf DE setzen bei deutschen Indizes
     const deKeys = ['DAX40','MDAX','TECDAX','SDAX','HDAX'];
@@ -10841,7 +10798,7 @@ function saveJournal(){
   renderJournal();
 }
 
-function renderJournal(){
+function renderJournal(){ if(!document.getElementById('panel-journal')) return; // v243: Panel entfernt, JS dormant (Sync-sicher)
   const container = document.getElementById('journal-list');
   if(!container) return;
   const open = journalData.filter(function(p){ return p.status!=='closed'; });
@@ -13238,6 +13195,26 @@ var FIXED_LISTS = {
     {sym:'CRSP',name:'CRISPR Therapeutics'},{sym:'BEAM',name:'Beam Therapeutics'},{sym:'NTLA',name:'Intellia'},
     {sym:'EXAS',name:'Exact Sciences'},{sym:'ILMN',name:'Illumina'},{sym:'RXRX',name:'Recursion'},
     {sym:'DXCM',name:'DexCom'},{sym:'ALGN',name:'Align Technology'},
+  ],
+  // v243 (05.07.2026): Supercycle-Sektoren — Sync mit Aggregator v4.7 (Gemini-Audit: 10 Fehlticker aussortiert)
+  'GRID_ELECTRIFICATION': [
+    {sym:'GEV',name:'GE Vernova'},{sym:'EMR',name:'Emerson Electric'},{sym:'VMI',name:'Valmont Industries'},
+    {sym:'AME',name:'AMETEK'},{sym:'POWL',name:'Powell Industries'},{sym:'AEIS',name:'Advanced Energy'},{sym:'PLPC',name:'Preformed Line Products'},
+  ],
+  'PRECIOUS_METALS': [
+    {sym:'NEM',name:'Newmont'},{sym:'B',name:'Barrick Mining'},{sym:'WPM',name:'Wheaton Precious Metals'},
+    {sym:'FNV',name:'Franco-Nevada'},{sym:'RGLD',name:'Royal Gold'},{sym:'PAAS',name:'Pan American Silver'},
+    {sym:'HL',name:'Hecla Mining'},{sym:'AG',name:'First Majestic'},{sym:'EXK',name:'Endeavour Silver'},
+    {sym:'FSM',name:'Fortuna Mining'},{sym:'MAG',name:'MAG Silver'},
+  ],
+  'AGRICULTURE': [
+    {sym:'DE',name:'Deere & Co.'},{sym:'AGCO',name:'AGCO'},{sym:'CTVA',name:'Corteva'},{sym:'NTR',name:'Nutrien'},
+    {sym:'MOS',name:'Mosaic'},{sym:'CF',name:'CF Industries'},{sym:'FMC',name:'FMC Corp.'},
+    {sym:'DAR',name:'Darling Ingredients'},{sym:'CNH',name:'CNH Industrial'},{sym:'AVD',name:'American Vanguard'},
+  ],
+  'WATER': [
+    {sym:'XYL',name:'Xylem'},{sym:'AWK',name:'American Water Works'},{sym:'WTS',name:'Watts Water'},
+    {sym:'AOS',name:'A.O. Smith'},{sym:'ECL',name:'Ecolab'},{sym:'BMI',name:'Badger Meter'},
   ],
   'REIT': [
     {sym:'PLD',name:'Prologis'},{sym:'AMT',name:'American Tower'},{sym:'EQIX',name:'Equinix'},
@@ -16466,6 +16443,8 @@ async function loadScannerFromKV() {
     'fixed:BIOTECH':'BIOTECH','fixed:FINTECH':'FINTECH',
     'fixed:MATERIALS':'MATERIALS','fixed:CYBERSECURITY':'CYBERSECURITY',
     'fixed:NUCLEAR_ENERGY':'NUCLEAR_ENERGY','fixed:SPACE':'SPACE','fixed:BIOTECH_LONGEVITY':'BIOTECH_LONGEVITY',
+    'fixed:PICKS_SHOVELS':'PICKS_SHOVELS','fixed:GRID_ELECTRIFICATION':'GRID_ELECTRIFICATION',
+    'fixed:PRECIOUS_METALS':'PRECIOUS_METALS','fixed:AGRICULTURE':'AGRICULTURE','fixed:WATER':'WATER',
   };
   var sectorFilter = SECTOR_PRESET_MAP[presetVal] || null;
   var allTickers = (window._alphaData && _alphaData.tickers) ? _alphaData.tickers : [];
