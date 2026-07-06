@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260705-v243">
+<meta name="app-version" content="20260706-v244">
 <!-- CHANGELOG (neueste zuerst):
-     v243: UI-Reorg nach Form-follows-Function (STRATEGIE v1.5): Sidebar in Workflow-Reihenfolge
+     v244: Scanner-UX: Long|Bear-Segmentschalter neben Scan-Button, KI-Analyse-Button beschriftet & erst nach Scan sichtbar; help: Fruehausstieg-Empfehlung (BaFin-Sprachhygiene).
+v243: UI-Reorg nach Form-follows-Function (STRATEGIE v1.5): Sidebar in Workflow-Reihenfolge
            (Tagesstart → Markt-Kontext → Trading → Verwaltung); Dark Pool ohne eigenen Tab, lebt als
            Sektion im Makro-Tab (loadDarkPool an Makro gekoppelt); Journal-Tab entfernt (80/20, JS
            dormant + Guard, Git = Archiv); Container-Orphan-</div> behoben (alle Panels wieder auf
@@ -400,7 +401,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="topbar-title" id="topbar-panel-title"><i class="ti ti-radar"></i> Scanner</div>
     <div style="display:flex;gap:6px;align-items:center">
       <a href="/help" target="_blank" title="Bedienungsanleitung" style="padding:4px 9px;border-radius:6px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-help-circle"></i> Hilfe</a>
-      <button onclick="showBearScanner()" style="padding:4px 10px;border-radius:6px;border:1px solid var(--red);background:rgba(239,68,68,0.1);color:var(--red);font-size:11px;font-weight:600;cursor:pointer"><i class="ti ti-trending-down"></i> Bear-Scan</button>
     </div>
   </div>
 
@@ -431,9 +431,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div id="regime-cockpit" style="display:none"></div>
         <!-- Morning Briefing Button -->
         <div style="padding:.5rem .9rem;display:flex;align-items:center;gap:8px">
-          <button onclick="showBearScanner()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--red);background:rgba(239,68,68,0.1);color:var(--red);font-size:12px;font-weight:600;cursor:pointer" title="Bear Scanner">
-              <i class="ti ti-trending-down"></i>
-            </button>
             <button id="morning-btn" onclick="runMorningBriefing()" style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
             <i class="ti ti-sunrise"></i> Morning Briefing starten
           </button>
@@ -491,17 +488,21 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <span id="kv-mode-badge" onclick="loadScannerFromKV()" style="display:none;font-size:10px;padding:3px 8px;border-radius:6px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green);white-space:nowrap;cursor:pointer" title="Klicken: Aggregator-Ergebnisse laden (Nacht-Scan)">
           <i class="ti ti-database"></i> <span id="kv-mode-date">KV</span>
         </span>
+        <div id="scan-mode-seg" style="display:flex;border:0.5px solid var(--border2);border-radius:8px;overflow:hidden" title="Scan-Richtung: Long-Scanner oder Bear-Scanner">
+          <button id="seg-long" onclick="setScanMode('long')" style="padding:6px 12px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:rgba(52,194,110,0.15);color:var(--green)">📈 Long</button>
+          <button id="seg-bear" onclick="setScanMode('bear')" style="padding:6px 12px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:var(--bg3);color:var(--text3)">🐻 Bear</button>
+        </div>
         <button class="btn btn-primary" onclick="runScanAuto()" id="scan-btn">
           <i class="ti ti-player-play"></i> Scan
         </button>
         <button id="kv-live-btn" style="display:none;font-size:11px;padding:4px 10px;border-radius:8px;background:rgba(239,68,68,0.1);border:0.5px solid var(--red);color:var(--red);cursor:pointer;white-space:nowrap" onclick="runScan()" title="Live-Scan via Twelve Data API (Rate-Limited)">
           <i class="ti ti-wifi"></i> Live
         </button>
-        <div style="position:relative;display:inline-block" id="ki-dropdown-wrap">
+        <div style="position:relative;display:none" id="ki-dropdown-wrap">
           <button class="btn" onclick="toggleKiDropdown(this)"
             style="background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.2));border-color:#818cf8;color:#818cf8;font-size:13px;display:flex;align-items:center;gap:4px"
             title="KI-Analyse der Scanner-Ergebnisse">
-            <i class="ti ti-brain"></i>
+            <i class="ti ti-brain"></i> <span style="font-size:11px;font-weight:600">KI-Analyse der Treffer</span>
             <i class="ti ti-chevron-down" style="font-size:10px"></i>
           </button>
           <div id="ki-strat-dropdown" style="display:none;position:absolute;right:0;top:110%;background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:6px;z-index:500;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
@@ -5995,6 +5996,7 @@ async function runScan(){
   var colBtn = document.getElementById('collapse-all-btn');
   if (expBtn) expBtn.style.display = 'inline-block';
   if (colBtn) colBtn.style.display = 'inline-block';
+      var kiWrap=document.getElementById('ki-dropdown-wrap'); if(kiWrap)kiWrap.style.display='inline-block';
   setTimeout(function(){ document.getElementById('scan-progress').style.display='none'; },2000);
   btn.disabled=false;
   try { autoSaveShortlist(); } catch(e) { console.warn('[Shortlist] autoSave Fehler:', e.message); }
@@ -6257,6 +6259,7 @@ async function loadScannerFromKV() {
   var colBtn2 = document.getElementById('collapse-all-btn');
   if (expBtn2) expBtn2.style.display = 'inline-block';
   if (colBtn2) colBtn2.style.display = 'inline-block';
+      var kiWrap=document.getElementById('ki-dropdown-wrap'); if(kiWrap)kiWrap.style.display='inline-block';
   window._scannerKvMode = true;
   var hint = document.getElementById('scanner-market-hint');
   if (hint) hint.innerHTML = '<i class="ti ti-database"></i> '
@@ -16505,6 +16508,7 @@ async function loadScannerFromKV() {
   var colBtn2 = document.getElementById('collapse-all-btn');
   if (expBtn2) expBtn2.style.display = 'inline-block';
   if (colBtn2) colBtn2.style.display = 'inline-block';
+      var kiWrap=document.getElementById('ki-dropdown-wrap'); if(kiWrap)kiWrap.style.display='inline-block';
   window._scannerKvMode = true;
   var hint = document.getElementById('scanner-market-hint');
   if (hint) hint.innerHTML = '<i class="ti ti-database"></i> '
@@ -20527,6 +20531,17 @@ function renderAlphaCards(ms) {
 }
 
 
+// v244: Long|Bear-Segmentschalter (Scanner-Toolbar)
+function _setScanModeVisual(m){
+  var sl=document.getElementById('seg-long'), sb=document.getElementById('seg-bear');
+  if(!sl||!sb) return;
+  if(m==='bear'){ sb.style.background='rgba(239,68,68,0.15)'; sb.style.color='var(--red)'; sl.style.background='var(--bg3)'; sl.style.color='var(--text3)'; }
+  else { sl.style.background='rgba(52,194,110,0.15)'; sl.style.color='var(--green)'; sb.style.background='var(--bg3)'; sb.style.color='var(--text3)'; }
+}
+function setScanMode(m){
+  _setScanModeVisual(m);
+  if(m==='bear') showBearScanner();
+}
 function showBearScanner(forceList) {
   var candidates = [];
 
@@ -20664,7 +20679,7 @@ function renderBearScannerModal(candidates, listLabel, totalScanned) {
   var inner = document.createElement('div');
   inner.style.cssText = 'max-width:580px;margin:0 auto;background:var(--bg2);border-radius:16px;border:1px solid rgba(239,68,68,0.3);overflow:hidden';
 
-  function closeBear() { modal.remove(); document.body.style.overflow = ''; }
+  function closeBear() { modal.remove(); document.body.style.overflow = ''; if(typeof _setScanModeVisual==='function')_setScanModeVisual('long'); }
 
   // Header
   var header = document.createElement('div');
