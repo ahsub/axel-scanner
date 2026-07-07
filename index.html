@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260708-v246">
+<meta name="app-version" content="20260708-v247">
 <!-- CHANGELOG (neueste zuerst):
+     v247: Morning-Briefing-Button aus Scanner-Tab + Alpha Desk entfernt (AP-B); Autostart bei Programmstart + Sidebar-Nav bleiben; morning-btn ID als unsichtbarer Stub erhalten.
      v246: AP-B Cache-Disziplin: setKiStrat/switchAlphaLB triggern keinen KI-Call mehr; openKiBriefing mit 15min In-Memory-Cache (_kiCache) + "Neu berechnen"-Button + forceRefresh; _showKiBriefingForStrat zeigt Cache-Treffer sofort.
      v245: AP-C Sprache: "KI-basierte Markt-Einschaetzung", Modellname raus, "Kurz und buendig", TF-Buttons 15min/30min. AP-I Rate-Limit UX: showKiError() zentral, 429 unterscheidbar (Tageslimit vs. Anthropic-RL), Reset-Zeit, Retry-Button.
      v244: Scanner-UX: Long|Bear-Segmentschalter neben Scan-Button, KI-Analyse-Button beschriftet & erst nach Scan sichtbar; help: Fruehausstieg-Empfehlung (BaFin-Sprachhygiene).
@@ -431,13 +432,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
         <!-- MSE Detail Modal Trigger -->
         <div id="regime-cockpit" style="display:none"></div>
-        <!-- Morning Briefing Button -->
-        <div style="padding:.5rem .9rem;display:flex;align-items:center;gap:8px">
-            <button id="morning-btn" onclick="runMorningBriefing()" style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
-            <i class="ti ti-sunrise"></i> Morning Briefing starten
-          </button>
-          <div id="morning-cache-info" style="font-size:10px;color:var(--text3)"></div>
-        </div>
+        <!-- Morning Briefing Button entfernt (AP-B 08.07.2026) -->
+        <!-- Status-Span bleibt für JS-Kompatibilität (runMorningBriefing setzt innerHTML) -->
+        <span id="morning-btn" style="display:none"></span>
+        <div id="morning-cache-info" style="display:none"></div>
       </div>
       <!-- US/DE Market Toggle -->
       <div style="display:flex;gap:0;margin-bottom:.75rem;border:0.5px solid var(--border2);border-radius:var(--radius-sm);overflow:hidden">
@@ -2288,12 +2286,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <!-- Regime Badge + Meta -->
     <div id="alpha-meta" style="margin-top:.5rem;font-size:11px;color:var(--text3)">Lade Daten…</div>
-    <!-- Morning Briefing Button (NEU 01.07.2026) — Vorgeschalteter Analyse-Start -->
-    <div style="margin-top:.5rem;padding-top:.5rem;border-top:.5px solid var(--border2)">
-      <button onclick="showPanel('scanner');setTimeout(runMorningBriefing,150)" style="width:100%;padding:6px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
-        <i class="ti ti-sunrise"></i> Morning Briefing — Marktbeurteilung vor Analyse starten
-      </button>
-    </div>
+    <!-- Morning Briefing Button entfernt (AP-B 08.07.2026) -->
   </div>
 
   <!-- Market Weather Row -->
