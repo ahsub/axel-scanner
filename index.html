@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260708-v245">
+<meta name="app-version" content="20260708-v246">
 <!-- CHANGELOG (neueste zuerst):
+     v246: AP-B Cache-Disziplin: setKiStrat/switchAlphaLB triggern keinen KI-Call mehr; openKiBriefing mit 15min In-Memory-Cache (_kiCache) + "Neu berechnen"-Button + forceRefresh; _showKiBriefingForStrat zeigt Cache-Treffer sofort.
      v245: AP-C Sprache: "KI-basierte Markt-Einschaetzung", Modellname raus, "Kurz und buendig", TF-Buttons 15min/30min. AP-I Rate-Limit UX: showKiError() zentral, 429 unterscheidbar (Tageslimit vs. Anthropic-RL), Reset-Zeit, Retry-Button.
      v244: Scanner-UX: Long|Bear-Segmentschalter neben Scan-Button, KI-Analyse-Button beschriftet & erst nach Scan sichtbar; help: Fruehausstieg-Empfehlung (BaFin-Sprachhygiene).
 v243: UI-Reorg nach Form-follows-Function (STRATEGIE v1.5): Sidebar in Workflow-Reihenfolge
@@ -15484,7 +15485,40 @@ function hideKiDropdown() {
   if (m) m.remove();
 }
 
-async function openKiBriefing(defaultStrat) {
+// ── KI-Briefing In-Memory-Cache (AP-B Cache-Disziplin) ──────────────────────
+// Speichert KI-Antworten pro Strategie für die aktuelle Session.
+// Verhindert unnötige API-Calls bei Strategie-Wechsel / Tab-Wechsel.
+var _kiCache = {}; // { strat: { text, ts } }
+var _KI_CACHE_TTL = 15 * 60 * 1000; // 15 Minuten
+
+// Zeigt gecachtes Ergebnis (falls vorhanden) oder Prompt zur Analyse
+function _showKiBriefingForStrat(strat) {
+  var content = document.getElementById('ki-briefing-content');
+  if (!content) return;
+  var cached = _kiCache[strat];
+  if (cached && (Date.now() - cached.ts) < _KI_CACHE_TTL) {
+    // Cache-Treffer: Ergebnis sofort zeigen + "Neu berechnen"-Option
+    var ageMin = Math.round((Date.now() - cached.ts) / 60000);
+    content.innerHTML =
+      '<div style="font-size:10px;color:var(--text3);padding:4px 8px 8px;display:flex;align-items:center;gap:8px">'
+      + '<span>⚡ Gecacht · vor ' + ageMin + ' min</span>'
+      + '<button onclick="openKiBriefing(_kiStrat, true)" '
+      + 'style="font-size:10px;padding:1px 8px;border-radius:5px;border:0.5px solid var(--border2);'
+      + 'background:transparent;color:var(--text3);cursor:pointer">↺ Neu berechnen</button>'
+      + '</div>'
+      + cached.text;
+  } else {
+    // Kein Cache: neutralen Hinweis zeigen
+    content.innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:12px">'
+      + '<i class="ti ti-brain" style="font-size:1.5rem;display:block;margin-bottom:.5rem"></i>'
+      + 'Strategie gewählt: <b>' + strat + '</b><br>'
+      + '<span style="font-size:11px">KI-Analyse starten → Button oben im Modal</span>'
+      + '</div>';
+  }
+}
+
+async function openKiBriefing(defaultStrat, forceRefresh) {
   const modal = document.getElementById('ki-briefing-modal');
   const content = document.getElementById('ki-briefing-content');
   if (!modal || !content) return;
@@ -15525,6 +15559,13 @@ async function openKiBriefing(defaultStrat) {
   // KI-Call via ko-ai Worker — kein lokaler API-Key nötig
   if (!getAiToken()) {
     content.innerHTML = '<div style="color:var(--red);padding:1rem">KI-Token nicht gesetzt. Bitte im Admin-Tab unter "UnderlyingIQ KI-Zugang" eintragen.</div>';
+    return;
+  }
+
+  // ── Cache-Check (AP-B) ────────────────────────────────────────
+  var cacheKey = startStrat;
+  if (!forceRefresh && _kiCache[cacheKey] && (Date.now() - _kiCache[cacheKey].ts) < _KI_CACHE_TTL) {
+    _showKiBriefingForStrat(cacheKey);
     return;
   }
 
@@ -15896,10 +15937,13 @@ async function openKiBriefing(defaultStrat) {
 
     // Zeitstempel
     const ts = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    content.innerHTML = '<div style="font-size:10px;color:var(--text3);margin-bottom:.75rem">'
-      + 'Generiert: ' + ts + ' · ' + top10.length + ' Titel analysiert · Modell: Claude Haiku'
+    var _kiRendered = '<div style="font-size:10px;color:var(--text3);margin-bottom:.75rem">'
+      + 'Generiert: ' + ts + ' · ' + top10.length + ' Titel analysiert'
       + '</div>'
       + '<div style="font-size:12px;line-height:1.6">' + formatted + '</div>';
+    content.innerHTML = _kiRendered;
+    // Cache befüllen (AP-B)
+    _kiCache[cacheKey] = { text: _kiRendered, ts: Date.now() };
 
     // ── KI-Tracking: Top-3 Empfehlungen automatisch speichern ──
     // Extrahiere die Top-3 Symbole aus dem generierten Text (erste 3 der sortierten Liste)
@@ -16026,10 +16070,10 @@ function setKiStrat(btn) {
   // Hint aktualisieren
   const hint = document.getElementById('ki-strat-hint');
   if (hint && cfg) hint.textContent = cfg.hint;
-  // Analyse direkt starten (NEU 30.06.2026 — vorher nur Strategie gesetzt,
-  // aber keine Analyse getriggert; Scanner-Dropdown-Buttons triggerten dagegen
-  // direkt openKiBriefing() -> inkonsistentes Verhalten)
-  openKiBriefing(strat);
+  // AP-B Cache-Disziplin (08.07.2026): Strategie-Wechsel löst keinen neuen KI-Call aus.
+  // Analyse nur auf expliziten Nutzer-Wunsch (KI-Button im Modal).
+  // Cached Ergebnis der neuen Strategie wird in openKiBriefing() gezeigt falls vorhanden.
+  if (typeof _showKiBriefingForStrat === 'function') _showKiBriefingForStrat(strat);
 }
 
 // CSV SAVE DIALOG (ersetzt prompt() das in iframes geblockt wird)
@@ -20428,9 +20472,8 @@ function switchAlphaLB(btn, key) {
   document.querySelectorAll('.alpha-lb-tab').forEach(function(b){ b.style.opacity = '0.5'; });
   btn.style.opacity = '1';
   if (_alphaData) renderAlphaLB(_alphaData.leaderboards, key);
-  // NEU (01.07.2026): KI-Briefing mit passender Strategie triggern
-  var strat = _lbToStrat[key] || 'momentum';
-  if (typeof openKiBriefing === 'function') openKiBriefing(strat);
+  // AP-B Cache-Disziplin (08.07.2026): Tab-Wechsel löst keinen KI-Call mehr aus.
+  // KI-Analyse nur auf expliziten Nutzer-Wunsch.
 }
 
 function filterAlpha(f) {
