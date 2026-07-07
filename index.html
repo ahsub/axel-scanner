@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v263">
+<meta name="version" content="20260708-v264">
 <!-- CHANGELOG (neueste zuerst):
+     v264: Scanner: Market-Sentiment-Block entfernt (qqq-banner+vix-ampel hidden); KI-Analyse-Button in Steuerleiste; alpha-lb-cards display-Konflikt behoben.
      v263: Strategie-Ampel auf Landing-Page (grün/gelb/rot, alle Strategien). window._lastMseResult für Landing-Page-Zugriff. Scanner Gates: inaktive Strategien explizit rot+gelb mit Border. Selektiv-Tooltip erklärt was Selektiv bedeutet.
      v262: MB-Architektur: Polling-Gate vor Schritt 9 — wartet bis intermarket-score + bull-score im DOM befüllt sind (max 15s, 500ms-Intervall). KI-Analyse startet erst wenn Data-Basket vollständig ist.
      v261: (1) Spinner display:flex/none Konflikt behoben. (2) MB-Start: kein Tab-Wechsel zu Makro mehr. (3) Wartezeiten erhöht: Intermarket 2500ms, Bull-Indikator 1500ms, Sektor/RS je 1500ms — DOM muss befüllt sein bevor Prompt gebaut wird.
@@ -590,6 +591,14 @@ background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);borde
           <i class="ti ti-database"></i> Aggregator
         </button>
 
+        <!-- KI-Analyse-Button -->
+        <button id="ki-analyse-header-btn" onclick="toggleKiDropdown(this)"
+          style="display:flex;align-items:center;gap:5px;padding:6px 10px;font-size:12px;font-weight:500;
+background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);border-radius:8px;cursor:pointer"
+          title="KI-basierte Markt-Einschätzung">
+          <i class="ti ti-brain" style="color:var(--accent)"></i> KI-Analyse
+        </button>
+
         <!-- Trennlinie -->
         <div style="width:1px;height:24px;background:var(--border2);margin:0 2px"></div>
 
@@ -683,8 +692,10 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
           title="Filter aufheben">✕ Reset</button>
         <span id="price-filter-hint" style="font-size:10px;color:var(--text3);margin-left:2px;flex:1;text-align:right"></span>
       </div>
-      <div id="qqq-regime-banner" style="display:none;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;margin:6px 1rem 0" title="Markov-Regime des NASDAQ100"></div>
-      <div id="vix-ampel" style="display:none;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;margin:8px 1rem 0;cursor:default" title="VIX = CBOE Volatility Index"></div>
+      <!-- qqq-regime-banner + vix-ampel aus Scanner entfernt (08.07.2026) -->
+      <!-- Regime-Info ist bereits im Market-Weather-Widget oben sichtbar -->
+      <div id="qqq-regime-banner" style="display:none"></div>
+      <div id="vix-ampel" style="display:none"></div>
       <div id="scan-progress" style="display:none;margin-bottom:.75rem">
         <div style="font-size:12px;color:var(--text2)" id="scan-label">Analysiere…</div>
         <div class="progress"><div class="progress-fill" id="scan-bar" style="width:0%"></div></div>
