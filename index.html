@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260708-v250">
+<meta name="app-version" content="20260708-v251">
 <!-- CHANGELOG (neueste zuerst):
+     v251: (E) Track-Record-Uhr live: 60s Interval + Minuten-Anzeige (Xd Yh Zmin). (F) Changelog-Snippet auf Landing-Page (Build-Version aus Meta-Tag).
      v250: (A) help.html Sync: Modellnamen+KI-Begriff aktualisiert. (B) 47 alert()→showKoToast: keine blockierenden Browser-Dialoge mehr. (C) Prompt "kurz und bündig". (D) nav-scanner hardcoded active entfernt.
      v249: (1) Zentraler Modal-Handler: Escape+Außenklick für alle 11 Modals. (2) Track-Record-Uhr auf Landing-Page (seit 02.07.2026). (3) nav-scanner Initial-Highlight beim App-Start. (4) KI-Dropdown gesperrt solange keine Scan-Ergebnisse geladen.
      v248: AP-A Landing-Page: panel-home neu; Sidebar "Morning Briefing" → "Übersicht" (showPanel home); renderHomeLanding() zeigt Datum, letztes Briefing-Preview, Regime/VIX, Rechtshinweis; "Neu berechnen"-Button triggert runMorningBriefing; nav-morning → nav-home.
@@ -421,6 +422,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <div>
             <div style="font-size:16px;font-weight:700;color:var(--text)">UnderlyingIQ</div>
             <div id="home-date" style="font-size:11px;color:var(--text3)">—</div>
+          <div id="home-changelog" style="font-size:10px;color:var(--text3);margin-top:2px;opacity:.6"></div>
           </div>
         </div>
 
@@ -4985,6 +4987,14 @@ function renderHomeLanding() {
     });
   }
 
+  // Changelog-Snippet: Build-Version aus Meta-Tag
+  var clEl = document.getElementById('home-changelog');
+  if (clEl) {
+    var verMeta = document.querySelector('meta[name="version"]');
+    var ver = verMeta ? verMeta.getAttribute('content') : '';
+    clEl.textContent = ver ? 'Build ' + ver : '';
+  }
+
   // Letztes Morning Briefing aus localStorage laden
   var today = new Date().toLocaleDateString('de-DE',
     {day:'2-digit',month:'2-digit',year:'numeric'}).split('.').reverse().join('-');
@@ -5028,15 +5038,20 @@ function renderHomeLanding() {
     vixEl2.style.color = vixNum < 16 ? 'var(--green)' : vixNum < 25 ? 'var(--amber)' : 'var(--red)';
   }
 
-  // Track-Record-Uhr
-  var trEl = document.getElementById('home-track-record');
-  if (trEl) {
+  // Track-Record-Uhr (live, 60s Interval)
+  function _updateTrackRecord() {
+    var trEl = document.getElementById('home-track-record');
+    if (!trEl) return;
     var trStart = new Date('2026-07-02T00:00:00+02:00');
-    var trNow   = new Date();
-    var trDiff  = trNow - trStart;
+    var trDiff  = Date.now() - trStart;
     var trDays  = Math.floor(trDiff / 86400000);
     var trHours = Math.floor((trDiff % 86400000) / 3600000);
-    trEl.textContent = trDays + 'd ' + trHours + 'h';
+    var trMins  = Math.floor((trDiff % 3600000) / 60000);
+    trEl.textContent = trDays + 'd ' + trHours + 'h ' + trMins + 'min';
+  }
+  _updateTrackRecord();
+  if (!window._trInterval) {
+    window._trInterval = setInterval(_updateTrackRecord, 60000);
   }
 }
 
