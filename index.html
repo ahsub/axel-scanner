@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260708-v248">
+<meta name="app-version" content="20260708-v249">
 <!-- CHANGELOG (neueste zuerst):
+     v249: (1) Zentraler Modal-Handler: Escape+Außenklick für alle 11 Modals. (2) Track-Record-Uhr auf Landing-Page (seit 02.07.2026). (3) nav-scanner Initial-Highlight beim App-Start. (4) KI-Dropdown gesperrt solange keine Scan-Ergebnisse geladen.
      v248: AP-A Landing-Page: panel-home neu; Sidebar "Morning Briefing" → "Übersicht" (showPanel home); renderHomeLanding() zeigt Datum, letztes Briefing-Preview, Regime/VIX, Rechtshinweis; "Neu berechnen"-Button triggert runMorningBriefing; nav-morning → nav-home.
      v247: Morning-Briefing-Button aus Scanner-Tab + Alpha Desk entfernt (AP-B); Autostart bei Programmstart + Sidebar-Nav bleiben; morning-btn ID als unsichtbarer Stub erhalten.
      v246: AP-B Cache-Disziplin: setKiStrat/switchAlphaLB triggern keinen KI-Call mehr; openKiBriefing mit 15min In-Memory-Cache (_kiCache) + "Neu berechnen"-Button + forceRefresh; _showKiBriefingForStrat zeigt Cache-Treffer sofort.
@@ -447,6 +448,15 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <div id="home-regime-val" style="font-size:13px;font-weight:600;color:var(--text)">—</div>
           <div style="font-size:11px;color:var(--text3);min-width:60px;margin-left:auto">VIX</div>
           <div id="home-vix-val" style="font-size:13px;font-weight:600;color:var(--text)">—</div>
+        </div>
+
+        <!-- Track-Record-Uhr -->
+        <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;padding:.9rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.75rem">
+          <i class="ti ti-clock-record" style="color:var(--accent);font-size:1.1rem"></i>
+          <div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Track-Record läuft seit 02.07.2026</div>
+            <div style="font-size:13px;font-weight:600;color:var(--accent)" id="home-track-record">—</div>
+          </div>
         </div>
 
         <!-- Rechtshinweis -->
@@ -4850,6 +4860,9 @@ function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
+  // Fix 3 (AP): Initial-Panel nav-highlight setzen
+  var _navScanner = document.getElementById('nav-scanner');
+  if (_navScanner) _navScanner.classList.add('active');
   window._appUnlocked = true;
   // KoPrompts + UI-Cache initialisieren
   // NEU (30.06.2026): defensive Absicherung gegen Lade-Reihenfolge-Race —
@@ -5013,6 +5026,17 @@ function renderHomeLanding() {
     var vixNum = parseFloat(vixDom.textContent);
     vixEl2.style.color = vixNum < 16 ? 'var(--green)' : vixNum < 25 ? 'var(--amber)' : 'var(--red)';
   }
+
+  // Track-Record-Uhr
+  var trEl = document.getElementById('home-track-record');
+  if (trEl) {
+    var trStart = new Date('2026-07-02T00:00:00+02:00');
+    var trNow   = new Date();
+    var trDiff  = trNow - trStart;
+    var trDays  = Math.floor(trDiff / 86400000);
+    var trHours = Math.floor((trDiff % 86400000) / 3600000);
+    trEl.textContent = trDays + 'd ' + trHours + 'h';
+  }
 }
 
 function showPanel(id){
@@ -5075,6 +5099,48 @@ function updateClock(){
     now.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' · '+
     now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
+
+// ── Zentraler Modal-Handler: Escape + Außenklick (AP — Schließ-Konsistenz) ───
+// Deckt alle Modals ab. Jede Schließ-Funktion bleibt eigenständig.
+(function() {
+  var MODAL_CLOSE_MAP = {
+    'deep-dive-modal':    function(){ if(typeof closeDeepDive==='function') closeDeepDive(); },
+    'sync-modal':         function(){ if(typeof closeSyncModal==='function') closeSyncModal(); },
+    'workflow-modal':     function(){ if(typeof closeWorkflowModal==='function') closeWorkflowModal(); },
+    'yt-modal':           function(){ if(typeof closeYtModal==='function') closeYtModal(); },
+    'eic-pin-modal':      function(){ if(typeof closeEicModal==='function') closeEicModal(); },
+    'wl-modal':           function(){ if(typeof closeWatchlistModal==='function') closeWatchlistModal(); },
+    'mover-modal':        function(){ if(typeof closeMoverModal==='function') closeMoverModal(); },
+    'list-editor-modal':  function(){ if(typeof closeListEditor==='function') closeListEditor(); },
+    'de-list-modal':      function(){ if(typeof closeDEListSelector==='function') closeDEListSelector(); },
+    'ki-briefing-modal':  function(){ var m=document.getElementById('ki-briefing-modal'); if(m) m.style.display='none'; },
+    'tearsheet-modal':    function(){ if(typeof closeTearsheet==='function') closeTearsheet(); },
+  };
+
+  // Escape-Taste: schließt oberstes sichtbares Modal
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape') return;
+    var ids = Object.keys(MODAL_CLOSE_MAP);
+    // Von oben (hoher z-index) nach unten suchen
+    var visible = ids.filter(function(id) {
+      var el = document.getElementById(id);
+      return el && el.style.display !== 'none' && el.style.display !== '';
+    });
+    if (visible.length) MODAL_CLOSE_MAP[visible[visible.length - 1]]();
+  });
+
+  // Außenklick: schließt Modal wenn Klick direkt auf Overlay (nicht auf Inhalt)
+  document.addEventListener('click', function(e) {
+    var ids = Object.keys(MODAL_CLOSE_MAP);
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el && el.style.display !== 'none' && el.style.display !== '' && e.target === el) {
+        MODAL_CLOSE_MAP[ids[i]]();
+        break;
+      }
+    }
+  });
+})();
 
 // ─── SCANNER ─────────────────────────────────────────────────────────
 const charts={};
@@ -15529,6 +15595,13 @@ function toggleKiDropdown(anchorEl) {
   // Remove existing popup if open
   var existing = document.getElementById('ki-float-menu');
   if (existing) { existing.remove(); return; }
+
+  // Fix 4 (AP-B): Kein KI-Dropdown ohne Scan-Ergebnisse
+  var hasResults = tickerData && Object.keys(tickerData).length > 0;
+  if (!hasResults) {
+    showKoToast('⚠ Erst Scanner starten — noch keine Ergebnisse geladen.');
+    return;
+  }
 
   var menu = document.createElement('div');
   menu.id = 'ki-float-menu';
