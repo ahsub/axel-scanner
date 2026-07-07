@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v254">
+<meta name="version" content="20260708-v255">
 <!-- CHANGELOG (neueste zuerst):
+     v255: EIC-Bug fix (Außenklick-Handler Konflikt). Übersicht-Panel: Makro+MB vereint; runHomeBriefing() mit Cache+Aktivitätsanzeige; Makro-Strip (SP/NQ/DAX/VIX/Öl/Gold); vollständiger Briefing-Text mit Markdown; Neu-Button nach erstem Briefing; Navigation bleibt auf Home.
      v254: Alpha Desk: Refresh-Button entfernt; KO-Short data-lb korrigiert; Karten-Liste entfernt (nur Chips); Chips +MACD-Indikator +TradingView-Button.
      v253: Scanner-Header Redesign: Handelsplatz-Buttons (US/DE) öffnen Dropdown mit Listen; Aggregator-Button; Long/Bear auf gleicher Ebene; Aktive-Liste-Chip; Makro-Link aus Cockpit entfernt; _setScanModeVisual sync beide Leisten.
      v252: (1) Landing-Page: Datum zweistufig (Wochentag + Datum+Uhrzeit), Version v252·08.07.2026. (2) DIX/GEX→PCR/GEX-Proxy Labels (Squeezemetrics tot). (3) MB-Orchestrierung: Makro-Schritt 0 vor MB-Start, Rückkehr zu Scanner nach Briefing.
@@ -417,51 +418,89 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <div class="content">
     <!-- HOME / LANDING PANEL (AP-A) -->
     <div id="panel-home" class="panel">
-      <div id="home-landing" style="padding:1.25rem;max-width:680px;margin:0 auto">
+      <div id="home-landing" style="padding:1.25rem;max-width:720px;margin:0 auto">
 
         <!-- Header -->
-        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem">
-          <i class="ti ti-home" style="font-size:1.4rem;color:var(--accent)"></i>
-          <div>
-            <div style="font-size:16px;font-weight:700;color:var(--text)">UnderlyingIQ</div>
-            <div id="home-date" style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap">—</div>
-          <div id="home-changelog" style="font-size:10px;color:var(--text3);margin-top:2px;opacity:.6"></div>
-          </div>
-        </div>
-
-        <!-- Briefing-Status-Card -->
-        <div id="home-briefing-card" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;padding:1rem;margin-bottom:.75rem">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
-            <div style="font-size:12px;font-weight:600;color:var(--text2)">
-              <i class="ti ti-sunrise" style="color:var(--accent)"></i> Morning Briefing
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <div style="display:flex;align-items:center;gap:.75rem">
+            <i class="ti ti-home" style="font-size:1.4rem;color:var(--accent)"></i>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:var(--text)">UnderlyingIQ · Übersicht</div>
+              <div id="home-date" style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap">—</div>
+              <div id="home-changelog" style="font-size:10px;color:var(--text3);margin-top:2px;opacity:.6"></div>
             </div>
-            <div id="home-briefing-time" style="font-size:10px;color:var(--text3)">—</div>
           </div>
-          <div id="home-briefing-text" style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:.75rem">
-            Noch kein Briefing heute.
+          <!-- Track-Record kompakt im Header -->
+          <div style="text-align:right">
+            <div style="font-size:9px;color:var(--text3);letter-spacing:.5px">TRACK RECORD</div>
+            <div id="home-track-record" style="font-size:13px;font-weight:700;color:var(--accent)">—</div>
           </div>
-          <button onclick="showPanel('scanner');setTimeout(runMorningBriefing,150)"
-            style="padding:6px 14px;border-radius:8px;border:1px solid var(--accent);
-            background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;
-            font-weight:600;cursor:pointer">
-            <i class="ti ti-refresh"></i> Neu berechnen
-          </button>
         </div>
 
-        <!-- Regime-Status -->
-        <div id="home-regime-card" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;padding:.9rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.75rem">
-          <div style="font-size:11px;color:var(--text3);min-width:80px">Marktregime</div>
-          <div id="home-regime-val" style="font-size:13px;font-weight:600;color:var(--text)">—</div>
-          <div style="font-size:11px;color:var(--text3);min-width:60px;margin-left:auto">VIX</div>
-          <div id="home-vix-val" style="font-size:13px;font-weight:600;color:var(--text)">—</div>
+        <!-- Markt-Status Zeile: Regime + VIX kompakt -->
+        <div id="home-regime-card" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:.6rem 1rem;margin-bottom:.75rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:10px;color:var(--text3)">REGIME</span>
+            <span id="home-regime-val" style="font-size:12px;font-weight:700;color:var(--text)">—</span>
+          </div>
+          <div style="width:1px;height:16px;background:var(--border2)"></div>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:10px;color:var(--text3)">VIX</span>
+            <span id="home-vix-val" style="font-size:12px;font-weight:700;color:var(--text)">—</span>
+          </div>
+          <div style="margin-left:auto">
+            <!-- Aktivitäts-Spinner (sichtbar während Analyse läuft) -->
+            <div id="home-activity" style="display:none;font-size:11px;color:var(--accent);display:flex;align-items:center;gap:6px">
+              <i class="ti ti-loader" style="animation:spin 1s linear infinite"></i>
+              <span id="home-activity-text">Bitte Geduld, Bericht wird erstellt…</span>
+            </div>
+          </div>
         </div>
 
-        <!-- Track-Record-Uhr -->
-        <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;padding:.9rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.75rem">
-          <i class="ti ti-clock-record" style="color:var(--accent);font-size:1.1rem"></i>
-          <div>
-            <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Track-Record läuft seit 02.07.2026</div>
-            <div style="font-size:13px;font-weight:600;color:var(--accent)" id="home-track-record">—</div>
+        <!-- Haupt-Card: Makro + Morning Briefing vereint -->
+        <div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;overflow:hidden;margin-bottom:.75rem">
+
+          <!-- Card-Header -->
+          <div style="padding:.75rem 1rem;border-bottom:0.5px solid var(--border2);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:12px;font-weight:600;color:var(--text2)">
+              <i class="ti ti-chart-bar" style="color:var(--accent)"></i>
+              Marktlage &amp; Briefing
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div id="home-briefing-time" style="font-size:10px;color:var(--text3)">—</div>
+              <!-- Neu berechnen: nur sichtbar wenn Briefing bereits vorhanden -->
+              <button id="home-refresh-btn" onclick="runHomeBriefing(true)"
+                style="display:none;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);
+                background:transparent;color:var(--text3);font-size:10px;cursor:pointer"
+                title="Briefing neu berechnen (Cache überschreiben)">
+                ↺ Neu
+              </button>
+            </div>
+          </div>
+
+          <!-- Makro-Schnellansicht (aus localStorage) -->
+          <div id="home-makro-strip" style="padding:.6rem 1rem;border-bottom:0.5px solid var(--border2);display:flex;gap:1rem;flex-wrap:wrap;font-size:11px;color:var(--text3)">
+            <span>S&P <span id="hm-sp" style="color:var(--text);font-weight:600">—</span></span>
+            <span>NQ <span id="hm-nq" style="color:var(--text);font-weight:600">—</span></span>
+            <span>DAX <span id="hm-dax" style="color:var(--text);font-weight:600">—</span></span>
+            <span>VIX <span id="hm-vix" style="color:var(--text);font-weight:600">—</span></span>
+            <span>Öl <span id="hm-oil" style="color:var(--text);font-weight:600">—</span></span>
+            <span>Gold <span id="hm-gold" style="color:var(--text);font-weight:600">—</span></span>
+          </div>
+
+          <!-- Briefing-Text -->
+          <div id="home-briefing-text" style="padding:.85rem 1rem;font-size:12px;color:var(--text3);line-height:1.7">
+            Noch kein Briefing heute — Button unten klicken.
+          </div>
+
+          <!-- Aktion-Button -->
+          <div style="padding:.6rem 1rem;border-top:0.5px solid var(--border2)">
+            <button id="home-start-btn" onclick="runHomeBriefing(false)"
+              style="width:100%;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);
+              background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;
+              font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+              <i class="ti ti-chart-radar"></i> Aktuelles Marktgeschehen überprüfen
+            </button>
           </div>
         </div>
 
@@ -4984,8 +5023,61 @@ function changePin(){
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────
+// ── runHomeBriefing: Makro + MB aus Übersicht-Tab heraus starten ─────────────
+async function runHomeBriefing(force) {
+  var today = new Date().toISOString().slice(0,10);
+  var cacheKey = 'morning_briefing_' + today;
+  var startBtn = document.getElementById('home-start-btn');
+  var actEl    = document.getElementById('home-activity');
+  var actTxt   = document.getElementById('home-activity-text');
+  var txtEl    = document.getElementById('home-briefing-text');
+
+  // Cache prüfen (nur wenn kein force)
+  if (!force) {
+    try {
+      var cached = JSON.parse(localStorage.getItem(cacheKey));
+      if (cached && cached.kiBriefing) { renderHomeLanding(); return; }
+    } catch(e) {}
+  }
+
+  // Aktivitätsanzeige einschalten
+  if (actEl) actEl.style.display = 'flex';
+  if (startBtn) { startBtn.disabled = true; startBtn.style.opacity = '.5'; }
+  if (txtEl) txtEl.innerHTML = '<span style="color:var(--text3)">Bitte Geduld, Bericht wird erstellt…</span>';
+
+  var _steps = ['Makrodaten laden…','Marktregime berechnen…','Sektoren analysieren…',
+                'Intermarket prüfen…','KI-Briefing generieren…','Bericht wird erstellt…'];
+  var _si = 0;
+  var _stTimer = setInterval(function() {
+    _si = (_si+1) % _steps.length;
+    if (actTxt) actTxt.textContent = _steps[_si];
+  }, 2500);
+
+  try {
+    await runMorningBriefing();
+  } catch(e) {
+    if (txtEl) txtEl.textContent = '⚠ Fehler: ' + e.message;
+  } finally {
+    clearInterval(_stTimer);
+    if (actEl) actEl.style.display = 'none';
+    if (startBtn) { startBtn.disabled = false; startBtn.style.opacity = '1'; }
+    renderHomeLanding();
+  }
+}
+
 // ── HOME LANDING (AP-A) ──────────────────────────────────────────────────────
 function renderHomeLanding() {
+  // Makro-Strip aus localStorage
+  try {
+    var mkRaw = localStorage.getItem('ko_makro');
+    var mk = mkRaw ? JSON.parse(mkRaw) : null;
+    if (mk) {
+      var _hm = function(id,val){var e=document.getElementById(id);if(e&&val)e.textContent=val;};
+      _hm('hm-sp',mk.sp);_hm('hm-nq',mk.nq);_hm('hm-dax',mk.dax);
+      _hm('hm-vix',mk.vix);_hm('hm-oil',mk.oil);_hm('hm-gold',mk.gold);
+    }
+  } catch(e) {}
+
   // Datum + Uhrzeit
   var dateEl = document.getElementById('home-date');
   if (dateEl) {
@@ -5024,11 +5116,16 @@ function renderHomeLanding() {
 
   if (cached && cached.kiBriefing) {
     if (txtEl) {
-      // Ersten Absatz zeigen (max ~300 Zeichen)
-      var preview = cached.kiBriefing.replace(/#+\s*/g,'').trim();
-      preview = preview.length > 300 ? preview.substring(0, 300) + '…' : preview;
-      txtEl.textContent = preview;
+      // Vollständigen Text mit Basis-Markdown anzeigen
+      var formatted = (cached.kiBriefing||'')
+        .replace(/^## (.+)$/gm,'<div style="font-weight:700;margin-top:.6rem;color:var(--text)">$1</div>')
+        .replace(/^### (.+)$/gm,'<div style="font-weight:600;margin-top:.4rem;color:var(--text2)">$1</div>')
+        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+        .replace(/\n/g,'<br>');
+      txtEl.innerHTML = formatted;
       txtEl.style.color = 'var(--text2)';
+      var rb=document.getElementById('home-refresh-btn');
+      if(rb) rb.style.display='block';
     }
     if (timeEl) timeEl.textContent = 'Heute · ' + (cached.time || '—') + ' Uhr';
   } else {
@@ -5141,7 +5238,7 @@ function updateClock(){
     'sync-modal':         function(){ if(typeof closeSyncModal==='function') closeSyncModal(); },
     'workflow-modal':     function(){ if(typeof closeWorkflowModal==='function') closeWorkflowModal(); },
     'yt-modal':           function(){ if(typeof closeYtModal==='function') closeYtModal(); },
-    'eic-pin-modal':      function(){ if(typeof closeEicModal==='function') closeEicModal(); },
+    // eic-pin-modal: bewusst NICHT im Außenklick-Handler — PIN-Eingabe soll nicht versehentlich schließen
     'wl-modal':           function(){ if(typeof closeWatchlistModal==='function') closeWatchlistModal(); },
     'mover-modal':        function(){ if(typeof closeMoverModal==='function') closeMoverModal(); },
     'list-editor-modal':  function(){ if(typeof closeListEditor==='function') closeListEditor(); },
@@ -5153,6 +5250,11 @@ function updateClock(){
   // Escape-Taste: schließt oberstes sichtbares Modal
   document.addEventListener('keydown', function(e) {
     if (e.key !== 'Escape') return;
+    // EIC-PIN separat: Escape schließt, aber kein Außenklick
+    var eicM = document.getElementById('eic-pin-modal');
+    if (eicM && eicM.style.display !== 'none' && eicM.style.display !== '') {
+      if(typeof closeEicModal==='function') closeEicModal(); return;
+    }
     var ids = Object.keys(MODAL_CLOSE_MAP);
     // Von oben (hoher z-index) nach unten suchen
     var visible = ids.filter(function(id) {
@@ -19479,8 +19581,12 @@ async function runMorningBriefing() {
     // ── Cache + Anzeige ───────────────────────────────────────────
     try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) { console.warn('[Briefing] Cache-Fehler:', e.message); }
     _applyMorningResults(results);
-    // Zurück zum Scanner nach Briefing
-    if (typeof showPanel === 'function') setTimeout(function(){ showPanel('scanner'); }, 800);
+    // Navigation nach Briefing: nur wenn NICHT von Home-Panel aufgerufen
+    var _homePanel = document.getElementById('panel-home');
+    var _homeActive = _homePanel && _homePanel.classList.contains('active');
+    if (typeof showPanel === 'function' && !_homeActive) {
+      setTimeout(function(){ showPanel('scanner'); }, 800);
+    }
     if (cacheEl) cacheEl.textContent = 'Heute ' + results.time + ' Uhr';
 
   } catch(e) {
