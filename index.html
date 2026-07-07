@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v259">
+<meta name="version" content="20260708-v260">
 <!-- CHANGELOG (neueste zuerst):
+     v260: KRITISCH: Syntax-Fehler Z20837 behoben — toter Karten-Block (if false &&) hatte ungültiges .join('')-Statement → JS-Ausführung gestoppt → toggleExpertMode undefined → EIC-Slider tot.
      v259: EIC-Fix 4: _eicToggleLock Guard-Variable verhindert onchange-Loop zuverlässig.
      v258: EIC-Fix 3: onchange-Manipulation entfernt — einfacher checked=false reicht, da das inline onchange-Attribut durch Property-Zuweisung nicht überschrieben werden kann.
      v257: EIC-Fix 2: toggleExpertMode onchange-Loop eliminiert — checked=false setzt Handler kurz auf null (20ms) damit kein doppelter Trigger.
@@ -20824,21 +20825,7 @@ function renderAlphaLB(lb, key) {
   if (!cardsEl) { return; }
   cardsEl.style.display = 'none';
   cardsEl.innerHTML = '';
-  if (false && items.slice(0,8).map(function(x, i) {
-    // Score-Balken-Breite
-    var barW = Math.min(100, x.score || 0);
-    var scoreCol = (x.score || 0) >= 70 ? 'var(--green)' : (x.score || 0) >= 50 ? 'var(--amber)' : col;
-    return '<div style="background:var(--bg2);border-radius:8px;padding:8px 10px;border:0.5px solid var(--border2);cursor:pointer" onclick="openDeepDive(\'' + x.sym + '\',\'' + x.sym + '\')">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
-      +   '<span style="font-family:var(--mono);font-weight:700;font-size:13px;color:' + col + '">' + (i+1) + '. ' + x.sym + '</span>'
-      +   '<span style="font-size:11px;font-weight:600;color:' + scoreCol + '">Score ' + (x.score || 0) + '</span>'
-      + '</div>'
-      + '<div style="height:3px;background:var(--bg3);border-radius:2px;overflow:hidden">'
-      +   '<div style="height:100%;width:' + barW + '%;background:' + scoreCol + ';border-radius:2px"></div>'
-      + '</div>'
-      + '<div style="font-size:9px;color:var(--text3);margin-top:3px">→ DeepDive öffnen</div>'
-      + '</div>';
-  }).join('');
+  // Karten-Block entfernt (v254) — nur Chips werden gerendert
 }
 
 // Mapping Leaderboard-Key → passende KI-Strategie
