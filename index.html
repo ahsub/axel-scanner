@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v262">
+<meta name="version" content="20260708-v263">
 <!-- CHANGELOG (neueste zuerst):
+     v263: Strategie-Ampel auf Landing-Page (grün/gelb/rot, alle Strategien). window._lastMseResult für Landing-Page-Zugriff. Scanner Gates: inaktive Strategien explizit rot+gelb mit Border. Selektiv-Tooltip erklärt was Selektiv bedeutet.
      v262: MB-Architektur: Polling-Gate vor Schritt 9 — wartet bis intermarket-score + bull-score im DOM befüllt sind (max 15s, 500ms-Intervall). KI-Analyse startet erst wenn Data-Basket vollständig ist.
      v261: (1) Spinner display:flex/none Konflikt behoben. (2) MB-Start: kein Tab-Wechsel zu Makro mehr. (3) Wartezeiten erhöht: Intermarket 2500ms, Bull-Indikator 1500ms, Sektor/RS je 1500ms — DOM muss befüllt sein bevor Prompt gebaut wird.
      v260: KRITISCH: Syntax-Fehler Z20837 behoben — toter Karten-Block (if false &&) hatte ungültiges .join('')-Statement → JS-Ausführung gestoppt → toggleExpertMode undefined → EIC-Slider tot.
@@ -461,6 +462,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
               <i class="ti ti-loader" style="animation:spin 1s linear infinite"></i>
               <span id="home-activity-text">Bitte Geduld, Bericht wird erstellt…</span>
             </div>
+          </div>
+        </div>
+
+        <!-- Strategie-Ampel -->
+        <div id="home-strategy-ampel" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:.7rem 1rem;margin-bottom:.75rem">
+          <div style="font-size:10px;color:var(--text3);letter-spacing:.8px;margin-bottom:.5rem">STRATEGIE-AMPEL</div>
+          <div id="home-strategy-gates" style="display:flex;gap:5px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--text3)">Noch keine Regime-Daten</span>
           </div>
         </div>
 
@@ -5141,6 +5150,45 @@ function renderHomeLanding() {
       txtEl.style.color = 'var(--text3)';
     }
     if (timeEl) timeEl.textContent = '—';
+  }
+
+  // Strategie-Ampel befüllen
+  var gatesHomeEl = document.getElementById('home-strategy-gates');
+  if (gatesHomeEl) {
+    var mseResult = window._lastMseResult || null;
+    if (mseResult && mseResult.strategies) {
+      var _ampelLabels = {
+        momentum:     '📈 Momentum',
+        swing:        '🔄 Swing',
+        csp_wheel:    '⚙️ CSP/Wheel',
+        meanrev:      '↩️ Mean Rev.',
+        breakout:     '🚀 Breakout',
+        atmna:        '⚡ atmna',
+        fading_short: '🔝 KO-Short',
+        dividend:     '💰 Dividend',
+        weekly_income:'📅 Weekly Inc.',
+      };
+      var _ampelHtml = Object.entries(mseResult.strategies).map(function(e) {
+        var key = e[0], strat = e[1];
+        var label = _ampelLabels[key] || key;
+        if (strat.active === true) {
+          return '<div title="' + (strat.note||'') + '" style="font-size:11px;padding:3px 9px;border-radius:10px;'
+            + 'background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green)">'
+            + '✓ ' + label + '</div>';
+        } else if (strat.conditional) {
+          return '<div title="' + (strat.note||'') + '" style="font-size:11px;padding:3px 9px;border-radius:10px;'
+            + 'background:rgba(245,158,11,0.1);border:0.5px solid var(--amber);color:var(--amber)">'
+            + '~ ' + label + '</div>';
+        } else {
+          return '<div title="' + (strat.note||'') + '" style="font-size:11px;padding:3px 9px;border-radius:10px;'
+            + 'background:rgba(239,68,68,0.08);border:0.5px solid var(--red);color:var(--red)">'
+            + '✗ ' + label + '</div>';
+        }
+      }).join('');
+      gatesHomeEl.innerHTML = _ampelHtml || '<span style="font-size:11px;color:var(--text3)">Keine Daten</span>';
+    } else {
+      gatesHomeEl.innerHTML = '<span style="font-size:11px;color:var(--text3)">Morning Briefing starten für Strategie-Ampel</span>';
+    }
   }
 
   // Regime + VIX aus DOM lesen (bereits geladen)
@@ -18868,24 +18916,40 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
     };
     gatesEl.innerHTML = Object.entries(result.strategies).map(function(entry) {
       var key = entry[0], strat = entry[1];
-      var color  = strat.active ? 'var(--green)' : 'var(--red)';
-      var bg     = strat.active ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
-      var prefix = strat.active ? '✓' : '✗';
-      return '<div title="' + strat.note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;background:' + bg + ';color:' + color + ';cursor:help">'
-        + prefix + ' ' + strategyLabels[key] + '</div>';
+      var color, bg, prefix;
+      if (strat.active) {
+        color = 'var(--green)'; bg = 'rgba(34,197,94,0.1)'; prefix = '✓';
+      } else if (strat.conditional) {
+        color = 'var(--amber)'; bg = 'rgba(245,158,11,0.1)'; prefix = '~';
+      } else {
+        color = 'var(--red)'; bg = 'rgba(239,68,68,0.08)'; prefix = '✗';
+      }
+      var label = strategyLabels[key] || key;
+      var note  = strat.note || (strat.active ? 'Handelbar' : 'Nicht empfohlen im aktuellen Regime');
+      return '<div title="' + note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;'
+        + 'background:' + bg + ';color:' + color + ';border:0.5px solid ' + color + ';cursor:help">'
+        + prefix + ' ' + label + '</div>';
     }).join('');
   }
 
   // Action Text
   var actionEl = document.getElementById('rc-action');
   if (actionEl && result) {
-    actionEl.textContent = result.action;
+    // Erklärenden Tooltip bei 'Selektiv vorgehen'
+    var actionText = result.action || '';
+    if (actionText.includes('Selektiv')) {
+      actionEl.title = 'Selektiv = Nur Setups mit Score ≥75, klarem Trend und engem Stop handeln. '
+        + 'Positionsgröße reduzieren, keine neuen Strategien aufbauen.';
+      actionEl.style.cursor = 'help';
+    }
+    actionEl.textContent = actionText;
     actionEl.style.color = result.color;
   }
 
   // Globale Variable für Scanner-Filter
-  window._currentRegime = result ? result.regime : null;
-  window._lastQqqRegime = result ? result.regime.toLowerCase() : null;
+  window._currentRegime  = result ? result.regime : null;
+  window._lastQqqRegime  = result ? result.regime.toLowerCase() : null;
+  window._lastMseResult  = result || null; // für Strategie-Ampel Landing-Page
 }
 
 // MSE Detail Modal
