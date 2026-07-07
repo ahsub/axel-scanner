@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260708-v251">
+<meta name="version" content="20260708-v252">
 <!-- CHANGELOG (neueste zuerst):
+     v252: (1) Landing-Page: Datum zweistufig (Wochentag + Datum+Uhrzeit), Version v252·08.07.2026. (2) DIX/GEX→PCR/GEX-Proxy Labels (Squeezemetrics tot). (3) MB-Orchestrierung: Makro-Schritt 0 vor MB-Start, Rückkehr zu Scanner nach Briefing.
      v251: (E) Track-Record-Uhr live: 60s Interval + Minuten-Anzeige (Xd Yh Zmin). (F) Changelog-Snippet auf Landing-Page (Build-Version aus Meta-Tag).
      v250: (A) help.html Sync: Modellnamen+KI-Begriff aktualisiert. (B) 47 alert()→showKoToast: keine blockierenden Browser-Dialoge mehr. (C) Prompt "kurz und bündig". (D) nav-scanner hardcoded active entfernt.
      v249: (1) Zentraler Modal-Handler: Escape+Außenklick für alle 11 Modals. (2) Track-Record-Uhr auf Landing-Page (seit 02.07.2026). (3) nav-scanner Initial-Highlight beim App-Start. (4) KI-Dropdown gesperrt solange keine Scan-Ergebnisse geladen.
@@ -421,7 +422,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <i class="ti ti-home" style="font-size:1.4rem;color:var(--accent)"></i>
           <div>
             <div style="font-size:16px;font-weight:700;color:var(--text)">UnderlyingIQ</div>
-            <div id="home-date" style="font-size:11px;color:var(--text3)">—</div>
+            <div id="home-date" style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap">—</div>
           <div id="home-changelog" style="font-size:10px;color:var(--text3);margin-top:2px;opacity:.6"></div>
           </div>
         </div>
@@ -4979,12 +4980,16 @@ function changePin(){
 // ─── NAV ─────────────────────────────────────────────────────────────
 // ── HOME LANDING (AP-A) ──────────────────────────────────────────────────────
 function renderHomeLanding() {
-  // Datum
+  // Datum + Uhrzeit
   var dateEl = document.getElementById('home-date');
   if (dateEl) {
-    dateEl.textContent = new Date().toLocaleDateString('de-DE', {
-      weekday:'long', year:'numeric', month:'long', day:'numeric'
-    });
+    var _now = new Date();
+    var _day = _now.toLocaleDateString('de-DE', { weekday:'long' });
+    var _date = _now.toLocaleDateString('de-DE', { day:'2-digit', month:'long', year:'numeric' });
+    var _time = _now.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    dateEl.innerHTML =
+      '<span style="font-size:13px;font-weight:600;color:var(--text)">' + _day + '</span>'
+      + '<span style="margin-left:6px;font-size:11px;color:var(--text3)">' + _date + ' · ' + _time + '</span>';
   }
 
   // Changelog-Snippet: Build-Version aus Meta-Tag
@@ -4992,7 +4997,13 @@ function renderHomeLanding() {
   if (clEl) {
     var verMeta = document.querySelector('meta[name="version"]');
     var ver = verMeta ? verMeta.getAttribute('content') : '';
-    clEl.textContent = ver ? 'Build ' + ver : '';
+    // Format: '20260708-v251' → 'v251 · 08.07.2026'
+    if (ver) {
+      var parts = ver.split('-');
+      var vNum  = parts[1] || ver;
+      var vDate = parts[0] ? parts[0].replace(/(\d{4})(\d{2})(\d{2})/, '$3.$2.$1') : '';
+      clEl.textContent = vNum + (vDate ? ' · ' + vDate : '');
+    }
   }
 
   // Letztes Morning Briefing aus localStorage laden
@@ -18792,8 +18803,8 @@ function showMSEDetail() {
 
   var metricsHtml = [
     ['VVIX Z-Score', metrics.vvix_z20 != null ? metrics.vvix_z20.toFixed(2) : '—'],
-    ['GEX Z-Score',  metrics.gex_z20  != null ? metrics.gex_z20.toFixed(2)  : '—'],
-    ['DIX Z-Score',  metrics.dix_z20  != null ? metrics.dix_z20.toFixed(2)  : '—'],
+    ['GEX-Proxy Z',  metrics.gex_z20  != null ? metrics.gex_z20.toFixed(2)  : '—'],
+    ['PCR Z-Score',  metrics.dix_z20  != null ? metrics.dix_z20.toFixed(2)  : '—'],
     ['SKEW Pct20',   metrics.skew_pct20 != null ? metrics.skew_pct20 + '%'  : '—'],
     ['VIX Term',     metrics.term_structure || '—'],
   ].map(function(r) {
@@ -19285,6 +19296,13 @@ async function runMorningBriefing() {
   var wasMakro = document.getElementById('panel-makro')?.classList.contains('active');
 
   try {
+    // ── 0/9: Makro-Panel kurz aktivieren (Intermarket + Bull-Indikator brauchen DOM-Kontext) ──
+    setStep('Makro-Daten vorbereiten…');
+    if (typeof showPanel === 'function') showPanel('makro');
+    if (typeof loadMakro === 'function') loadMakro();
+    if (typeof refreshLivePrices === 'function') await refreshLivePrices();
+    await new Promise(function(r){ setTimeout(r, 1000); }); // DOM settle
+
     // ── 1/9: Market State Engine (VVIX, SKEW, VIX, VIX3M) ────────
     setStep('1/9 Market State Engine…');
     if (typeof updateMarketWeatherWidget === 'function') {
@@ -19417,8 +19435,8 @@ async function runMorningBriefing() {
       messwerteLines.push('--- VOLATILITÄT & FLOW ---');
       messwerteLines.push('VVIX Rohwert: ' + vvixRaw + ' · Z-Score(20T): ' + vvixZ);
       messwerteLines.push('SKEW Rohwert: ' + skewRaw + ' · Perzentil(20T): ' + skewPct);
-      messwerteLines.push('DIX Z-Score(20T): ' + dixZ + ' (positiv = institutionelle Akkumulation)');
-      messwerteLines.push('GEX Z-Score(20T): ' + gexZ + ' (positiv = Dealer dämpfen Bewegung)');
+      messwerteLines.push('PCR Z-Score(20T): ' + dixZ + ' (negativ = Akkumulation/Bullish)');
+      messwerteLines.push('GEX-Proxy Z(20T): ' + gexZ + ' (positiv = Dealer dämpfen Bewegung)');
       messwerteLines.push('Institutional Flow Score: ' + (results.dpScore || '—') + '/100');
       messwerteLines.push('');
       messwerteLines.push('--- MAKRO-INDIKATOREN ---');
@@ -19455,6 +19473,8 @@ async function runMorningBriefing() {
     // ── Cache + Anzeige ───────────────────────────────────────────
     try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) { console.warn('[Briefing] Cache-Fehler:', e.message); }
     _applyMorningResults(results);
+    // Zurück zum Scanner nach Briefing
+    if (typeof showPanel === 'function') setTimeout(function(){ showPanel('scanner'); }, 800);
     if (cacheEl) cacheEl.textContent = 'Heute ' + results.time + ' Uhr';
 
   } catch(e) {
@@ -19852,8 +19872,8 @@ function showMorningTearsheet(results) {
           metricRow('VIX Term', metrics ? metrics.term_structure : '—', metrics && metrics.term_structure === 'CONTANGO' ? '#22c55e' : '#f0a93a') +
           metricRow('VVIX', metrics ? val(metrics.vvix_raw,'') + ' (Z: ' + val(metrics.vvix_z20,'') + ')' : '—') +
           metricRow('SKEW', metrics ? val(metrics.skew_raw,'') + ' (Pct: ' + val(metrics.skew_pct20,'%') + ')' : '—') +
-          metricRow('DIX Z-Score', metrics ? val(metrics.dix_z20) : '—') +
-          metricRow('GEX Z-Score', metrics ? val(metrics.gex_z20) : '—') +
+          metricRow('PCR Z-Score', metrics ? val(metrics.dix_z20) : '—') +
+          metricRow('GEX-Proxy Z', metrics ? val(metrics.gex_z20) : '—') +
           metricRow('Dark Pool Flow', val(results.dpScore, '/100'), scoreColor(results.dpScore, 40, 60)) +
           metricRow('Flow Signal', dpSig ? dpSig.emoji + ' ' + dpSig.label : '—') +
         '</table>' +
