@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v252">
+<meta name="version" content="20260708-v253">
 <!-- CHANGELOG (neueste zuerst):
+     v253: Scanner-Header Redesign: Handelsplatz-Buttons (US/DE) öffnen Dropdown mit Listen; Aggregator-Button; Long/Bear auf gleicher Ebene; Aktive-Liste-Chip; Makro-Link aus Cockpit entfernt; _setScanModeVisual sync beide Leisten.
      v252: (1) Landing-Page: Datum zweistufig (Wochentag + Datum+Uhrzeit), Version v252·08.07.2026. (2) DIX/GEX→PCR/GEX-Proxy Labels (Squeezemetrics tot). (3) MB-Orchestrierung: Makro-Schritt 0 vor MB-Start, Rückkehr zu Scanner nach Briefing.
      v251: (E) Track-Record-Uhr live: 60s Interval + Minuten-Anzeige (Xd Yh Zmin). (F) Changelog-Snippet auf Landing-Page (Build-Version aus Meta-Tag).
      v250: (A) help.html Sync: Modellnamen+KI-Begriff aktualisiert. (B) 47 alert()→showKoToast: keine blockierenden Browser-Dialoge mehr. (C) Prompt "kurz und bündig". (D) nav-scanner hardcoded active entfernt.
@@ -489,7 +490,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <div id="rc-vix" style="font-size:11px;color:var(--text2)">VIX —</div>
             <div id="rc-dp" style="font-size:11px;color:var(--text2)">Flow —</div>
             <div id="rc-tsi" style="font-size:11px;color:var(--text2)">Stress —</div>
-            <div style="font-size:10px;color:var(--text3);margin-left:auto;cursor:pointer" onclick="showPanel('makro')">→ Makro</div>
+            <!-- Makro-Link entfernt -->
           </div>
           <!-- Strategie-Gates (werden nach Regime aktualisiert) -->
           <div id="mse-gates" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:.3rem"></div>
@@ -504,14 +505,51 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <span id="morning-btn" style="display:none"></span>
         <div id="morning-cache-info" style="display:none"></div>
       </div>
-      <!-- US/DE Market Toggle -->
-      <div style="display:flex;gap:0;margin-bottom:.75rem;border:0.5px solid var(--border2);border-radius:var(--radius-sm);overflow:hidden">
-        <button id="mkt-us-btn" onclick="setMarket('us')" style="flex:1;padding:8px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:var(--accent);color:#fff;transition:all .15s">
-          🔔 USA (NYSE/Nasdaq)
+      <!-- Scanner-Steuerleiste: Handelsplatz + Richtung auf gleicher Ebene -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:.6rem;flex-wrap:wrap">
+
+        <!-- Handelsplatz USA -->
+        <div style="position:relative">
+          <button id="mkt-us-btn" onclick="toggleMarketDropdown('us',this)"
+            style="display:flex;align-items:center;gap:5px;padding:6px 10px;font-size:12px;font-weight:600;
+background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer">
+            🇺🇸 USA <i class="ti ti-chevron-down" style="font-size:10px"></i>
+          </button>
+        </div>
+
+        <!-- Handelsplatz DE -->
+        <div style="position:relative">
+          <button id="mkt-de-btn" onclick="toggleMarketDropdown('de',this)"
+            style="display:flex;align-items:center;gap:5px;padding:6px 10px;font-size:12px;font-weight:500;
+background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);border-radius:8px;cursor:pointer">
+            🇩🇪 DE <i class="ti ti-chevron-down" style="font-size:10px"></i>
+          </button>
+        </div>
+
+        <!-- Aggregator-Liste -->
+        <button onclick="loadScannerFromKV()"
+          style="display:flex;align-items:center;gap:5px;padding:6px 10px;font-size:12px;font-weight:500;
+background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);border-radius:8px;cursor:pointer"
+          title="Nächtliche Aggregator-Liste laden">
+          <i class="ti ti-database"></i> Aggregator
         </button>
-        <button id="mkt-de-btn" onclick="setMarket('de')" style="flex:1;padding:8px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:var(--bg3);color:var(--text2);transition:all .15s">
-          🇩🇪 DE (TR / L&S)
-        </button>
+
+        <!-- Trennlinie -->
+        <div style="width:1px;height:24px;background:var(--border2);margin:0 2px"></div>
+
+        <!-- Long / Bear Richtung -->
+        <div id="scan-mode-seg-2" style="display:flex;border:0.5px solid var(--border2);border-radius:8px;overflow:hidden">
+          <button id="seg-long-2" onclick="setScanMode('long',this)"
+            style="padding:6px 12px;font-size:12px;font-weight:600;border:none;cursor:pointer;
+background:var(--accent);color:#fff">↑ Long</button>
+          <button id="seg-bear-2" onclick="setScanMode('bear',this)"
+            style="padding:6px 12px;font-size:12px;font-weight:500;border:none;cursor:pointer;
+background:var(--bg3);color:var(--text2)">↓ Bear</button>
+        </div>
+
+        <!-- Aktive Listen als Chips -->
+        <div id="active-list-chips" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center"></div>
+
       </div>
 
       <div class="btn-row">
@@ -555,38 +593,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <span id="kv-mode-badge" onclick="loadScannerFromKV()" style="display:none;font-size:10px;padding:3px 8px;border-radius:6px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green);white-space:nowrap;cursor:pointer" title="Klicken: Aggregator-Ergebnisse laden (Nacht-Scan)">
           <i class="ti ti-database"></i> <span id="kv-mode-date">KV</span>
         </span>
-        <div id="scan-mode-seg" style="display:flex;border:0.5px solid var(--border2);border-radius:8px;overflow:hidden" title="Scan-Richtung: Long-Scanner oder Bear-Scanner">
-          <button id="seg-long" onclick="setScanMode('long')" style="padding:6px 12px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:rgba(52,194,110,0.15);color:var(--green)">📈 Long</button>
-          <button id="seg-bear" onclick="setScanMode('bear')" style="padding:6px 12px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:var(--bg3);color:var(--text3)">🐻 Bear</button>
-        </div>
-        <button class="btn btn-primary" onclick="runScanAuto()" id="scan-btn">
-          <i class="ti ti-player-play"></i> Scan
-        </button>
-        <button id="kv-live-btn" style="display:none;font-size:11px;padding:4px 10px;border-radius:8px;background:rgba(239,68,68,0.1);border:0.5px solid var(--red);color:var(--red);cursor:pointer;white-space:nowrap" onclick="runScan()" title="Live-Scan via Twelve Data API (Rate-Limited)">
-          <i class="ti ti-wifi"></i> Live
-        </button>
-        <div style="position:relative;display:none" id="ki-dropdown-wrap">
-          <button class="btn" onclick="toggleKiDropdown(this)"
-            style="background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.2));border-color:#818cf8;color:#818cf8;font-size:13px;display:flex;align-items:center;gap:4px"
-            title="KI-basierte Markt-Einschätzung der Scanner-Ergebnisse">
-            <i class="ti ti-brain"></i> <span style="font-size:11px;font-weight:600">KI-basierte Markt-Einschätzung</span>
-            <i class="ti ti-chevron-down" style="font-size:10px"></i>
-          </button>
-          <div id="ki-strat-dropdown" style="display:none;position:absolute;right:0;top:110%;background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:6px;z-index:500;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
-            <div style="font-size:10px;color:var(--text3);padding:2px 6px 6px;border-bottom:0.5px solid var(--border);margin-bottom:4px">KI-ANALYSE STARTEN:</div>
-            <button onclick="openKiBriefing('ko');hideKiDropdown()" class="ki-dd-btn">⚡ KO-Trading</button>
-            <button onclick="openKiBriefing('momentum');hideKiDropdown()" class="ki-dd-btn">📈 Momentum</button>
-            <button onclick="openKiBriefing('options');hideKiDropdown()" class="ki-dd-btn">🎯 Options-Wheel</button>
-            <button onclick="openKiBriefing('swing');hideKiDropdown()" class="ki-dd-btn">🔄 Swing-Trading</button>
-            <button onclick="openKiBriefing('meanrev');hideKiDropdown()" class="ki-dd-btn">↩️ Mean Reversion</button>
-            <button onclick="openKiBriefing('breakout');hideKiDropdown()" class="ki-dd-btn">🚀 Breakout</button>
-            <button onclick="openKiBriefing('dividend');hideKiDropdown()" class="ki-dd-btn">💰 Dividend Growth</button>
-            <button onclick="openKiBriefing('atmna');hideKiDropdown()" class="ki-dd-btn" style="color:#a371f7">⚙️ Options ATM/NA</button>
-            <button onclick="openKiBriefing('weekly_income');hideKiDropdown()" class="ki-dd-btn" style="color:#34d399">📅 Options Weekly</button>
-            <div style="border-top:0.5px solid var(--border);margin-top:4px;padding-top:4px">
-              <button onclick="openKiBriefing();hideKiDropdown()" class="ki-dd-btn" style="color:var(--text3);font-size:10px">🧠 Alle Strategien (Modal)</button>
-            </div>
-          </div>
+        <!-- scan-mode-seg in Steuerleiste (v253) -->
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem">
@@ -20846,12 +20853,130 @@ function renderAlphaCards(ms) {
 
 // v244: Long|Bear-Segmentschalter (Scanner-Toolbar)
 function _setScanModeVisual(m){
-  var sl=document.getElementById('seg-long'), sb=document.getElementById('seg-bear');
-  if(!sl||!sb) return;
-  if(m==='bear'){ sb.style.background='rgba(239,68,68,0.15)'; sb.style.color='var(--red)'; sl.style.background='var(--bg3)'; sl.style.color='var(--text3)'; }
-  else { sl.style.background='rgba(52,194,110,0.15)'; sl.style.color='var(--green)'; sb.style.background='var(--bg3)'; sb.style.color='var(--text3)'; }
+  // Sync beide Seg-Leisten (alt seg-long/bear + neu seg-long-2/bear-2)
+  [['seg-long','seg-bear'],['seg-long-2','seg-bear-2']].forEach(function(ids){
+    var sl=document.getElementById(ids[0]), sb=document.getElementById(ids[1]);
+    if(!sl||!sb) return;
+    if(m==='bear'){
+      sb.style.background='rgba(239,68,68,0.15)'; sb.style.color='var(--red)';
+      sl.style.background='var(--bg3)'; sl.style.color='var(--text3)';
+    } else {
+      sl.style.background='var(--accent)'; sl.style.color='#fff';
+      sb.style.background='var(--bg3)'; sb.style.color='var(--text2)';
+    }
+  });
 }
-function setScanMode(m){
+// ── Handelsplatz-Dropdown (AP Scanner-Header v253) ────────────────────────────
+var _marketDropdowns = {
+  us: [
+    ["default", "🇺🇸 50 US-Aktien (Standard)"]
+    ["top50-us", "📈 IBD Momentum Top-50"]
+    ["fixed:SP500", "🇺🇸 S&P 500 Kern-100"]
+    ["fixed:NDX100", "🇺🇸 NASDAQ 100"]
+    ["fixed:DEFENSE", "🛡️ Defense & Aerospace"]
+    ["fixed:ROBOTICS", "🤖 Robotics & AI"]
+    ["fixed:CYBERSECURITY", "🔐 Cybersecurity"]
+    ["fixed:NUCLEAR_ENERGY", "☢️ Nuclear Energy"]
+    ["fixed:HEALTH", "🏥 Healthcare"]
+    ["fixed:FINANCE", "🏦 Financials"]
+    ["fixed:ENERGY", "⚡ Energy & Oil"]
+    ["fixed:AI_TECH", "💡 AI & Tech"]
+    ["fixed:PICKS_SHOVELS", "⛏ AI-Infrastruktur"]
+    ["fixed:PRECIOUS_METALS", "🥇 Precious Metals"]
+    ["fixed:SPACE", "🚀 Space"]
+  ],
+  de: [
+    ["fixed:DAX40", "📊 DAX 40"]
+    ["fixed:MDAX", "📈 MDAX Top 20"]
+    ["fixed:TECDAX", "💻 TecDAX"]
+    ["default", "🇺🇸 US-Aktien (DE-handelbar)"]
+  ]
+};
+
+function toggleMarketDropdown(market, btn) {
+  // Bestehende Dropdowns schließen
+  var existing = document.getElementById('mkt-dropdown');
+  if (existing) {
+    existing.remove();
+    // Wenn gleicher Button: nur schließen
+    if (existing.dataset.market === market) return;
+  }
+
+  setMarket(market);
+
+  var dropdown = document.createElement('div');
+  dropdown.id = 'mkt-dropdown';
+  dropdown.dataset.market = market;
+  dropdown.style.cssText =
+    'position:fixed;z-index:4000;background:var(--bg2);border:0.5px solid var(--border2);' +
+    'border-radius:10px;padding:6px;box-shadow:0 8px 32px rgba(0,0,0,.4);min-width:220px;' +
+    'max-height:340px;overflow-y:auto';
+
+  var r = btn.getBoundingClientRect();
+  dropdown.style.top  = (r.bottom + 4) + 'px';
+  dropdown.style.left = Math.max(8, r.left) + 'px';
+
+  var header = document.createElement('div');
+  header.style.cssText = 'font-size:10px;color:var(--text3);padding:4px 8px 6px;letter-spacing:.5px;font-weight:600';
+  header.textContent = market === 'us' ? '🇺🇸 US-LISTEN' : '🇩🇪 DE-LISTEN';
+  dropdown.appendChild(header);
+
+  (_marketDropdowns[market] || []).forEach(function(item) {
+    var el = document.createElement('div');
+    el.style.cssText = 'padding:7px 10px;font-size:12px;cursor:pointer;color:var(--text2);border-radius:6px';
+    el.textContent = item[1];
+    el.onmouseover = function() { el.style.background = 'var(--bg3)'; };
+    el.onmouseout  = function() { el.style.background = ''; };
+    el.onclick     = function() { selectMarketList(item[0], market); dropdown.remove(); };
+    dropdown.appendChild(el);
+  });
+
+  document.body.appendChild(dropdown);
+  setTimeout(function() {
+    document.addEventListener('click', function _close(e) {
+      if (!dropdown.contains(e.target) && e.target !== btn) {
+        dropdown.remove();
+        document.removeEventListener('click', _close);
+      }
+    });
+  }, 10);
+}
+
+function selectMarketList(val, market, el) {
+  // Preset-Select synchronisieren
+  var sel = document.getElementById('ticker-preset');
+  if (sel) {
+    sel.value = val;
+    if (typeof onPresetChange === 'function') onPresetChange();
+    if (typeof updateWlButtons === 'function') updateWlButtons();
+  }
+  // Chip anzeigen
+  _updateActiveChip(val, market);
+}
+
+function _updateActiveChip(val, market) {
+  var chipsEl = document.getElementById('active-list-chips');
+  if (!chipsEl) return;
+  // Label aus _marketDropdowns holen
+  var lists = _marketDropdowns[market] || [];
+  var found = lists.find(function(i) { return i[0] === val; });
+  var label = found ? found[1] : val;
+  chipsEl.innerHTML =
+    '<div style="display:flex;align-items:center;gap:4px;padding:3px 8px;font-size:11px;' +
+    'background:var(--bg3);border:0.5px solid var(--border2);border-radius:12px;color:var(--text2)">' +
+    label +
+    ' <span onclick="_clearActiveChip()" style="cursor:pointer;color:var(--text3);margin-left:2px">×</span>' +
+    '</div>';
+}
+
+function _clearActiveChip() {
+  var chipsEl = document.getElementById('active-list-chips');
+  if (chipsEl) chipsEl.innerHTML = '';
+  var sel = document.getElementById('ticker-preset');
+  if (sel) { sel.value = 'default'; if (typeof onPresetChange==='function') onPresetChange(); }
+}
+
+function setScanMode(m, btn){
   _setScanModeVisual(m);
   if(m==='bear') showBearScanner();
 }
