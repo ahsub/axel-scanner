@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v260">
+<meta name="version" content="20260708-v261">
 <!-- CHANGELOG (neueste zuerst):
+     v261: (1) Spinner display:flex/none Konflikt behoben. (2) MB-Start: kein Tab-Wechsel zu Makro mehr. (3) Wartezeiten erhöht: Intermarket 2500ms, Bull-Indikator 1500ms, Sektor/RS je 1500ms — DOM muss befüllt sein bevor Prompt gebaut wird.
      v260: KRITISCH: Syntax-Fehler Z20837 behoben — toter Karten-Block (if false &&) hatte ungültiges .join('')-Statement → JS-Ausführung gestoppt → toggleExpertMode undefined → EIC-Slider tot.
      v259: EIC-Fix 4: _eicToggleLock Guard-Variable verhindert onchange-Loop zuverlässig.
      v258: EIC-Fix 3: onchange-Manipulation entfernt — einfacher checked=false reicht, da das inline onchange-Attribut durch Property-Zuweisung nicht überschrieben werden kann.
@@ -19450,7 +19451,7 @@ async function runMorningBriefing() {
     // ── 3/9: Sektor-Überhitzung ───────────────────────────────────
     setStep('3/9 Sektor-Überhitzung…');
     if (typeof loadSektorOverheat === 'function') await loadSektorOverheat();
-    await new Promise(function(r){ setTimeout(r, 800); });
+    await new Promise(function(r){ setTimeout(r, 1500); });
 
     // ── 4/9: NDX Breadth ─────────────────────────────────────────
     setStep('4/9 NDX Breadth…');
@@ -19460,17 +19461,17 @@ async function runMorningBriefing() {
     // ── 5/9: Intermarket-Analyse ──────────────────────────────────
     setStep('5/9 Intermarket-Analyse…');
     if (typeof loadIntermarket === 'function') await loadIntermarket();
-    await new Promise(function(r){ setTimeout(r, 800); });
+    await new Promise(function(r){ setTimeout(r, 2500); }); // Fetch+Render abwarten
 
     // ── 6/9: Bull-Market Frühindikator ───────────────────────────
     setStep('6/9 Bull-Market Indikator…');
     if (typeof calcBullIndicator === 'function') await calcBullIndicator();
-    await new Promise(function(r){ setTimeout(r, 500); });
+    await new Promise(function(r){ setTimeout(r, 1500); }); // DOM befüllen lassen
 
     // ── 7/9: Sektor Relative Strength vs. SPY ────────────────────
     setStep('7/9 Sektor RS vs. SPY…');
     if (typeof loadSektorRS === 'function') await loadSektorRS();
-    await new Promise(function(r){ setTimeout(r, 800); });
+    await new Promise(function(r){ setTimeout(r, 1500); });
 
     // ── 8/9: Treasury Stress Index ───────────────────────────────
     setStep('8/9 Treasury Stress…');
