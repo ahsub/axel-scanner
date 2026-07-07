@@ -456,7 +456,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           </div>
           <div style="margin-left:auto">
             <!-- Aktivitäts-Spinner (sichtbar während Analyse läuft) -->
-            <div id="home-activity" style="display:none;font-size:11px;color:var(--accent);display:flex;align-items:center;gap:6px">
+            <div id="home-activity" style="display:none;font-size:11px;color:var(--accent);align-items:center;gap:6px">
               <i class="ti ti-loader" style="animation:spin 1s linear infinite"></i>
               <span id="home-activity-text">Bitte Geduld, Bericht wird erstellt…</span>
             </div>
@@ -19419,7 +19419,6 @@ async function runMorningBriefing() {
   try {
     // ── 0/9: Makro-Panel kurz aktivieren (Intermarket + Bull-Indikator brauchen DOM-Kontext) ──
     setStep('Makro-Daten vorbereiten…');
-    if (typeof showPanel === 'function') showPanel('makro');
     if (typeof loadMakro === 'function') loadMakro();
     if (typeof refreshLivePrices === 'function') await refreshLivePrices();
     await new Promise(function(r){ setTimeout(r, 1000); }); // DOM settle
