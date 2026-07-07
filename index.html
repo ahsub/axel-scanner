@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v253">
+<meta name="version" content="20260708-v254">
 <!-- CHANGELOG (neueste zuerst):
+     v254: Alpha Desk: Refresh-Button entfernt; KO-Short data-lb korrigiert; Karten-Liste entfernt (nur Chips); Chips +MACD-Indikator +TradingView-Button.
      v253: Scanner-Header Redesign: Handelsplatz-Buttons (US/DE) öffnen Dropdown mit Listen; Aggregator-Button; Long/Bear auf gleicher Ebene; Aktive-Liste-Chip; Makro-Link aus Cockpit entfernt; _setScanModeVisual sync beide Leisten.
      v252: (1) Landing-Page: Datum zweistufig (Wochentag + Datum+Uhrzeit), Version v252·08.07.2026. (2) DIX/GEX→PCR/GEX-Proxy Labels (Squeezemetrics tot). (3) MB-Orchestrierung: Makro-Schritt 0 vor MB-Start, Rückkehr zu Scanner nach Briefing.
      v251: (E) Track-Record-Uhr live: 60s Interval + Minuten-Anzeige (Xd Yh Zmin). (F) Changelog-Snippet auf Landing-Page (Build-Version aus Meta-Tag).
@@ -2354,9 +2355,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
           </button>
         </div>
       </div>
-      <button onclick="loadAlphaDashboard(true)" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer">
-        <i class="ti ti-refresh"></i> Refresh
-      </button>
+      <!-- Refresh-Button entfernt (AP 08.07.2026) -->
     </div>
     <!-- Regime Badge + Meta -->
     <div id="alpha-meta" style="margin-top:.5rem;font-size:11px;color:var(--text3)">Lade Daten…</div>
@@ -2376,7 +2375,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <button class="alpha-lb-tab" data-lb="short_breakdown" onclick="switchAlphaLB(this,'short_breakdown')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--red);background:rgba(239,68,68,0.08);color:var(--red);cursor:pointer">📉 Breakdown</button>
       <button class="alpha-lb-tab" data-lb="short_fading" onclick="switchAlphaLB(this,'short_fading')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.08);color:#f97316;cursor:pointer">🔝 Fading</button>
       <!-- NEU (01.07.2026): Fading Short via KO — separater Tab für Short-Strategie-Workflow -->
-      <button class="alpha-lb-tab" data-lb="short_fading" onclick="switchAlphaLB(this,'short_fading_ko')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.15);color:#f97316;cursor:pointer;font-weight:700">⚠️ KO-Short</button>
+      <button class="alpha-lb-tab" data-lb="short_fading_ko" onclick="switchAlphaLB(this,'short_fading_ko')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.15);color:#f97316;cursor:pointer;font-weight:700">⚠️ KO-Short</button>
     </div>
     <div id="alpha-lb-content" style="margin-top:.4rem;min-height:36px;font-size:11px;color:var(--text3)">–</div>
     <!-- Leaderboard-Karten (NEU 01.07.2026): befüllt sich beim Klick auf Leaderboard-Tab -->
@@ -20647,19 +20646,23 @@ function renderAlphaLB(lb, key) {
   items.slice(0,10).forEach(function(x) {
     var chip = document.createElement('div');
     chip.style.cssText = 'font-size:10px;padding:2px 7px;border-radius:5px;background:var(--bg3);border:0.5px solid var(--border2);cursor:pointer';
-    chip.title = 'Score: ' + x.score;
-    chip.innerHTML = '<span style="font-family:var(--mono);font-weight:600;color:' + col + '">' + x.sym + '</span> <span style="color:var(--text3)">' + x.score + '</span>';
+    var macdStr = x.macd != null ? (x.macd > 0 ? ' ▲' : ' ▼') : '';
+    chip.title = 'Score: ' + x.score + (x.macd != null ? ' · MACD: ' + (x.macd > 0 ? 'bullish' : 'bearish') : '') + ' · Klick: DeepDive';
+    chip.innerHTML = '<span style="font-family:var(--mono);font-weight:600;color:' + col + '">' + x.sym + '</span>'
+      + '<span style="color:var(--text3)"> ' + x.score + macdStr + '</span>'
+      + '<span onclick="(function(e,s){e.stopPropagation();window.open(\'https://www.tradingview.com/chart/?symbol=\'+s,\'_blank\');})(event,\'" + x.sym + "\')" '
+      + 'style="margin-left:4px;color:var(--text3);cursor:pointer;font-size:9px" title="TradingView">📈</span>';
     chip.onclick = (function(s){ return function(){ openDeepDive(s,s); }; })(x.sym);
     wrap.appendChild(chip);
   });
   el.innerHTML = '';
   el.appendChild(wrap);
 
-  // NEU (01.07.2026): Karten-Liste unter den Chips — zeigt Ticker als
-  // kompakte DeepDive-Einstiegskarten, damit Titel direkt analysiert werden koennen
-  if (!cardsEl) return;
-  cardsEl.style.display = 'flex';
-  cardsEl.innerHTML = items.slice(0,8).map(function(x, i) {
+  // Karten-Liste entfernt (AP 08.07.2026) — Chips genügen als Einstieg
+  if (!cardsEl) { return; }
+  cardsEl.style.display = 'none';
+  cardsEl.innerHTML = '';
+  if (false && items.slice(0,8).map(function(x, i) {
     // Score-Balken-Breite
     var barW = Math.min(100, x.score || 0);
     var scoreCol = (x.score || 0) >= 70 ? 'var(--green)' : (x.score || 0) >= 50 ? 'var(--amber)' : col;
