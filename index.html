@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260706-v244">
+<meta name="app-version" content="20260708-v245">
 <!-- CHANGELOG (neueste zuerst):
+     v245: AP-C Sprache: "KI-basierte Markt-Einschaetzung", Modellname raus, "Kurz und buendig", TF-Buttons 15min/30min. AP-I Rate-Limit UX: showKiError() zentral, 429 unterscheidbar (Tageslimit vs. Anthropic-RL), Reset-Zeit, Retry-Button.
      v244: Scanner-UX: Long|Bear-Segmentschalter neben Scan-Button, KI-Analyse-Button beschriftet & erst nach Scan sichtbar; help: Fruehausstieg-Empfehlung (BaFin-Sprachhygiene).
 v243: UI-Reorg nach Form-follows-Function (STRATEGIE v1.5): Sidebar in Workflow-Reihenfolge
            (Tagesstart → Markt-Kontext → Trading → Verwaltung); Dark Pool ohne eigenen Tab, lebt als
@@ -501,8 +502,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div style="position:relative;display:none" id="ki-dropdown-wrap">
           <button class="btn" onclick="toggleKiDropdown(this)"
             style="background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.2));border-color:#818cf8;color:#818cf8;font-size:13px;display:flex;align-items:center;gap:4px"
-            title="KI-Analyse der Scanner-Ergebnisse">
-            <i class="ti ti-brain"></i> <span style="font-size:11px;font-weight:600">KI-Analyse der Treffer</span>
+            title="KI-basierte Markt-Einschätzung der Scanner-Ergebnisse">
+            <i class="ti ti-brain"></i> <span style="font-size:11px;font-weight:600">KI-basierte Markt-Einschätzung</span>
             <i class="ti ti-chevron-down" style="font-size:10px"></i>
           </button>
           <div id="ki-strat-dropdown" style="display:none;position:absolute;right:0;top:110%;background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:6px;z-index:500;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
@@ -525,8 +526,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem">
         <span style="font-size:11px;color:var(--text3);white-space:nowrap">Zeitrahmen:</span>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
-          <button class="btn btn-sm tf-btn" id="tf-15m" onclick="setTF('15m')">15m</button>
-          <button class="btn btn-sm tf-btn" id="tf-30m" onclick="setTF('30m')">30m</button>
+          <button class="btn btn-sm tf-btn" id="tf-15m" onclick="setTF('15m')">15min</button>
+          <button class="btn btn-sm tf-btn" id="tf-30m" onclick="setTF('30m')">30min</button>
           <button class="btn btn-sm tf-btn" id="tf-1h" onclick="setTF('1h')">1h</button>
           <button class="btn btn-sm tf-btn" id="tf-4h" onclick="setTF('4h')">4h</button>
           <button class="btn btn-sm tf-btn active-tf" id="tf-1d" onclick="setTF('1d')">1T</button>
@@ -1283,7 +1284,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
 
     <div id="dp-ki-footer" style="display:none;margin-top:.6rem;font-size:10px;color:var(--text3);text-align:right">
-      <i class="ti ti-robot"></i> Claude Sonnet · <span id="dp-ki-time"></span> · Rein deskriptive Datenanalyse · Keine Anlageberatung gem. §1 WpHG
+      <i class="ti ti-robot"></i> KI-Analyse · <span id="dp-ki-time"></span> · Rein deskriptive Datenanalyse · Keine Anlageberatung gem. §1 WpHG
     </div>
   </div>
 
@@ -1891,11 +1892,11 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div>
             <div style="font-size:13px;font-weight:500">KI-Analysesprache</div>
-            <div style="font-size:11px;color:var(--text3)">Fachsprache / Einfache Sprache</div>
+            <div style="font-size:11px;color:var(--text3)">Fachsprache / Kurz und bündig</div>
           </div>
           <button id="simple-lang-toggle" onclick="toggleSimpleLanguage(this)"
             style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer">
-            💬 Einfache Sprache
+            💬 Kurz und bündig
           </button>
         </div>
       </div>
@@ -3519,7 +3520,7 @@ async function loadExtraTickerReview() {
     }
     if (sumEl) sumEl.textContent = approved.length + ' Ticker bereits freigegeben und aktiv in der Aggregator-Universe.';
   } catch(e) {
-    el.innerHTML = '<div style="color:var(--red);font-size:11px">Fehler beim Laden: ' + e.message + '</div>';
+    showKiError(el, e);
   }
 }
 window.loadExtraTickerReview = loadExtraTickerReview;
@@ -3585,13 +3586,70 @@ async function koAiCall(action, payload, expertMode) {
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: 'HTTP ' + resp.status }));
     if (resp.status === 401) throw new Error('KI-Token ungültig — bitte im Admin-Tab aktualisieren');
-    if (resp.status === 429) throw new Error('Rate-Limit erreicht — bitte kurz warten');
+    if (resp.status === 429) {
+      const rl429 = await resp.json().catch(() => ({}));
+      const rlErr = new Error(rl429.message || 'Rate-Limit erreicht — bitte kurz warten');
+      rlErr.isRateLimit = true;
+      rlErr.rlUsed  = rl429.used  || null;
+      rlErr.rlLimit = rl429.limit || null;
+      throw rlErr;
+    }
     throw new Error(err.error || 'KI-Worker Fehler ' + resp.status);
   }
 
   const data = await resp.json();
   if (!data.text) throw new Error('Leere Antwort vom KI-Worker');
   return data.text;
+}
+
+// ── Rate-Limit Fehler-Anzeige (zentral) ─────────────────────────────────────
+// Zeigt unterscheidbare Fehlermeldung je nach Typ:
+//   isRateLimit=true + Tageslimit → Reset-Zeit + Info-Text
+//   isRateLimit=true ohne Limit   → Anthropic 429, kurz warten + Retry-Button
+//   sonstiger Fehler              → generische Fehlermeldung
+function showKiError(el, err, retryFn) {
+  if (!el) return;
+  var isRL = err && err.isRateLimit;
+  var msg, sub, showRetry = false;
+
+  if (isRL && err.rlLimit) {
+    // Tageslimit des UIQ-Workers
+    msg = '⏳ KI-Tageskontingent ausgeschöpft';
+    sub = 'Heute bereits ' + (err.rlUsed||'?') + '&thinsp;/&thinsp;' + err.rlLimit
+        + ' Anfragen gesendet. Reset um 00:00 UTC'
+        + ' (' + _rlResetIn() + ').</p>'
+        + '<p style="margin:.4rem 0 0">Tipp: gecachte Ergebnisse bleiben sichtbar — '
+        + 'kein Datenverlust.';
+  } else if (isRL) {
+    // Anthropic-seitiges 429 (zu viele parallele Requests)
+    msg = '⏱ Zu viele Anfragen gleichzeitig';
+    sub = 'Kurz warten und erneut versuchen.';
+    showRetry = !!retryFn;
+  } else {
+    msg = '⚠️ KI-Fehler';
+    sub = err ? err.message : 'Unbekannter Fehler';
+  }
+
+  el.innerHTML =
+    '<div style="color:var(--red);padding:.75rem 1rem;border:0.5px solid var(--red);'
+    + 'border-radius:8px;background:rgba(239,68,68,0.07);font-size:12px;line-height:1.5">'
+    + '<div style="font-weight:600;margin-bottom:.25rem">' + msg + '</div>'
+    + '<p style="margin:0;color:var(--text2)">' + sub + '</p>'
+    + (showRetry
+        ? '<button onclick="(' + retryFn.toString() + ')()" '
+          + 'style="margin-top:.5rem;padding:3px 10px;font-size:11px;border-radius:6px;'
+          + 'border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer">'
+          + '↺ Erneut versuchen</button>'
+        : '')
+    + '</div>';
+}
+
+function _rlResetIn() {
+  var now = new Date();
+  var resetUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  var diff = Math.round((resetUTC - now) / 60000);
+  var h = Math.floor(diff / 60), m = diff % 60;
+  return h > 0 ? 'in ' + h + 'h ' + m + 'min' : 'in ' + m + ' min';
 }
 
 // ── KoSync: Cloud-Sync via ko-sync Worker ──────────────────────────────────────
@@ -4717,7 +4775,7 @@ function _initTheme() {
   var slBtn = document.getElementById('simple-lang-toggle');
   if (slBtn && _simpleLanguage) {
     slBtn.style.background = 'var(--green)'; slBtn.style.color = '#fff';
-    slBtn.style.borderColor = 'var(--green)'; slBtn.textContent = '✓ Einfache Sprache AN';
+    slBtn.style.borderColor = 'var(--green)'; slBtn.textContent = '✓ Kurz und bündig AN';
   }
 }
 
@@ -4731,9 +4789,9 @@ function toggleSimpleLanguage(btn) {
     btn.style.background = _simpleLanguage ? 'var(--green)' : 'var(--bg3)';
     btn.style.color = _simpleLanguage ? '#fff' : 'var(--text2)';
     btn.style.borderColor = _simpleLanguage ? 'var(--green)' : 'var(--border2)';
-    btn.textContent = _simpleLanguage ? '✓ Einfache Sprache AN' : '💬 Einfache Sprache';
+    btn.textContent = _simpleLanguage ? '✓ Kurz und bündig AN' : '💬 Kurz und bündig';
   }
-  showKoToast(_simpleLanguage ? '✓ KI schreibt jetzt in einfacher Sprache' : 'KI schreibt jetzt in Fachsprache');
+  showKoToast(_simpleLanguage ? '✓ Kurz und bündig aktiv' : 'Zurück zur Fachsprache');
 }
 
 function getSimpleLangSuffix() {
@@ -15796,8 +15854,7 @@ async function openKiBriefing(defaultStrat) {
     try {
       _kiText = await koAiCall('ki_briefing', prompt, _expertMode);
     } catch(fetchErr) {
-      content.innerHTML = '<div style="color:var(--red);padding:1rem;font-size:12px">'
-        + '⚠️ Fetch-Fehler: ' + fetchErr.message + '</div>';
+      showKiError(content, fetchErr);
       return;
     }
     const _kiData = { content: [{ text: _kiText }] };
@@ -17829,7 +17886,7 @@ async function runMetaAnalysis() {
     const ts = new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'});
     metaEl.innerHTML = '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">Meta-Analyse · ' + ts + ' · ' + dp + ' Datenpunkte</div>' + formatted;
   } catch(e) {
-    metaEl.innerHTML = '<div style="color:var(--red)">Fehler: ' + e.message + '</div>';
+    showKiError(metaEl, e);
   }
 }
 
@@ -18048,7 +18105,7 @@ async function fetchSingleForDeepDive(sym, name) {
     generateDeepDiveKI(sym, name, raw, _ddCurrentState);
 
   } catch(e) {
-    document.getElementById('dd-tech-grid').innerHTML = '<div style="color:var(--red);font-size:12px;grid-column:1/-1">Fehler: ' + e.message + '</div>';
+    showKiError(document.getElementById('dd-ki-text') || document.getElementById('dd-tech-grid'), e);
   }
 }
 
@@ -18164,7 +18221,7 @@ async function generateDeepDiveKI(sym, name, raw, state) {
       .replace(/\n\n/g, '<br><br>')
       .replace(/\n/g, '<br>');
     document.getElementById('dd-ki-text').innerHTML = '<div style="font-size:13px;line-height:1.8;color:var(--text)">' + html + '</div>';
-    document.getElementById('dd-ki-status').textContent = 'Claude Sonnet · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' · Keine Anlageberatung gem. §1 WpHG';
+    document.getElementById('dd-ki-status').textContent = 'KI-Analyse · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' · Keine Anlageberatung gem. §1 WpHG';
 
     // Kontext-Analyse Box
     var score = state.compositeScore || 50;
@@ -19587,8 +19644,8 @@ function showMorningTearsheet(results) {
     // KI-Analyse
     '<div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border)">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">'
-        + '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px">KI-MARKTANALYSE · CLAUDE SONNET</div>'
-        + (results.kiBriefing ? '<button id="ts-simple-btn" onclick="generateSimpleTearsheet()" style="font-size:10px;padding:3px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer" title="Allgemeinverständliche Umformulierung"><i class=\"ti ti-text-size\"></i> Einfache Sprache</button>' : '')
+        + '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px">KI-MARKTANALYSE</div>'
+        + (results.kiBriefing ? '<button id="ts-simple-btn" onclick="generateSimpleTearsheet()" style="font-size:10px;padding:3px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer" title="Allgemeinverständliche Umformulierung"><i class=\"ti ti-text-size\"></i> Kurz und bündig</button>' : '')
       + '</div>'
       + '<div id="ts-ki-text" style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap;min-height:120px">'
         + (results.kiBriefing || '<span style="color:var(--text3)">KI-Token nicht gesetzt — KI-Analyse nicht verfügbar.</span>')
@@ -20210,7 +20267,7 @@ async function runOptionsKiBriefing(strat) {
     if (statusEl) statusEl.textContent = '';
   } catch(e) {
     var contentEl = document.getElementById('ki-content');
-    if (contentEl) contentEl.innerHTML = '<div style="color:var(--red)">Fehler: ' + e.message + '</div>';
+    showKiError(contentEl, e);
     if (statusEl) statusEl.textContent = '';
   }
 }
@@ -21277,7 +21334,7 @@ async function generateDpKI(data, scoreObj, signal) {
     try {
       text = await koAiCall('dark_pool', prompt, false);
     } catch(dpErr) {
-      contentEl.innerHTML = '<div style="color:var(--red);font-size:12px">Fehler: ' + dpErr.message + '</div>';
+      showKiError(contentEl, dpErr);
       return;
     }
     if (!text) {
