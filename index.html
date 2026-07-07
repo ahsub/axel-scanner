@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260708-v247">
+<meta name="app-version" content="20260708-v248">
 <!-- CHANGELOG (neueste zuerst):
+     v248: AP-A Landing-Page: panel-home neu; Sidebar "Morning Briefing" → "Übersicht" (showPanel home); renderHomeLanding() zeigt Datum, letztes Briefing-Preview, Regime/VIX, Rechtshinweis; "Neu berechnen"-Button triggert runMorningBriefing; nav-morning → nav-home.
      v247: Morning-Briefing-Button aus Scanner-Tab + Alpha Desk entfernt (AP-B); Autostart bei Programmstart + Sidebar-Nav bleiben; morning-btn ID als unsichtbarer Stub erhalten.
      v246: AP-B Cache-Disziplin: setKiStrat/switchAlphaLB triggern keinen KI-Call mehr; openKiBriefing mit 15min In-Memory-Cache (_kiCache) + "Neu berechnen"-Button + forceRefresh; _showKiBriefingForStrat zeigt Cache-Treffer sofort.
      v245: AP-C Sprache: "KI-basierte Markt-Einschaetzung", Modellname raus, "Kurz und buendig", TF-Buttons 15min/30min. AP-I Rate-Limit UX: showKiError() zentral, 429 unterscheidbar (Tageslimit vs. Anthropic-RL), Reset-Zeit, Retry-Button.
@@ -351,10 +352,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="sidebar-time" id="topbar-time"></div>
     </div>
     <div class="sidebar-section">Tagesstart</div>
-    <button class="nav-btn" id="nav-morning" onclick="showPanel('scanner');setTimeout(runMorningBriefing,150)"
+    <button class="nav-btn" id="nav-home" onclick="showPanel('home')"
       style="border-left:3px solid var(--accent);background:rgba(79,142,247,0.06)">
-      <i class="ti ti-sunrise" aria-hidden="true" style="color:var(--accent)"></i>
-      <span class="nav-btn-label" style="color:var(--accent)">Morning Briefing<span class="nav-btn-sub">Marktbeurteilung &amp; Strategie-Ampel</span></span>
+      <i class="ti ti-home" aria-hidden="true" style="color:var(--accent)"></i>
+      <span class="nav-btn-label" style="color:var(--accent)">Übersicht<span class="nav-btn-sub">Briefing-Status &amp; Tagesstart</span></span>
     </button>
     <button class="nav-btn alpha-btn" id="nav-alpha" onclick="showPanel('alpha');setTimeout(loadAlphaDashboard,80)">
       <i class="ti ti-sparkles" aria-hidden="true"></i>
@@ -408,6 +409,58 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
 
   <div class="content">
+    <!-- HOME / LANDING PANEL (AP-A) -->
+    <div id="panel-home" class="panel">
+      <div id="home-landing" style="padding:1.25rem;max-width:680px;margin:0 auto">
+
+        <!-- Header -->
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem">
+          <i class="ti ti-home" style="font-size:1.4rem;color:var(--accent)"></i>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--text)">UnderlyingIQ</div>
+            <div id="home-date" style="font-size:11px;color:var(--text3)">—</div>
+          </div>
+        </div>
+
+        <!-- Briefing-Status-Card -->
+        <div id="home-briefing-card" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;padding:1rem;margin-bottom:.75rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+            <div style="font-size:12px;font-weight:600;color:var(--text2)">
+              <i class="ti ti-sunrise" style="color:var(--accent)"></i> Morning Briefing
+            </div>
+            <div id="home-briefing-time" style="font-size:10px;color:var(--text3)">—</div>
+          </div>
+          <div id="home-briefing-text" style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:.75rem">
+            Noch kein Briefing heute.
+          </div>
+          <button onclick="showPanel('scanner');setTimeout(runMorningBriefing,150)"
+            style="padding:6px 14px;border-radius:8px;border:1px solid var(--accent);
+            background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;
+            font-weight:600;cursor:pointer">
+            <i class="ti ti-refresh"></i> Neu berechnen
+          </button>
+        </div>
+
+        <!-- Regime-Status -->
+        <div id="home-regime-card" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:12px;padding:.9rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.75rem">
+          <div style="font-size:11px;color:var(--text3);min-width:80px">Marktregime</div>
+          <div id="home-regime-val" style="font-size:13px;font-weight:600;color:var(--text)">—</div>
+          <div style="font-size:11px;color:var(--text3);min-width:60px;margin-left:auto">VIX</div>
+          <div id="home-vix-val" style="font-size:13px;font-weight:600;color:var(--text)">—</div>
+        </div>
+
+        <!-- Rechtshinweis -->
+        <div style="font-size:10px;color:var(--text3);line-height:1.5;padding:.6rem .75rem;
+          background:var(--bg2);border-radius:8px;border:0.5px solid var(--border2)">
+          UnderlyingIQ ist ein privates Analyse-Werkzeug. Alle Inhalte dienen ausschließlich
+          der persönlichen Information und stellen keine Anlageberatung oder Empfehlung im
+          Sinne des WpHG dar. Investitionsentscheidungen liegen allein in der Verantwortung
+          des Nutzers.
+        </div>
+
+      </div>
+    </div>
+
     <!-- SCANNER PANEL -->
     <div id="panel-scanner" class="panel active">
       <div class="sec">Technischer Scanner</div>
@@ -4908,10 +4961,65 @@ function changePin(){
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────
+// ── HOME LANDING (AP-A) ──────────────────────────────────────────────────────
+function renderHomeLanding() {
+  // Datum
+  var dateEl = document.getElementById('home-date');
+  if (dateEl) {
+    dateEl.textContent = new Date().toLocaleDateString('de-DE', {
+      weekday:'long', year:'numeric', month:'long', day:'numeric'
+    });
+  }
+
+  // Letztes Morning Briefing aus localStorage laden
+  var today = new Date().toLocaleDateString('de-DE',
+    {day:'2-digit',month:'2-digit',year:'numeric'}).split('.').reverse().join('-');
+  var cacheKey = 'morning_briefing_' + today;
+  var cached = null;
+  try { cached = JSON.parse(localStorage.getItem(cacheKey)); } catch(e) {}
+
+  var txtEl  = document.getElementById('home-briefing-text');
+  var timeEl = document.getElementById('home-briefing-time');
+
+  if (cached && cached.kiBriefing) {
+    if (txtEl) {
+      // Ersten Absatz zeigen (max ~300 Zeichen)
+      var preview = cached.kiBriefing.replace(/#+\s*/g,'').trim();
+      preview = preview.length > 300 ? preview.substring(0, 300) + '…' : preview;
+      txtEl.textContent = preview;
+      txtEl.style.color = 'var(--text2)';
+    }
+    if (timeEl) timeEl.textContent = 'Heute · ' + (cached.time || '—') + ' Uhr';
+  } else {
+    if (txtEl) {
+      txtEl.textContent = 'Noch kein Briefing heute. Autostart läuft beim nächsten Programm-Start.';
+      txtEl.style.color = 'var(--text3)';
+    }
+    if (timeEl) timeEl.textContent = '—';
+  }
+
+  // Regime + VIX aus DOM lesen (bereits geladen)
+  var regEl = document.getElementById('home-regime-val');
+  var vixEl2 = document.getElementById('home-vix-val');
+  var regime = window._lastRegime || null;
+  var vixDom = document.getElementById('m-vix');
+  if (regEl) {
+    regEl.textContent = regime
+      ? (regime === 'bull' ? '🟢 Bull' : regime === 'bear' ? '🔴 Bear' : '🟡 Neutral')
+      : '—';
+  }
+  if (vixEl2 && vixDom) {
+    vixEl2.textContent = vixDom.textContent || '—';
+    var vixNum = parseFloat(vixDom.textContent);
+    vixEl2.style.color = vixNum < 16 ? 'var(--green)' : vixNum < 25 ? 'var(--amber)' : 'var(--red)';
+  }
+}
+
 function showPanel(id){
   if(id==='fibo' && !_fiboData.length){ buildFiboTab(); }
   // Topbar-Titel aktualisieren
   var titles = {
+    home:'<i class="ti ti-home" style="color:var(--accent)"></i> Übersicht',
     scanner:'<i class="ti ti-radar"></i> Scanner',
     alpha:'<i class="ti ti-sparkles" style="color:#a78bfa"></i> Alpha Desk',
     darkpool:'<i class="ti ti-building-bank"></i> Dark Pool',
@@ -4943,6 +5051,9 @@ function showPanel(id){
   }
   if(id==='ibd'){
     updateSessionBar();
+  }
+  if(id==='home'){
+    renderHomeLanding();
   }
   if(id==='makro'){
     loadYahooNewsFromCache();
