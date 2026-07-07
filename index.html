@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v258">
+<meta name="version" content="20260708-v259">
 <!-- CHANGELOG (neueste zuerst):
+     v259: EIC-Fix 4: _eicToggleLock Guard-Variable verhindert onchange-Loop zuverlässig.
      v258: EIC-Fix 3: onchange-Manipulation entfernt — einfacher checked=false reicht, da das inline onchange-Attribut durch Property-Zuweisung nicht überschrieben werden kann.
      v257: EIC-Fix 2: toggleExpertMode onchange-Loop eliminiert — checked=false setzt Handler kurz auf null (20ms) damit kein doppelter Trigger.
      v256: EIC-Fix (setTimeout 10ms gegen Event-Race). MB-Prompt: +10J Treasury, +DXY vs SMA200, +Sektor-Überhitzung, +PCR-Rohwert. MB-Cache: Timelog (_savedAt), Messwert-Snapshot (_messwerte), Referenz-Speicherung (morning_briefing_ref) für Drift-Erkennung.
@@ -18970,12 +18971,15 @@ function showMSEDetail() {
 
 var _expertModeActive = false;
 
+var _eicToggleLock = false;
 function toggleExpertMode(checked) {
+  if (_eicToggleLock) return; // Loop-Schutz
   // Nur wenn EIC entriegelt
   if (checked && !_eicUnlocked) {
-    // Checkbox ohne Loop zurücksetzen: setAttribute blockiert onchange nicht
+    _eicToggleLock = true;
     var _tog = document.getElementById('expert-mode-toggle');
     if (_tog) _tog.checked = false;
+    setTimeout(function(){ _eicToggleLock = false; }, 50);
     showEicPinModal();
     return;
   }
