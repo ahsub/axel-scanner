@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v264">
+<meta name="version" content="20260708-v265">
 <!-- CHANGELOG (neueste zuerst):
+     v265: KRITISCH: _marketDropdowns fehlende Kommas zwischen Array-Einträgen — JS-Syntax-Fehler brach alle folgenden Panels (Fibonacci, KO-Rechner, Backlog, Einstellungen).
      v264: Scanner: Market-Sentiment-Block entfernt (qqq-banner+vix-ampel hidden); KI-Analyse-Button in Steuerleiste; alpha-lb-cards display-Konflikt behoben.
      v263: Strategie-Ampel auf Landing-Page (grün/gelb/rot, alle Strategien). window._lastMseResult für Landing-Page-Zugriff. Scanner Gates: inaktive Strategien explizit rot+gelb mit Border. Selektiv-Tooltip erklärt was Selektiv bedeutet.
      v262: MB-Architektur: Polling-Gate vor Schritt 9 — wartet bis intermarket-score + bull-score im DOM befüllt sind (max 15s, 500ms-Intervall). KI-Analyse startet erst wenn Data-Basket vollständig ist.
@@ -21115,27 +21116,27 @@ function _setScanModeVisual(m){
 // ── Handelsplatz-Dropdown (AP Scanner-Header v253) ────────────────────────────
 var _marketDropdowns = {
   us: [
-    ["default", "🇺🇸 50 US-Aktien (Standard)"]
-    ["top50-us", "📈 IBD Momentum Top-50"]
-    ["fixed:SP500", "🇺🇸 S&P 500 Kern-100"]
-    ["fixed:NDX100", "🇺🇸 NASDAQ 100"]
-    ["fixed:DEFENSE", "🛡️ Defense & Aerospace"]
-    ["fixed:ROBOTICS", "🤖 Robotics & AI"]
-    ["fixed:CYBERSECURITY", "🔐 Cybersecurity"]
-    ["fixed:NUCLEAR_ENERGY", "☢️ Nuclear Energy"]
-    ["fixed:HEALTH", "🏥 Healthcare"]
-    ["fixed:FINANCE", "🏦 Financials"]
-    ["fixed:ENERGY", "⚡ Energy & Oil"]
-    ["fixed:AI_TECH", "💡 AI & Tech"]
-    ["fixed:PICKS_SHOVELS", "⛏ AI-Infrastruktur"]
-    ["fixed:PRECIOUS_METALS", "🥇 Precious Metals"]
-    ["fixed:SPACE", "🚀 Space"]
+    ["default",               "🇺🇸 50 US-Aktien (Standard)"],
+    ["top50-us",              "📈 IBD Momentum Top-50"],
+    ["fixed:SP500",           "🇺🇸 S&P 500 Kern-100"],
+    ["fixed:NDX100",          "🇺🇸 NASDAQ 100"],
+    ["fixed:DEFENSE",         "🛡️ Defense & Aerospace"],
+    ["fixed:ROBOTICS",        "🤖 Robotics & AI"],
+    ["fixed:CYBERSECURITY",   "🔐 Cybersecurity"],
+    ["fixed:NUCLEAR_ENERGY",  "☢️ Nuclear Energy"],
+    ["fixed:HEALTH",          "🏥 Healthcare"],
+    ["fixed:FINANCE",         "🏦 Financials"],
+    ["fixed:ENERGY",          "⚡ Energy & Oil"],
+    ["fixed:AI_TECH",         "💡 AI & Tech"],
+    ["fixed:PICKS_SHOVELS",   "⛏ AI-Infrastruktur"],
+    ["fixed:PRECIOUS_METALS", "🥇 Precious Metals"],
+    ["fixed:SPACE",           "🚀 Space"]
   ],
   de: [
-    ["fixed:DAX40", "📊 DAX 40"]
-    ["fixed:MDAX", "📈 MDAX Top 20"]
-    ["fixed:TECDAX", "💻 TecDAX"]
-    ["default", "🇺🇸 US-Aktien (DE-handelbar)"]
+    ["fixed:DAX40",  "📊 DAX 40"],
+    ["fixed:MDAX",   "📈 MDAX Top 20"],
+    ["fixed:TECDAX", "💻 TecDAX"],
+    ["default",      "🇺🇸 US-Aktien (DE-handelbar)"]
   ]
 };
 
