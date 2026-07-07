@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v261">
+<meta name="version" content="20260708-v262">
 <!-- CHANGELOG (neueste zuerst):
+     v262: MB-Architektur: Polling-Gate vor Schritt 9 — wartet bis intermarket-score + bull-score im DOM befüllt sind (max 15s, 500ms-Intervall). KI-Analyse startet erst wenn Data-Basket vollständig ist.
      v261: (1) Spinner display:flex/none Konflikt behoben. (2) MB-Start: kein Tab-Wechsel zu Makro mehr. (3) Wartezeiten erhöht: Intermarket 2500ms, Bull-Indikator 1500ms, Sektor/RS je 1500ms — DOM muss befüllt sein bevor Prompt gebaut wird.
      v260: KRITISCH: Syntax-Fehler Z20837 behoben — toter Karten-Block (if false &&) hatte ungültiges .join('')-Statement → JS-Ausführung gestoppt → toggleExpertMode undefined → EIC-Slider tot.
      v259: EIC-Fix 4: _eicToggleLock Guard-Variable verhindert onchange-Loop zuverlässig.
@@ -19505,6 +19506,24 @@ async function runMorningBriefing() {
       var dpFinal = (typeof KoDarkPool !== 'undefined') ? KoDarkPool._cache : null;
       await updateMarketWeatherWidget(dpFinal, results.vix, results.tsiScore);
     }
+
+    // ── Warten bis ALLE Makro-DOM-Werte befüllt sind ──────────────
+    setStep('Daten werden konsolidiert…');
+    // Polling: wartet bis intermarket-score + bull-score nicht mehr leer sind
+    await new Promise(function(resolve) {
+      var _tries = 0;
+      var _poll = setInterval(function() {
+        var imScore  = document.getElementById('intermarket-score');
+        var bScore   = document.getElementById('bull-score');
+        var imOk  = imScore  && imScore.textContent  && imScore.textContent  !== '—' && imScore.textContent  !== '';
+        var bOk   = bScore   && bScore.textContent   && bScore.textContent   !== '—' && bScore.textContent   !== '';
+        _tries++;
+        if ((imOk && bOk) || _tries > 30) { // max 15s (30 × 500ms)
+          clearInterval(_poll);
+          resolve();
+        }
+      }, 500);
+    });
 
     // ── 9/9: Auto-Makro KI-Analyse ───────────────────────────────
     setStep('9/9 KI-Makro-Analyse…');
