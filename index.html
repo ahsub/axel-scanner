@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v255">
+<meta name="version" content="20260708-v256">
 <!-- CHANGELOG (neueste zuerst):
+     v256: EIC-Fix (setTimeout 10ms gegen Event-Race). MB-Prompt: +10J Treasury, +DXY vs SMA200, +Sektor-Überhitzung, +PCR-Rohwert. MB-Cache: Timelog (_savedAt), Messwert-Snapshot (_messwerte), Referenz-Speicherung (morning_briefing_ref) für Drift-Erkennung.
      v255: EIC-Bug fix (Außenklick-Handler Konflikt). Übersicht-Panel: Makro+MB vereint; runHomeBriefing() mit Cache+Aktivitätsanzeige; Makro-Strip (SP/NQ/DAX/VIX/Öl/Gold); vollständiger Briefing-Text mit Markdown; Neu-Button nach erstem Briefing; Navigation bleibt auf Home.
      v254: Alpha Desk: Refresh-Button entfernt; KO-Short data-lb korrigiert; Karten-Liste entfernt (nur Chips); Chips +MACD-Indikator +TradingView-Button.
      v253: Scanner-Header Redesign: Handelsplatz-Buttons (US/DE) öffnen Dropdown mit Listen; Aggregator-Button; Long/Bear auf gleicher Ebene; Aktive-Liste-Chip; Makro-Link aus Cockpit entfernt; _setScanModeVisual sync beide Leisten.
@@ -13673,7 +13674,9 @@ function showEicPinModal() {
   _eicPinEntry = '';
   updateEicDots();
   var modal = document.getElementById('eic-pin-modal');
-  if (modal) modal.style.display = 'flex';
+  // setTimeout: verhindert dass der auslösende click-Event sofort
+  // durch document bubbled und das Modal wieder schließt (Event-Race)
+  if (modal) setTimeout(function(){ modal.style.display = 'flex'; }, 10);
   var hint = document.getElementById('eic-set-pin-hint');
   if (hint) hint.style.display = localStorage.getItem(EIC_PIN_KEY) ? 'none' : 'block';
 }
@@ -18724,6 +18727,7 @@ async function calcTreasuryStress() {
   if (dxy && dxy.closes && dxy.closes.length >= 20) {
     var dxySma200 = dxy.closes.slice(-20).reduce(function(a,b){return a+b;},0) / Math.min(20, dxy.closes.length);
     var dxyBull   = dxy.price > dxySma200;
+    window._imDxyBull = dxyBull; // MB-Prompt Zugriff
     if (dxyBull) score += 15; // Starker Dollar = Risk-Off
     if (dxyEl) {
       dxyEl.textContent = dxy.price.toFixed(2);
@@ -19553,6 +19557,34 @@ async function runMorningBriefing() {
       messwerteLines.push('NDX Breadth (>50d MA): ' + breadthVal);
       messwerteLines.push('Bull-Market Frühindikator: ' + bullScore);
       if (sektorTxt !== '—') messwerteLines.push('Sektor RS vs. SPY: ' + sektorTxt);
+
+      // ── Zusatz-Messwerte aus DOM (Intermarket-Panel) ──────────────────
+      var _imVal = function(id) {
+        var el = document.getElementById(id);
+        return el ? el.textContent.trim() : '—';
+      };
+      // 10Y-2Y Spread
+      var tnx  = _imVal('im-tnx');
+      var irx  = _imVal('im-irx'); // 13W = Kurzfristzins-Proxy
+      messwerteLines.push('10J Treasury: ' + tnx + '%');
+      if (irx !== '—') messwerteLines.push('Kurzfristzins (3M): ' + irx + '%');
+      // DXY
+      var dxyEl = document.getElementById('im-dxy');
+      if (!dxyEl) dxyEl = document.querySelector('[id*="dxy"]');
+      var dxyTxt = dxyEl ? dxyEl.textContent.trim() : '—';
+      // DXY vs SMA200 aus window._imDxyBull (gesetzt von loadIntermarket)
+      var dxySignal = typeof window._imDxyBull !== 'undefined'
+        ? (window._imDxyBull ? 'über SMA200 (USD stark)' : 'unter SMA200 (USD schwach)') : '—';
+      messwerteLines.push('DXY: ' + dxyTxt + ' · ' + dxySignal);
+      // Sektor-Überhitzung (Top-Überhitzte)
+      var sohEl = document.getElementById('overheat-text');
+      if (!sohEl) sohEl = document.getElementById('sektor-overheat-content');
+      var sohTxt = sohEl ? sohEl.innerText.slice(0,150).replace(/\n/g,' · ') : '—';
+      if (sohTxt !== '—') messwerteLines.push('Sektor-Überhitzung: ' + sohTxt);
+      // PCR Rohwert aus KV-Daten
+      var pcrRaw = (window._alphaData && _alphaData.market && _alphaData.market.pcr)
+        ? _alphaData.market.pcr.value || '—' : '—';
+      if (pcrRaw !== '—') messwerteLines.push('Put/Call Ratio (aktuell): ' + pcrRaw);
       messwerteLines.push(''); messwerteLines.push('--- SENTIMENT & BEWERTUNG ---');
       if (results.fearGreed){var _fg=results.fearGreed;messwerteLines.push('Fear & Greed: '+_fg.score+'/100 ('+(_fg.rating||'')+')'+(_fg.previous?' Vortag:'+_fg.previous:'')+(_fg.proxy?' [Proxy]':' [CNN]'));}else messwerteLines.push('Fear & Greed: n/v');
       if (results.iosMarket){var _im=results.iosMarket;messwerteLines.push('IOS Market: '+_im.iosMarketScore+'/100 → '+(_im.iosMarketDecision||'')+' T:'+_im.iosMarketTrend+' B:'+_im.iosMarketBreadth+' R:'+_im.iosMarketRisk);}
@@ -19579,7 +19611,24 @@ async function runMorningBriefing() {
     }
 
     // ── Cache + Anzeige ───────────────────────────────────────────
-    try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) { console.warn('[Briefing] Cache-Fehler:', e.message); }
+    try { // Timelog + Messwert-Snapshot für Referenz/Drift-Erkennung
+      results._savedAt  = new Date().toISOString();
+      results._messwerte = messwerteLines.join('\n');
+      localStorage.setItem(cacheKey, JSON.stringify(results));
+      // Vortages-Referenz (für Drift-Erkennung beim nächsten Lauf)
+      var refKey = 'morning_briefing_ref';
+      var prevRef = null;
+      try { prevRef = JSON.parse(localStorage.getItem(refKey)); } catch(_){}
+      // Nur speichern wenn neuer Tag
+      if (!prevRef || prevRef.date !== today) {
+        localStorage.setItem(refKey, JSON.stringify({
+          date: today, savedAt: results._savedAt,
+          vix: results.vix, tsiScore: results.tsiScore,
+          iosMarket: results.iosMarket, fearGreed: results.fearGreed,
+          messwerte: results._messwerte
+        }));
+      }
+    } catch(e) { console.warn('[Briefing] Cache-Fehler:', e.message); }
     _applyMorningResults(results);
     // Navigation nach Briefing: nur wenn NICHT von Home-Panel aufgerufen
     var _homePanel = document.getElementById('panel-home');
