@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v256">
+<meta name="version" content="20260708-v257">
 <!-- CHANGELOG (neueste zuerst):
+     v257: EIC-Fix 2: toggleExpertMode onchange-Loop eliminiert — checked=false setzt Handler kurz auf null (20ms) damit kein doppelter Trigger.
      v256: EIC-Fix (setTimeout 10ms gegen Event-Race). MB-Prompt: +10J Treasury, +DXY vs SMA200, +Sektor-Überhitzung, +PCR-Rohwert. MB-Cache: Timelog (_savedAt), Messwert-Snapshot (_messwerte), Referenz-Speicherung (morning_briefing_ref) für Drift-Erkennung.
      v255: EIC-Bug fix (Außenklick-Handler Konflikt). Übersicht-Panel: Makro+MB vereint; runHomeBriefing() mit Cache+Aktivitätsanzeige; Makro-Strip (SP/NQ/DAX/VIX/Öl/Gold); vollständiger Briefing-Text mit Markdown; Neu-Button nach erstem Briefing; Navigation bleibt auf Home.
      v254: Alpha Desk: Refresh-Button entfernt; KO-Short data-lb korrigiert; Karten-Liste entfernt (nur Chips); Chips +MACD-Indikator +TradingView-Button.
@@ -18971,9 +18972,14 @@ var _expertModeActive = false;
 function toggleExpertMode(checked) {
   // Nur wenn EIC entriegelt
   if (checked && !_eicUnlocked) {
-    document.getElementById('expert-mode-toggle').checked = false;
+    // checked=false ohne onchange-Loop: kurz Event-Handler entfernen
+    var _tog = document.getElementById('expert-mode-toggle');
+    if (_tog) {
+      _tog.onchange = null;
+      _tog.checked = false;
+      setTimeout(function(){ _tog.onchange = function(){ toggleExpertMode(this.checked); }; }, 20);
+    }
     showEicPinModal();
-    showToast('⛔ EIC-Verifizierung erforderlich');
     return;
   }
 
