@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="20260708-v249">
+<meta name="app-version" content="20260708-v250">
 <!-- CHANGELOG (neueste zuerst):
+     v250: (A) help.html Sync: Modellnamen+KI-Begriff aktualisiert. (B) 47 alert()→showKoToast: keine blockierenden Browser-Dialoge mehr. (C) Prompt "kurz und bündig". (D) nav-scanner hardcoded active entfernt.
      v249: (1) Zentraler Modal-Handler: Escape+Außenklick für alle 11 Modals. (2) Track-Record-Uhr auf Landing-Page (seit 02.07.2026). (3) nav-scanner Initial-Highlight beim App-Start. (4) KI-Dropdown gesperrt solange keine Scan-Ergebnisse geladen.
      v248: AP-A Landing-Page: panel-home neu; Sidebar "Morning Briefing" → "Übersicht" (showPanel home); renderHomeLanding() zeigt Datum, letztes Briefing-Preview, Regime/VIX, Rechtshinweis; "Neu berechnen"-Button triggert runMorningBriefing; nav-morning → nav-home.
      v247: Morning-Briefing-Button aus Scanner-Tab + Alpha Desk entfernt (AP-B); Autostart bei Programmstart + Sidebar-Nav bleiben; morning-btn ID als unsichtbarer Stub erhalten.
@@ -370,7 +371,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </button>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">Trading</div>
-    <button class="nav-btn active" id="nav-scanner" onclick="showPanel('scanner')">
+    <button class="nav-btn" id="nav-scanner" onclick="showPanel('scanner')">
       <i class="ti ti-radar" aria-hidden="true"></i>
       <span class="nav-btn-label">Scanner<span class="nav-btn-sub">Aktien scannen &amp; filtern</span></span>
     </button>
@@ -3418,7 +3419,7 @@ async function verifyUserToken() {
 async function proposeTickerForAggregator(sym, note) {
   const btn = document.getElementById('fibo-propose-' + sym);
   const token = getAiToken();
-  if (!token) { alert('KI-Token nicht gesetzt — bitte im Admin-Tab eintragen'); return; }
+  if (!token) { showKoToast('⚠ KI-Token nicht gesetzt — bitte im Admin-Tab eintragen'); return; }
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Sende...'; }
 
   try {
@@ -3450,7 +3451,7 @@ async function proposeTickerForAggregator(sym, note) {
       btn.disabled = false;
       btn.innerHTML = '<i class="ti ti-plus"></i> Zur Aggregator-Liste vorschlagen';
     }
-    alert('Vorschlag fehlgeschlagen: ' + e.message);
+    showKoToast('⚠ Vorschlag fehlgeschlagen: ' + e.message);
   }
 }
 window.proposeTickerForAggregator = proposeTickerForAggregator;
@@ -3592,7 +3593,7 @@ async function approveExtraTicker(sym) {
     });
     if (!resp.ok) { const d = await resp.json().catch(()=>({})); throw new Error(d.error || 'HTTP '+resp.status); }
     loadExtraTickerReview();
-  } catch(e) { alert('Freigabe fehlgeschlagen: ' + e.message); }
+  } catch(e) { showKoToast('⚠ Freigabe fehlgeschlagen: ' + e.message); }
 }
 window.approveExtraTicker = approveExtraTicker;
 
@@ -3606,7 +3607,7 @@ async function rejectExtraTicker(sym) {
     });
     if (!resp.ok) { const d = await resp.json().catch(()=>({})); throw new Error(d.error || 'HTTP '+resp.status); }
     loadExtraTickerReview();
-  } catch(e) { alert('Verwerfen fehlgeschlagen: ' + e.message); }
+  } catch(e) { showKoToast('⚠ Verwerfen fehlgeschlagen: ' + e.message); }
 }
 window.rejectExtraTicker = rejectExtraTicker;
 
@@ -4945,7 +4946,7 @@ function unlockApp(){
 }
 function saveTwelveKey(){
   const k=document.getElementById('td-key-input').value.trim();
-  if(!k){alert('Bitte Key eingeben');return;}
+  if(!k){showKoToast('⚠ Bitte Key eingeben');return;}
   setTwelveKey(k);
   document.getElementById('td-key-input').value='';
   const msg=document.getElementById('td-key-msg');
@@ -4955,7 +4956,7 @@ function saveTwelveKey(){
 
 function saveFinnhubKey(){
   const k=document.getElementById('fh-key-input').value.trim();
-  if(!k){alert('Bitte Key eingeben');return;}
+  if(!k){showKoToast('⚠ Bitte Key eingeben');return;}
   setFinnhubKey(k);
   document.getElementById('fh-key-input').value='';
   const msg=document.getElementById('fh-key-msg');
@@ -7735,7 +7736,7 @@ function sortIBD(col){
 
 function saveIBD(){
   const raw=document.getElementById('ibd-json').value.trim();
-  if(!raw){alert('Bitte JSON einfügen.');return;}
+  if(!raw){showKoToast('⚠ Bitte JSON einfügen');return;}
   try{
     const data=JSON.parse(raw);
     if(!Array.isArray(data)) throw new Error('Kein Array');
@@ -7749,7 +7750,7 @@ function saveIBD(){
     msg.style.display='block';
     setTimeout(()=>msg.style.display='none',3000);
     document.getElementById('ibd-json').value='';
-  }catch(e){alert('Ungültiges JSON: '+e.message);}
+  }catch(e){showKoToast('⚠ Ungültiges JSON: ' + e.message);}
 }
 
 // ─── MAKRO ─────────────────────────────────────────────────────────
@@ -7929,7 +7930,7 @@ function saveMakro(){
     factors:[]
   };
   const factorsRaw=document.getElementById('m-factors-in').value.trim();
-  if(factorsRaw){try{d.factors=JSON.parse(factorsRaw);}catch(e){alert('Faktoren-JSON ungültig: '+e.message);return;}}
+  if(factorsRaw){try{d.factors=JSON.parse(factorsRaw);}catch(e){showKoToast('⚠ Faktoren-JSON ungültig: ' + e.message);return;}}
   localStorage.setItem(MAKRO_KEY,JSON.stringify(d));
   renderMakro(d);
   const msg=document.getElementById('makro-save-msg');
@@ -8429,7 +8430,7 @@ function requestMakroUpdate(){
       }
     });
   } else {
-    alert(prompt);
+    console.log('[DEBUG prompt]', prompt);
   }
 }
 
@@ -8492,7 +8493,7 @@ function setAnthropicKey(k){ localStorage.setItem('ko_ant_key', k.trim()); }
 
 function saveAnthropicKey(){
   const k = document.getElementById('ant-key-input') && document.getElementById('ant-key-input').value.trim();
-  if(!k){ alert('Bitte Key eingeben'); return; }
+  if(!k){ showKoToast('⚠ Bitte Key eingeben'); return; }
   setAnthropicKey(k);
   document.getElementById('ant-key-input').value = '';
   const msg = document.getElementById('ant-key-msg');
@@ -8503,7 +8504,7 @@ function saveAnthropicKey(){
 function saveAiToken() {
   const inp = document.getElementById('ai-token-input');
   const k = inp ? inp.value.trim() : '';
-  if (!k) { alert('Bitte Token eingeben'); return; }
+  if (!k) { showKoToast('⚠ Bitte Token eingeben'); return; }
   localStorage.setItem('ko_ai_token', k);
   inp.value = '';
   inp.placeholder = 'Token gesetzt ✓';
@@ -9346,7 +9347,7 @@ async function loadIntermarket() {
 async function autoMakro(){
   const antKey = getAiToken();
   if(!antKey){
-    alert('Bitte zuerst KI-Token im Admin-Tab unter "UnderlyingIQ KI-Zugang" eintragen.');
+    showKoToast('⚠ KI-Token fehlt — bitte im Admin-Tab eintragen');
     showPanel('admin');
     return;
   }
@@ -10117,7 +10118,7 @@ function scanAllMovers(){
     const btns = document.querySelectorAll('#market-intel-container button[data-sym]');
     tickers = Array.from(btns).map(function(b){ return b.dataset.sym; }).filter(Boolean);
   }
-  if(!tickers.length){ alert('Bitte zuerst Top 10 Aktivste laden'); return; }
+  if(!tickers.length){ showKoToast('⚠ Bitte zuerst Top 10 Aktivste laden'); return; }
   scanTickerList(tickers, 'Top 10 Aktivste');
 }
 
@@ -10127,7 +10128,7 @@ function scanAllAH(){
     const btns = document.querySelectorAll('#market-intel-container button[data-sym]');
     tickers = Array.from(btns).map(function(b){ return b.dataset.sym; }).filter(Boolean);
   }
-  if(!tickers.length){ alert('Bitte zuerst After-Hours Movers laden'); return; }
+  if(!tickers.length){ showKoToast('⚠ Bitte zuerst After-Hours Movers laden'); return; }
   scanTickerList(tickers, 'After-Hours Movers');
 }
 
@@ -10149,7 +10150,7 @@ async function debugDEFetch(){
   // Falls nicht gefunden: Yahoo Finance als Fallback (SAP.DE)
 
   const tdKey=getTwelveKey();
-  if(!tdKey){ alert('Kein Twelve Data Key!'); return; }
+  if(!tdKey){ showKoToast('⚠ Kein Twelve Data Key gesetzt'); return; }
   const proxy='https://my-cors-proxy.ahildebrand.workers.dev/';
   const results=[];
   const testSyms=['SAP:XETR','SAP','SAP.DE','SAP:XETRA'];
@@ -10168,7 +10169,7 @@ async function debugDEFetch(){
       results.push(sym+': ERROR '+e.message);
     }
   }
-  alert('Twelve Data DE Symbol Test:\n\n'+results.join('\n'));
+  showKoToast('TD-Test: ' + results.slice(0,3).join(' · ') + (results.length>3?' …':''));
 }
 
 // ─── EARNINGS KALENDER ────────────────────────────────────────────────────────
@@ -10374,14 +10375,14 @@ function saveWatchlistsWithSync(wls, listName) {
 
 function saveWatchlist(){
   const input = document.getElementById('custom-input').value.trim();
-  if(!input){ alert('Bitte zuerst Ticker eingeben'); return; }
+  if(!input){ showKoToast('⚠ Bitte Ticker eingeben'); return; }
   const name = prompt('Watchlist-Name:', 'Meine Watchlist');
   if(!name) return;
   const wls = getWatchlists();
   wls[name] = input;
   localStorage.setItem(WL_KEY, JSON.stringify(wls));
   updateWatchlistDropdown();
-  alert('✓ Watchlist "'+name+'" gespeichert');
+  showKoToast('✓ Watchlist "' + name + '" gespeichert');
 }
 
 function updateWatchlistDropdown(activeWL) {
@@ -10924,7 +10925,7 @@ var wlModalSym='';
 function openWatchlistModal(sym){
   wlModalSym=sym;
   var modal=document.getElementById('wl-modal');
-  if(!modal){alert('Modal nicht gefunden');return;}
+  if(!modal){showKoToast('⚠ Interner Fehler: Modal nicht gefunden');return;}
   document.getElementById('wl-modal-title').textContent='Zu Watchlist hinzufügen';
   document.getElementById('wl-modal-sym').textContent=sym;
   document.getElementById('wl-new-name').value='';
@@ -10988,7 +10989,7 @@ function removeFromWatchlist(name,sym){
 }
 function createAndAddToWatchlist(){
   var name=document.getElementById('wl-new-name').value.trim();
-  if(!name){alert('Bitte Namen eingeben');return;}
+  if(!name){showKoToast('⚠ Bitte Namen eingeben');return;}
   addToWatchlist(name,wlModalSym);
   document.getElementById('wl-new-name').value='';
 }
@@ -10996,7 +10997,7 @@ function renameWatchlist(oldName,newName){
   newName=(newName||'').trim();
   if(!newName||newName===oldName) return;
   var wls=getWatchlists();
-  if(wls[newName]){alert('"'+newName+'" existiert bereits');return;}
+  if(wls[newName]){showKoToast('⚠ "' + newName + '" existiert bereits');return;}
   wls[newName]=wls[oldName];delete wls[oldName];
   localStorage.setItem(WL_KEY,JSON.stringify(wls));
   updateWatchlistDropdown();showWlMsg('✓ Umbenannt');renderWatchlistModal();
@@ -11172,7 +11173,7 @@ function saveScoreWeights(){
   const st=parseInt(document.getElementById('w-sticky')?.value)||0;
   const v=parseInt(document.getElementById('w-vol')?.value)||0;
   const sum=t+s+b+st+v;
-  if(sum!==100){ alert('Summe muss 100 ergeben (aktuell: '+sum+')'); return; }
+  if(sum!==100){ showKoToast('⚠ Summe muss 100 ergeben (aktuell: ' + sum + ')'); return; }
   const weights={tech:t,sepa:s,bp:b,sticky:st,vol:v};
   localStorage.setItem(WEIGHTS_KEY,JSON.stringify(weights));
   const msg=document.getElementById('w-msg');
@@ -12164,7 +12165,7 @@ function mmToggleAll(checked){
 function mmSaveWatchlist(){
   var container=document.getElementById('mover-modal-cards'); var cbs=(container?container.querySelectorAll('.mm-cb:checked'):document.querySelectorAll('.mm-cb:checked'));
   var tickers=Array.from(cbs).map(function(c){return c.dataset.sym;}).filter(Boolean);
-  if(!tickers.length){ alert('Bitte mindestens einen Ticker auswählen.'); return; }
+  if(!tickers.length){ showKoToast('⚠ Bitte mindestens einen Ticker auswählen'); return; }
   var nameEl=document.getElementById('mm-wl-name');
   var today=new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
   var name=(nameEl&&nameEl.value.trim())||('Scan '+today);
@@ -12182,7 +12183,7 @@ function mmSaveWatchlist(){
 function mmScanSelected(){
   var container=document.getElementById('mover-modal-cards'); var cbs=(container?container.querySelectorAll('.mm-cb:checked'):document.querySelectorAll('.mm-cb:checked'));
   var tickers=Array.from(cbs).map(function(c){return c.dataset.sym;}).filter(Boolean);
-  if(!tickers.length){ alert('Bitte mindestens einen Ticker auswählen.'); return; }
+  if(!tickers.length){ showKoToast('⚠ Bitte mindestens einen Ticker auswählen'); return; }
   closeMoverModal();
   document.getElementById('ticker-preset').value='custom';
   document.getElementById('custom-wrap').style.display='block';
@@ -12215,7 +12216,7 @@ async function loadIndexMovers(){
   var label = moverBtn ? moverBtn.dataset.label : 'Index';
 
   if(!sym || !INDEX_STOCKS[sym]){
-    alert('Für diesen Index sind keine Einzeltitel verfügbar.');
+    showKoToast('ℹ Für diesen Index sind keine Einzeltitel verfügbar');
     return;
   }
 
@@ -12540,7 +12541,7 @@ function leAddRow(){
   var nameEl = document.getElementById('le-new-name');
   var sym = symEl ? symEl.value.trim().toUpperCase() : '';
   var name = nameEl ? nameEl.value.trim() : sym;
-  if(!sym){ alert('Bitte Ticker eingeben.'); return; }
+  if(!sym){ showKoToast('⚠ Bitte Ticker eingeben'); return; }
   _listEditorData.push({sym:sym, name:name||sym, exchange:getExchange(sym),
                         comp:'', eps:'', rs:'', lastEps:'', sales:'', sector:'', note:''});
   if(symEl) symEl.value = '';
@@ -12552,7 +12553,7 @@ function leAddRow(){
 }
 
 function leSaveList(){
-  if(!_listEditorData.length){ alert('Liste ist leer.'); return; }
+  if(!_listEditorData.length){ showKoToast('⚠ Liste ist leer'); return; }
   var msg = '';
   if(_listEditorMode === 'us50'){
     // Update DEFAULT_TICKERS in memory
@@ -12645,13 +12646,13 @@ function leWLNew(){
 
 function leWLRename(){
   var oldName = window._leActiveWatchlist;
-  if(!oldName){ alert('Keine Watchlist ausgewählt.'); return; }
-  if(FIXED_LISTS[oldName]){ alert('Diese Liste ist fest verdrahtet und kann nicht umbenannt werden.'); return; }
+  if(!oldName){ showKoToast('⚠ Keine Watchlist ausgewählt'); return; }
+  if(FIXED_LISTS[oldName]){ showKoToast('⚠ Diese Liste kann nicht umbenannt werden'); return; }
   var newName = prompt('Neuer Name für "'+oldName+'":', oldName);
   if(!newName || !newName.trim() || newName.trim()===oldName) return;
   newName = newName.trim();
   var wls = getWatchlists();
-  if(wls[newName]){ alert('Name bereits vergeben.'); return; }
+  if(wls[newName]){ showKoToast('⚠ Name bereits vergeben'); return; }
   wls[newName] = wls[oldName];
   delete wls[oldName];
   localStorage.setItem(WL_KEY, JSON.stringify(wls));
@@ -12663,8 +12664,8 @@ function leWLRename(){
 
 function leWLDelete(){
   var name = window._leActiveWatchlist;
-  if(!name){ alert('Keine Watchlist ausgewählt.'); return; }
-  if(FIXED_LISTS[name]){ alert('Diese Liste ist fest verdrahtet und kann nicht gelöscht werden.'); return; }
+  if(!name){ showKoToast('⚠ Keine Watchlist ausgewählt'); return; }
+  if(FIXED_LISTS[name]){ showKoToast('⚠ Diese Liste kann nicht gelöscht werden'); return; }
   if(!confirm('Watchlist "'+name+'" wirklich löschen?')) return;
   var wls = getWatchlists();
   delete wls[name];
@@ -12794,7 +12795,7 @@ function leWLImportToActive(input){
 
 function leWLScanNow(){
   var name = window._leActiveWatchlist;
-  if(!name||!_listEditorData.length){ alert('Bitte zuerst eine Watchlist mit Tickers auswählen.'); return; }
+  if(!name||!_listEditorData.length){ showKoToast('⚠ Bitte Watchlist mit Titeln auswählen'); return; }
   leSaveList();
   closeListEditor();
   var tickers = _listEditorData.map(function(r){return r.sym;}).filter(Boolean).join(', ');
@@ -12807,7 +12808,7 @@ function leWLScanNow(){
 
 function leWLAddToScanner(){
   var name = window._leActiveWatchlist;
-  if(!name){ alert('Keine Watchlist ausgewählt.'); return; }
+  if(!name){ showKoToast('⚠ Keine Watchlist ausgewählt'); return; }
   closeListEditor();
   showPanel('scanner');
   // Trigger preset selection
@@ -13003,7 +13004,7 @@ function loadCustomLists(){
 // ─── IBD GIST UPDATE ─────────────────────────────────────────────────────────
 function saveGistUrl(){
   var url = (document.getElementById('ibd-gist-url')?.value||'').trim();
-  if(!url){ alert('Bitte URL eingeben.'); return; }
+  if(!url){ showKoToast('⚠ Bitte URL eingeben'); return; }
   localStorage.setItem('ko_ibd_gist_url', url);
   var msg = document.getElementById('gist-load-msg');
   if(msg){ msg.style.display='block'; msg.style.color='var(--green)'; msg.textContent='✓ URL gespeichert'; setTimeout(function(){msg.style.display='none';},2000); }
@@ -13084,9 +13085,9 @@ function scanFilteredIBD(scanAll){
     if(fc && (!r.comp || r.comp < parseInt(fc))) return false;
     return true;
   });
-  if(!data.length){ alert('Keine Titel in der aktuellen Filteransicht.'); return; }
+  if(!data.length){ showKoToast('⚠ Keine Titel in der aktuellen Ansicht'); return; }
   var tickers = data.filter(function(r){return r.ticker;}).map(function(r){return r.ticker;});
-  if(!tickers.length){ alert('Keine Ticker in der Liste.'); return; }
+  if(!tickers.length){ showKoToast('⚠ Keine Ticker in der Liste'); return; }
   document.getElementById('ticker-preset').value = 'custom';
   document.getElementById('custom-wrap').style.display = 'block';
   document.getElementById('custom-input').value = tickers.join(', ');
@@ -13845,7 +13846,7 @@ function addDEGroupToWatchlist(groupName){
   saveWatchlistsWithSync(wls);
   updateWatchlistDropdown();
   closeDEListSelector();
-  alert('✓ "' + name + '" als Watchlist gespeichert (' + tickers.length + ' Titel)');
+  showKoToast('✓ "' + name + '" gespeichert (' + tickers.length + ' Titel)');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -15245,7 +15246,7 @@ function loadSektorDriverWL(syms) {
 window.loadSektorDriverWL = loadSektorDriverWL;
 function saveCurrentAsWatchlist() {
   const input = document.getElementById('custom-input');
-  if (!input || !input.value.trim()) { alert('Bitte zuerst Ticker eingeben'); return; }
+  if (!input || !input.value.trim()) { showKoToast('⚠ Bitte Ticker eingeben'); return; }
   const name = prompt('Name der neuen Watchlist:', 'Meine Watchlist');
   if (!name) return;
   const wls = getWatchlists();
@@ -15262,7 +15263,7 @@ function updateExistingWatchlist() {
   const sel = document.getElementById('list-select');
   if (!input || !sel) return;
   const val = sel ? sel.value : '';
-  if (!val.startsWith('wl:')) { alert('Keine gespeicherte Watchlist ausgewaehlt'); return; }
+  if (!val.startsWith('wl:')) { showKoToast('⚠ Keine Watchlist ausgewählt'); return; }
   const name = val.replace('wl:', '');
   if (!confirm('Watchlist "' + name + '" aktualisieren?')) return;
   const wls = getWatchlists();
@@ -15483,7 +15484,7 @@ async function rescanTickerTF(sym, tf) {
 // FIBO EIGENE TICKER
 async function scanFiboCustom() {
   const input = document.getElementById('fibo-custom-input');
-  if (!input || !input.value.trim()) { alert('Bitte Ticker eingeben'); return; }
+  if (!input || !input.value.trim()) { showKoToast('⚠ Bitte Ticker eingeben'); return; }
 
   const syms = input.value.split(',')
     .map(function(s){ return s.trim().toUpperCase(); })
@@ -17327,7 +17328,7 @@ function schedulerUpdateUI() {
 // ── Top-20 aus aktuellem Scan speichern ──
 function saveTop20ToBacklog() {
   if (!Object.keys(tickerData).length) {
-    alert('Kein Scan vorhanden — bitte zuerst Scan durchführen.');
+    showKoToast('⚠ Kein Scan vorhanden — bitte zuerst scannen');
     return;
   }
 
@@ -17356,7 +17357,7 @@ function saveTop20ToBacklog() {
   allScored.sort(function(a, b) { return b.score - a.score; });
   const top20 = allScored.slice(0, 20);
 
-  if (!top20.length) { alert('Keine Scan-Ergebnisse verfügbar.'); return; }
+  if (!top20.length) { showKoToast('⚠ Keine Scan-Ergebnisse — bitte zuerst scannen'); return; }
 
   const entry = {
     date: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
@@ -17937,7 +17938,7 @@ function calcHypotheticalScore(ticker, w) {
 async function runBacktest() {
   const winners = TrackingStore.load('winners');
   if (!winners || !winners.data || !winners.data.length) {
-    alert('Keine gespeicherten Top-20-Listen vorhanden.');
+    showKoToast('⚠ Keine gespeicherten Top-20-Listen vorhanden');
     return;
   }
 
@@ -18150,7 +18151,7 @@ function importBacklogData() {
         renderBacklogPanel();
         showKoToast('✅ Backlog importiert (' + (data.exportDate || 'unbekannt') + ')');
       } catch(err) {
-        alert('Import-Fehler: ' + err.message);
+        showKoToast('⚠ Import-Fehler: ' + err.message);
       }
     };
     reader.readAsText(file);
@@ -18748,7 +18749,7 @@ function showMSEDetail() {
   var regime  = KoMarketState._lastRegime;
   var metrics = KoMarketState._lastMetrics;
   if (!regime || !metrics) {
-    alert('Noch keine Regime-Daten — Morning Briefing starten!');
+    showKoToast('⚠ Noch keine Regime-Daten — Morning Briefing starten');
     return;
   }
   var gates  = KoMarketState.getStrategyGates(regime);
@@ -19671,7 +19672,7 @@ async function generateSimpleTearsheet() {
   btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Läuft…';
   box.style.display = 'block';
   txt.textContent = 'KI formuliert um…';
-  var prompt = 'Du bekommst einen Finanzmarkt-Analysetext. Formuliere ihn in einfacher Sprache um.\n'
+  var prompt = 'Du bekommst einen Finanzmarkt-Analysetext. Formuliere ihn kurz und bündig um — prägnant, ohne Fachjargon.\n'
     + 'REGELN (absolut einzuhalten):\n'
     + '- Keine neuen Fakten, keine Empfehlungen — nur Umformulierung.\n'
     + '- Alle Zahlenwerte 1:1 übernehmen. Halluzinationsverbot absolut.\n'
