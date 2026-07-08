@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v277">
+<meta name="version" content="20260709-v278">
 <!-- CHANGELOG (neueste zuerst):
      v272: loadIntermarket + calcBullIndicator: intermarket-score + bull-score DOM-Elemente programmatisch anlegen (waren nie im HTML). Registry-Polling findet sie jetzt. window._imScore + window._bullScore gesetzt.
      v271: MB-Prompt nutzt buildPromptSection() aus ko-indicators-registry. Fallback auf manuellen Block wenn Registry nicht geladen. messwerteLines generisch, erweiterbar ohne Code-Eingriff.
@@ -445,7 +445,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <div>
               <div style="font-size:16px;font-weight:700;color:var(--text)">UnderlyingIQ · Übersicht</div>
               <div id="home-date" style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap">—</div>
-              <div id="home-changelog" style="font-size:10px;color:var(--text3);margin-top:2px;opacity:.6"></div>
+              <div id="home-changelog" style="font-size:10px;color:var(--accent);margin-top:2px;opacity:.85;font-weight:500"></div>
             </div>
           </div>
           <!-- Track-Record kompakt im Header -->
@@ -493,7 +493,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
               Marktlage &amp; Briefing
             </div>
             <div style="display:flex;align-items:center;gap:8px">
-              <button id="home-briefing-time" onclick="runHomeBriefing(false)" style="font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;padding:0" title="Letztes Briefing öffnen oder neu erstellen">—</button>
+              <button id="home-briefing-time" onclick="runHomeBriefing(false)" style="font-size:10px;color:var(--accent);background:rgba(79,142,247,0.08);border:0.5px solid var(--accent);border-radius:6px;cursor:pointer;padding:3px 8px;white-space:nowrap" title="Letztes Briefing öffnen oder neu erstellen">—</button>
               <!-- Neu berechnen: nur sichtbar wenn Briefing bereits vorhanden -->
               <button id="home-refresh-btn" onclick="runHomeBriefing(true)"
                 style="display:none;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);
@@ -5158,13 +5158,13 @@ function renderHomeLanding() {
       var rb=document.getElementById('home-refresh-btn');
       if(rb) rb.style.display='block';
     }
-    if (timeEl) timeEl.textContent = 'Heute · ' + (cached.time || '—') + ' Uhr';
+    if (timeEl) timeEl.textContent = '📋 Letztes Briefing: Heute · ' + (cached.time || '—') + ' Uhr — klicken zum Öffnen';
   } else {
     if (txtEl) {
       txtEl.textContent = 'Noch kein Briefing heute. Autostart läuft beim nächsten Programm-Start.';
       txtEl.style.color = 'var(--text3)';
     }
-    if (timeEl) timeEl.textContent = '—';
+    if (timeEl) timeEl.textContent = '⚡ Marktlage analysieren & Briefing erstellen';
   }
 
   // Strategie-Ampel befüllen
