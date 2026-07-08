@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v273">
+<meta name="version" content="20260709-v274">
 <!-- CHANGELOG (neueste zuerst):
      v272: loadIntermarket + calcBullIndicator: intermarket-score + bull-score DOM-Elemente programmatisch anlegen (waren nie im HTML). Registry-Polling findet sie jetzt. window._imScore + window._bullScore gesetzt.
      v271: MB-Prompt nutzt buildPromptSection() aus ko-indicators-registry. Fallback auf manuellen Block wenn Registry nicht geladen. messwerteLines generisch, erweiterbar ohne Code-Eingriff.
@@ -736,6 +736,12 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         </button>
         <button class="btn btn-sm" id="mkt-ah-btn" onclick="loadAfterHours()">
           <i class="ti ti-moon"></i> After-Hours Movers
+        </button>
+        <button class="btn btn-sm" onclick="loadWinners()" style="color:var(--green)">
+          <i class="ti ti-trending-up"></i> Winners
+        </button>
+        <button class="btn btn-sm" onclick="loadLosers()" style="color:var(--red)">
+          <i class="ti ti-trending-down"></i> Losers
         </button>
         <button class="btn btn-sm" onclick="openMoverModal('active')" style="background:var(--blue-bg);border-color:var(--accent);color:var(--accent)">
           <i class="ti ti-layout-grid"></i> Mover-Karten
@@ -8273,6 +8279,94 @@ async function loadAfterHours(){
   }
 }
 
+
+// ─── WINNERS / LOSERS direkt in market-intel-container (v273) ──────────────
+async function loadWinners(){
+  const container=document.getElementById('market-intel-container');
+  const clearBtn=document.getElementById('mkt-clear-btn');
+  container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade Tagesgewinner…</div>';
+  if(clearBtn) clearBtn.style.display='inline';
+  try{
+    const corsProxy=(typeof KoConfig!=='undefined')?KoConfig.api.corsProxy:'https://my-cors-proxy.ahildebrand.workers.dev';
+    const r=await fetch(corsProxy+'/?url='+encodeURIComponent('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_gainers&count=20'));
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    const quotes=(j?.finance?.result?.[0]?.quotes||[])
+      .filter(function(q){return (q.marketCap||0)>=2e9&&q.symbol&&!q.symbol.includes('^');})
+      .sort(function(a,b){return b.regularMarketChangePercent-a.regularMarketChangePercent;})
+      .slice(0,15);
+    if(!quotes.length){container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0">Keine Daten verfügbar.</div>';return;}
+    window.lastMovers=quotes.map(function(q){return q.symbol;});
+    const rows=quotes.map(function(q){
+      const chg=q.regularMarketChangePercent||0;
+      return '<tr>'+
+        '<td style="font-weight:600;font-family:var(--mono);font-size:12px">'+
+          '<button class="btn btn-sm" data-sym="'+q.symbol+'" onclick="quickScanBtn(this)" style="padding:0;font-size:12px;font-family:var(--mono);color:var(--green);background:none;border:none;text-decoration:underline;cursor:pointer;font-weight:600">'+q.symbol+'</button>'+
+        '</td>'+
+        '<td style="font-size:11px;color:var(--text2)">'+(q.shortName||q.symbol)+'</td>'+
+        '<td style="font-family:var(--mono);font-size:12px;text-align:right">$'+(q.regularMarketPrice||0).toFixed(2)+'</td>'+
+        '<td style="font-family:var(--mono);font-size:12px;text-align:right;color:var(--green)">+'+(chg).toFixed(2)+'%</td>'+
+        '<td style="font-size:10px;color:var(--text3);text-align:right">$'+((q.marketCap||0)/1e9).toFixed(1)+'B</td>'+
+      '</tr>';
+    }).join('');
+    container.innerHTML=
+      '<div style="font-size:11px;font-weight:500;color:var(--green);margin-bottom:6px">🟢 Daily Winners (US) · MarketCap >2 Mrd · '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr · Klick = Scanner</div>'+
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'+
+      '<thead><tr>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Ticker</th>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Name</th>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Kurs</th>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">+%</th>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">MCap</th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }catch(e){
+    container.innerHTML='<div style="font-size:12px;color:var(--red);padding:8px 0">⚠ Fehler: '+e.message+'</div>';
+  }
+}
+
+async function loadLosers(){
+  const container=document.getElementById('market-intel-container');
+  const clearBtn=document.getElementById('mkt-clear-btn');
+  container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0"><i class="ti ti-loader"></i> Lade Tagesverlierer…</div>';
+  if(clearBtn) clearBtn.style.display='inline';
+  try{
+    const corsProxy=(typeof KoConfig!=='undefined')?KoConfig.api.corsProxy:'https://my-cors-proxy.ahildebrand.workers.dev';
+    const r=await fetch(corsProxy+'/?url='+encodeURIComponent('https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=day_losers&count=20'));
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    const quotes=(j?.finance?.result?.[0]?.quotes||[])
+      .filter(function(q){return (q.marketCap||0)>=2e9&&q.symbol&&!q.symbol.includes('^');})
+      .sort(function(a,b){return a.regularMarketChangePercent-b.regularMarketChangePercent;})
+      .slice(0,15);
+    if(!quotes.length){container.innerHTML='<div style="font-size:12px;color:var(--text2);padding:8px 0">Keine Daten verfügbar.</div>';return;}
+    window.lastMovers=quotes.map(function(q){return q.symbol;});
+    const rows=quotes.map(function(q){
+      const chg=q.regularMarketChangePercent||0;
+      return '<tr>'+
+        '<td style="font-weight:600;font-family:var(--mono);font-size:12px">'+
+          '<button class="btn btn-sm" data-sym="'+q.symbol+'" onclick="quickScanBtn(this)" style="padding:0;font-size:12px;font-family:var(--mono);color:var(--red);background:none;border:none;text-decoration:underline;cursor:pointer;font-weight:600">'+q.symbol+'</button>'+
+        '</td>'+
+        '<td style="font-size:11px;color:var(--text2)">'+(q.shortName||q.symbol)+'</td>'+
+        '<td style="font-family:var(--mono);font-size:12px;text-align:right">$'+(q.regularMarketPrice||0).toFixed(2)+'</td>'+
+        '<td style="font-family:var(--mono);font-size:12px;text-align:right;color:var(--red)">'+(chg).toFixed(2)+'%</td>'+
+        '<td style="font-size:10px;color:var(--text3);text-align:right">$'+((q.marketCap||0)/1e9).toFixed(1)+'B</td>'+
+      '</tr>';
+    }).join('');
+    container.innerHTML=
+      '<div style="font-size:11px;font-weight:500;color:var(--red);margin-bottom:6px">🔴 Daily Losers (US) · MarketCap >2 Mrd · '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr · Klick = Scanner</div>'+
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'+
+      '<thead><tr>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Ticker</th>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:left;padding:4px 6px;border-bottom:0.5px solid var(--border)">Name</th>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">Kurs</th>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">-%</th>'+
+      '<th style="font-size:10px;color:var(--text3);text-align:right;padding:4px 6px;border-bottom:0.5px solid var(--border)">MCap</th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  }catch(e){
+    container.innerHTML='<div style="font-size:12px;color:var(--red);padding:8px 0">⚠ Fehler: '+e.message+'</div>';
+  }
+}
+// ─── END WINNERS / LOSERS ──────────────────────────────────────────────────
 
 function renderMostActive(d){
   window.lastMovers=(d.items||[]).map(function(s){return s.scanSym||s.symbol;}).filter(Boolean);
