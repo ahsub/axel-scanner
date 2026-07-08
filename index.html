@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260708-v265">
+<meta name="version" content="20260709-v266">
 <!-- CHANGELOG (neueste zuerst):
+     v266: Refactor ko-scanner.js v1.0.0 + ko-home.js v1.0.0 → ahsub/ko-modules@f1615dc. jsDelivr Hash 732694e→f1615dc. Neue Script-Tags.
      v265: KRITISCH: _marketDropdowns fehlende Kommas zwischen Array-Einträgen — JS-Syntax-Fehler brach alle folgenden Panels (Fibonacci, KO-Rechner, Backlog, Einstellungen).
      v264: Scanner: Market-Sentiment-Block entfernt (qqq-banner+vix-ampel hidden); KI-Analyse-Button in Steuerleiste; alpha-lb-cards display-Konflikt behoben.
      v263: Strategie-Ampel auf Landing-Page (grün/gelb/rot, alle Strategien). window._lastMseResult für Landing-Page-Zugriff. Scanner Gates: inaktive Strategien explizit rot+gelb mit Border. Selektiv-Tooltip erklärt was Selektiv bedeutet.
@@ -2890,19 +2891,19 @@ window.pinSubmit = function(){
 </script>
 
 <!-- ko-config.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-config.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-config.js"></script>
 
 <!-- ko-indicators.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-indicators.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-indicators.js"></script>
 
 <!-- ko-scoring.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-scoring.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-scoring.js"></script>
 
 <!-- ko-markov.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-markov.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-markov.js"></script>
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-data.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-data.js"></script>
 <!-- ko-strategies.js v2.1.0 — Commit-Hash 785e61e (01.07.2026, Short-Strategie
      fading_short + Regelwerk-Erweiterung). type="module" erforderlich. -->
 <script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@785e61e/ko-strategies.js"></script>
@@ -21997,8 +21998,10 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-market-state.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@732694e/ko-darkpool.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-darkpool.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-scanner.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-home.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
