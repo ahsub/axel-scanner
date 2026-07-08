@@ -4,8 +4,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v271">
+<meta name="version" content="20260709-v272">
 <!-- CHANGELOG (neueste zuerst):
+     v272: loadIntermarket + calcBullIndicator: intermarket-score + bull-score DOM-Elemente programmatisch anlegen (waren nie im HTML). Registry-Polling findet sie jetzt. window._imScore + window._bullScore gesetzt.
      v271: MB-Prompt nutzt buildPromptSection() aus ko-indicators-registry. Fallback auf manuellen Block wenn Registry nicht geladen. messwerteLines generisch, erweiterbar ohne Code-Eingriff.
      v270: ko-indicators.json v1.0.0 (25 Indikatoren-Registry) + ko-indicators-loader.js v1.0.0 (waitForAllIndicators, buildPromptSection, getIndicatorValue). Hash b820f1b→0a921fb. Polling-Gate nutzt jetzt Registry.
      v269: panel-scanner active→panel (kein Race-Condition Flash mehr). panel-home active als Default. Scanner-Blöcke nicht mehr auf Übersicht sichtbar.
@@ -9048,6 +9049,16 @@ async function calcBullIndicator() {
   }
 
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-calculator"></i> Berechnen'; }
+  // Bull-Score in DOM + window (für Registry + MB-Prompt)
+  window._bullScore = scorePct;
+  var _bullScoreEl = document.getElementById('bull-score');
+  if (!_bullScoreEl) {
+    _bullScoreEl = document.createElement('span');
+    _bullScoreEl.id = 'bull-score';
+    _bullScoreEl.style.display = 'none';
+    document.body.appendChild(_bullScoreEl);
+  }
+  _bullScoreEl.textContent = scorePct + '/100';
 }
 
 
@@ -9509,6 +9520,13 @@ async function loadIntermarket() {
   }
 
   if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Laden'; }
+  // Intermarket-Score in DOM (für Registry-Polling + MB-Prompt)
+  window._imScore = scorePct;
+  (function() {
+    var el = document.getElementById('intermarket-score');
+    if (!el) { el = document.createElement('span'); el.id = 'intermarket-score'; el.style.display = 'none'; document.body.appendChild(el); }
+    el.textContent = scorePct + '/100';
+  })();
   // CNN Fear & Greed parallel laden
   fetchCnnFearGreed();
 }
