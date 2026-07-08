@@ -4,8 +4,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v268">
+<meta name="version" content="20260709-v269">
 <!-- CHANGELOG (neueste zuerst):
+     v269: panel-scanner active→panel (kein Race-Condition Flash mehr). panel-home active als Default. Scanner-Blöcke nicht mehr auf Übersicht sichtbar.
      v268: Stufe 2: unlockApp→showPanel(home) — App startet auf Übersicht. Versions-Format fix (v268·09.07.2026). home-briefing-time→klickbarer Button (öffnet/erstellt Briefing). Button-Text: "Marktlage analysieren & Briefing erstellen".
      v267: ko-scanner.js + ko-home.js Syntax-Fehler behoben (saubere Funktionsdefinitionen, keine losen Statements). Inline-Duplikate aus index.html entfernt. Hash f1615dc→b820f1b.
      v266: Refactor ko-scanner.js v1.0.0 + ko-home.js v1.0.0 → ahsub/ko-modules@b820f1b. jsDelivr Hash 732694e→b820f1b. Neue Script-Tags.
@@ -431,7 +432,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
   <div class="content">
     <!-- HOME / LANDING PANEL (AP-A) -->
-    <div id="panel-home" class="panel">
+    <div id="panel-home" class="panel active">
       <div id="home-landing" style="padding:1.25rem;max-width:720px;margin:0 auto">
 
         <!-- Header -->
@@ -539,7 +540,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
 
     <!-- SCANNER PANEL -->
-    <div id="panel-scanner" class="panel active">
+    <div id="panel-scanner" class="panel">
       <div class="sec">Technischer Scanner</div>
 
       <!-- MARKET REGIME COCKPIT + ONE-BUTTON MORNING BRIEFING -->
@@ -19574,6 +19575,22 @@ async function runMorningBriefing() {
       var breadthVal       = document.getElementById('breadth-pct')?.textContent || '—';
       var bullScore        = document.getElementById('bull-score')?.textContent || '—';
       var regime           = window._lastQqqRegime || window._currentRegime || 'unbekannt';
+
+      // ── Zusatz-Messwerte aus DOM (VOR messwerteLines) ────────────────
+      var _imVal = function(id) {
+        var el = document.getElementById(id);
+        return el ? el.textContent.trim() : '—';
+      };
+      var tnx      = _imVal('im-tnx');
+      var irx      = _imVal('im-irx');
+      var dxyEl    = document.getElementById('im-dxy') || document.querySelector('[id*="dxy"]');
+      var dxyTxt   = dxyEl ? dxyEl.textContent.trim() : '—';
+      var dxySignal = typeof window._imDxyBull !== 'undefined'
+        ? (window._imDxyBull ? 'über SMA200 (USD stark)' : 'unter SMA200 (USD schwach)') : '—';
+      var sohEl    = document.getElementById('overheat-text') || document.getElementById('sektor-overheat-content');
+      var sohTxt   = sohEl ? sohEl.innerText.slice(0,150).replace(/\n/g,' · ') : '—';
+      var pcrRaw   = (window._alphaData && window._alphaData.market && window._alphaData.market.pcr)
+        ? (window._alphaData.market.pcr.value || '—') : '—';
       var mseRegime        = KoMarketState?._lastRegime || '—';
       var vixZone          = !results.vix ? 3 : results.vix < 12 ? 1 : results.vix < 16 ? 2 : results.vix < 20 ? 3 : results.vix < 28 ? 4 : 5;
 
@@ -19625,32 +19642,11 @@ async function runMorningBriefing() {
       messwerteLines.push('Bull-Market Frühindikator: ' + bullScore);
       if (sektorTxt !== '—') messwerteLines.push('Sektor RS vs. SPY: ' + sektorTxt);
 
-      // ── Zusatz-Messwerte aus DOM (Intermarket-Panel) ──────────────────
-      var _imVal = function(id) {
-        var el = document.getElementById(id);
-        return el ? el.textContent.trim() : '—';
-      };
-      // 10Y-2Y Spread
-      var tnx  = _imVal('im-tnx');
-      var irx  = _imVal('im-irx'); // 13W = Kurzfristzins-Proxy
+      // ── Zusatz push()-Aufrufe (Vars oben definiert) ─────────────────
       messwerteLines.push('10J Treasury: ' + tnx + '%');
       if (irx !== '—') messwerteLines.push('Kurzfristzins (3M): ' + irx + '%');
-      // DXY
-      var dxyEl = document.getElementById('im-dxy');
-      if (!dxyEl) dxyEl = document.querySelector('[id*="dxy"]');
-      var dxyTxt = dxyEl ? dxyEl.textContent.trim() : '—';
-      // DXY vs SMA200 aus window._imDxyBull (gesetzt von loadIntermarket)
-      var dxySignal = typeof window._imDxyBull !== 'undefined'
-        ? (window._imDxyBull ? 'über SMA200 (USD stark)' : 'unter SMA200 (USD schwach)') : '—';
       messwerteLines.push('DXY: ' + dxyTxt + ' · ' + dxySignal);
-      // Sektor-Überhitzung (Top-Überhitzte)
-      var sohEl = document.getElementById('overheat-text');
-      if (!sohEl) sohEl = document.getElementById('sektor-overheat-content');
-      var sohTxt = sohEl ? sohEl.innerText.slice(0,150).replace(/\n/g,' · ') : '—';
       if (sohTxt !== '—') messwerteLines.push('Sektor-Überhitzung: ' + sohTxt);
-      // PCR Rohwert aus KV-Daten
-      var pcrRaw = (window._alphaData && _alphaData.market && _alphaData.market.pcr)
-        ? _alphaData.market.pcr.value || '—' : '—';
       if (pcrRaw !== '—') messwerteLines.push('Put/Call Ratio (aktuell): ' + pcrRaw);
       messwerteLines.push(''); messwerteLines.push('--- SENTIMENT & BEWERTUNG ---');
       if (results.fearGreed){var _fg=results.fearGreed;messwerteLines.push('Fear & Greed: '+_fg.score+'/100 ('+(_fg.rating||'')+')'+(_fg.previous?' Vortag:'+_fg.previous:'')+(_fg.proxy?' [Proxy]':' [CNN]'));}else messwerteLines.push('Fear & Greed: n/v');
