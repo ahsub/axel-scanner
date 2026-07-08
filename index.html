@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v276">
+<meta name="version" content="20260709-v277">
 <!-- CHANGELOG (neueste zuerst):
      v272: loadIntermarket + calcBullIndicator: intermarket-score + bull-score DOM-Elemente programmatisch anlegen (waren nie im HTML). Registry-Polling findet sie jetzt. window._imScore + window._bullScore gesetzt.
      v271: MB-Prompt nutzt buildPromptSection() aus ko-indicators-registry. Fallback auf manuellen Block wenn Registry nicht geladen. messwerteLines generisch, erweiterbar ohne Code-Eingriff.
@@ -667,6 +667,15 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         <!-- kv-mode-badge entfernt (v275) — Aggregator via Dropdown erreichbar -->
         <!-- scan-mode-seg in Steuerleiste (v253) -->
         </div>
+      </div>
+      <!-- Scan-Ausführen Button (v277) -->
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:.75rem">
+        <button class="btn btn-primary" id="scan-run-btn" onclick="runScan()" style="flex:1;font-size:13px;font-weight:600;padding:8px 16px;border-radius:8px">
+          <i class="ti ti-player-play"></i> Scan ausführen
+        </button>
+        <button class="btn btn-sm" id="scan-auto-btn" onclick="runScanAuto()" title="Automatisch: alle Listen scannen" style="font-size:11px;padding:6px 10px">
+          <i class="ti ti-refresh"></i> Auto
+        </button>
       </div>
       <div id="custom-wrap" style="display:block;margin-bottom:.75rem"><div style="display:flex;gap:6px;align-items:center"><input type="text" id="custom-input" placeholder="AAPL, MSFT oder 'Hugo Boss, Hensoldt' (Klarnamen möglich)" style="flex:1" oninput="this.dataset.userTyped='1'"><button class="btn btn-sm" onclick="saveCurrentAsWatchlist()" title="Als neue Watchlist speichern" style="white-space:nowrap;font-size:11px;flex-shrink:0"><i class="ti ti-bookmark-plus"></i> Speichern</button><button class="btn btn-sm" id="update-wl-btn" onclick="updateExistingWatchlist()" title="Aktuelle Watchlist aktualisieren" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)"><i class="ti ti-refresh"></i> WL aktualisieren</button>
 <button class="btn btn-sm" id="iv-toolbar-btn" onclick="enrichTop40WithIV()" title="IV-Daten für aktuelle Liste laden (24h Cache)" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:rgba(79,142,247,0.1);border-color:var(--accent);color:var(--accent)"><i class="ti ti-chart-candle"></i> IV laden</button></div></div>
@@ -22035,7 +22044,7 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@d5b062d/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-home.js"></script>
