@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v274">
+<meta name="version" content="20260709-v275">
 <!-- CHANGELOG (neueste zuerst):
      v272: loadIntermarket + calcBullIndicator: intermarket-score + bull-score DOM-Elemente programmatisch anlegen (waren nie im HTML). Registry-Polling findet sie jetzt. window._imScore + window._bullScore gesetzt.
      v271: MB-Prompt nutzt buildPromptSection() aus ko-indicators-registry. Fallback auf manuellen Block wenn Registry nicht geladen. messwerteLines generisch, erweiterbar ohne Code-Eingriff.
@@ -664,9 +664,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         <!-- KV-Modus Badge -->
         <button onclick="expandAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="expand-all-btn" title="Alle aufklappen"><i class="ti ti-chevrons-down"></i></button>
         <button onclick="collapseAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="collapse-all-btn" title="Alle zuklappen"><i class="ti ti-chevrons-up"></i></button>
-        <span id="kv-mode-badge" onclick="loadScannerFromKV()" style="display:none;font-size:10px;padding:3px 8px;border-radius:6px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green);white-space:nowrap;cursor:pointer" title="Klicken: Aggregator-Ergebnisse laden (Nacht-Scan)">
-          <i class="ti ti-database"></i> <span id="kv-mode-date">KV</span>
-        </span>
+        <!-- kv-mode-badge entfernt (v275) — Aggregator via Dropdown erreichbar -->
         <!-- scan-mode-seg in Steuerleiste (v253) -->
         </div>
       </div>
@@ -713,7 +711,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
 
       <div id="scan-container"></div>
       <div style="font-size:11px;color:var(--text3);margin-top:.5rem" id="scanner-market-hint">
-        <i class="ti ti-info-circle"></i> 🔔 US-Markt · Daten via Twelve Data · Kaufsignal = alle 3 bullisch
+        <i class="ti ti-info-circle"></i> <span id="scanner-hint-text">Markteinschätzung wird geladen…</span>
       </div>
 
       <div style="height:0.5px;background:var(--border);margin:1.25rem 0"></div>
@@ -4975,6 +4973,8 @@ function unlockApp(){
   setTimeout(initExpertMode, 500);
   // Market Regime Cockpit befüllen
   setTimeout(updateRegimeCockpit, 1500);
+  // Scanner-Hint: Single Source of Truth aus MB-Cache (v275)
+  setTimeout(updateScannerHint, 800);
 
   // MSE v2.0: Badge sofort aus wiederhergestelltem Regime befüllen
   setTimeout(function() {
@@ -20414,6 +20414,34 @@ async function updateRegimeCockpit() {
 var _origCalcTSI = window.calcTreasuryStress;
 
 // ── SWING-TRADING FILTER & ANALYSE ───────────────────────────────────────────
+
+// ─── SCANNER HINT: Single Source of Truth aus MB-Cache (v275) ────────────────
+function updateScannerHint() {
+  var hintEl = document.getElementById('scanner-hint-text');
+  if (!hintEl) return;
+  try {
+    var today = new Date().toISOString().slice(0,10);
+    var cached = JSON.parse(localStorage.getItem('morning_briefing_' + today) || 'null');
+    if (cached && cached.regime) {
+      var gates = (typeof KoMarketState !== 'undefined') ? KoMarketState.getStrategyGates(cached.regime) : null;
+      if (gates) {
+        hintEl.textContent = gates.label + ' · ' + gates.action;
+        hintEl.parentElement.style.color = gates.color;
+        return;
+      }
+    }
+    // Fallback: letztes gespeichertes Regime
+    if (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) {
+      var g = KoMarketState.getStrategyGates(KoMarketState._lastRegime);
+      hintEl.textContent = g.label + ' · ' + g.action;
+      hintEl.parentElement.style.color = g.color;
+    } else {
+      hintEl.textContent = 'Markteinschätzung via Morning Briefing verfügbar';
+    }
+  } catch(e) {
+    hintEl.textContent = 'Markteinschätzung via Morning Briefing verfügbar';
+  }
+}
 
 function showSwingFilter() {
   var candidates = { long: [], neutral: [] };
