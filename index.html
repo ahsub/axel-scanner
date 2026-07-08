@@ -4,8 +4,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v267">
+<meta name="version" content="20260709-v268">
 <!-- CHANGELOG (neueste zuerst):
+     v268: Stufe 2: unlockApp→showPanel(home) — App startet auf Übersicht. Versions-Format fix (v268·09.07.2026). home-briefing-time→klickbarer Button (öffnet/erstellt Briefing). Button-Text: "Marktlage analysieren & Briefing erstellen".
      v267: ko-scanner.js + ko-home.js Syntax-Fehler behoben (saubere Funktionsdefinitionen, keine losen Statements). Inline-Duplikate aus index.html entfernt. Hash f1615dc→b820f1b.
      v266: Refactor ko-scanner.js v1.0.0 + ko-home.js v1.0.0 → ahsub/ko-modules@b820f1b. jsDelivr Hash 732694e→b820f1b. Neue Script-Tags.
      v265: KRITISCH: _marketDropdowns fehlende Kommas zwischen Array-Einträgen — JS-Syntax-Fehler brach alle folgenden Panels (Fibonacci, KO-Rechner, Backlog, Einstellungen).
@@ -488,7 +489,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
               Marktlage &amp; Briefing
             </div>
             <div style="display:flex;align-items:center;gap:8px">
-              <div id="home-briefing-time" style="font-size:10px;color:var(--text3)">—</div>
+              <button id="home-briefing-time" onclick="runHomeBriefing(false)" style="font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;padding:0" title="Letztes Briefing öffnen oder neu erstellen">—</button>
               <!-- Neu berechnen: nur sichtbar wenn Briefing bereits vorhanden -->
               <button id="home-refresh-btn" onclick="runHomeBriefing(true)"
                 style="display:none;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);
@@ -520,7 +521,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
               style="width:100%;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);
               background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;
               font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-              <i class="ti ti-chart-radar"></i> Aktuelles Marktgeschehen überprüfen
+              <i class="ti ti-chart-radar"></i> Marktlage analysieren &amp; Briefing erstellen
             </button>
           </div>
         </div>
@@ -4940,10 +4941,9 @@ function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   updateClock(); setInterval(updateClock,1000);
-  // Fix 3 (AP): Initial-Panel nav-highlight setzen
-  var _navScanner = document.getElementById('nav-scanner');
-  if (_navScanner) _navScanner.classList.add('active');
+  // Initial-Panel: Home/Übersicht (v267)
   window._appUnlocked = true;
+  showPanel('home');
   // KoPrompts + UI-Cache initialisieren
   // NEU (30.06.2026): defensive Absicherung gegen Lade-Reihenfolge-Race —
   // _initKoPrompts() wird erst spaeter im Dokument definiert (~Zeile 15700+);
@@ -5085,11 +5085,14 @@ function renderHomeLanding() {
   if (clEl) {
     var verMeta = document.querySelector('meta[name="version"]');
     var ver = verMeta ? verMeta.getAttribute('content') : '';
-    // Format: '20260708-v251' → 'v251 · 08.07.2026'
+    // Format: '20260709-v267' → 'v267 · 09.07.2026'
     if (ver) {
-      var parts = ver.split('-');
-      var vNum  = parts[1] || ver;
-      var vDate = parts[0] ? parts[0].replace(/(\d{4})(\d{2})(\d{2})/, '$3.$2.$1') : '';
+      var parts = ver.split('-v');
+      var vNum  = parts[1] ? 'v' + parts[1] : ver;
+      var rawDate = parts[0] || '';
+      var vDate = rawDate.length === 8
+        ? rawDate.slice(6,8) + '.' + rawDate.slice(4,6) + '.' + rawDate.slice(0,4)
+        : '';
       clEl.textContent = vNum + (vDate ? ' · ' + vDate : '');
     }
   }
