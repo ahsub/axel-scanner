@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v275">
+<meta name="version" content="20260709-v276">
 <!-- CHANGELOG (neueste zuerst):
      v272: loadIntermarket + calcBullIndicator: intermarket-score + bull-score DOM-Elemente programmatisch anlegen (waren nie im HTML). Registry-Polling findet sie jetzt. window._imScore + window._bullScore gesetzt.
      v271: MB-Prompt nutzt buildPromptSection() aus ko-indicators-registry. Fallback auf manuellen Block wenn Registry nicht geladen. messwerteLines generisch, erweiterbar ohne Code-Eingriff.
@@ -4991,12 +4991,30 @@ function unlockApp(){
       }
       if (action) { action.textContent = gates.action; action.style.color = gates.color; }
       if (gates2) {
-        var sL = { momentum:'📈 Momentum', swing:'🔄 Swing', csp_wheel:'⚙️ CSP/Wheel', meanrev:'↩️ Mean Rev.', breakout:'🚀 Breakout' };
+        var sL = {
+          momentum:     '📈 Momentum',
+          breakout:     '🚀 Breakout',
+          swing:        '🔄 Swing',
+          ko:           '⚡ KO-Zertifikat',
+          csp_wheel:    '⚙️ CSP/Wheel',
+          atmna:        '🎯 ATM/NA',
+          weekly_income:'💰 Weekly Income',
+          value:        '💎 Value',
+          dividend:     '🏦 Dividende',
+          meanrev:      '↩️ Mean Rev.',
+          fading_short: '🔻 Fading Short',
+        };
+        // 3-Farb-Ampel: green=🟢 aktiv/empfohlen, amber=🟡 möglich, red=🔴 gesperrt
+        var colorMap = {
+          green: { col:'var(--green)',  bg:'rgba(34,197,94,0.12)',  icon:'🟢' },
+          amber: { col:'var(--amber)',  bg:'rgba(245,158,11,0.12)', icon:'🟡' },
+          red:   { col:'var(--red)',    bg:'rgba(239,68,68,0.10)',  icon:'🔴' },
+        };
         gates2.innerHTML = Object.entries(gates.strategies).map(function(e) {
           var k = e[0], s = e[1];
-          var col = s.active ? 'var(--green)' : 'var(--red)';
-          var bg  = s.active ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)';
-          return '<div title="' + s.note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;background:' + bg + ';color:' + col + '">' + (s.active ? '✓' : '✗') + ' ' + sL[k] + '</div>';
+          var cKey = s.color || (s.active ? 'green' : 'red');
+          var c = colorMap[cKey] || colorMap.red;
+          return '<div title="' + s.note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;background:' + c.bg + ';color:' + c.col + ';cursor:help">' + c.icon + ' ' + (sL[k] || k) + '</div>';
         }).join('');
       }
       window._currentRegime = KoMarketState._lastRegime;
@@ -5145,35 +5163,35 @@ function renderHomeLanding() {
   if (gatesHomeEl) {
     var mseResult = window._lastMseResult || null;
     if (mseResult && mseResult.strategies) {
-      var _ampelLabels = {
-        momentum:     '📈 Momentum',
-        swing:        '🔄 Swing',
-        csp_wheel:    '⚙️ CSP/Wheel',
-        meanrev:      '↩️ Mean Rev.',
-        breakout:     '🚀 Breakout',
-        atmna:        '⚡ atmna',
-        fading_short: '🔝 KO-Short',
-        dividend:     '💰 Dividend',
-        weekly_income:'📅 Weekly Inc.',
+      // Single Source of Truth: getStrategyGates aus ko-market-state.js (v275)
+      var _sL = {
+        momentum:'📈 Momentum', breakout:'🚀 Breakout', swing:'🔄 Swing',
+        ko:'⚡ KO-Zertifikat', csp_wheel:'⚙️ CSP/Wheel', atmna:'🎯 ATM/NA',
+        weekly_income:'💰 Weekly Income', value:'💎 Value',
+        dividend:'🏦 Dividende', meanrev:'↩️ Mean Rev.', fading_short:'🔻 Fading Short',
       };
-      var _ampelHtml = Object.entries(mseResult.strategies).map(function(e) {
-        var key = e[0], strat = e[1];
-        var label = _ampelLabels[key] || key;
-        if (strat.active === true) {
-          return '<div title="' + (strat.note||'') + '" style="font-size:11px;padding:3px 9px;border-radius:10px;'
-            + 'background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green)">'
-            + '✓ ' + label + '</div>';
-        } else if (strat.conditional) {
-          return '<div title="' + (strat.note||'') + '" style="font-size:11px;padding:3px 9px;border-radius:10px;'
-            + 'background:rgba(245,158,11,0.1);border:0.5px solid var(--amber);color:var(--amber)">'
-            + '~ ' + label + '</div>';
-        } else {
-          return '<div title="' + (strat.note||'') + '" style="font-size:11px;padding:3px 9px;border-radius:10px;'
-            + 'background:rgba(239,68,68,0.08);border:0.5px solid var(--red);color:var(--red)">'
-            + '✗ ' + label + '</div>';
-        }
-      }).join('');
+      var _cMap = {
+        green:{col:'var(--green)',bg:'rgba(34,197,94,0.12)',icon:'🟢'},
+        amber:{col:'var(--amber)',bg:'rgba(245,158,11,0.12)',icon:'🟡'},
+        red:  {col:'var(--red)',  bg:'rgba(239,68,68,0.10)', icon:'🔴'},
+      };
+      function _renderAmpel(strategies) {
+        return Object.entries(strategies).map(function(e) {
+          var k=e[0],s=e[1]; var c=_cMap[s.color||(s.active?'green':'red')]||_cMap.red;
+          return '<div title="'+(s.note||'')+'" style="font-size:11px;padding:3px 9px;border-radius:10px;background:'+c.bg+';color:'+c.col+';cursor:help">'+c.icon+' '+(_sL[k]||k)+'</div>';
+        }).join('');
+      }
+      var _ampelHtml = _renderAmpel(mseResult.strategies);
       gatesHomeEl.innerHTML = _ampelHtml || '<span style="font-size:11px;color:var(--text3)">Keine Daten</span>';
+    } else if (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) {
+      var _fbG = KoMarketState.getStrategyGates(KoMarketState._lastRegime);
+      if (_fbG && _fbG.strategies) {
+        var _sL2={momentum:'📈 Momentum',breakout:'🚀 Breakout',swing:'🔄 Swing',ko:'⚡ KO-Zertifikat',csp_wheel:'⚙️ CSP/Wheel',atmna:'🎯 ATM/NA',weekly_income:'💰 Weekly Income',value:'💎 Value',dividend:'🏦 Dividende',meanrev:'↩️ Mean Rev.',fading_short:'🔻 Fading Short'};
+        var _cMap2={green:{col:'var(--green)',bg:'rgba(34,197,94,0.12)',icon:'🟢'},amber:{col:'var(--amber)',bg:'rgba(245,158,11,0.12)',icon:'🟡'},red:{col:'var(--red)',bg:'rgba(239,68,68,0.10)',icon:'🔴'}};
+        gatesHomeEl.innerHTML=Object.entries(_fbG.strategies).map(function(e){var k=e[0],s=e[1];var c=_cMap2[s.color||(s.active?'green':'red')]||_cMap2.red;return '<div title="'+(s.note||'')+'" style="font-size:11px;padding:3px 9px;border-radius:10px;background:'+c.bg+';color:'+c.col+';cursor:help">'+c.icon+' '+(_sL2[k]||k)+'</div>';}).join('');
+      } else {
+        gatesHomeEl.innerHTML = '<span style="font-size:11px;color:var(--text3)">Morning Briefing starten für Strategie-Ampel</span>';
+      }
     } else {
       gatesHomeEl.innerHTML = '<span style="font-size:11px;color:var(--text3)">Morning Briefing starten für Strategie-Ampel</span>';
     }
