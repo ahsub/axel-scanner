@@ -4,8 +4,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v270">
+<meta name="version" content="20260709-v271">
 <!-- CHANGELOG (neueste zuerst):
+     v271: MB-Prompt nutzt buildPromptSection() aus ko-indicators-registry. Fallback auf manuellen Block wenn Registry nicht geladen. messwerteLines generisch, erweiterbar ohne Code-Eingriff.
      v270: ko-indicators.json v1.0.0 (25 Indikatoren-Registry) + ko-indicators-loader.js v1.0.0 (waitForAllIndicators, buildPromptSection, getIndicatorValue). Hash b820f1b→0a921fb. Polling-Gate nutzt jetzt Registry.
      v269: panel-scanner active→panel (kein Race-Condition Flash mehr). panel-home active als Default. Scanner-Blöcke nicht mehr auf Übersicht sichtbar.
      v268: Stufe 2: unlockApp→showPanel(home) — App startet auf Übersicht. Versions-Format fix (v268·09.07.2026). home-briefing-time→klickbarer Button (öffnet/erstellt Briefing). Button-Text: "Marktlage analysieren & Briefing erstellen".
@@ -19620,42 +19621,56 @@ async function runMorningBriefing() {
       } else { sektorTxt = sektorRsTxt; }
 
       // Nur vorhandene Werte in den Prompt aufnehmen
+      // ── Prompt-Aufbau via ko-indicators-registry ────────────────────
       var messwerteLines = [];
       messwerteLines.push('DATUM: ' + new Date().toLocaleDateString('de-DE'));
       messwerteLines.push('');
-      messwerteLines.push('--- MARKT-REGIME ---');
-      messwerteLines.push('MSE Regime: ' + mseRegime + (mseRegime !== '—' ? ' (Market State Engine v2.0)' : ' (noch nicht berechnet)'));
-      if (typeof KoMarketState !== 'undefined' && KoMarketState._historySource) {
-        messwerteLines.push('MSE History: ' + KoMarketState._historySource + ' (' + (KoMarketState._history.vvix || []).length + ' VVIX-Punkte, ' + (KoMarketState._history.skew || []).length + ' SKEW-Punkte)');
+
+      // Registry-basierter Prompt-Aufbau (ko-indicators-loader.js)
+      var _alphaCtx = window._alphaData || null;
+      if (typeof buildPromptSection === 'function' && _indicatorRegistry) {
+        // Generisch: alle Kategorien in definierter Reihenfolge
+        ['regime','volatility','sentiment','macro','commodity','fx'].forEach(function(cat) {
+          var lines = buildPromptSection(cat, _alphaCtx);
+          lines.forEach(function(l){ messwerteLines.push(l); });
+          messwerteLines.push('');
+        });
+        // Spezifische Werte die nicht in der Registry stehen
+        messwerteLines.push('--- ZUSATZ-KONTEXT ---');
+        messwerteLines.push('MSE Regime: ' + mseRegime + (mseRegime !== '—' ? ' (Market State Engine v2.0)' : ' (noch nicht berechnet)'));
+        messwerteLines.push('QQQ Markov: ' + regime);
+        messwerteLines.push('VIX: ' + (results.vix || '—') + ' · Zone ' + vixZone + ' von 6');
+        messwerteLines.push('VIX Term Structure: ' + termStruct);
+        if (sektorTxt !== '—') messwerteLines.push('Sektor RS vs. SPY: ' + sektorTxt);
+        if (results.fearGreed) {
+          var _fg = results.fearGreed;
+          messwerteLines.push('Fear & Greed: '+_fg.score+'/100 ('+(_fg.rating||'')+')'+(_fg.previous?' Vortag:'+_fg.previous:'')+(_fg.proxy?' [Proxy]':' [CNN]'));
+        }
+        if (results.iosMarket) {
+          var _im = results.iosMarket;
+          messwerteLines.push('IOS Market: '+_im.iosMarketScore+'/100 → '+(_im.iosMarketDecision||'')+' T:'+_im.iosMarketTrend+' B:'+_im.iosMarketBreadth+' R:'+_im.iosMarketRisk);
+        }
+      } else {
+        // Fallback: manueller Prompt-Aufbau (wenn Registry nicht geladen)
+        console.warn('[MB] ko-indicators-registry nicht verfügbar — Fallback-Prompt');
+        messwerteLines.push('--- MARKT-REGIME ---');
+        messwerteLines.push('MSE Regime: ' + mseRegime);
+        messwerteLines.push('QQQ Markov: ' + regime);
+        messwerteLines.push('VIX: ' + (results.vix || '—') + ' · Zone ' + vixZone);
+        messwerteLines.push('VIX Term Structure: ' + termStruct);
+        messwerteLines.push('');
+        messwerteLines.push('--- MAKRO ---');
+        messwerteLines.push('Treasury Stress: ' + (results.tsiScore || '—') + '/100');
+        messwerteLines.push('Intermarket Risk: ' + intermarketScore);
+        messwerteLines.push('NDX Breadth: ' + breadthVal);
+        messwerteLines.push('Bull-Indikator: ' + bullScore);
+        messwerteLines.push('DXY: ' + dxyTxt + ' · ' + dxySignal);
+        messwerteLines.push('10J Treasury: ' + tnx + '%');
+        if (pcrRaw !== '—') messwerteLines.push('Put/Call Ratio: ' + pcrRaw);
+        if (sektorTxt !== '—') messwerteLines.push('Sektor RS: ' + sektorTxt);
+        if (results.fearGreed) messwerteLines.push('Fear & Greed: ' + results.fearGreed.score + '/100');
+        if (results.iosMarket) messwerteLines.push('IOS Market: ' + results.iosMarket.iosMarketScore + '/100');
       }
-      messwerteLines.push('QQQ Markov: ' + regime);
-      messwerteLines.push('VIX: ' + (results.vix || '—') + ' · Zone ' + vixZone + ' von 6');
-      messwerteLines.push('VIX Term Structure: ' + termStruct);
-      messwerteLines.push('');
-      messwerteLines.push('--- VOLATILITÄT & FLOW ---');
-      messwerteLines.push('VVIX Rohwert: ' + vvixRaw + ' · Z-Score(20T): ' + vvixZ);
-      messwerteLines.push('SKEW Rohwert: ' + skewRaw + ' · Perzentil(20T): ' + skewPct);
-      messwerteLines.push('PCR Z-Score(20T): ' + dixZ + ' (negativ = Akkumulation/Bullish)');
-      messwerteLines.push('GEX-Proxy Z(20T): ' + gexZ + ' (positiv = Dealer dämpfen Bewegung)');
-      messwerteLines.push('Institutional Flow Score: ' + (results.dpScore || '—') + '/100');
-      messwerteLines.push('');
-      messwerteLines.push('--- MAKRO-INDIKATOREN ---');
-      messwerteLines.push('Treasury Stress Score: ' + (results.tsiScore || '—') + '/100');
-      messwerteLines.push('Intermarket Risk Score: ' + intermarketScore);
-      messwerteLines.push('NDX Breadth (>50d MA): ' + breadthVal);
-      messwerteLines.push('Bull-Market Frühindikator: ' + bullScore);
-      if (sektorTxt !== '—') messwerteLines.push('Sektor RS vs. SPY: ' + sektorTxt);
-
-      // ── Zusatz push()-Aufrufe (Vars oben definiert) ─────────────────
-      messwerteLines.push('10J Treasury: ' + tnx + '%');
-      if (irx !== '—') messwerteLines.push('Kurzfristzins (3M): ' + irx + '%');
-      messwerteLines.push('DXY: ' + dxyTxt + ' · ' + dxySignal);
-      if (sohTxt !== '—') messwerteLines.push('Sektor-Überhitzung: ' + sohTxt);
-      if (pcrRaw !== '—') messwerteLines.push('Put/Call Ratio (aktuell): ' + pcrRaw);
-      messwerteLines.push(''); messwerteLines.push('--- SENTIMENT & BEWERTUNG ---');
-      if (results.fearGreed){var _fg=results.fearGreed;messwerteLines.push('Fear & Greed: '+_fg.score+'/100 ('+(_fg.rating||'')+')'+(_fg.previous?' Vortag:'+_fg.previous:'')+(_fg.proxy?' [Proxy]':' [CNN]'));}else messwerteLines.push('Fear & Greed: n/v');
-      if (results.iosMarket){var _im=results.iosMarket;messwerteLines.push('IOS Market: '+_im.iosMarketScore+'/100 → '+(_im.iosMarketDecision||'')+' T:'+_im.iosMarketTrend+' B:'+_im.iosMarketBreadth+' R:'+_im.iosMarketRisk);}
-
       var KI_HALLU_SCHUTZ =
         'ABSOLUTE REGELN — KEINE AUSNAHMEN:\n'
         + '1. Analysiere AUSSCHLIESSLICH die unten aufgeführten Messwerte.\n'
