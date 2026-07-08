@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v272">
+<meta name="version" content="20260709-v273">
 <!-- CHANGELOG (neueste zuerst):
      v272: loadIntermarket + calcBullIndicator: intermarket-score + bull-score DOM-Elemente programmatisch anlegen (waren nie im HTML). Registry-Polling findet sie jetzt. window._imScore + window._bullScore gesetzt.
      v271: MB-Prompt nutzt buildPromptSection() aus ko-indicators-registry. Fallback auf manuellen Block wenn Registry nicht geladen. messwerteLines generisch, erweiterbar ohne Code-Eingriff.
@@ -670,17 +670,6 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         <!-- scan-mode-seg in Steuerleiste (v253) -->
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem">
-        <span style="font-size:11px;color:var(--text3);white-space:nowrap">Zeitrahmen:</span>
-        <div style="display:flex;gap:4px;flex-wrap:wrap">
-          <button class="btn btn-sm tf-btn" id="tf-15m" onclick="setTF('15m')">15min</button>
-          <button class="btn btn-sm tf-btn" id="tf-30m" onclick="setTF('30m')">30min</button>
-          <button class="btn btn-sm tf-btn" id="tf-1h" onclick="setTF('1h')">1h</button>
-          <button class="btn btn-sm tf-btn" id="tf-4h" onclick="setTF('4h')">4h</button>
-          <button class="btn btn-sm tf-btn active-tf" id="tf-1d" onclick="setTF('1d')">1T</button>
-        </div>
-        <span style="font-size:11px;color:var(--text3)" id="tf-label">Tageschart · MACD (12/26/9)</span>
-      </div>
       <div id="custom-wrap" style="display:block;margin-bottom:.75rem"><div style="display:flex;gap:6px;align-items:center"><input type="text" id="custom-input" placeholder="AAPL, MSFT oder 'Hugo Boss, Hensoldt' (Klarnamen möglich)" style="flex:1" oninput="this.dataset.userTyped='1'"><button class="btn btn-sm" onclick="saveCurrentAsWatchlist()" title="Als neue Watchlist speichern" style="white-space:nowrap;font-size:11px;flex-shrink:0"><i class="ti ti-bookmark-plus"></i> Speichern</button><button class="btn btn-sm" id="update-wl-btn" onclick="updateExistingWatchlist()" title="Aktuelle Watchlist aktualisieren" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:var(--amber-bg);border-color:var(--amber);color:var(--amber)"><i class="ti ti-refresh"></i> WL aktualisieren</button>
 <button class="btn btn-sm" id="iv-toolbar-btn" onclick="enrichTop40WithIV()" title="IV-Daten für aktuelle Liste laden (24h Cache)" style="display:none;white-space:nowrap;font-size:11px;flex-shrink:0;background:rgba(79,142,247,0.1);border-color:var(--accent);color:var(--accent)"><i class="ti ti-chart-candle"></i> IV laden</button></div></div>
 
@@ -705,6 +694,18 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <!-- Regime-Info ist bereits im Market-Weather-Widget oben sichtbar -->
       <div id="qqq-regime-banner" style="display:none"></div>
       <div id="vix-ampel" style="display:none"></div>
+      <!-- Zeitrahmen-Leiste: direkt über Ticker-Karten (v273) -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem">
+        <span style="font-size:11px;color:var(--text3);white-space:nowrap">Zeitrahmen:</span>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-sm tf-btn" id="tf-15m" onclick="setTF('15m')">15min</button>
+          <button class="btn btn-sm tf-btn" id="tf-30m" onclick="setTF('30m')">30min</button>
+          <button class="btn btn-sm tf-btn" id="tf-1h" onclick="setTF('1h')">1h</button>
+          <button class="btn btn-sm tf-btn" id="tf-4h" onclick="setTF('4h')">4h</button>
+          <button class="btn btn-sm tf-btn active-tf" id="tf-1d" onclick="setTF('1d')">1T</button>
+        </div>
+        <span style="font-size:11px;color:var(--text3)" id="tf-label">Tageschart · MACD (12/26/9)</span>
+      </div>
       <div id="scan-progress" style="display:none;margin-bottom:.75rem">
         <div style="font-size:12px;color:var(--text2)" id="scan-label">Analysiere…</div>
         <div class="progress"><div class="progress-fill" id="scan-bar" style="width:0%"></div></div>
