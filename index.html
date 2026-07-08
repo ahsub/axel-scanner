@@ -1,11 +1,13 @@
+// ── _marketDropdowns → ko-scanner.js (extern geladen)
 <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v266">
+<meta name="version" content="20260709-v267">
 <!-- CHANGELOG (neueste zuerst):
-     v266: Refactor ko-scanner.js v1.0.0 + ko-home.js v1.0.0 → ahsub/ko-modules@f1615dc. jsDelivr Hash 732694e→f1615dc. Neue Script-Tags.
+     v267: ko-scanner.js + ko-home.js Syntax-Fehler behoben (saubere Funktionsdefinitionen, keine losen Statements). Inline-Duplikate aus index.html entfernt. Hash f1615dc→b820f1b.
+     v266: Refactor ko-scanner.js v1.0.0 + ko-home.js v1.0.0 → ahsub/ko-modules@b820f1b. jsDelivr Hash 732694e→b820f1b. Neue Script-Tags.
      v265: KRITISCH: _marketDropdowns fehlende Kommas zwischen Array-Einträgen — JS-Syntax-Fehler brach alle folgenden Panels (Fibonacci, KO-Rechner, Backlog, Einstellungen).
      v264: Scanner: Market-Sentiment-Block entfernt (qqq-banner+vix-ampel hidden); KI-Analyse-Button in Steuerleiste; alpha-lb-cards display-Konflikt behoben.
      v263: Strategie-Ampel auf Landing-Page (grün/gelb/rot, alle Strategien). window._lastMseResult für Landing-Page-Zugriff. Scanner Gates: inaktive Strategien explizit rot+gelb mit Border. Selektiv-Tooltip erklärt was Selektiv bedeutet.
@@ -2891,19 +2893,19 @@ window.pinSubmit = function(){
 </script>
 
 <!-- ko-config.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-config.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b820f1b/ko-config.js"></script>
 
 <!-- ko-indicators.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-indicators.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b820f1b/ko-indicators.js"></script>
 
 <!-- ko-scoring.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-scoring.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b820f1b/ko-scoring.js"></script>
 
 <!-- ko-markov.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-markov.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b820f1b/ko-markov.js"></script>
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-data.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b820f1b/ko-data.js"></script>
 <!-- ko-strategies.js v2.1.0 — Commit-Hash 785e61e (01.07.2026, Short-Strategie
      fading_short + Regelwerk-Erweiterung). type="module" erforderlich. -->
 <script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@785e61e/ko-strategies.js"></script>
@@ -5052,49 +5054,8 @@ function changePin(){
 }
 
 // ─── NAV ─────────────────────────────────────────────────────────────
-// ── runHomeBriefing: Makro + MB aus Übersicht-Tab heraus starten ─────────────
-async function runHomeBriefing(force) {
-  var today = new Date().toISOString().slice(0,10);
-  var cacheKey = 'morning_briefing_' + today;
-  var startBtn = document.getElementById('home-start-btn');
-  var actEl    = document.getElementById('home-activity');
-  var actTxt   = document.getElementById('home-activity-text');
-  var txtEl    = document.getElementById('home-briefing-text');
+// runHomeBriefing → ko-home.js
 
-  // Cache prüfen (nur wenn kein force)
-  if (!force) {
-    try {
-      var cached = JSON.parse(localStorage.getItem(cacheKey));
-      if (cached && cached.kiBriefing) { renderHomeLanding(); return; }
-    } catch(e) {}
-  }
-
-  // Aktivitätsanzeige einschalten
-  if (actEl) actEl.style.display = 'flex';
-  if (startBtn) { startBtn.disabled = true; startBtn.style.opacity = '.5'; }
-  if (txtEl) txtEl.innerHTML = '<span style="color:var(--text3)">Bitte Geduld, Bericht wird erstellt…</span>';
-
-  var _steps = ['Makrodaten laden…','Marktregime berechnen…','Sektoren analysieren…',
-                'Intermarket prüfen…','KI-Briefing generieren…','Bericht wird erstellt…'];
-  var _si = 0;
-  var _stTimer = setInterval(function() {
-    _si = (_si+1) % _steps.length;
-    if (actTxt) actTxt.textContent = _steps[_si];
-  }, 2500);
-
-  try {
-    await runMorningBriefing();
-  } catch(e) {
-    if (txtEl) txtEl.textContent = '⚠ Fehler: ' + e.message;
-  } finally {
-    clearInterval(_stTimer);
-    if (actEl) actEl.style.display = 'none';
-    if (startBtn) { startBtn.disabled = false; startBtn.style.opacity = '1'; }
-    renderHomeLanding();
-  }
-}
-
-// ── HOME LANDING (AP-A) ──────────────────────────────────────────────────────
 function renderHomeLanding() {
   // Makro-Strip aus localStorage
   try {
@@ -15870,8 +15831,7 @@ function hideKiDropdown() {
 // ── KI-Briefing In-Memory-Cache (AP-B Cache-Disziplin) ──────────────────────
 // Speichert KI-Antworten pro Strategie für die aktuelle Session.
 // Verhindert unnötige API-Calls bei Strategie-Wechsel / Tab-Wechsel.
-var _kiCache = {}; // { strat: { text, ts } }
-var _KI_CACHE_TTL = 15 * 60 * 1000; // 15 Minuten
+// _kiCache → ko-home.js
 
 // Zeigt gecachtes Ergebnis (falls vorhanden) oder Prompt zur Analyse
 function _showKiBriefingForStrat(strat) {
@@ -21114,115 +21074,15 @@ function _setScanModeVisual(m){
     }
   });
 }
-// ── Handelsplatz-Dropdown (AP Scanner-Header v253) ────────────────────────────
-var _marketDropdowns = {
-  us: [
-    ["default",               "🇺🇸 50 US-Aktien (Standard)"],
-    ["top50-us",              "📈 IBD Momentum Top-50"],
-    ["fixed:SP500",           "🇺🇸 S&P 500 Kern-100"],
-    ["fixed:NDX100",          "🇺🇸 NASDAQ 100"],
-    ["fixed:DEFENSE",         "🛡️ Defense & Aerospace"],
-    ["fixed:ROBOTICS",        "🤖 Robotics & AI"],
-    ["fixed:CYBERSECURITY",   "🔐 Cybersecurity"],
-    ["fixed:NUCLEAR_ENERGY",  "☢️ Nuclear Energy"],
-    ["fixed:HEALTH",          "🏥 Healthcare"],
-    ["fixed:FINANCE",         "🏦 Financials"],
-    ["fixed:ENERGY",          "⚡ Energy & Oil"],
-    ["fixed:AI_TECH",         "💡 AI & Tech"],
-    ["fixed:PICKS_SHOVELS",   "⛏ AI-Infrastruktur"],
-    ["fixed:PRECIOUS_METALS", "🥇 Precious Metals"],
-    ["fixed:SPACE",           "🚀 Space"]
-  ],
-  de: [
-    ["fixed:DAX40",  "📊 DAX 40"],
-    ["fixed:MDAX",   "📈 MDAX Top 20"],
-    ["fixed:TECDAX", "💻 TecDAX"],
-    ["default",      "🇺🇸 US-Aktien (DE-handelbar)"]
-  ]
-};
+// ── _marketDropdowns + toggleMarketDropdown → ko-scanner.js (extern)
 
-function toggleMarketDropdown(market, btn) {
-  // Bestehende Dropdowns schließen
-  var existing = document.getElementById('mkt-dropdown');
-  if (existing) {
-    existing.remove();
-    // Wenn gleicher Button: nur schließen
-    if (existing.dataset.market === market) return;
-  }
+// toggleMarketDropdown → ko-scanner.js
 
-  setMarket(market);
+// selectMarketList → ko-scanner.js
 
-  var dropdown = document.createElement('div');
-  dropdown.id = 'mkt-dropdown';
-  dropdown.dataset.market = market;
-  dropdown.style.cssText =
-    'position:fixed;z-index:4000;background:var(--bg2);border:0.5px solid var(--border2);' +
-    'border-radius:10px;padding:6px;box-shadow:0 8px 32px rgba(0,0,0,.4);min-width:220px;' +
-    'max-height:340px;overflow-y:auto';
+// _updateActiveChip → ko-scanner.js
 
-  var r = btn.getBoundingClientRect();
-  dropdown.style.top  = (r.bottom + 4) + 'px';
-  dropdown.style.left = Math.max(8, r.left) + 'px';
-
-  var header = document.createElement('div');
-  header.style.cssText = 'font-size:10px;color:var(--text3);padding:4px 8px 6px;letter-spacing:.5px;font-weight:600';
-  header.textContent = market === 'us' ? '🇺🇸 US-LISTEN' : '🇩🇪 DE-LISTEN';
-  dropdown.appendChild(header);
-
-  (_marketDropdowns[market] || []).forEach(function(item) {
-    var el = document.createElement('div');
-    el.style.cssText = 'padding:7px 10px;font-size:12px;cursor:pointer;color:var(--text2);border-radius:6px';
-    el.textContent = item[1];
-    el.onmouseover = function() { el.style.background = 'var(--bg3)'; };
-    el.onmouseout  = function() { el.style.background = ''; };
-    el.onclick     = function() { selectMarketList(item[0], market); dropdown.remove(); };
-    dropdown.appendChild(el);
-  });
-
-  document.body.appendChild(dropdown);
-  setTimeout(function() {
-    document.addEventListener('click', function _close(e) {
-      if (!dropdown.contains(e.target) && e.target !== btn) {
-        dropdown.remove();
-        document.removeEventListener('click', _close);
-      }
-    });
-  }, 10);
-}
-
-function selectMarketList(val, market, el) {
-  // Preset-Select synchronisieren
-  var sel = document.getElementById('ticker-preset');
-  if (sel) {
-    sel.value = val;
-    if (typeof onPresetChange === 'function') onPresetChange();
-    if (typeof updateWlButtons === 'function') updateWlButtons();
-  }
-  // Chip anzeigen
-  _updateActiveChip(val, market);
-}
-
-function _updateActiveChip(val, market) {
-  var chipsEl = document.getElementById('active-list-chips');
-  if (!chipsEl) return;
-  // Label aus _marketDropdowns holen
-  var lists = _marketDropdowns[market] || [];
-  var found = lists.find(function(i) { return i[0] === val; });
-  var label = found ? found[1] : val;
-  chipsEl.innerHTML =
-    '<div style="display:flex;align-items:center;gap:4px;padding:3px 8px;font-size:11px;' +
-    'background:var(--bg3);border:0.5px solid var(--border2);border-radius:12px;color:var(--text2)">' +
-    label +
-    ' <span onclick="_clearActiveChip()" style="cursor:pointer;color:var(--text3);margin-left:2px">×</span>' +
-    '</div>';
-}
-
-function _clearActiveChip() {
-  var chipsEl = document.getElementById('active-list-chips');
-  if (chipsEl) chipsEl.innerHTML = '';
-  var sel = document.getElementById('ticker-preset');
-  if (sel) { sel.value = 'default'; if (typeof onPresetChange==='function') onPresetChange(); }
-}
+// _clearActiveChip → ko-scanner.js
 
 function setScanMode(m, btn){
   _setScanModeVisual(m);
@@ -21998,10 +21858,10 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-market-state.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-darkpool.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f1615dc/ko-home.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b820f1b/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b820f1b/ko-darkpool.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b820f1b/ko-scanner.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b820f1b/ko-home.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
