@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v280">
+<meta name="version" content="20260709-v281">
 <!-- CHANGELOG (neueste zuerst):
+     v281: Übersicht-Umbau Schritt 2 (Makro-Kondensat): Sektor Top-3/Flop-3-Kachel im Home-Tab (_loadHomeSektorKondensat, KV-only aus master_market_data/sectorRS, KEIN Live-Yahoo-Fallback — schont API-Budget). Overheat bewusst nicht enthalten (Schwellen laut MB-STATEMENT-DATA-MATRIX §4.3 noch unkalibriert). Kachel klickbar → Makro-Tab, teilt _sektorData mit Makro-Tab (kein Doppel-Load). Div-Bilanz nach Einbau verifiziert (kein neuer v280-artiger Bug).
      v280: KRITISCH: (1) Verwaister JS-Kommentar vor <!DOCTYPE html> entfernt (erschien als sichtbarer Text oben auf der Seite). (2) Überzähliges </div> in panel-scanner-Steuerleiste (btn-row-Bereich, seit vor v279 vorhanden) entfernt — schloss panel-scanner vorzeitig, wodurch Watchlist/Scan-Button/Zeitrahmen/QQQ-Regime als DOM-Streuner außerhalb aller Panels landeten und immer sichtbar waren (unabhängig vom aktiven Tab). Verifiziert via html5lib: custom-input jetzt korrekt unter panel-scanner verschachtelt.
      v279: Übersicht-Umbau Schritt 1 (Makro-Kondensat): PD-Fix (Eigener-Ticker-Feld direkt unter Watchlist-Pulldown, vor Scan-Button). Home-Markt-Status-Zeile um F&G (aus _cnnFearGreed) und PCR/GEX-Proxy (DOM-Kopie aus dp-pcr/dp-gex) erweitert, alle 4 Kacheln klickbar → Makro-Tab. Sektor Top-3/Flop-3 folgt als Schritt 2.
      v272: loadIntermarket + calcBullIndicator: intermarket-score + bull-score DOM-Elemente programmatisch anlegen (waren nie im HTML). Registry-Polling findet sie jetzt. window._imScore + window._bullScore gesetzt.
@@ -482,6 +483,25 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <div id="home-activity" style="display:none;font-size:11px;color:var(--accent);align-items:center;gap:6px">
               <i class="ti ti-loader" style="animation:spin 1s linear infinite"></i>
               <span id="home-activity-text">Bitte Geduld, Bericht wird erstellt…</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sektor Top-3 / Flop-3 (v281, Makro-Kondensat Schritt 2) -->
+        <div id="home-sektor-card" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:.7rem 1rem;margin-bottom:.75rem;cursor:pointer" onclick="showPanel('makro')" title="Details im Makro-Tab">
+          <div style="font-size:10px;color:var(--text3);letter-spacing:.8px;margin-bottom:.5rem">SEKTOREN · RELATIVE STÄRKE (5T)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+            <div>
+              <div style="font-size:9px;color:var(--green);margin-bottom:4px">TOP 3</div>
+              <div id="home-sektor-top" style="display:flex;flex-direction:column;gap:4px">
+                <span style="font-size:11px;color:var(--text3)">Lädt…</span>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--red);margin-bottom:4px">FLOP 3</div>
+              <div id="home-sektor-flop" style="display:flex;flex-direction:column;gap:4px">
+                <span style="font-size:11px;color:var(--text3)">Lädt…</span>
+              </div>
             </div>
           </div>
         </div>
@@ -5258,6 +5278,9 @@ function renderHomeLanding() {
       pcrgexEl.textContent = '—';
     }
   }
+
+  // Sektor Top-3/Flop-3 (v281) — KV-Cache, non-blocking
+  try { _loadHomeSektorKondensat(); } catch(e) { console.warn('[HomeSektor]', e.message); }
 
   // Track-Record-Uhr (live, 60s Interval)
   function _updateTrackRecord() {
@@ -15403,6 +15426,61 @@ async function fetchSektorPerf(sym) {
     setTdCacheEntry(sektorCacheKey2, { p5: perf5d, p1: perf1d, px: vals[vals.length-1] });
     return { sym, perf5d, perf1d, price: vals[vals.length-1], fromCache: res.fromCache };
   } catch(e) { return null; }
+}
+
+// ── Home-Kondensat: Sektor Top-3/Flop-3 (v281) ──────────────────────────
+// Nur KV-Cache (master_market_data), KEIN Live-Yahoo-Fallback — schont
+// API-Budget analog daily_market_snapshot-Ziel (SUITE.md §7 Folgesprint).
+// Overheat bewusst nicht enthalten: Schwellen laut MB-STATEMENT-DATA-MATRIX
+// §4.3/AK-3 noch nicht kalibriert; Live-Yahoo-Overheat-Fetch würde gegen
+// das Snapshot-Cache-Ziel arbeiten. Nachrüstung als eigener Schritt/Sprint.
+async function _loadHomeSektorKondensat() {
+  var topEl = document.getElementById('home-sektor-top');
+  var flopEl = document.getElementById('home-sektor-flop');
+  if (!topEl || !flopEl) return;
+
+  try {
+    var kvUrl = (typeof KoConfig !== 'undefined' ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev')
+              + '/sync/master_market_data';
+    var kvResp = await fetch(kvUrl, { cache: 'no-store' });
+    if (!kvResp.ok) throw new Error('KV nicht erreichbar');
+    var kvResp2 = await kvResp.json();
+    var kvData  = kvResp2.data || kvResp2;
+    var sectorRS = kvData?.sectorRS;
+    if (!sectorRS || Object.keys(sectorRS).length < 5) throw new Error('zu wenig Sektor-Daten im KV');
+
+    var kvResults = Object.values(sectorRS)
+      .filter(function(s){ return s.rs5 != null; })
+      .map(function(s) {
+        var match = (typeof SEKTOREN !== 'undefined') ? SEKTOREN.find(function(x){ return x.sym === s.sym; }) : null;
+        return { sym: s.sym, name: match ? match.name : s.sym, rs5d: s.rs5 || 0, perf5d: s.ret5 || 0, price: s.price || 0, fromKV: true };
+      })
+      .sort(function(a,b){ return b.rs5d - a.rs5d; });
+
+    if (kvResults.length < 5) throw new Error('zu wenig verwertbare Sektor-Daten');
+
+    // Mit Makro-Tab teilen, damit dort kein Doppel-Load nötig ist
+    if (typeof _sektorData !== 'undefined') _sektorData = kvResults;
+
+    var top3  = kvResults.slice(0, 3);
+    var flop3 = kvResults.slice(-3).reverse();
+
+    function renderChip(s) {
+      var color = s.rs5d >= 0 ? 'var(--green)' : 'var(--red)';
+      var sign  = s.rs5d >= 0 ? '+' : '';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 8px;background:var(--bg3);border-radius:6px;font-size:11px">'
+           + '<span style="color:var(--text)">' + s.name + '</span>'
+           + '<span style="color:' + color + ';font-weight:600;white-space:nowrap">' + sign + s.rs5d.toFixed(1) + '%</span>'
+           + '</div>';
+    }
+
+    topEl.innerHTML  = top3.map(renderChip).join('');
+    flopEl.innerHTML = flop3.map(renderChip).join('');
+  } catch(e) {
+    console.log('[HomeSektorKondensat] nicht verfügbar:', e.message);
+    topEl.innerHTML  = '<span style="font-size:11px;color:var(--text3)">— (Makro-Tab besuchen für Sektor-Daten)</span>';
+    flopEl.innerHTML = '<span style="font-size:11px;color:var(--text3)">—</span>';
+  }
 }
 
 async function loadSektorRS() {
