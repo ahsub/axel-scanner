@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v281">
+<meta name="version" content="20260709-v283">
 <!-- CHANGELOG (neueste zuerst):
+     v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
+     v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
      v281: Übersicht-Umbau Schritt 2 (Makro-Kondensat): Sektor Top-3/Flop-3-Kachel im Home-Tab (_loadHomeSektorKondensat, KV-only aus master_market_data/sectorRS, KEIN Live-Yahoo-Fallback — schont API-Budget). Overheat bewusst nicht enthalten (Schwellen laut MB-STATEMENT-DATA-MATRIX §4.3 noch unkalibriert). Kachel klickbar → Makro-Tab, teilt _sektorData mit Makro-Tab (kein Doppel-Load). Div-Bilanz nach Einbau verifiziert (kein neuer v280-artiger Bug).
      v280: KRITISCH: (1) Verwaister JS-Kommentar vor <!DOCTYPE html> entfernt (erschien als sichtbarer Text oben auf der Seite). (2) Überzähliges </div> in panel-scanner-Steuerleiste (btn-row-Bereich, seit vor v279 vorhanden) entfernt — schloss panel-scanner vorzeitig, wodurch Watchlist/Scan-Button/Zeitrahmen/QQQ-Regime als DOM-Streuner außerhalb aller Panels landeten und immer sichtbar waren (unabhängig vom aktiven Tab). Verifiziert via html5lib: custom-input jetzt korrekt unter panel-scanner verschachtelt.
      v279: Übersicht-Umbau Schritt 1 (Makro-Kondensat): PD-Fix (Eigener-Ticker-Feld direkt unter Watchlist-Pulldown, vor Scan-Button). Home-Markt-Status-Zeile um F&G (aus _cnnFearGreed) und PCR/GEX-Proxy (DOM-Kopie aus dp-pcr/dp-gex) erweitert, alle 4 Kacheln klickbar → Makro-Tab. Sektor Top-3/Flop-3 folgt als Schritt 2.
@@ -14,7 +16,7 @@
      v269: panel-scanner active→panel (kein Race-Condition Flash mehr). panel-home active als Default. Scanner-Blöcke nicht mehr auf Übersicht sichtbar.
      v268: Stufe 2: unlockApp→showPanel(home) — App startet auf Übersicht. Versions-Format fix (v268·09.07.2026). home-briefing-time→klickbarer Button (öffnet/erstellt Briefing). Button-Text: "Marktlage analysieren & Briefing erstellen".
      v267: ko-scanner.js + ko-home.js Syntax-Fehler behoben (saubere Funktionsdefinitionen, keine losen Statements). Inline-Duplikate aus index.html entfernt. Hash f1615dc→0a921fb.
-     v266: Refactor ko-scanner.js v1.0.0 + ko-home.js v1.0.0 → ahsub/ko-modules@0a921fb. jsDelivr Hash 732694e→0a921fb. Neue Script-Tags.
+     v266: Refactor ko-scanner.js v1.0.0 + ko-home.js v1.0.0 → ahsub/ko-modules@b94303a. jsDelivr Hash 732694e→0a921fb. Neue Script-Tags.
      v265: KRITISCH: _marketDropdowns fehlende Kommas zwischen Array-Einträgen — JS-Syntax-Fehler brach alle folgenden Panels (Fibonacci, KO-Rechner, Backlog, Einstellungen).
      v264: Scanner: Market-Sentiment-Block entfernt (qqq-banner+vix-ampel hidden); KI-Analyse-Button in Steuerleiste; alpha-lb-cards display-Konflikt behoben.
      v263: Strategie-Ampel auf Landing-Page (grün/gelb/rot, alle Strategien). window._lastMseResult für Landing-Page-Zugriff. Scanner Gates: inaktive Strategien explizit rot+gelb mit Border. Selektiv-Tooltip erklärt was Selektiv bedeutet.
@@ -2943,19 +2945,19 @@ window.pinSubmit = function(){
 </script>
 
 <!-- ko-config.js — extern geladen aus ahsub/ko-modules -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-config.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-config.js"></script>
 
 <!-- ko-indicators.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-indicators.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-indicators.js"></script>
 
 <!-- ko-scoring.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-scoring.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-scoring.js"></script>
 
 <!-- ko-markov.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-markov.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-markov.js"></script>
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-data.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-data.js"></script>
 <!-- ko-strategies.js v2.1.0 — Commit-Hash 785e61e (01.07.2026, Short-Strategie
      fading_short + Regelwerk-Erweiterung). type="module" erforderlich. -->
 <script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@785e61e/ko-strategies.js"></script>
@@ -5126,16 +5128,7 @@ function changePin(){
 // runHomeBriefing → ko-home.js
 
 function renderHomeLanding() {
-  // Makro-Strip aus localStorage
-  try {
-    var mkRaw = localStorage.getItem('ko_makro');
-    var mk = mkRaw ? JSON.parse(mkRaw) : null;
-    if (mk) {
-      var _hm = function(id,val){var e=document.getElementById(id);if(e&&val)e.textContent=val;};
-      _hm('hm-sp',mk.sp);_hm('hm-nq',mk.nq);_hm('hm-dax',mk.dax);
-      _hm('hm-vix',mk.vix);_hm('hm-oil',mk.oil);_hm('hm-gold',mk.gold);
-    }
-  } catch(e) {}
+  // Makro-Strip wird unten via _loadHomeMakroStrip() befüllt (KV-Cache, v283)
 
   // Datum + Uhrzeit
   var dateEl = document.getElementById('home-date');
@@ -5282,6 +5275,16 @@ function renderHomeLanding() {
   // Sektor Top-3/Flop-3 (v281) — KV-Cache, non-blocking
   try { _loadHomeSektorKondensat(); } catch(e) { console.warn('[HomeSektor]', e.message); }
 
+  // Makro-Strip: 2-4h KV-Cache (v283) — S&P/NQ/DAX/Oel/Gold (VIX bewusst NICHT
+  // im Snapshot, kommt live aus m-vix, siehe _applyHomeStripValues).
+  // Ersetzt direkten refreshLivePrices()-Call bei jedem Home-Start: erst KV
+  // lesen (via KoSync, gleicher Worker wie master_market_data), nur bei
+  // Ablauf/Fehlen selbst live laden + zurückschreiben. So macht nur der/die
+  // erste Öffner:in nach TTL-Ablauf den Live-Call, alle anderen lesen nur —
+  // Beta-Tester-taugliches Muster, konsistent mit daily_market_snapshot-Ziel
+  // (SUITE.md §7), ohne Aggregator/Cron anzufassen.
+  _loadHomeMakroStrip();
+
   // Track-Record-Uhr (live, 60s Interval)
   function _updateTrackRecord() {
     var trEl = document.getElementById('home-track-record');
@@ -5297,6 +5300,73 @@ function renderHomeLanding() {
   if (!window._trInterval) {
     window._trInterval = setInterval(_updateTrackRecord, 60000);
   }
+}
+
+// ── Home-Makro-Strip: 2-4h KV-Cache (v283) ────────────────────────────────
+var HOME_STRIP_TTL_MS = 3 * 60 * 60 * 1000; // 3h Mittelwert aus 2-4h
+var HOME_STRIP_KV_KEY = 'market_strip_snapshot';
+
+function _applyHomeStripValues(vals) {
+  var map = { sp:'hm-sp', nq:'hm-nq', dax:'hm-dax', oil:'hm-oil', gold:'hm-gold' };
+  Object.keys(map).forEach(function(k) {
+    var e = document.getElementById(map[k]);
+    if (e && vals[k] != null && vals[k] !== '') e.textContent = vals[k];
+  });
+  // VIX bewusst NICHT aus dem KV-Snapshot — kommt live aus m-vix (Makro-Tab),
+  // derselben Quelle wie die Kopf-Kachel, um zwei Werte für dieselbe Zahl zu vermeiden.
+  var vixEl = document.getElementById('hm-vix');
+  var vixSrc = document.getElementById('m-vix');
+  if (vixEl && vixSrc && vixSrc.textContent && vixSrc.textContent !== '—') {
+    vixEl.textContent = vixSrc.textContent;
+  }
+}
+
+async function _loadHomeMakroStrip() {
+  // 1) KV-Cache prüfen
+  try {
+    if (typeof KoSync !== 'undefined') {
+      var cached = await KoSync.pull(HOME_STRIP_KV_KEY);
+      if (cached && cached.data && cached.ts && (Date.now() - cached.ts) < HOME_STRIP_TTL_MS) {
+        _applyHomeStripValues(cached.data);
+        return; // frisch genug — kein Live-Load nötig
+      }
+      // Auch bei abgelaufenem Cache: sofort anzeigen (besser als '—'),
+      // während im Hintergrund neu geladen wird
+      if (cached && cached.data) _applyHomeStripValues(cached.data);
+    }
+  } catch(e) { console.log('[HomeMakroStrip] KV-Read fehlgeschlagen:', e.message); }
+
+  // 2) Cache fehlt/abgelaufen → live laden (nur diese eine Instanz tut das)
+  try {
+    var vals = await _fetchHomeStripLive();
+    if (vals) {
+      _applyHomeStripValues(vals);
+      if (typeof KoSync !== 'undefined') {
+        KoSync.push(HOME_STRIP_KV_KEY, vals).catch(function(e){
+          console.log('[HomeMakroStrip] KV-Write fehlgeschlagen:', e.message);
+        });
+      }
+    }
+  } catch(e) { console.log('[HomeMakroStrip] Live-Load fehlgeschlagen:', e.message); }
+}
+
+async function _fetchHomeStripLive() {
+  if (typeof fetchYahooSingle !== 'function') return null;
+  var tickers = { sp:'^GSPC', nq:'^NDX', dax:'^GDAXI', oil:'CL=F', gold:'GC=F' };
+  var out = {};
+  var keys = Object.keys(tickers);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    try {
+      var d = await fetchYahooSingle(tickers[k]);
+      if (d && d.price != null) {
+        out[k] = (k === 'sp' || k === 'nq' || k === 'dax')
+          ? d.price.toFixed(1)
+          : d.price.toFixed(2);
+      }
+    } catch(e) { /* einzelner Ticker-Fehler stoppt nicht die anderen */ }
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 function showPanel(id){
@@ -8885,6 +8955,7 @@ const IM_TICKERS = [
   // ── Währungen ──
   { sym:'GC=F',     id:'im-gold',  label:'Gold',              unit:'$',  role:'safe_haven' },
   { sym:'HG=F',     id:'im-cu',    label:'Kupfer',            unit:'$',  role:'risk_on'    },
+  { sym:'CL=F',     id:'im-oil',   label:'Öl (WTI)',          unit:'$',  role:'context'    },
   { sym:'AUDUSD=X', id:'im-aud',   label:'AUD/USD',           unit:'',   role:'risk_on'    },
   { sym:'JPYUSD=X', id:'im-jpy',   label:'JPY/USD',           unit:'',   role:'safe_haven' },
   { sym:'DX-Y.NYB', id:'im-dxy',   label:'USD Index',         unit:'',   role:'context'    },
@@ -8957,7 +9028,7 @@ function imSignalCard(id, label, value, unit, chgPct, signal, desc, noScore) {
     ? (chgPct >= 0 ? '+' : '') + chgPct.toFixed(2) + '%'
     : '—';
   const chgColor = chgPct > 0 ? 'var(--green)' : chgPct < 0 ? 'var(--red)' : 'var(--text3)';
-  return '<div style="background:var(--bg3);border-radius:8px;padding:6px 8px;border-left:2px solid ' + sigColor + '">'
+  return '<div id="' + id + '" data-value="' + (value != null ? value : '') + '" style="background:var(--bg3);border-radius:8px;padding:6px 8px;border-left:2px solid ' + sigColor + '">'
     + '<div style="display:flex;justify-content:space-between;align-items:center">'
     + '<span style="font-size:10px;color:var(--text2)">' + label + '</span>'
     + '<i class="ti ' + sigIcon + '" style="font-size:12px;color:' + sigColor + '"></i>'
@@ -9462,6 +9533,7 @@ async function loadIntermarket() {
   // Kupfer/Gold Ratio berechnen
   const cu   = results.find(r => r.sym === 'HG=F')?.data;
   const gold = results.find(r => r.sym === 'GC=F')?.data;
+  const oil  = results.find(r => r.sym === 'CL=F')?.data;
   const cuGoldRatio     = (cu && gold) ? cu.price / gold.price : null;
   const cuGoldRatioPrev = (cu && gold) ? cu.prev / gold.prev : null;
   const cuGoldChg       = (cuGoldRatio && cuGoldRatioPrev) 
@@ -9519,6 +9591,20 @@ async function loadIntermarket() {
     const desc = sig === 'risk_on' ? 'Industrie > Gold' : sig === 'risk_off' ? 'Flucht zu Gold' : 'Ausgeglichen';
     signals.push({ id:'im-cugold', label:'Kupfer/Gold Ratio', value:cuGoldRatio, unit:'', chgPct:cuGoldChg, signal:sig, desc, pts });
     scorePoints += pts; scoreCount++;
+  }
+
+  // Gold & Kupfer Einzelwerte (v282) — nur Anzeige/KI-Kontext, kein Score-Beitrag
+  // (Cu/Gold-Ratio oben bleibt die Scoring-Grundlage; das hier schließt die
+  // Registry-Lücke: ko-indicators.json 'gold'/'copper' erwarteten Einzelwerte,
+  // die es vorher nicht gab)
+  if (gold) {
+    signals.push({ id:'im-gold', label:'Gold', value:gold.price, unit:'$', chgPct:gold.chgPct, signal:'neutral', desc:'Safe-Haven-Referenz', pts:0, noScore:true });
+  }
+  if (cu) {
+    signals.push({ id:'im-cu', label:'Kupfer', value:cu.price, unit:'$', chgPct:cu.chgPct, signal:'neutral', desc:'Dr. Copper — Konjunktur', pts:0, noScore:true });
+  }
+  if (oil) {
+    signals.push({ id:'im-oil', label:'Öl (WTI)', value:oil.price, unit:'$', chgPct:oil.chgPct, signal:'neutral', desc:'Energiepreis-Referenz', pts:0, noScore:true });
   }
 
   // JNK/LQD Spread-Proxy: steigend = Risk-On (HY gefragt)
@@ -9650,7 +9736,7 @@ async function loadIntermarket() {
   if (grid) {
     // Signale in Kategorien aufteilen
     const cats = [
-      { key: ['im-vvix','im-aud','im-jpy','im-cugold','im-spread','im-dxy'], title: '📊 Sentiment & Währungen' },
+      { key: ['im-vvix','im-aud','im-jpy','im-cugold','im-gold','im-cu','im-oil','im-spread','im-dxy'], title: '📊 Sentiment & Währungen' },
       { key: ['im-tnx','im-yc','im-tyx','im-tip'], title: '📈 Zinsen & Inflation' },
       { key: ['im-itb','im-mbb','im-lbs','im-vnq'], title: '🏠 Housing & REITs' },
       { key: ['im-tip','im-fvx','im-tyx','im-irx','im-xlu'], title: '📊 Makro: Inflation & Zinsen' },
@@ -22160,10 +22246,10 @@ async function generateDpKI(data, scoreObj, signal) {
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@d5b062d/ko-market-state.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-darkpool.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-home.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@0a921fb/ko-indicators-loader.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-darkpool.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-scanner.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-home.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-indicators-loader.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
