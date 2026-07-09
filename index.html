@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v289">
+<meta name="version" content="20260709-v290">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -1092,7 +1092,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <div class="card" style="padding:.75rem">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:.6rem">
           <div style="background:var(--bg3);border-radius:8px;padding:6px 8px">
-            <div style="font-size:10px;color:var(--text3)">10Y-2Y Spread</div>
+            <div id="tsi-yield-label" style="font-size:10px;color:var(--text3)">Zinskurve</div>
             <div id="tsi-yield-spread" style="font-size:13px;font-weight:600">—</div>
             <div id="tsi-yield-signal" style="font-size:10px;color:var(--text3)">—</div>
           </div>
@@ -1187,7 +1187,6 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         <div class="mc"><div class="mcl">S&P 500</div><div class="mcv" id="m-sp">—</div><div style="font-size:10px;margin-top:2px" id="m-sp-chg">—</div></div>
         <div class="mc"><div class="mcl">VIX</div><div class="mcv" id="m-vix">—</div><div style="font-size:10px;margin-top:2px" id="m-vix-chg">—</div></div>
         <div class="mc"><div class="mcl">Nasdaq</div><div class="mcv" id="m-nq">—</div><div style="font-size:10px;margin-top:2px" id="m-nq-chg">—</div></div>
-        <div class="mc"><div class="mcl">WTI Öl</div><div class="mcv" id="m-oil">—</div><div style="font-size:10px;margin-top:2px" id="m-oil-chg">—</div></div>
       </div>
       <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px;margin-top:.25rem">
         <i class="ti ti-world" style="font-size:12px"></i> Europäische &amp; Globale Indices
@@ -8209,7 +8208,7 @@ function renderMakro(d){
   document.getElementById('m-sp').textContent=d.sp||'—';
   document.getElementById('m-nq').textContent=d.nq||'—';
   document.getElementById('m-vix').textContent=d.vix||'—';
-  document.getElementById('m-oil').textContent=d.oil||'—';
+  { const _elMOil=document.getElementById('m-oil'); if(_elMOil) _elMOil.textContent=d.oil||'—'; }
   // Crypto
   const cryptos=[
     {key:'btc',label:'BTC'},
@@ -8762,7 +8761,8 @@ async function refreshLivePrices(){
         {sym:'QQQ', el:'m-nq', chgEl:'m-nq-chg', label:'Nasdaq'},
         // VIXY entfernt — war ETF-Preis (~$15), nicht echter VIX-Index!
         // VIX wird jetzt ausschließlich via fetchVix() (^VIX Yahoo) geladen
-        {sym:'USO', el:'m-oil',chgEl:'m-oil-chg', label:'WTI Öl'},
+        // USO entfernt (09.07.2026): war Öl-ETF-Kurs, nicht WTI-Futures-Preis (Contango-Roll-Abweichung).
+        // Gleiches Muster wie VIXY oben. Echte WTI-Karte via CL=F Futures existiert bereits im Rohstoffe-Block.
       ];
       const usResults = await Promise.all(usIdxMap.map(function(idx) {
         return fetch('https://finnhub.io/api/v1/quote?symbol='+idx.sym+'&token='+fhKey2)
@@ -9056,7 +9056,9 @@ const IM_TICKERS = [
   { sym:'DX-Y.NYB', id:'im-dxy',   label:'USD Index',         unit:'',   role:'context'    },
   // ── Zinsen & Yield Curve ──
   { sym:'^TNX',     id:'im-tnx',   label:'10J Treasury',      unit:'%',  role:'rates'      },
-  { sym:'^FVX',     id:'im-fvx',   label:'2J Treasury',       unit:'%',  role:'rates'      },
+  // ^FVX war hier fälschlich als '2J Treasury' gelabelt (tatsächlich 5J) und
+  // duplizierte die DOM-ID 'im-fvx' mit dem korrekten Eintrag weiter unten.
+  // Entfernt 09.07.2026 — echte 2J-Rendite kommt jetzt via FRED DGS2 im Aggregator.
   { sym:'^TYX',     id:'im-tyx',   label:'30J Treasury',      unit:'%',  role:'rates'      },
   // ── Inflation ──
   { sym:'TIP',      id:'im-tip',   label:'TIPS (Inflation)',   unit:'$',  role:'inflation'  },
@@ -19147,9 +19149,9 @@ async function calcTreasuryStress() {
   }
 
   // Parallel laden
-  var [us10y, us2y, dxy, spx] = await Promise.all([
+  var [us10y, us3mo, dxy, spx] = await Promise.all([
     fetchYF('^TNX'),   // 10Y Treasury Yield
-    fetchYF('^IRX'),   // 2Y Treasury Yield (13-week proxy)
+    fetchYF('^IRX'),   // 13-Week T-Bill (3 Monate) — NICHT 2J, korrekt benannt
     fetchYF('DX-Y.NYB'), // DXY Dollar Index
     fetchYF('^GSPC'),  // S&P 500
   ]);
@@ -19157,17 +19159,38 @@ async function calcTreasuryStress() {
   // Auch ^TYX (30Y) als Fallback für 10Y
   if (!us10y) us10y = await fetchYF('^TYX');
 
-  // 2Y besser: ^FVX (5Y) als Proxy wenn ^IRX nicht geht
-  if (!us2y || !us2y.price) us2y = await fetchYF('^FVX');
-
-  // ── Zinskurve ──────────────────────────────────────────────────
+  // ── Zinskurve: primär echte 10J-2J via FRED (Aggregator-Snapshot) ────────
+  // v289: ^FVX war fälschlich als "2J" gelabelt (ist tatsächlich 5J) — ersetzt
+  // durch echte FRED-Daten (DGS2/DGS10 Constant Maturity). Fallback: 10J-3M
+  // via ^IRX, korrekt benannt (kein falscher "2Y"-Anspruch mehr).
   var yieldSpread = null;
   var yieldEl     = document.getElementById('tsi-yield-spread');
   var yieldSigEl  = document.getElementById('tsi-yield-signal');
-  if (us10y && us2y && us10y.price && us2y.price) {
-    yieldSpread = Math.round((us10y.price - us2y.price) * 100) / 100;
+  var yieldLabelEl = document.getElementById('tsi-yield-label');
+
+  var _fredCurve = (window._alphaData && _alphaData.market && _alphaData.market.fredMacro)
+    ? _alphaData.market.fredMacro.yield_curve : null;
+
+  if (_fredCurve && _fredCurve.ok) {
+    // Echte 10J-2J Zinskurve aus dem Aggregator (FRED DGS2/DGS10)
+    yieldSpread = _fredCurve.spread_10y2y;
+    var inverted = _fredCurve.inverted;
+    if (inverted) score += 15;
+    if (yieldLabelEl) yieldLabelEl.textContent = 'Zinskurve 10J-2J (FRED)';
+    if (yieldEl) {
+      yieldEl.textContent = (yieldSpread >= 0 ? '+' : '') + yieldSpread + '%';
+      yieldEl.style.color = inverted ? 'var(--red)' : 'var(--green)';
+    }
+    if (yieldSigEl) {
+      yieldSigEl.textContent = inverted ? 'INVERTIERT ⚠' : 'NORMAL ✓';
+      yieldSigEl.style.color = inverted ? 'var(--red)' : 'var(--green)';
+    }
+  } else if (us10y && us3mo && us10y.price && us3mo.price) {
+    // Fallback: 10J-3M Spread (NY-Fed-Variante, eigenständig legitim, korrekt benannt)
+    yieldSpread = Math.round((us10y.price - us3mo.price) * 100) / 100;
     var inverted = yieldSpread < 0;
     if (inverted) score += 15;
+    if (yieldLabelEl) yieldLabelEl.textContent = 'Zinskurve 10J-3M (Ersatz, NY-Fed-Variante)';
     if (yieldEl) {
       yieldEl.textContent = (yieldSpread >= 0 ? '+' : '') + yieldSpread + '%';
       yieldEl.style.color = inverted ? 'var(--red)' : 'var(--green)';
