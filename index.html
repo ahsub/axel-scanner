@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v287">
+<meta name="version" content="20260709-v288">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -1275,8 +1275,8 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         </div>
         <div class="mc" style="padding:6px 6px">
           <div class="mcl">Lithium</div>
-          <div class="mcv" id="m-lithium" style="font-size:12px">—</div>
-          <div style="font-size:10px;margin-top:2px" id="m-lithium-chg">—</div>
+          <div class="mcv" id="m-lithium" style="font-size:12px;color:var(--text3)">n/v</div>
+          <div style="font-size:9px;margin-top:2px;color:var(--text3)" id="m-lithium-chg" title="Kein freier Lithium-Spotpreis-Feed verfügbar. LIT-ETF zeigte zuvor einen Aktienkorb-Kurs, keinen Rohstoffpreis.">kein Feed</div>
         </div>
         <div class="mc" style="padding:6px 6px">
           <div class="mcl">Öl WTI</div>
@@ -8820,7 +8820,9 @@ async function refreshLivePrices(){
       {sym:'SI=F',  el:'m-silver',  chgEl:'m-silver-chg',  label:'Silber'},
       {sym:'HG=F',  el:'m-copper',  chgEl:'m-copper-chg',  label:'Kupfer'},
       {sym:'CL=F',  el:'m-oil2',    chgEl:'m-oil2-chg',    label:'Öl WTI'},
-      {sym:'LIT',   el:'m-lithium', chgEl:'m-lithium-chg', label:'Lithium ETF'},
+      // Lithium entfernt (09.07.2026): LIT=ETF-Kurs (Aktienkorb), kein Rohstoff-Spotpreis.
+      // Kein freier, verlässlicher Lithium-Spotfeed verfügbar (Trading Economics/SMM/Fastmarkets
+      // sind kostenpflichtig). Konsistent mit Aggregator-Entscheidung (ALB ebenfalls entfernt).
     ];
     const commResults = await Promise.all(commMap.map(function(c){
       const yfUrl='https://query1.finance.yahoo.com/v7/finance/chart/'+encodeURIComponent(c.sym)+'?interval=1d&range=5d';
@@ -9064,7 +9066,9 @@ const IM_TICKERS = [
   // ── Housing USA ──
   { sym:'ITB',      id:'im-itb',   label:'ITB (Homebuilder)', unit:'$',  role:'housing'    },
   { sym:'MBB',      id:'im-mbb',   label:'MBB (Mortgage)',    unit:'$',  role:'housing'    },
-  { sym:'LBS=F',    id:'im-lbs',   label:'Lumber',            unit:'$',  role:'housing'    },
+  // Lumber (LBS=F) entfernt (09.07.2026): CME Random-Length-Lumber-Kontrakt
+  // vermutlich 2024 eingestellt, Ticker lieferte nie Daten. Kein verifizierter
+  // Ersatz-Ticker gefunden — ehrlich entfernt statt geraten.
 ,
   // ── Makro: Inflation ──
   { sym:'TIP',      id:'im-tip',   label:'TIPS ETF',          unit:'$',  role:'inflation'  },
@@ -9807,18 +9811,7 @@ async function loadIntermarket() {
       value:mbb.price, unit:'$', chgPct:mbb.chgPct, signal:sig, desc, pts });
     scorePoints += pts; scoreCount++;
   }
-  // Lumber: steigend = Bau-Nachfrage hoch = Housing-Boom
-  const lbs = results.find(r => r.sym === 'LBS=F')?.data;
-  if (lbs) {
-    const sig = lbs.chg5d > 3 ? 'risk_on' : lbs.chg5d < -3 ? 'risk_off' : 'neutral';
-    const pts = sig === 'risk_on' ? 11 : sig === 'risk_off' ? 5 : 8;
-    const desc = sig === 'risk_on' ? 'Baunachfrage hoch↑'
-               : sig === 'risk_off' ? 'Baunachfrage schwach↓'
-               : 'Stabile Baunachfrage';
-    signals.push({ id:'im-lbs', label:'Lumber (Bauholz)',
-      value:lbs.price, unit:'$', chgPct:lbs.chgPct, signal:sig, desc, pts });
-    scorePoints += pts; scoreCount++;
-  }
+  // Lumber entfernt (09.07.2026) — LBS=F lieferte nie Daten (Kontrakt vermutlich eingestellt)
 
 
   // ── Score berechnen ──────────────────────────────────────────────
@@ -9831,7 +9824,7 @@ async function loadIntermarket() {
     const cats = [
       { key: ['im-vvix','im-aud','im-jpy','im-cugold','im-gold','im-cu','im-oil','im-spread','im-dxy'], title: '📊 Sentiment & Währungen' },
       { key: ['im-tnx','im-yc','im-tyx','im-tip'], title: '📈 Zinsen & Inflation' },
-      { key: ['im-itb','im-mbb','im-lbs','im-vnq'], title: '🏠 Housing & REITs' },
+      { key: ['im-itb','im-mbb','im-vnq'], title: '🏠 Housing & REITs' },
       { key: ['im-tip','im-fvx','im-tyx','im-irx','im-xlu'], title: '📊 Makro: Inflation & Zinsen' },
     ];
     var html = '';
@@ -19398,8 +19391,8 @@ function showMSEDetail() {
 
   var metricsHtml = [
     ['VVIX Z-Score', metrics.vvix_z20 != null ? metrics.vvix_z20.toFixed(2) : '—'],
-    ['GEX-Proxy Z',  metrics.gex_z20  != null ? metrics.gex_z20.toFixed(2)  : '—'],
-    ['PCR Z-Score',  metrics.dix_z20  != null ? metrics.dix_z20.toFixed(2)  : '—'],
+    ['DIX Z-Score', metrics.dix_z20 != null ? metrics.dix_z20.toFixed(2) : 'n/v'],
+    ['GEX (AAPL-Proxy) Z',  metrics.gex_z20  != null ? metrics.gex_z20.toFixed(2)  : 'n/v'],
     ['SKEW Pct20',   metrics.skew_pct20 != null ? metrics.skew_pct20 + '%'  : '—'],
     ['VIX Term',     metrics.term_structure || '—'],
   ].map(function(r) {
@@ -20640,8 +20633,14 @@ function showMorningTearsheet(results) {
           metricRow('VIX Term', metrics ? metrics.term_structure : '—', metrics && metrics.term_structure === 'CONTANGO' ? '#22c55e' : '#f0a93a') +
           metricRow('VVIX', metrics ? val(metrics.vvix_raw,'') + ' (Z: ' + val(metrics.vvix_z20,'') + ')' : '—') +
           metricRow('SKEW', metrics ? val(metrics.skew_raw,'') + ' (Pct: ' + val(metrics.skew_pct20,'%') + ')' : '—') +
-          metricRow('PCR Z-Score', metrics ? val(metrics.dix_z20) : '—') +
-          metricRow('GEX-Proxy Z', metrics ? val(metrics.gex_z20) : '—') +
+          (function(){
+            var _pcr = (window._alphaData && _alphaData.market && _alphaData.market.pcr) ? _alphaData.market.pcr : null;
+            if (!_pcr || _pcr.pcr == null) return metricRow('PCR', 'n/v');
+            var _pcrTxt = _pcr.pcr + (_pcr.source === 'vix_proxy' ? ' [VIX-Proxy]' : _pcr.source === 'cboe' ? ' [CBOE]' : '');
+            return metricRow('PCR', _pcrTxt + ' (' + (_pcr.signal||'') + ')');
+          })() +
+          metricRow('DIX Z-Score', metrics && metrics.dix_z20 != null ? val(metrics.dix_z20) : 'n/v — kein Datenfeed') +
+          metricRow('GEX (AAPL-Proxy) Z', metrics && metrics.gex_z20 != null ? val(metrics.gex_z20) : 'n/v — keine Historie') +
           metricRow('Dark Pool Flow', val(results.dpScore, '/100'), scoreColor(results.dpScore, 40, 60)) +
           metricRow('Flow Signal', dpSig ? dpSig.emoji + ' ' + dpSig.label : '—') +
         '</table>' +
