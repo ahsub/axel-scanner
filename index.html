@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v283">
+<meta name="version" content="20260709-v284">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -504,6 +504,34 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
               <div id="home-sektor-flop" style="display:flex;flex-direction:column;gap:4px">
                 <span style="font-size:11px;color:var(--text3)">Lädt…</span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4-Spalten Marktaktivität (v284) -->
+        <div id="home-mover-card" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:.7rem 1rem;margin-bottom:.75rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+            <span style="font-size:10px;color:var(--text3);letter-spacing:.8px">MARKTAKTIVITÄT</span>
+            <button onclick="_loadHomeMover()" style="font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0">
+              <i class="ti ti-refresh"></i> laden
+            </button>
+          </div>
+          <div id="home-mover-cols" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem">
+            <div>
+              <div style="font-size:9px;color:var(--text3);margin-bottom:3px">🔥 AKTIVSTE</div>
+              <div id="hm-active" style="font-size:10px;color:var(--text2)"><span style="color:var(--text3)">—</span></div>
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--text3);margin-bottom:3px">📊 VOLUMEN</div>
+              <div id="hm-volume" style="font-size:10px;color:var(--text2)"><span style="color:var(--text3)">—</span></div>
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--green);margin-bottom:3px">🟢 WINNER</div>
+              <div id="hm-winners" style="font-size:10px;color:var(--text2)"><span style="color:var(--text3)">—</span></div>
+            </div>
+            <div>
+              <div style="font-size:9px;color:var(--red);margin-bottom:3px">🔴 LOSER</div>
+              <div id="hm-losers" style="font-size:10px;color:var(--text2)"><span style="color:var(--text3)">—</span></div>
             </div>
           </div>
         </div>
@@ -5299,6 +5327,71 @@ function renderHomeLanding() {
   _updateTrackRecord();
   if (!window._trInterval) {
     window._trInterval = setInterval(_updateTrackRecord, 60000);
+  }
+}
+
+// ── Home 4-Spalten Mover (v284) ───────────────────────────────────────────
+async function _loadHomeMover() {
+  var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
+  var cols = { active: 'hm-active', volume: 'hm-volume', winners: 'hm-winners', losers: 'hm-losers' };
+  Object.values(cols).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '<span style="color:var(--text3)">…</span>';
+  });
+
+  var screens = {
+    active:  'most_actives',
+    volume:  'most_actives',   // volume via sort
+    winners: 'day_gainers',
+    losers:  'day_losers',
+  };
+
+  async function fetchScreen(scrId) {
+    var url = corsProxy + '/?url=' + encodeURIComponent(
+      'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=' + scrId + '&count=10');
+    var r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var j = await r.json();
+    return (j?.finance?.result?.[0]?.quotes || [])
+      .filter(function(q) { return (q.marketCap||0) >= 2e9 && q.symbol && !q.symbol.includes('^'); });
+  }
+
+  function renderList(quotes, mode) {
+    return quotes.slice(0, 5).map(function(q) {
+      var chg = q.regularMarketChangePercent || 0;
+      var color = chg >= 0 ? 'var(--green)' : 'var(--red)';
+      var sign  = chg >= 0 ? '+' : '';
+      var metric = mode === 'volume'
+        ? ((q.regularMarketVolume||0)/1e6).toFixed(1) + 'M'
+        : sign + chg.toFixed(1) + '%';
+      var mColor = mode === 'winners' ? 'var(--green)'
+                 : mode === 'losers'  ? 'var(--red)'
+                 : 'var(--text3)';
+      return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border)">'
+           + '<button onclick="loadTickerForScan(\'' + q.symbol + '\')" style="font-size:10px;font-family:var(--mono);font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;text-align:left">' + q.symbol + '</button>'
+           + '<span style="font-size:10px;color:' + mColor + ';font-family:var(--mono)">' + metric + '</span>'
+           + '</div>';
+    }).join('');
+  }
+
+  try {
+    var [activeQ, gainersQ, losersQ] = await Promise.all([
+      fetchScreen('most_actives'),
+      fetchScreen('day_gainers'),
+      fetchScreen('day_losers'),
+    ]);
+    // Volume: same list sorted by volume
+    var volumeQ = [...activeQ].sort(function(a,b) { return (b.regularMarketVolume||0)-(a.regularMarketVolume||0); });
+
+    document.getElementById('hm-active').innerHTML  = renderList(activeQ,  'active');
+    document.getElementById('hm-volume').innerHTML  = renderList(volumeQ,  'volume');
+    document.getElementById('hm-winners').innerHTML = renderList(gainersQ, 'winners');
+    document.getElementById('hm-losers').innerHTML  = renderList(losersQ,  'losers');
+  } catch(e) {
+    Object.values(cols).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.innerHTML = '<span style="color:var(--red);font-size:10px">⚠ ' + e.message + '</span>';
+    });
   }
 }
 
