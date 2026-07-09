@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260709-v290">
+<meta name="version" content="20260709-v291">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -5367,7 +5367,7 @@ async function _loadHomeMover() {
                  : mode === 'losers'  ? 'var(--red)'
                  : 'var(--text3)';
       return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:0.5px solid var(--border)">'
-           + '<button onclick="loadTickerForScan(\'' + q.symbol + '\')" style="font-size:10px;font-family:var(--mono);font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;text-align:left">' + q.symbol + '</button>'
+           + '<button class="btn btn-sm" data-sym="' + q.symbol + '" onclick="quickScanBtn(this)" style="font-size:10px;font-family:var(--mono);font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;text-align:left">' + q.symbol + '</button>'
            + '<span style="font-size:10px;color:' + mColor + ';font-family:var(--mono)">' + metric + '</span>'
            + '</div>';
     }).join('');
@@ -9071,7 +9071,8 @@ const IM_TICKERS = [
   // Lumber (LBS=F) entfernt (09.07.2026): CME Random-Length-Lumber-Kontrakt
   // vermutlich 2024 eingestellt, Ticker lieferte nie Daten. Kein verifizierter
   // Ersatz-Ticker gefunden — ehrlich entfernt statt geraten.
-,
+  // (Hinweis: hier stand zuvor ein doppeltes Komma im Array — erzeugte ein
+  // undefined-Element und crashte loadIntermarket(). Mit entfernt, v290.)
   // ── Makro: Inflation ──
   { sym:'TIP',      id:'im-tip',   label:'TIPS ETF',          unit:'$',  role:'inflation'  },
   // ── Makro: Zinsstruktur ──
