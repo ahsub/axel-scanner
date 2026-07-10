@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260710-v296">
+<meta name="version" content="20260710-v297">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -19346,27 +19346,25 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
   var gatesEl = document.getElementById('mse-gates');
   if (gatesEl && result) {
     var strategyLabels = {
-      momentum:  '📈 Momentum',
-      swing:     '🔄 Swing',
-      csp_wheel: '⚙️ CSP/Wheel',
-      meanrev:   '↩️ Mean Rev.',
-      breakout:  '🚀 Breakout',
+      momentum:'📈 Momentum', breakout:'🚀 Breakout', swing:'🔄 Swing',
+      ko:'⚡ KO-Zertifikat', csp_wheel:'⚙️ CSP/Wheel', atmna:'🎯 ATM/NA',
+      weekly_income:'💰 Weekly Income', value:'💎 Value',
+      dividend:'🏦 Dividende', meanrev:'↩️ Mean Rev.', fading_short:'🔻 Fading Short',
+    };
+    var _cMapMse = {
+      green: { col:'var(--green)', bg:'rgba(34,197,94,0.1)',  icon:'🟢' },
+      amber: { col:'var(--amber)', bg:'rgba(245,158,11,0.1)', icon:'🟡' },
+      red:   { col:'var(--red)',   bg:'rgba(239,68,68,0.08)', icon:'🔴' },
     };
     gatesEl.innerHTML = Object.entries(result.strategies).map(function(entry) {
       var key = entry[0], strat = entry[1];
-      var color, bg, prefix;
-      if (strat.active) {
-        color = 'var(--green)'; bg = 'rgba(34,197,94,0.1)'; prefix = '✓';
-      } else if (strat.conditional) {
-        color = 'var(--amber)'; bg = 'rgba(245,158,11,0.1)'; prefix = '~';
-      } else {
-        color = 'var(--red)'; bg = 'rgba(239,68,68,0.08)'; prefix = '✗';
-      }
+      var cKey = strat.color || (strat.active ? 'green' : 'red');
+      var c = _cMapMse[cKey] || _cMapMse.red;
       var label = strategyLabels[key] || key;
       var note  = strat.note || (strat.active ? 'Handelbar' : 'Nicht empfohlen im aktuellen Regime');
       return '<div title="' + note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;'
-        + 'background:' + bg + ';color:' + color + ';border:0.5px solid ' + color + ';cursor:help">'
-        + prefix + ' ' + label + '</div>';
+        + 'background:' + c.bg + ';color:' + c.col + ';border:0.5px solid ' + c.col + ';cursor:help">'
+        + c.icon + ' ' + label + '</div>';
     }).join('');
   }
 
@@ -20599,14 +20597,24 @@ function showMorningTearsheet(results) {
   // Strategie-Gates HTML
   var stratHtml = '';
   if (gates) {
-    var sL = {momentum:'📈 Momentum',swing:'🔄 Swing',csp_wheel:'⚙️ CSP/Wheel',meanrev:'↩️ Mean Rev.',breakout:'🚀 Breakout'};
+    var sL = {
+      momentum:'📈 Momentum', breakout:'🚀 Breakout', swing:'🔄 Swing',
+      ko:'⚡ KO-Zertifikat', csp_wheel:'⚙️ CSP/Wheel', atmna:'🎯 ATM/NA',
+      weekly_income:'💰 Weekly Income', value:'💎 Value',
+      dividend:'🏦 Dividende', meanrev:'↩️ Mean Rev.', fading_short:'🔻 Fading Short',
+    };
+    var cMap = {
+      green: { col:'#22c55e', bg:'rgba(34,197,94,0.12)',  icon:'🟢' },
+      amber: { col:'#f59e0b', bg:'rgba(245,158,11,0.12)', icon:'🟡' },
+      red:   { col:'#ef4444', bg:'rgba(239,68,68,0.10)',  icon:'🔴' },
+    };
     stratHtml = Object.entries(gates.strategies).map(function(e) {
       var k = e[0], s = e[1];
-      var col = s.active ? '#22c55e' : '#ef4444';
+      var cKey = s.color || (s.active ? 'green' : 'red');
+      var c = cMap[cKey] || cMap.red;
       return '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:' +
-        (s.active ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)') +
-        ';color:' + col + ';border:0.5px solid ' + col + ';white-space:nowrap" title="' + s.note + '">' +
-        (s.active ? '✓ ' : '✗ ') + sL[k] + '</span>';
+        c.bg + ';color:' + c.col + ';border:0.5px solid ' + c.col + ';white-space:nowrap" title="' + (s.note||'') + '">' +
+        c.icon + ' ' + (sL[k] || k) + '</span>';
     }).join(' ');
   }
 
