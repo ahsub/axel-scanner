@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260710-v294">
+<meta name="version" content="20260710-v295">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -1401,9 +1401,8 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       </div>
     </div>
     <div id="dp-dix-info" style="font-size:11px;color:var(--text3);margin-top:.5rem;line-height:1.5;padding:6px 8px;background:var(--bg3);border-radius:6px">
-      <b>DIX-Proxy</b> = OBV-basierter Institutional Flow auf SPY. Hoch (&gt;49%) = Institutionen kaufen → <span style="color:var(--green)">bullisch</span>.<br>
-      <b>GEX-Proxy</b> = Volumen-Anomalie SPY. Positiv = stabilisierend, Negativ = destabilisierend.<br>
-      <span style="color:var(--amber)">⚠ Echter DIX/GEX (squeezemetrics) seit 2024 Paywall-geschützt.</span>
+      <b>⚠ Volumen-Heuristik</b> (kein echter DIX/GEX) — Formel aus SPY-Volumen/OBV, bewusst auf plausiblen Wertebereich skaliert, aber ohne echte Dark-Pool- oder Optionsketten-Datenbasis. Nur zur groben Orientierung, nicht für KI-Analysen verwendet.<br>
+      <span style="color:var(--amber)">Echter DIX/GEX (SqueezeMetrics) seit 2024 kostenpflichtig — Umstellung geplant sobald finanzierbar.</span>
     </div>
   </div>
 
@@ -20002,8 +20001,14 @@ async function runMorningBriefing() {
       KoDarkPool.clearCache();
       var dpData  = await KoDarkPool.fetchCached();
       var dpScore = KoDarkPool.score(dpData);
-      results.dpScore  = dpScore ? dpScore.total : null;
-      results.dpSignal = dpData ? (KoDarkPool.interpret ? KoDarkPool.interpret(dpScore, dpData).label : '') : null;
+      // v10.07.2026 (Option B): Morning Briefing bekommt NUR den kiTotal-Score
+      // (PCR + VIX-Term, echte Daten) — nicht die volle Mischung inkl. DIX/GEX-
+      // Volumen-Heuristik. dpScore.total (mit Heuristik) bleibt für die Dark-
+      // Pool-Tab-Anzeige unverändert erhalten, fließt aber nicht in KI-Prompts.
+      results.dpScore  = dpScore ? dpScore.total : null;   // für UI-Anzeige (rc-dp Widget)
+      results.dpSignal = (dpData && dpScore && dpScore.kiTotal != null && KoDarkPool.interpret)
+        ? KoDarkPool.interpret({ total: dpScore.kiTotal }, dpData).label
+        : null;
       window._dpLastScore = results.dpScore;
       var dpEl = document.getElementById('rc-dp');
       if (dpEl && results.dpScore) {
@@ -22305,11 +22310,11 @@ function renderDpArrows(data) {
     var dixTrend = data.dix.dixTrend === 'steigend';
     var dixBull  = data.dix.dix >= 49;
     arrows.push({
-      label: 'DIX-Proxy',
+      label: 'Vol-Heuristik',
       val:   data.dix.dix + '%',
       arrow: dixTrend ? '↑' : '↓',
       color: dixBull ? 'var(--green)' : 'var(--amber)',
-      tip:   dixTrend ? 'Steigend — Institutionen kaufen' : 'Fallend — Institutionen zurückhaltend',
+      tip:   'Kein echter DIX — SPY-Volumen-Heuristik. ' + (dixTrend ? 'Steigend' : 'Fallend'),
     });
   }
 
@@ -22392,17 +22397,21 @@ async function generateDpKI(data, scoreObj, signal) {
     + ' Claude analysiert Marktdaten…</div>';
 
   // Prompt zusammenbauen
+  // v10.07.2026 (Option B, Axel-Entscheidung): DIX/GEX-Volumen-Heuristik NICHT
+  // an die KI senden — keine echte Datenbasis, Verwechslungsgefahr mit echtem
+  // institutionellem Flow. Ersatz durch SqueezeMetrics geplant sobald finanzierbar.
+  // Bis dahin nur PCR (VVIX/SKEW-basiert, methodisch legitim) + VIX-Term (100% real).
   var ctx = [];
-  ctx.push('INSTITUTIONAL FLOW SCORE: ' + (scoreObj ? scoreObj.total : '?') + '/100 → ' + signal.label);
-  if (data.dix) {
-    ctx.push('DIX-Proxy: ' + data.dix.dix + '% (' + data.dix.dixTrend + ') | GEX-Proxy: ' + (data.dix.gex >= 0 ? '+' : '') + data.dix.gex + ' Mrd');
-  }
+  ctx.push('INSTITUTIONAL FLOW SCORE (nur PCR + VIX-Term, DIX/GEX-Heuristik ausgeschlossen): '
+    + (scoreObj && scoreObj.kiTotal != null ? scoreObj.kiTotal : '?') + '/100');
   if (data.pcr) {
     ctx.push('VVIX: ' + (data.pcr.vvix || '?') + ' | SKEW: ' + (data.pcr.skew || '?') + ' | PCR-Proxy: ' + data.pcr.pcr + ' (' + data.pcr.signal + ')');
   }
   if (data.vixTerm) {
     ctx.push('VIX Spot: ' + data.vixTerm.vix + ' | VIX 3M: ' + data.vixTerm.vix3m + ' | Spread: ' + data.vixTerm.spread + ' | Struktur: ' + data.vixTerm.structure);
   }
+  ctx.push('DIX (Dark Pool Index): n/v — kein freier Datenfeed verfügbar. NIEMALS einen Wert nennen oder schätzen.');
+  ctx.push('GEX (Markt-Level SPY/QQQ): n/v — kein freier Datenfeed verfügbar. NIEMALS einen Wert nennen oder schätzen.');
 
   var isExpert2 = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
 
@@ -22410,18 +22419,18 @@ async function generateDpKI(data, scoreObj, signal) {
     + '\n\nAKTUELLE MESSWERTE:\n' + ctx.join('\n') + '\n\n'
     + (isExpert2
       ? 'Analysiere in 5 Sätzen mit konkreten Handlungsimplikationen:\n'
-        + '1. Was signalisiert der institutionelle Flow (DIX/GEX) für die Marktrichtung?\n'
+        + '1. Was signalisiert der Put/Call-Ratio-Proxy (VVIX/SKEW-basiert) für Options-Sentiment?\n'
         + '2. Was sagt die VIX-Kurvenstruktur über das Volatilitäts-Regime?\n'
         + '3. Was bedeutet der SKEW-Wert für Tail-Risiken und Options-Pricing?\n'
-        + '4. Welche konkrete Strategie ist im aktuellen Flow-Umfeld bevorzugt (CSP/Long/Hedge)?\n'
+        + '4. Welche konkrete Strategie ist im aktuellen Sentiment-Umfeld bevorzugt (CSP/Long/Hedge)?\n'
         + '5. Gibt es einen Regime-Wechsel-Hinweis? Was wäre das Trigger-Event?\n'
       : 'Formuliere 4-5 objektive deskriptive Sätze (BaFin-konform):\n'
-        + '1. Was zeigen die Daten über institutionelles Marktverhalten?\n'
+        + '1. Was zeigen PCR-Proxy und VIX-Struktur über Options-Marktsentiment?\n'
         + '2. Was sagt die VIX-Kurvenstruktur?\n'
         + '3. Was signalisiert SKEW über Tail-Risk-Absicherungen?\n'
         + '4. Welche Parameter sollte der Anwender prüfen?\n'
     )
-    + '\nNur Messwerte. Keine Erfindungen. Kein Markdown.';
+    + '\nNur Messwerte. Keine Erfindungen. DIX/GEX sind n/v — niemals erwähnen oder interpretieren. Kein Markdown.';
 
   try {
     if (!getAiToken()) {
@@ -22469,7 +22478,7 @@ async function generateDpKI(data, scoreObj, signal) {
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@35eb224/ko-market-state.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-darkpool.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b94303a/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1d89a9f/ko-prompts.js">
 </script>
