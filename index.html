@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260711-v300">
+<meta name="version" content="20260711-v301">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -15819,7 +15819,7 @@ function renderSektorRS(results, spy5d, spy1d) {
     const arrow = r.rs1d >= 0.3 ? ' \u2191' : r.rs1d <= -0.3 ? ' \u2193' : ' \u2192';
     const arrowColor = r.rs1d >= 0.3 ? 'var(--green)' : r.rs1d <= -0.3 ? 'var(--red)' : 'var(--text3)';
 
-    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;background:'+bgRow+';margin-bottom:3px">' +
+    return '<div onclick="showEtfHoldingsModal(\''+r.sym+'\')" style="display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;background:'+bgRow+';margin-bottom:3px;cursor:pointer" title="Klicken für Top-Holdings">' +
       '<span style="width:40px;font-weight:700;font-size:12px;color:var(--text1)">'+r.sym+'</span>' +
       '<span style="width:120px;font-size:11px;color:var(--text2)"><i class="ti '+r.icon+'" style="font-size:10px"></i> '+r.name+'</span>' +
       // RS-Balken
@@ -15873,6 +15873,87 @@ function renderSektorRS(results, spy5d, spy1d) {
   }
 
   el.innerHTML = spyRow + rows + legend + driverBtn;
+}
+
+// ── ETF-HOLDINGS-MODAL (11.07.2026, Präsentationsfeedback e) ─────────────
+// Klick auf eine Sektor-ETF-Zeile zeigt Top-15-Holdings (falls Daten vorhanden,
+// aktuell nur XLK als Proof-of-Concept) + Übernahme in eine Watchlist.
+function showEtfHoldingsModal(etfSym) {
+  var old = document.getElementById('etf-holdings-modal');
+  if (old) old.remove();
+
+  var sh = (window._alphaData && _alphaData.market && _alphaData.market.sectorHoldings)
+    ? _alphaData.market.sectorHoldings[etfSym] : null;
+
+  var modal = document.createElement('div');
+  modal.id = 'etf-holdings-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);overflow-y:auto;padding:1rem;display:flex;align-items:center;justify-content:center';
+
+  var bodyHtml;
+  if (!sh || !sh.ok) {
+    bodyHtml = '<div style="padding:1.5rem;text-align:center;color:var(--text3)">'
+      + '<i class="ti ti-chart-pie" style="font-size:28px;display:block;margin-bottom:.5rem"></i>'
+      + 'Für <b>' + etfSym + '</b> sind noch keine Holdings-Daten hinterlegt.<br>'
+      + '<span style="font-size:12px">Aktuell nur für XLK verfügbar (Proof-of-Concept, 11.07.2026).</span>'
+      + '</div>';
+  } else {
+    var sourceNote = sh.source === 'ssga_ucits_proxy'
+      ? 'Quelle: State-Street-UCITS-Wrapper (europäische Notierung, nahezu identische Konstituenten zum US-ETF, Gewichtung kann leicht abweichen)'
+      : 'Quelle: SSGA';
+    var rows = sh.holdings.map(function(h) {
+      var tickerCell = h.ticker
+        ? '<span style="font-weight:700;color:var(--accent)">' + h.ticker + '</span>'
+        : '<span style="color:var(--text3);font-size:11px">n/a</span>';
+      return '<tr style="border-bottom:0.5px solid var(--border)">'
+        + '<td style="padding:5px 8px">' + tickerCell + '</td>'
+        + '<td style="padding:5px 8px;font-size:12px;color:var(--text2)">' + h.name + '</td>'
+        + '<td style="padding:5px 8px;text-align:right;font-weight:600">' + h.weight + '%</td>'
+        + '</tr>';
+    }).join('');
+    bodyHtml = '<div style="padding:1rem 1.25rem">'
+      + '<div style="font-size:11px;color:var(--text3);margin-bottom:.75rem">' + sourceNote
+      + ' · ' + sh.resolvedCount + '/' + sh.totalCount + ' Ticker aufgelöst</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+      + '<thead><tr style="background:var(--bg3)">'
+      + '<th style="padding:5px 8px;text-align:left;font-size:10px;color:var(--text3)">TICKER</th>'
+      + '<th style="padding:5px 8px;text-align:left;font-size:10px;color:var(--text3)">NAME</th>'
+      + '<th style="padding:5px 8px;text-align:right;font-size:10px;color:var(--text3)">GEWICHT</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table>'
+      + '<button class="btn btn-sm" onclick="addSectorHoldingsToWatchlist(\'' + etfSym + '\')" style="margin-top:1rem;width:100%;color:var(--accent);border-color:var(--accent)">'
+      + '<i class="ti ti-star"></i> Alle in Watchlist "' + etfSym + '-Holdings" übernehmen</button>'
+      + '</div>';
+  }
+
+  modal.innerHTML = '<div style="width:min(520px,100%);background:var(--bg);border-radius:16px;border:1px solid var(--border2);max-height:calc(100vh - 2rem);overflow-y:auto">'
+    + '<div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between">'
+    + '<span style="font-size:16px;font-weight:700">' + etfSym + ' — Top Holdings</span>'
+    + '<button onclick="document.getElementById(\'etf-holdings-modal\').remove()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer">✕</button>'
+    + '</div>' + bodyHtml + '</div>';
+
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+// Übernimmt alle aufgelösten Ticker eines ETF-Holdings-Sets in EINE neue/bestehende
+// Watchlist (ein Refresh/Toast statt N einzelner addToWatchlist()-Aufrufe).
+function addSectorHoldingsToWatchlist(etfSym) {
+  var sh = (window._alphaData && _alphaData.market && _alphaData.market.sectorHoldings)
+    ? _alphaData.market.sectorHoldings[etfSym] : null;
+  if (!sh || !sh.ok) return;
+
+  var wlName = etfSym + '-Holdings';
+  var syms = sh.holdings.map(function(h) { return h.ticker; }).filter(Boolean);
+  if (!syms.length) { showWlMsg('⚠ Keine aufgelösten Ticker vorhanden'); return; }
+
+  var wls = getWatchlists();
+  var existing = (wls[wlName] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+  syms.forEach(function(s) { if (existing.indexOf(s) < 0) existing.push(s); });
+  wls[wlName] = existing.join(', ');
+  localStorage.setItem(WL_KEY, JSON.stringify(wls));
+  updateWatchlistDropdown();
+  showWlMsg('✓ ' + syms.length + ' Ticker in "' + wlName + '" übernommen');
+  var m = document.getElementById('etf-holdings-modal');
+  if (m) m.remove();
 }
 
 // Sektor-Treiber-Ticker als dynamische WL in den Scanner laden (NEU 01.07.2026)
