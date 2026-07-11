@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260711-v298">
+<meta name="version" content="20260711-v299">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -5063,27 +5063,16 @@ function unlockApp(){
       }
       if (action) { action.textContent = gates.action; action.style.color = gates.color; }
       if (gates2) {
-        var sL = {
-          momentum:     '📈 Momentum',
-          breakout:     '🚀 Breakout',
-          swing:        '🔄 Swing',
-          ko:           '⚡ KO-Zertifikat',
-          csp_wheel:    '⚙️ CSP/Wheel',
-          atmna:        '🎯 ATM/NA',
-          weekly_income:'💰 Weekly Income',
-          value:        '💎 Value',
-          dividend:     '🏦 Dividende',
-          meanrev:      '↩️ Mean Rev.',
-          fading_short: '🔻 Fading Short',
-        };
+        var sL = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_LABELS) || {};
+        var sOrder = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_ORDER) || Object.keys(gates.strategies);
         // 3-Farb-Ampel: green=🟢 aktiv/empfohlen, amber=🟡 möglich, red=🔴 gesperrt
         var colorMap = {
           green: { col:'var(--green)',  bg:'rgba(34,197,94,0.12)',  icon:'🟢' },
           amber: { col:'var(--amber)',  bg:'rgba(245,158,11,0.12)', icon:'🟡' },
           red:   { col:'var(--red)',    bg:'rgba(239,68,68,0.10)',  icon:'🔴' },
         };
-        gates2.innerHTML = Object.entries(gates.strategies).map(function(e) {
-          var k = e[0], s = e[1];
+        gates2.innerHTML = sOrder.filter(function(k) { return gates.strategies[k]; }).map(function(k) {
+          var s = gates.strategies[k];
           var cKey = s.color || (s.active ? 'green' : 'red');
           var c = colorMap[cKey] || colorMap.red;
           return '<div title="' + s.note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;background:' + c.bg + ';color:' + c.col + ';cursor:help">' + c.icon + ' ' + (sL[k] || k) + '</div>';
@@ -5236,20 +5225,16 @@ function renderHomeLanding() {
     var mseResult = window._lastMseResult || null;
     if (mseResult && mseResult.strategies) {
       // Single Source of Truth: getStrategyGates aus ko-market-state.js (v275)
-      var _sL = {
-        momentum:'📈 Momentum', breakout:'🚀 Breakout', swing:'🔄 Swing',
-        ko:'⚡ KO-Zertifikat', csp_wheel:'⚙️ CSP/Wheel', atmna:'🎯 ATM/NA',
-        weekly_income:'💰 Weekly Income', value:'💎 Value',
-        dividend:'🏦 Dividende', meanrev:'↩️ Mean Rev.', fading_short:'🔻 Fading Short',
-      };
+      var _sL = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_LABELS) || {};
+      var _sOrder = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_ORDER) || Object.keys(mseResult.strategies);
       var _cMap = {
         green:{col:'var(--green)',bg:'rgba(34,197,94,0.12)',icon:'🟢'},
         amber:{col:'var(--amber)',bg:'rgba(245,158,11,0.12)',icon:'🟡'},
         red:  {col:'var(--red)',  bg:'rgba(239,68,68,0.10)', icon:'🔴'},
       };
       function _renderAmpel(strategies) {
-        return Object.entries(strategies).map(function(e) {
-          var k=e[0],s=e[1]; var c=_cMap[s.color||(s.active?'green':'red')]||_cMap.red;
+        return _sOrder.filter(function(k) { return strategies[k]; }).map(function(k) {
+          var s = strategies[k]; var c=_cMap[s.color||(s.active?'green':'red')]||_cMap.red;
           return '<div title="'+(s.note||'')+'" style="font-size:11px;padding:3px 9px;border-radius:10px;background:'+c.bg+';color:'+c.col+';cursor:help">'+c.icon+' '+(_sL[k]||k)+'</div>';
         }).join('');
       }
@@ -19349,19 +19334,15 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
   // Strategy Gates anzeigen
   var gatesEl = document.getElementById('mse-gates');
   if (gatesEl && result) {
-    var strategyLabels = {
-      momentum:'📈 Momentum', breakout:'🚀 Breakout', swing:'🔄 Swing',
-      ko:'⚡ KO-Zertifikat', csp_wheel:'⚙️ CSP/Wheel', atmna:'🎯 ATM/NA',
-      weekly_income:'💰 Weekly Income', value:'💎 Value',
-      dividend:'🏦 Dividende', meanrev:'↩️ Mean Rev.', fading_short:'🔻 Fading Short',
-    };
+    var strategyLabels = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_LABELS) || {};
+    var strategyOrder  = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_ORDER) || Object.keys(result.strategies);
     var _cMapMse = {
       green: { col:'var(--green)', bg:'rgba(34,197,94,0.1)',  icon:'🟢' },
       amber: { col:'var(--amber)', bg:'rgba(245,158,11,0.1)', icon:'🟡' },
       red:   { col:'var(--red)',   bg:'rgba(239,68,68,0.08)', icon:'🔴' },
     };
-    gatesEl.innerHTML = Object.entries(result.strategies).map(function(entry) {
-      var key = entry[0], strat = entry[1];
+    gatesEl.innerHTML = strategyOrder.filter(function(key) { return result.strategies[key]; }).map(function(key) {
+      var strat = result.strategies[key];
       var cKey = strat.color || (strat.active ? 'green' : 'red');
       var c = _cMapMse[cKey] || _cMapMse.red;
       var label = strategyLabels[key] || key;
@@ -19404,21 +19385,21 @@ function showMSEDetail() {
   var modal  = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;z-index:2200;background:rgba(0,0,0,0.85);backdrop-filter:blur(4px);overflow-y:auto;padding:1rem';
 
-  var strategyLabels = {
-    momentum:  '📈 Momentum/SEPA',
-    swing:     '🔄 Swing-Trading',
-    csp_wheel: '⚙️ CSP/Wheel',
-    meanrev:   '↩️ Mean Reversion',
-    breakout:  '🚀 Breakout',
+  var strategyLabels = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_LABELS) || {};
+  var strategyOrder2  = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_ORDER) || Object.keys(gates.strategies);
+  var _cMapDetail = {
+    green: { col:'var(--green)', bg:'rgba(34,197,94,0.08)' },
+    amber: { col:'var(--amber)', bg:'rgba(245,158,11,0.08)' },
+    red:   { col:'var(--red)',   bg:'rgba(239,68,68,0.08)' },
   };
 
-  var stratsHtml = Object.entries(gates.strategies).map(function(entry) {
-    var key = entry[0], s = entry[1];
-    var color = s.active ? 'var(--green)' : 'var(--red)';
-    var bg    = s.active ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)';
-    var icon  = s.active ? '✅' : '🚫';
-    return '<div style="background:' + bg + ';border-radius:8px;padding:8px 12px;margin-bottom:6px;border-left:3px solid ' + color + '">'
-      + '<div style="font-size:12px;font-weight:600;color:' + color + '">' + icon + ' ' + strategyLabels[key] + '</div>'
+  var stratsHtml = strategyOrder2.filter(function(key) { return gates.strategies[key]; }).map(function(key) {
+    var s = gates.strategies[key];
+    var cKey = s.color || (s.active ? 'green' : 'red');
+    var c = _cMapDetail[cKey] || _cMapDetail.red;
+    var icon = cKey === 'green' ? '🟢' : cKey === 'amber' ? '🟡' : '🔴';
+    return '<div style="background:' + c.bg + ';border-radius:8px;padding:8px 12px;margin-bottom:6px;border-left:3px solid ' + c.col + '">'
+      + '<div style="font-size:12px;font-weight:600;color:' + c.col + '">' + icon + ' ' + (strategyLabels[key] || key) + '</div>'
       + '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + s.note + '</div>'
       + '</div>';
   }).join('');
@@ -20623,19 +20604,15 @@ function showMorningTearsheet(results) {
   // Strategie-Gates HTML
   var stratHtml = '';
   if (gates) {
-    var sL = {
-      momentum:'📈 Momentum', breakout:'🚀 Breakout', swing:'🔄 Swing',
-      ko:'⚡ KO-Zertifikat', csp_wheel:'⚙️ CSP/Wheel', atmna:'🎯 ATM/NA',
-      weekly_income:'💰 Weekly Income', value:'💎 Value',
-      dividend:'🏦 Dividende', meanrev:'↩️ Mean Rev.', fading_short:'🔻 Fading Short',
-    };
+    var sL = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_LABELS) || {};
+    var sOrderTs = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_ORDER) || Object.keys(gates.strategies);
     var cMap = {
       green: { col:'#22c55e', bg:'rgba(34,197,94,0.12)',  icon:'🟢' },
       amber: { col:'#f59e0b', bg:'rgba(245,158,11,0.12)', icon:'🟡' },
       red:   { col:'#ef4444', bg:'rgba(239,68,68,0.10)',  icon:'🔴' },
     };
-    stratHtml = Object.entries(gates.strategies).map(function(e) {
-      var k = e[0], s = e[1];
+    stratHtml = sOrderTs.filter(function(k) { return gates.strategies[k]; }).map(function(k) {
+      var s = gates.strategies[k];
       var cKey = s.color || (s.active ? 'green' : 'red');
       var c = cMap[cKey] || cMap.red;
       return '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:' +
@@ -22542,7 +22519,7 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@35eb224/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@86178fc/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@03ef406/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1d89a9f/ko-prompts.js">
