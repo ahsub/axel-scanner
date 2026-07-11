@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260711-v299">
+<meta name="version" content="20260711-v300">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -5688,6 +5688,52 @@ var YAHOO_SEARCH_OVERRIDE = {
 };
 
 // Yahoo Finance Search: Klarnamen → Ticker (async, kein hardcoded Mapping nötig)
+// Yahoo Finance Search: Ticker → Klarname (Reverse-Lookup, 11.07.2026)
+// Nutzt dieselbe Infrastruktur wie searchTickerByName() (CORS-Proxy, Yahoo-Search-
+// Endpunkt), nur umgekehrte Richtung. Gecacht — jeder Ticker wird nur einmal
+// pro Session aufgelöst, danach aus _yfNameCache bedient.
+var _yfNameCache = {};
+
+async function getTickerDisplayName(ticker) {
+  var key = ticker.toUpperCase().trim();
+  if (!key) return null;
+  if (key in _yfNameCache) return _yfNameCache[key];
+  try {
+    var url = 'https://query1.finance.yahoo.com/v1/finance/search?q='
+      + encodeURIComponent(key) + '&lang=en&region=US&quotesCount=5&newsCount=0';
+    var r = await fetch('https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(url));
+    if (!r.ok) { _yfNameCache[key] = null; return null; }
+    var j = await r.json();
+    var quotes = j && j.quotes;
+    if (!quotes || !quotes.length) { _yfNameCache[key] = null; return null; }
+    // Exaktes Symbol bevorzugen — Yahoo Search kann bei Ticker-Queries auch
+    // Fuzzy-Treffer liefern (z.B. ähnlich klingende Firmen)
+    var match = quotes.find(function(q) { return q.symbol && q.symbol.toUpperCase() === key; }) || quotes[0];
+    var name = (match && (match.shortname || match.longname)) || null;
+    _yfNameCache[key] = name;
+    return name;
+  } catch (e) {
+    _yfNameCache[key] = null;
+    return null;
+  }
+}
+
+// Reichert Scanner-Karten nachträglich mit Klarnamen an, wenn t.name === t.sym
+// (d.h. kein echter Name aufgelöst, nur der rohe Ticker als Platzhalter).
+// Läuft asynchron NACH dem Karten-Rendering — blockiert nichts, aktualisiert
+// die DOM-Elemente progressiv sobald einzelne Namen eintreffen.
+function enrichCardNamesWithClearNames(tickers) {
+  tickers.forEach(function(t) {
+    if (!t || !t.sym) return;
+    if (t.name && t.name.toUpperCase() !== t.sym.toUpperCase()) return; // schon ein echter Name
+    getTickerDisplayName(t.sym).then(function(name) {
+      if (!name) return;
+      var el = document.querySelector('#card-' + t.sym + ' .ticker-name');
+      if (el) el.textContent = name;
+    }).catch(function() { /* stumm — Anzeige bleibt beim Ticker-Symbol */ });
+  });
+}
+
 async function searchTickerByName(name, preferDE) {
   // Override-Prüfung zuerst (verhindert falsche Yahoo-Ergebnisse)
   var lower = name.toLowerCase().trim();
@@ -6264,6 +6310,7 @@ async function runScan(){
       <span style="margin-left:auto;font-size:11px;color:var(--text3)"><i class="ti ti-loader"></i> Lade…</span>
     </div>
   </div>`).join('');
+  try { enrichCardNamesWithClearNames(tickers); } catch(_eNames) { /* Klarnamen sind Zusatz, kein Blocker */ }
 
   for(let i=0;i<tickers.length;i++){
     const t=tickers[i];
@@ -17474,7 +17521,7 @@ function renderShortlistTab() {
         var sc = t.score>=70?'var(--green)':t.score>=50?'var(--accent)':'var(--amber)';
         return '<tr style="border-bottom:0.5px solid var(--border)">'
           + '<td style="padding:4px 8px;color:var(--text3);font-size:10px;font-family:var(--mono)">'+(idx+1)+'</td>'
-          + '<td style="padding:4px 8px;font-family:var(--mono);font-weight:700;color:var(--accent)">'+t.sym+'</td>'
+          + '<td style="padding:4px 8px;font-family:var(--mono);font-weight:700;color:var(--accent)" id="shortlist-name-'+t.sym+'">'+t.sym+'</td>'
           + '<td style="padding:4px 8px;text-align:center"><span style="font-family:var(--mono);font-weight:700;color:'+sc+'">'+(t.grade||'?')+' '+t.score+'</span></td>'
           + '<td style="padding:4px 8px;text-align:center;color:var(--text3);font-size:11px">$'+t.price+'</td>'
           + '<td style="padding:4px 8px;text-align:center;color:var(--green);font-size:11px">3/3</td>'
@@ -17494,6 +17541,18 @@ function renderShortlistTab() {
         + '<th style="padding:4px 8px;color:var(--text3);font-size:10px;text-align:center">SIGNAL</th>'
         + '</tr></thead><tbody>'+rows+'</tbody></table></div>';
     }).join('');
+
+    // Klarnamen nachladen (progressiv, blockiert nichts) — 11.07.2026
+    data.forEach(function(entry) {
+      (entry.tickers || []).forEach(function(t) {
+        if (!t || !t.sym) return;
+        getTickerDisplayName(t.sym).then(function(name) {
+          if (!name) return;
+          var cell = document.getElementById('shortlist-name-' + t.sym);
+          if (cell) cell.innerHTML = t.sym + '<br><span style="font-size:9px;font-weight:400;color:var(--text3)">' + name + '</span>';
+        }).catch(function() {});
+      });
+    });
   } catch(e) { el.innerHTML = '<span style="color:var(--red)">Fehler</span>'; }
 }
 
