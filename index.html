@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260711-v301">
+<meta name="version" content="20260712-v302">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -6862,6 +6862,26 @@ function kvToScannerState(r) {
     dist10wMA:    null,
     sessionNote:  null,
     rs:           null,
+    // RS-Rating (Aggregator v5.0, SUITE.md #14) — Universum-Perzentil 0-99
+    rsRating:     r.rsRating != null ? r.rsRating : null,
+    perf3m:       r.perf3m  != null ? r.perf3m  : null,
+    perf12m:      r.perf12m != null ? r.perf12m : null,
+    // IV-Archiv-Felder (Aggregator v5.1, SUITE.md #15)
+    // ivRank/ivPercentile: erst nach >=30 Archiv-Tagen befüllt (ab ~12.08.2026)
+    ivAtm:          r.ivAtm         != null ? r.ivAtm         : null,
+    ivRank:         r.ivRank        != null ? r.ivRank        : null,
+    ivPercentile:   r.ivPercentile  != null ? r.ivPercentile  : null,
+    ivArchiveDays:  r.ivArchiveDays != null ? r.ivArchiveDays : null,
+    // _ivp-Objekt: echte Aggregator-Werte wenn vorhanden, sonst HVP-Fallback (calcHV20 bleibt aktiv)
+    _ivp: (r.ivAtm != null) ? {
+      ivp:    r.ivRank,        // ivRank als ivp (0-100, wie HVP)
+      atmIV:  Math.round(r.ivAtm),
+      dte:    r.ivDte || null,
+      expiry: r.ivExpiry || null,
+      isHV:   false,           // echte Options-IV, kein HV-Proxy
+      ivPct:  r.ivPercentile,
+      archiveDays: r.ivArchiveDays,
+    } : null,   // null → Frontend fällt auf calcHV20-Proxy zurück (bestehende Logik)
     scoreColor:   scoreColor,
     _currency:    'USD',
     _er:          null,
@@ -21428,6 +21448,25 @@ function renderOptionsDeskCards(data) {
     var hvp = t.hvp || 0;
     var hvpColor = hvp >= 65 ? 'var(--green)' : hvp >= 50 ? 'var(--amber)' : 'var(--text2)';
     var hvpBadge = hvp >= 65 ? ' &starf;' : hvp >= 50 ? ' &check;' : '';
+    // IV-Rank aus Aggregator-Archiv (SUITE.md #15) — verfügbar ab ~30 Archiv-Tagen
+    var ivRank = t.ivRank != null ? t.ivRank : null;
+    var ivPct  = t.ivPercentile != null ? t.ivPercentile : null;
+    var ivDays = t.ivArchiveDays != null ? t.ivArchiveDays : null;
+    // ivDisplay: IVR wenn verfügbar, sonst HVP mit Hinweis, sonst Archiv-Status
+    var ivDisplay, ivColor, ivTitle;
+    if (ivRank != null) {
+      ivDisplay = 'IVR ' + ivRank + '%';
+      ivColor   = ivRank >= 50 ? (ivRank >= 70 ? 'var(--green)' : 'var(--amber)') : 'var(--text2)';
+      ivTitle   = 'IV-Rank ' + ivRank + '% (tastytrade)' + (ivPct != null ? ' · IVP ' + ivPct + '%' : '') + ' · Archiv: ' + (ivDays||'?') + ' Tage';
+    } else if (hvp > 0) {
+      ivDisplay = 'HVP ' + hvp + '%';
+      ivColor   = hvpColor;
+      ivTitle   = 'Historical Vol Percentile (IV-Archiv läuft — IV-Rank ab ~' + (30 - (ivDays||0)) + ' Tagen)';
+    } else {
+      ivDisplay = 'IV –';
+      ivColor   = 'var(--text3)';
+      ivTitle   = 'IV-Archiv sammelt Daten' + (ivDays ? ' (' + ivDays + '/30 Tage)' : '');
+    }
     var rsi = t.rsi ? Math.round(t.rsi) : '--';
     var rsiColor = t.rsi ? (t.rsi > 70 ? 'var(--red)' : t.rsi < 35 ? 'var(--green)' : 'var(--text2)') : 'var(--text3)';
     var dist200 = (t.dist200 != null) ? ((t.dist200 > 0 ? '+' : '') + t.dist200 + '%') : '--';
@@ -21459,7 +21498,7 @@ function renderOptionsDeskCards(data) {
       + (fiboBadge || sqBadge ? '<div style="margin-bottom:.3rem;display:flex;gap:4px;flex-wrap:wrap">' + fiboBadge + sqBadge + '</div>' : '')
       + renderFundamentalFlags(t, 'csp')
       + '<div style="display:flex;gap:.8rem;flex-wrap:wrap;font-size:11px;margin-bottom:.2rem">'
-      +   '<span>HVP <b style="color:' + hvpColor + '">' + hvp + '%' + hvpBadge + '</b></span>'
+      +   '<span title="' + ivTitle + '"><b style="color:' + ivColor + '">' + ivDisplay + '</b>' + (ivRank != null && ivRank >= 70 ? ' &starf;' : ivRank != null && ivRank >= 50 ? ' &check;' : hvpBadge) + '</span>'
       +   '<span>RSI <b style="color:' + rsiColor + '">' + rsi + '</b></span>'
       +   '<span>ATR <b>' + (t.atr ? t.atr.toFixed(2) : '--') + '</b></span>'
       +   '<span>&Delta;EMA200 <b style="color:' + d200c + '">' + dist200 + '</b></span>'
@@ -21490,7 +21529,7 @@ async function runOptionsKiBriefing(strat) {
     + tickers.map(function(t,i){
         return (i+1) + '. ' + t.sym
           + ' Kurs:$' + (t.price||'--')
-          + ' HVP:' + (t.hvp||'--') + '%'
+          + ' IVR:' + (t.ivRank != null ? t.ivRank + '%' : (t.hvp ? 'HVP' + t.hvp + '%' : '--'))
           + ' RSI:' + (t.rsi ? Math.round(t.rsi) : '--')
           + ' ATR:' + (t.atr||'--')
           + ' D200:' + (t.dist200!=null ? t.dist200+'%' : '--')
