@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260712-v305">
+<meta name="version" content="20260712-v306">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -2720,6 +2720,23 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <span style="font-size:15px;font-weight:600"><i class="ti ti-cloud"></i> Cloud Sync</span>
       <button onclick="closeSyncModal()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer"><i class="ti ti-x"></i></button>
     </div>
+    <!-- Token-Eingabe -->
+    <div style="margin-bottom:.75rem">
+      <div style="font-size:10px;color:var(--text3);letter-spacing:.8px;margin-bottom:.3rem">UIQ-SYNC-TOKEN</div>
+      <div style="display:flex;gap:.4rem;align-items:center">
+        <input id="sync-token-input" type="password"
+          placeholder="Eigenes Token (6-32 Zeichen, a-z A-Z 0-9 _ -)"
+          oninput="_syncTokenChanged(this.value)"
+          style="flex:1;font-size:12px;padding:5px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px;font-family:var(--mono)">
+        <button onclick="_syncTokenToggleVisibility()" id="sync-token-eye"
+          style="background:none;border:0.5px solid var(--border2);color:var(--text3);border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px" title="Token anzeigen/verbergen">
+          <i class="ti ti-eye"></i>
+        </button>
+      </div>
+      <div id="sync-token-hint" style="font-size:10px;margin-top:3px;color:var(--text3)">
+        Token isoliert deine Daten — gleicher Token auf Mobil und Desktop = automatischer Sync.
+      </div>
+    </div>
     <div id="sync-status-list" style="margin-bottom:1rem;font-size:12px;color:var(--text2)">
       <div style="color:var(--text3)"><i class="ti ti-loader"></i> Lade Status…</div>
     </div>
@@ -2737,6 +2754,11 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       </button>
       <button onclick="syncPushScanResults()" class="btn" style="flex:1;font-size:11px">
         <i class="ti ti-radar"></i> Scan-Ergebnisse sync
+      </button>
+    </div>
+    <div style="margin-top:.5rem">
+      <button onclick="syncDeleteAll()" class="btn" style="width:100%;font-size:11px;color:var(--red);border-color:var(--red);background:rgba(239,68,68,0.06)">
+        <i class="ti ti-trash"></i> Alle eigenen Cloud-Daten löschen
       </button>
     </div>
     <div id="sync-toast" style="margin-top:.75rem;font-size:12px;color:var(--green);display:none;text-align:center"></div>
@@ -3909,12 +3931,32 @@ const KoSync = {
   // Alle Keys die wir synchronisieren
   KEYS: ['watchlist', 'backlog_winners', 'backlog_oversold', 'backlog_tracking'],
 
+  // Token aus localStorage lesen
+  getToken: function() {
+    return (localStorage.getItem('uiq_sync_token') || '').trim();
+  },
+
+  // Token-Header für alle Requests
+  _headers: function() {
+    var t = this.getToken();
+    var h = { 'Content-Type': 'application/json' };
+    if (t) h['X-UIQ-Token'] = t;
+    return h;
+  },
+
+  // Token gesetzt und valide?
+  hasToken: function() {
+    var t = this.getToken();
+    return t.length >= 6 && /^[a-zA-Z0-9_\-]+$/.test(t);
+  },
+
   // Push: lokale Daten → Cloud
   push: async function(key, data) {
+    if (!this.hasToken()) return false;
     try {
       const r = await fetch(this.BASE + '/sync/' + key, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this._headers(),
         body: JSON.stringify({ data: data, ts: Date.now() })
       });
       return r.ok;
@@ -3923,20 +3965,33 @@ const KoSync = {
 
   // Pull: Cloud → lokale Daten
   pull: async function(key) {
+    if (!this.hasToken()) return null;
     try {
-      const r = await fetch(this.BASE + '/sync/' + key);
-      if (!r.ok) return null; // 404 = key not yet written, silent
+      const r = await fetch(this.BASE + '/sync/' + key, { headers: this._headers() });
+      if (!r.ok) return null;
       return await r.json();
     } catch(e) { console.warn('[KoWL] pull Fehler:', e.message); return null; }
   },
 
   // Status aller Keys
   status: async function() {
+    if (!this.hasToken()) return null;
     try {
-      const r = await fetch(this.BASE + '/sync/status');
+      const r = await fetch(this.BASE + '/sync/status', { headers: this._headers() });
       if (!r.ok) return null;
       return await r.json();
     } catch(e) { return null; }
+  },
+
+  // Alle eigenen Keys löschen (Reset)
+  deleteAll: async function() {
+    if (!this.hasToken()) return false;
+    try {
+      const r = await fetch(this.BASE + '/sync/all', {
+        method: 'DELETE', headers: this._headers()
+      });
+      return r.ok;
+    } catch(e) { return false; }
   },
 
   // Alle lokalen Daten → Cloud pushen
@@ -4005,6 +4060,56 @@ const KoSync = {
 // ── SYNC UI FUNKTIONEN ────────────────────────────────────────────────────────
 async function showSyncModal() {
   document.getElementById('sync-modal').style.display = 'flex';
+  // Token-Eingabefeld mit gespeichertem Token vorbelegen
+  var inp = document.getElementById('sync-token-input');
+  if (inp) {
+    inp.value = localStorage.getItem('uiq_sync_token') || '';
+    _syncTokenChanged(inp.value);
+  }
+  await refreshSyncStatus();
+}
+
+function _syncTokenChanged(val) {
+  val = val.trim();
+  var hint = document.getElementById('sync-token-hint');
+  var inp  = document.getElementById('sync-token-input');
+  if (!val) {
+    localStorage.removeItem('uiq_sync_token');
+    if (hint) { hint.textContent = 'Token isoliert deine Daten — gleicher Token auf Mobil und Desktop = automatischer Sync.'; hint.style.color = 'var(--text3)'; }
+    if (inp)  inp.style.borderColor = 'var(--border2)';
+    return;
+  }
+  var valid = val.length >= 6 && val.length <= 32 && /^[a-zA-Z0-9_\-]+$/.test(val);
+  if (valid) {
+    localStorage.setItem('uiq_sync_token', val);
+    if (hint) { hint.textContent = '✅ Token gesetzt — Sync aktiv. Gleiches Token auf anderen Geräten eingeben.'; hint.style.color = 'var(--green)'; }
+    if (inp)  inp.style.borderColor = 'var(--green)';
+  } else {
+    localStorage.removeItem('uiq_sync_token');
+    if (hint) { hint.textContent = '⚠️ Ungültig: 6-32 Zeichen, nur a-z A-Z 0-9 _ -'; hint.style.color = 'var(--amber)'; }
+    if (inp)  inp.style.borderColor = 'var(--amber)';
+  }
+}
+
+function _syncTokenToggleVisibility() {
+  var inp = document.getElementById('sync-token-input');
+  var ico = document.getElementById('sync-token-eye');
+  if (!inp) return;
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    if (ico) ico.innerHTML = '<i class="ti ti-eye-off"></i>';
+  } else {
+    inp.type = 'password';
+    if (ico) ico.innerHTML = '<i class="ti ti-eye"></i>';
+  }
+}
+
+async function syncDeleteAll() {
+  if (!KoSync.hasToken()) { showSyncToast('⚠ Kein Token gesetzt', false); return; }
+  if (!confirm('Alle eigenen Cloud-Sync-Daten unwiderruflich löschen?')) return;
+  showSyncToast('⏳ Lösche…', true);
+  var ok = await KoSync.deleteAll();
+  showSyncToast(ok ? '✅ Cloud-Daten gelöscht' : '❌ Fehler beim Löschen', ok, true);
   await refreshSyncStatus();
 }
 
@@ -4014,9 +4119,18 @@ function closeSyncModal() {
 
 async function refreshSyncStatus() {
   const list = document.getElementById('sync-status-list');
+
+  // Token-Check zuerst
+  if (!KoSync.hasToken()) {
+    list.innerHTML = '<div style="color:var(--amber);font-size:12px;padding:8px;background:rgba(245,158,11,0.1);border-radius:6px;border:0.5px solid var(--amber)">'
+      + '⚠️ Kein UIQ-Sync-Token gesetzt.<br>'
+      + '<span style="color:var(--text3)">Token oben eingeben um Sync zu aktivieren.</span></div>';
+    return;
+  }
+
   list.innerHTML = '<div style="color:var(--text3)"><i class="ti ti-loader"></i> Verbinde…</div>';
   try {
-    const r = await fetch(KoSync.BASE + '/sync/status');
+    const r = await fetch(KoSync.BASE + '/sync/status', { headers: KoSync._headers() });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
     const keys = data.keys || [];
@@ -4053,6 +4167,7 @@ function showSyncToast(msg, ok, autoClose=false) {
 }
 
 async function syncPushAll() {
+  if (!KoSync.hasToken()) { showSyncToast('⚠ Token setzen', false); showSyncModal(); return; }
   showSyncToast('⬆ Lade hoch…', true);
   var pushed = 0;
   // Watchlist
@@ -4073,6 +4188,7 @@ async function syncPushAll() {
 }
 
 async function syncPullAll() {
+  if (!KoSync.hasToken()) { showSyncToast('⚠ Token setzen', false); return; }
   showSyncToast('⬇ Lade herunter…', true);
   var pulled = await KoSync.pullAll();
   showSyncToast('✅ ' + pulled + ' Bereiche geladen', true, true);
