@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260712-v304">
+<meta name="version" content="20260712-v305">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -16532,6 +16532,13 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     + '<div style="margin-top:.5rem">Analysiere Top-Ergebnisse...</div></div>';
 
   // Top-Ergebnisse sammeln (max 25, Score >= 40, Fallback: alle verfügbaren)
+  // Für Value-Strategie: Fundamental-Felder aus valueScanner-Shortlist ergänzen
+  var _valueLookup = {};
+  if (startStrat === 'value' && window._alphaData && _alphaData.valueScanner) {
+    (_alphaData.valueScanner.shortlist || []).forEach(function(v) {
+      if (v.sym) _valueLookup[v.sym] = v;
+    });
+  }
   const topResults = [];
   Object.keys(tickerData).forEach(function(sym) {
     const raw = tickerData[sym];
@@ -16539,6 +16546,8 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     const state = processData(raw);
     if (!state || state.error) return;
     const score = state.compositeScore || 0;
+    // Value-Fundamentaldaten ergänzen falls im valueScanner vorhanden
+    var _vd = _valueLookup[sym] || {};
     topResults.push({
       sym: sym,
       score: score,
@@ -16547,6 +16556,15 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       ma200: state.ma200 || null,
       sepa: state.sepaScore || 0,
       bullCount: state.bullCount || 0,
+      // Value-Felder (nur wenn vorhanden)
+      pe: _vd.pe || null,
+      pb: _vd.pb || null,
+      roicProxy: _vd.roicProxy || null,
+      revGrowth: _vd.revGrowth || null,
+      fcfYield: _vd.fcfYield || null,
+      grossMargin: _vd.grossMargin || null,
+      finalScore: _vd.finalScore || null,
+      wheelCandidate: _vd.wheelCandidate || false,
       markov: raw._markov ? {
         regime: raw._markov.regime === 1 ? 'BULL' : raw._markov.regime === -1 ? 'BEAR' : 'SIDE',
         sticky: raw._markov.regime === 1 ? raw._markov.bullSticky :
@@ -16702,6 +16720,13 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     }
     // 52W Range
     if(r.dist52wHigh != null) line += ' 52W-H:' + (r.dist52wHigh >= 0 ? '+' : '') + r.dist52wHigh + '%';
+    // Value-Felder aus KV (nur wenn vorhanden — Scanner hat diese aus kvToScannerState)
+    if(r.pe != null)          line += ' PE:' + r.pe;
+    if(r.pb != null)          line += ' PB:' + r.pb;
+    if(r.roicProxy != null)   line += ' ROIC:' + r.roicProxy + '%';
+    if(r.revGrowth != null)   line += ' RG:' + (r.revGrowth>0?'+':'') + r.revGrowth + '%';
+    if(r.fcfYield != null)    line += ' FCF-Y:' + r.fcfYield + '%';
+    if(r.grossMargin != null) line += ' GM:' + r.grossMargin + '%';
     if(r.high52w && r.low52w) line += ' [52W:$'+r.low52w.toFixed(0)+'-$'+r.high52w.toFixed(0)+']';
     // KRITISCH: RSI + MACD + Bollinger + EMA50 + Volumen + Overheat
     if(r.rsi != null)       line += ' RSI:' + r.rsi.toFixed(1);
@@ -16844,7 +16869,35 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
   // NEU (30.06.2026, ko-strategies.js v2.0.0): Strategien sind jetzt reine
   // Regelwerk-Daten ohne eigene .prompt()-Methode — Prompt-Text kommt aus dem
   // gemeinsamen Builder via KoPrompts.get(id, ctx) statt stratCfg.prompt(ctx).
-  const prompt = KoPrompts.get((_kiStrat && KI_STRAT_CONFIG[_kiStrat]) ? _kiStrat : 'ko', { marktkontext: marktkontext, vixStr: vixForPrompt, optsCfg: optsCfg });
+  // Value-Strategie: ctx mit Fundamentaldaten aus valueScanner anreichern
+  var _kiCtx = { marktkontext: marktkontext, vixStr: vixForPrompt, optsCfg: optsCfg };
+  if (_kiStrat === 'value') {
+    var _isEicNow = (typeof _expertModeActive !== 'undefined' && _expertModeActive)
+                 && (typeof _eicUnlocked !== 'undefined' && _eicUnlocked);
+    // topResults bereits mit Value-Feldern angereichert (PATCH 5 oben)
+    _kiCtx.isEic   = _isEicNow;
+    _kiCtx.mode    = 'fundamental';
+    _kiCtx.tickers = topResults.map(function(t) {
+      return {
+        sym:          t.sym,
+        sector:       t.sector || '',
+        finalScore:   t.finalScore || null,
+        pe:           t.pe || null,
+        pb:           t.pb || null,
+        roicProxy:    t.roicProxy || null,
+        revGrowth:    t.revGrowth || null,
+        fcfYield:     t.fcfYield || null,
+        grossMargin:  t.grossMargin || null,
+        rsRating:     t.rs || null,
+        aboveEma200:  (t.ma200 && t.price) ? (t.price > t.ma200) : null,
+        rsi:          t.rsi || null,
+        hvp:          t.ivp || null,
+        ivAtm:        null,
+        wheelCandidate: t.wheelCandidate || false,
+      };
+    });
+  }
+  const prompt = KoPrompts.get((_kiStrat && KI_STRAT_CONFIG[_kiStrat]) ? _kiStrat : 'ko', _kiCtx);
 
   try {
         // KI-Call via ko-ai Worker
@@ -21683,31 +21736,32 @@ async function runValueKiBriefing(mode) {
   }
 
   var isWheel = mode === 'value_wheel';
-  var mktCtx  = 'MARKTREGIME: ' + (window._lastMseResult ? window._lastMseResult.regime || '–' : '–')
-    + '\nVIX: ' + (_getVixRobust() || '–')
-    + '\nFIN-Archiv: ' + (data.finWeek||'–')
-    + '\n\n';
+  var isEic   = (typeof _expertModeActive !== 'undefined' && _expertModeActive)
+             && (typeof _eicUnlocked !== 'undefined' && _eicUnlocked);
 
-  var tickerLines = candidates.map(function(t, i) {
-    return (i+1) + '. ' + t.sym
-      + ' Sektor:' + (t.sector||'–')
-      + ' Score:' + (t.finalScore||'–')
-      + ' PE:' + (t.pe||'–')
-      + ' PB:' + (t.pb||'–')
-      + ' ROIC%:' + (t.roicProxy||'–')
-      + ' RG%:' + (t.revGrowth||'–')
-      + ' GM%:' + (t.grossMargin||'–')
-      + ' RS:' + (t.rsRating != null ? t.rsRating : '–')
-      + (t.ivAtm != null ? ' IV:' + Math.round(t.ivAtm) + '%' : '')
-      + (t.hvp != null ? ' HVP:' + t.hvp + '%' : '')
-      + (isWheel && t.wheelCandidate ? ' [WHEEL-KANDIDAT]' : '');
-  }).join('\n');
+  // ── KoPrompts.get('value', ctx) — zentraler, BaFin/EIC-konformer Prompt ──
+  // ctx.tickers enthält alle Felder aus der Value-Shortlist (Stufe 2+3)
+  var ctx = {
+    isEic:   isEic,
+    mode:    isWheel ? 'wheel' : 'fundamental',
+    tickers: candidates,   // vollständige Objekte mit pe/pb/roic/rs/hvp etc.
+    marktkontext: 'MARKTREGIME: ' + (window._lastMseResult ? window._lastMseResult.regime || '–' : '–')
+      + '\nVIX: ' + (_getVixRobust() || '–')
+      + '\nFIN-Archiv: ' + (data.finWeek||'–'),
+  };
 
-  var systemPrompt = isWheel
-    ? 'Du bist ein Finanzanalyst für Value-Investing und Optionsstrategien (Wheel/CSP). Analysiere die folgende Liste von Value-Kandidaten mit Momentum-Bestätigung. Für jeden Wheel-Kandidaten: (1) Bewerte ob Fundamentals + Momentum eine CSP-Strategie rechtfertigen, (2) nenne den optimalen Einstiegszeitpunkt (IV-Niveau, Abstand zur EMA200), (3) schätze das Strike-Niveau (ca. EMA200 oder 15-20% OTM). Antworte auf Deutsch, präzise, ohne Ausschweifungen. Strikt datengebunden — keine Erfindungen.'
-    : 'Du bist ein Finanzanalyst für Value-Investing nach Carlin/Graham. Analysiere die folgende Liste fundamental starker Unternehmen. Für die Top-Kandidaten: (1) bewerte Bewertung (PE/PB) im Sektorkontext, (2) kommentiere Kapitaleffizienz (ROIC) und Wachstum, (3) identifiziere potenzielle Value Traps (negatives Wachstum, hohes PB trotz niedrigem ROIC). Antworte auf Deutsch, präzise. Strikt datengebunden.';
-
-  var userMsg = mktCtx + (isWheel ? 'VALUE + WHEEL-KANDIDATEN' : 'VALUE-FUNDAMENTAL-ANALYSE') + ' (Top-' + candidates.length + '):\n' + tickerLines;
+  // Prompt über KoPrompts-Modul (analog Scanner-Tab) — kein Inline-Prompt
+  var fullPrompt;
+  if (typeof KoPrompts !== 'undefined' && KoPrompts.get) {
+    fullPrompt = KoPrompts.get('value', ctx);
+  } else {
+    // Fallback wenn ko-prompts.js noch nicht geladen
+    fullPrompt = '⛔ DATENBINDUNG: Nur bereitgestellte Daten verwenden.\n\n'
+      + (isWheel ? 'Value + Wheel-Analyse (EIC)' : 'Value Fundamental-Analyse') + ':\n'
+      + candidates.map(function(t,i){ return (i+1)+'. '+t.sym+' Score:'+t.finalScore+' PE:'+t.pe+' RS:'+t.rsRating; }).join('\n')
+      + '\n\nAntworte auf Deutsch, strukturiert. Max. 400 Wörter.';
+  }
+  var userMsg = fullPrompt;
 
   // Modal öffnen (analog Options-KI-Briefing)
   var existing = document.getElementById('ki-modal');
@@ -21727,19 +21781,36 @@ async function runValueKiBriefing(mode) {
   modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
 
   try {
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': getAiToken(),
-                 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6', max_tokens: 1200,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userMsg }]
-      })
-    });
-    var j = await resp.json();
-    var text = (j.content && j.content[0] && j.content[0].text) ? j.content[0].text : 'Keine Antwort';
-    document.getElementById('ki-modal-body').innerHTML = text.replace(/\n/g,'<br>');
+    // Prompt kommt komplett aus KoPrompts.get() — kein separates system-Feld nötig
+    // koAiCall() nutzt den ko-ai Worker (BaFin-Compliance + Rate-Limiting)
+    var text;
+    try {
+      text = await koAiCall('value_briefing', userMsg, isEic);
+    } catch(_kErr) {
+      // Direkter API-Fallback falls koAiCall nicht verfügbar
+      var resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': getAiToken(),
+                   'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6', max_tokens: 1200,
+          messages: [{ role: 'user', content: userMsg }]
+        })
+      });
+      var j = await resp.json();
+      text = (j.content && j.content[0] && j.content[0].text) ? j.content[0].text : 'Keine Antwort';
+    }
+    if (!text) throw new Error('Keine KI-Antwort');
+    var html = text.replace(/##\s(.+)/g,'<b style="color:var(--accent)">$1</b>')
+                   .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+                   .replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
+    document.getElementById('ki-modal-body').innerHTML = html;
+    // BaFin-Disclaimer
+    document.getElementById('ki-modal-body').innerHTML +=
+      '<div style="font-size:10px;color:var(--text3);margin-top:.75rem;border-top:0.5px solid var(--border2);padding-top:.5rem">'
+      + (isEic ? '⚠️ EIC-Modus · Persönlicher Eigengebrauch · Keine Anlageberatung gem. §1 WpHG'
+               : '§34b WpHG · Statistische Kontext-Analyse · Keine Anlageberatung')
+      + '</div>';
     if (statusEl) statusEl.textContent = '';
   } catch(e) {
     document.getElementById('ki-modal-body').textContent = 'Fehler: ' + e.message;
