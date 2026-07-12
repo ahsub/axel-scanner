@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260712-v302">
+<meta name="version" content="20260712-v303">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -2505,6 +2505,10 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
             style="font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer">
             &#x1F3AF; Options-Desk
           </button>
+          <button id="alpha-tab-value" onclick="switchAlphaTab('value')"
+            style="font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer">
+            &#x1F50D; Value
+          </button>
         </div>
       </div>
       <!-- Refresh-Button entfernt (AP 08.07.2026) -->
@@ -2545,6 +2549,33 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       </div>
     </div>
     <div id="alpha-cards" style="display:flex;flex-direction:column;gap:.6rem"></div>
+  </div>
+
+  <!-- Value-Desk Panel (hidden by default) -->
+  <div id="alpha-panel-value" style="display:none;padding:.75rem 1rem">
+    <div style="font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:.25rem">VALUE-SCANNER &mdash; CARLIN/GRAHAM 3-STUFEN-SIEVE</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">Top-50 Fundamental-Kandidaten &middot; Sortiert nach Value-Score &middot; w&ouml;chentlich aktualisiert</div>
+    <!-- KI-Analyse -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.6rem;padding:.5rem;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+      <div style="font-size:9px;color:var(--text3);width:100%;margin-bottom:2px">KI-ANALYSE:</div>
+      <button onclick="runValueKiBriefing('value_wheel')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(34,197,94,0.1);color:var(--green);cursor:pointer">&#x2699;&#xFE0F; Value + Wheel</button>
+      <button onclick="runValueKiBriefing('value_pure')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);cursor:pointer">&#x1F4CA; Value Fundamentals</button>
+      <span id="value-ki-status" style="font-size:10px;color:var(--text3);align-self:center"></span>
+    </div>
+    <!-- Filter: Wheel-Kandidaten / RS-Filter -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.5rem;align-items:center">
+      <span style="font-size:10px;color:var(--text3)">Filter:</span>
+      <button onclick="filterValueDesk('all')" id="vdf-all" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-weight:700">Alle</button>
+      <button onclick="filterValueDesk('wheel')" id="vdf-wheel" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--green);background:rgba(34,197,94,0.1);color:var(--green);cursor:pointer">&#x2699; Wheel-Kandidaten</button>
+      <button onclick="filterValueDesk('uiq')" id="vdf-uiq" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--accent);background:rgba(79,142,247,0.08);color:var(--accent);cursor:pointer">UIQ-Universum</button>
+      <button onclick="filterValueDesk('rs70')" id="vdf-rs70" style="font-size:9px;padding:2px 7px;border-radius:5px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer">RS &ge; 70</button>
+    </div>
+    <!-- Karten-Container -->
+    <div id="value-desk-cards" style="display:flex;flex-direction:column;gap:.5rem">
+      <div style="color:var(--text3);font-size:12px;text-align:center;padding:1.5rem">Value-Scanner wird geladen&hellip;</div>
+    </div>
+    <!-- Meta-Info -->
+    <div id="value-desk-meta" style="margin-top:.75rem;font-size:10px;color:var(--text3);text-align:center"></div>
   </div>
 
   <!-- Options-Desk Panel (hidden by default) -->
@@ -5235,7 +5266,11 @@ function renderHomeLanding() {
       function _renderAmpel(strategies) {
         return _sOrder.filter(function(k) { return strategies[k]; }).map(function(k) {
           var s = strategies[k]; var c=_cMap[s.color||(s.active?'green':'red')]||_cMap.red;
-          return '<div title="'+(s.note||'')+'" style="font-size:11px;padding:3px 9px;border-radius:10px;background:'+c.bg+';color:'+c.col+';cursor:help">'+c.icon+' '+(_sL[k]||k)+'</div>';
+          // Value-Badge öffnet direkt den Alpha-Desk Value-Tab
+          var clickFn = (k === 'value') ? 'onclick="(function(){switchToPanel(\'alpha\');setTimeout(function(){switchAlphaTab(\'value\')},100);})()"' : '';
+          var cursorStyle = (k === 'value') ? 'cursor:pointer' : 'cursor:help';
+          return '<div '+clickFn+' title="'+(s.note||'')+(k==='value'?' — Klicken für Value-Desk':'')+
+            '" style="font-size:11px;padding:3px 9px;border-radius:10px;background:'+c.bg+';color:'+c.col+';'+cursorStyle+'">'+c.icon+' '+(_sL[k]||k)+'</div>';
         }).join('');
       }
       var _ampelHtml = _renderAmpel(mseResult.strategies);
@@ -21282,21 +21317,22 @@ function setOptionsSort(key) {
 }
 
 function switchAlphaTab(tab) {
-  var sp = document.getElementById('alpha-panel-shortlist');
-  var op = document.getElementById('alpha-panel-options');
-  var ts = document.getElementById('alpha-tab-shortlist');
-  var to = document.getElementById('alpha-tab-options');
-  if (tab === 'options') {
-    if (sp) sp.style.display = 'none';
-    if (op) op.style.display = 'block';
-    if (ts) { ts.style.background = 'var(--bg2)'; ts.style.color = 'var(--text2)'; ts.style.borderColor = 'var(--border2)'; }
-    if (to) { to.style.background = '#34d399'; to.style.color = '#000'; to.style.borderColor = '#34d399'; }
-    loadOptionsDesk();
-  } else {
-    if (sp) sp.style.display = 'block';
-    if (op) op.style.display = 'none';
-    if (ts) { ts.style.background = 'var(--accent)'; ts.style.color = '#fff'; ts.style.borderColor = 'var(--accent)'; }
-    if (to) { to.style.background = 'var(--bg2)'; to.style.color = 'var(--text2)'; to.style.borderColor = 'var(--border2)'; }
+  ['shortlist','options','value'].forEach(function(t) {
+    var panel = document.getElementById('alpha-panel-' + t);
+    var btn   = document.getElementById('alpha-tab-' + t);
+    if (!panel || !btn) return;
+    var isActive = t === tab;
+    panel.style.display = isActive ? '' : 'none';
+    btn.style.background  = isActive ? 'var(--accent)' : 'var(--bg2)';
+    btn.style.color       = isActive ? '#fff'          : 'var(--text2)';
+    btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border2)';
+    btn.style.fontWeight  = isActive ? '600'           : 'normal';
+  });
+  // Value-Desk beim ersten Öffnen befüllen
+  if (tab === 'value') {
+    var cards = document.getElementById('value-desk-cards');
+    if (cards && cards.querySelector('[data-loaded]')) return;  // schon geladen
+    renderValueDeskCards(null);  // lädt aus _alphaData
   }
 }
 
@@ -21511,6 +21547,201 @@ function renderOptionsDeskCards(data) {
       + '<div style="font-size:10px;color:var(--text3)">ATM ~' + atmStrike + ' &middot; Stop ~' + stopHint + ' (2 ATR)</div>'
       + '</div>';
   }).join('');
+}
+
+// ── VALUE-DESK FUNKTIONEN ────────────────────────────────────────────────────
+
+var _valueFilter = 'all';
+var _valueDeskData = null;
+
+function renderValueDeskCards(data) {
+  var cardsEl = document.getElementById('value-desk-cards');
+  var metaEl  = document.getElementById('value-desk-meta');
+  if (!cardsEl) return;
+
+  // Daten aus _alphaData wenn nicht explizit übergeben
+  if (!data) {
+    data = (window._alphaData && _alphaData.valueScanner) ? _alphaData.valueScanner : null;
+  }
+  if (!data || !data.shortlist || !data.shortlist.length) {
+    cardsEl.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:1.5rem">Keine Value-Scanner-Daten &mdash; n&auml;chster Aggregator-Lauf ausstehend.</div>';
+    return;
+  }
+
+  _valueDeskData = data;
+
+  // Filter anwenden
+  var list = data.shortlist.slice();
+  if (_valueFilter === 'wheel')  list = list.filter(function(t){ return t.wheelCandidate; });
+  if (_valueFilter === 'uiq')    list = list.filter(function(t){ return t.inUiqUniverse; });
+  if (_valueFilter === 'rs70')   list = list.filter(function(t){ return (t.rsRating||0) >= 70; });
+  // Immer nach finalScore absteigend sortiert
+  list.sort(function(a,b){ return (b.finalScore||0) - (a.finalScore||0); });
+
+  if (!list.length) {
+    cardsEl.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:1rem">Keine Treffer f&uuml;r diesen Filter.</div>';
+    return;
+  }
+
+  cardsEl.setAttribute('data-loaded','1');
+
+  cardsEl.innerHTML = list.map(function(t, idx) {
+    var wh   = t.wheelCandidate;
+    var uiq  = t.inUiqUniverse;
+    var rs   = t.rsRating;
+    var rsColor = rs == null ? 'var(--text3)' : rs >= 70 ? 'var(--green)' : rs >= 50 ? 'var(--amber)' : 'var(--text2)';
+    var peColor = !t.pe ? 'var(--text3)' : t.pe < 15 ? 'var(--green)' : t.pe < 25 ? 'var(--amber)' : 'var(--text2)';
+    var gmColor = !t.grossMargin ? 'var(--text3)' : t.grossMargin > 50 ? 'var(--green)' : t.grossMargin > 30 ? 'var(--amber)' : 'var(--text2)';
+
+    // Badges
+    var badges = '';
+    if (wh)  badges += '<span title="Value + Momentum + IV: Wheel/CSP-Einstieg prüfen" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green)">&#x2699; Wheel</span>';
+    if (!uiq) badges += '<span title="Russell3000-only — nicht im UIQ-Scan-Universum" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(245,158,11,0.1);border:0.5px solid var(--amber);color:var(--amber)">R3k</span>';
+
+    // Technische Felder (nur wenn UIQ-Universum)
+    var techLine = '';
+    if (uiq && t.rsi != null)   techLine += '<span>RSI <b style="color:' + (t.rsi>70?'var(--red)':t.rsi<35?'var(--green)':'var(--text2)') + '">' + Math.round(t.rsi) + '</b></span>';
+    if (uiq && t.hvp != null)   techLine += '<span>HVP <b>' + t.hvp + '%</b></span>';
+    if (uiq && t.ivAtm != null) techLine += '<span>IV <b>' + Math.round(t.ivAtm) + '%</b></span>';
+    if (uiq && t.dist200!=null) techLine += '<span>&Delta;200 <b style="color:' + (t.dist200>0?'var(--green)':'var(--red)') + '">' + (t.dist200>0?'+':'') + t.dist200 + '%</b></span>';
+
+    return '<div style="background:var(--bg2);border-radius:10px;padding:.6rem .8rem;border:0.5px solid var(--border2)">'
+      // Kopfzeile: Rang + Symbol + Sektor + Score
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">'
+      +   '<div style="display:flex;align-items:center;gap:6px">'
+      +     '<span style="font-size:13px;font-weight:700;cursor:pointer" onclick="openDeepDive('' + t.sym + '','' + t.sym + '')">'
+      +       (idx+1) + '. ' + t.sym
+      +     '</span>'
+      +     (badges ? '<div style="display:flex;gap:3px">' + badges + '</div>' : '')
+      +   '</div>'
+      +   '<div style="text-align:right">'
+      +     '<span style="font-size:12px;font-weight:700;color:var(--accent)">' + (t.finalScore||'—') + '</span>'
+      +     '<span style="font-size:9px;color:var(--text3);margin-left:3px">Score</span>'
+      +   '</div>'
+      + '</div>'
+      // Sektor + Industrie
+      + '<div style="font-size:10px;color:var(--text3);margin-bottom:.3rem">' + (t.sector||'') + (t.industry ? ' · ' + t.industry : '') + '</div>'
+      // Fundamental-Kennzahlen
+      + '<div style="display:flex;gap:.7rem;flex-wrap:wrap;font-size:11px;margin-bottom:.2rem">'
+      +   (t.pe != null ? '<span>PE <b style="color:' + peColor + '">' + t.pe + '</b></span>' : '')
+      +   (t.pb != null ? '<span>PB <b>' + t.pb + '</b></span>' : '')
+      +   (t.roicProxy != null ? '<span>ROIC <b>' + t.roicProxy + '%</b></span>' : '')
+      +   (t.revGrowth != null ? '<span>RG <b style="color:' + (t.revGrowth>10?'var(--green)':t.revGrowth>0?'var(--text2)':'var(--red)') + '">' + (t.revGrowth>0?'+':'') + t.revGrowth + '%</b></span>' : '')
+      +   (t.fcfYield != null ? '<span>FCF-Y <b>' + t.fcfYield + '%</b></span>' : '')
+      +   (t.grossMargin != null ? '<span>GM <b style="color:' + gmColor + '">' + t.grossMargin + '%</b></span>' : '')
+      + '</div>'
+      // Momentum-Zeile
+      + '<div style="display:flex;gap:.7rem;flex-wrap:wrap;font-size:11px;color:var(--text3)">'
+      +   (rs != null ? '<span>RS <b style="color:' + rsColor + '">' + rs + '</b>' + (uiq ? '' : '<span style="font-size:8px;color:var(--amber)"> R3k</span>') + '</span>' : '<span style="color:var(--text3)">RS —</span>')
+      +   (t.aboveEma200 != null ? '<span>EMA200 <b style="color:' + (t.aboveEma200?'var(--green)':'var(--red)') + '">' + (t.aboveEma200?'▲':'▼') + '</b></span>' : '')
+      +   (t.regime ? '<span>' + t.regime.toUpperCase() + '</span>' : '')
+      +   (techLine ? techLine : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  // Meta-Info
+  var wheel = data.shortlist.filter(function(t){ return t.wheelCandidate; }).length;
+  if (metaEl) metaEl.textContent = data.shortlist.length + ' Kandidaten · ' + wheel + ' Wheel · FIN-Archiv ' + (data.finWeek||'–') + ' · ' + (data.stufe1Pass||'–') + '/' + (data.universe||'–') + ' Stufe-1-Pass';
+}
+
+function filterValueDesk(f) {
+  _valueFilter = f;
+  ['all','wheel','uiq','rs70'].forEach(function(id) {
+    var btn = document.getElementById('vdf-' + id);
+    if (!btn) return;
+    var active = id === f;
+    btn.style.background  = active ? (id==='wheel'?'var(--green)':id==='uiq'?'var(--accent)':id==='rs70'?'var(--amber)':'var(--accent)') : (id==='wheel'?'rgba(34,197,94,0.1)':id==='uiq'?'rgba(79,142,247,0.08)':id==='rs70'?'rgba(245,158,11,0.1)':'var(--bg3)');
+    btn.style.color       = active ? '#fff' : (id==='wheel'?'var(--green)':id==='uiq'?'var(--accent)':id==='rs70'?'var(--amber)':'var(--text2)');
+    btn.style.fontWeight  = active ? '700' : 'normal';
+  });
+  renderValueDeskCards(_valueDeskData);
+}
+
+async function runValueKiBriefing(mode) {
+  if (!getAiToken()) { showKoToast('KI-Token nicht gesetzt'); return; }
+  var statusEl = document.getElementById('value-ki-status');
+  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i>';
+
+  var data = (window._alphaData && _alphaData.valueScanner) ? _alphaData.valueScanner : null;
+  if (!data || !data.shortlist || !data.shortlist.length) {
+    if (statusEl) statusEl.textContent = 'Keine Value-Daten';
+    return;
+  }
+
+  // Kandidaten für KI: Wheel-first wenn wheel-Modus, sonst Top-20 nach Score
+  var candidates = data.shortlist.slice().sort(function(a,b){ return (b.finalScore||0)-(a.finalScore||0); });
+  if (mode === 'value_wheel') candidates = candidates.filter(function(t){ return t.wheelCandidate; });
+  candidates = candidates.slice(0, 20);
+
+  if (!candidates.length) {
+    if (statusEl) statusEl.textContent = 'Keine Kandidaten';
+    return;
+  }
+
+  var isWheel = mode === 'value_wheel';
+  var mktCtx  = 'MARKTREGIME: ' + (window._lastMseResult ? window._lastMseResult.regime || '–' : '–')
+    + '\nVIX: ' + (_getVixRobust() || '–')
+    + '\nFIN-Archiv: ' + (data.finWeek||'–')
+    + '\n\n';
+
+  var tickerLines = candidates.map(function(t, i) {
+    return (i+1) + '. ' + t.sym
+      + ' Sektor:' + (t.sector||'–')
+      + ' Score:' + (t.finalScore||'–')
+      + ' PE:' + (t.pe||'–')
+      + ' PB:' + (t.pb||'–')
+      + ' ROIC%:' + (t.roicProxy||'–')
+      + ' RG%:' + (t.revGrowth||'–')
+      + ' GM%:' + (t.grossMargin||'–')
+      + ' RS:' + (t.rsRating != null ? t.rsRating : '–')
+      + (t.ivAtm != null ? ' IV:' + Math.round(t.ivAtm) + '%' : '')
+      + (t.hvp != null ? ' HVP:' + t.hvp + '%' : '')
+      + (isWheel && t.wheelCandidate ? ' [WHEEL-KANDIDAT]' : '');
+  }).join('\n');
+
+  var systemPrompt = isWheel
+    ? 'Du bist ein Finanzanalyst für Value-Investing und Optionsstrategien (Wheel/CSP). Analysiere die folgende Liste von Value-Kandidaten mit Momentum-Bestätigung. Für jeden Wheel-Kandidaten: (1) Bewerte ob Fundamentals + Momentum eine CSP-Strategie rechtfertigen, (2) nenne den optimalen Einstiegszeitpunkt (IV-Niveau, Abstand zur EMA200), (3) schätze das Strike-Niveau (ca. EMA200 oder 15-20% OTM). Antworte auf Deutsch, präzise, ohne Ausschweifungen. Strikt datengebunden — keine Erfindungen.'
+    : 'Du bist ein Finanzanalyst für Value-Investing nach Carlin/Graham. Analysiere die folgende Liste fundamental starker Unternehmen. Für die Top-Kandidaten: (1) bewerte Bewertung (PE/PB) im Sektorkontext, (2) kommentiere Kapitaleffizienz (ROIC) und Wachstum, (3) identifiziere potenzielle Value Traps (negatives Wachstum, hohes PB trotz niedrigem ROIC). Antworte auf Deutsch, präzise. Strikt datengebunden.';
+
+  var userMsg = mktCtx + (isWheel ? 'VALUE + WHEEL-KANDIDATEN' : 'VALUE-FUNDAMENTAL-ANALYSE') + ' (Top-' + candidates.length + '):\n' + tickerLines;
+
+  // Modal öffnen (analog Options-KI-Briefing)
+  var existing = document.getElementById('ki-modal');
+  if (existing) existing.remove();
+  var label = isWheel ? 'Value + Wheel/CSP-Empfehlung' : 'Value Fundamental-Analyse';
+  var modal = document.createElement('div');
+  modal.id = 'ki-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML = '<div style="background:var(--bg);border-radius:16px 16px 0 0;width:100%;max-width:680px;max-height:85vh;overflow-y:auto;padding:1.25rem">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'
+    + '<div><div style="font-size:13px;font-weight:700">KI-Briefing &mdash; Value-Desk</div><div style="font-size:11px;color:var(--text3)">' + label + '</div></div>'
+    + '<button onclick="this.closest(\'#ki-modal\').remove()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer"><i class="ti ti-x"></i></button>'
+    + '</div>'
+    + '<div id="ki-modal-body" style="font-size:13px;line-height:1.8;color:var(--text)"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere...</div>'
+    + '</div>';
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.remove(); });
+
+  try {
+    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': getAiToken(),
+                 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 1200,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMsg }]
+      })
+    });
+    var j = await resp.json();
+    var text = (j.content && j.content[0] && j.content[0].text) ? j.content[0].text : 'Keine Antwort';
+    document.getElementById('ki-modal-body').innerHTML = text.replace(/\n/g,'<br>');
+    if (statusEl) statusEl.textContent = '';
+  } catch(e) {
+    document.getElementById('ki-modal-body').textContent = 'Fehler: ' + e.message;
+    if (statusEl) statusEl.textContent = 'Fehler';
+  }
 }
 
 async function runOptionsKiBriefing(strat) {
