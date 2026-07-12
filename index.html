@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260712-v303">
+<meta name="version" content="20260712-v304">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -422,9 +422,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </button>
     <div class="sidebar-spacer"></div>
     <div class="sidebar-divider"></div>
-    <button class="nav-btn" id="nav-sync" onclick="showSyncModal()">
+    <button class="nav-btn" id="nav-sync" onclick="showSyncModal()" title="Synchronisiert Watchlisten und Morning Briefing zwischen Geräten (Cloudflare KV)">
       <i class="ti ti-cloud" id="sync-icon" aria-hidden="true"></i>
-      <span class="nav-btn-label">Cloud Sync<span class="nav-btn-sub" id="sync-label">Watchlist synchronisieren</span></span>
+      <span class="nav-btn-label">Cloud Sync<span class="nav-btn-sub" id="sync-label">Daten synchronisieren</span></span>
     </button>
   </nav>
 
@@ -5020,7 +5020,7 @@ function _initTheme() {
   var fsize = localStorage.getItem('ko_fontsize') || 'normal';
   setTheme(theme);
   setFontSize(fsize);
-  // Einfache Sprache wiederherstellen
+  // Kurz &amp; bündig wiederherstellen
   _simpleLanguage = localStorage.getItem('ko_simple_lang') === '1';
   var slBtn = document.getElementById('simple-lang-toggle');
   if (slBtn && _simpleLanguage) {
@@ -5046,7 +5046,7 @@ function toggleSimpleLanguage(btn) {
 
 function getSimpleLangSuffix() {
   if (!_simpleLanguage) return '';
-  return '\n\n== SPRACHE ==\nSchreibe diese Analyse in einfacher, verständlicher Alltagssprache. Vermeide Fachbegriffe wo möglich. Wenn du Fachbegriffe verwendest, erkläre sie kurz in Klammern. Halte Sätze kurz. Ziel: auch Börseneinsteiger sollen die Analyse verstehen.';
+  return '\n\n== SPRACHE ==\nSchreibe diese Analyse kurz und bündig. Vermeide Fachbegriffe wo möglich. Wenn du Fachbegriffe verwendest, erkläre sie kurz in Klammern. Halte Sätze kurz. Ziel: auch Börseneinsteiger sollen die Analyse verstehen.';
 }
 
 function unlockApp(){
@@ -21331,8 +21331,11 @@ function switchAlphaTab(tab) {
   // Value-Desk beim ersten Öffnen befüllen
   if (tab === 'value') {
     var cards = document.getElementById('value-desk-cards');
-    if (cards && cards.querySelector('[data-loaded]')) return;  // schon geladen
-    renderValueDeskCards(null);  // lädt aus _alphaData
+    // Nur nachladen wenn noch nicht befüllt (data-loaded oder alphaDaten frisch)
+    if (cards && cards.getAttribute('data-loaded')) return;
+    renderValueDeskCards(
+      (window._alphaData && _alphaData.valueScanner) ? _alphaData.valueScanner : null
+    );
   }
 }
 
@@ -21885,6 +21888,11 @@ function renderAlphaDashboard(data) {
 
   // ── Shortlist Cards ─────────────────────────────────────────────────────────
   renderAlphaCards(ms);
+
+  // ── Value-Desk: vorab befüllen damit Tab sofort nutzbar ──────────────────
+  if (data.valueScanner && data.valueScanner.shortlist) {
+    renderValueDeskCards(data.valueScanner);
+  }
 }
 
 function renderAlphaLB(lb, key) {
@@ -21998,6 +22006,14 @@ function renderAlphaCards(ms) {
   cont.innerHTML = ms.map(function(r) {
     return '<div class="card" id="card-' + r.sym + '"></div>';
   }).join('');
+
+  // Klarnamen progressiv nachladen — analog Scanner-Tab (v300, 11.07.2026)
+  // enrichCardNamesWithClearNames() setzt .ticker-name DOM-Elemente sobald
+  // Yahoo-Search-Antworten eintreffen (non-blocking, kein Render-Blocker).
+  try {
+    var _msForNames = ms.map(function(r){ return {sym: r.sym, name: r.name || r.sym}; });
+    enrichCardNamesWithClearNames(_msForNames);
+  } catch(_en) { /* Klarnamen sind Zusatz, kein Blocker */ }
 
   // Für jeden Titel: kvToScannerState → renderCard → Alpha-Extras injizieren
   ms.forEach(function(r, idx) {
