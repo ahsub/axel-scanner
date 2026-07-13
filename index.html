@@ -9233,6 +9233,52 @@ function saveAnthropicKey(){
 }
 
 // ── KI-Token (ko-ai Worker) ────────────────────────────────────────────────
+
+// ── KI-Token Admin-Hilfsfunktionen (v308-fix) ─────────────────────────────────
+function _updateKiTokenStatus() {
+  var inp = document.getElementById('ai-token-input');
+  var msg = document.getElementById('ai-token-msg');
+  var existing = (localStorage.getItem('ko_ai_token') || '').trim();
+  if (inp && existing) {
+    inp.placeholder = 'Token gesetzt ✓ (neu eingeben zum Überschreiben)';
+  }
+  if (msg && existing) {
+    msg.style.display = 'block';
+    msg.textContent = '✓ Token aktiv: ' + existing.slice(0, 8) + '...';
+  }
+}
+
+function clearKiToken() {
+  localStorage.removeItem('ko_ai_token');
+  var inp = document.getElementById('ai-token-input');
+  var msg = document.getElementById('ai-token-msg');
+  if (inp) { inp.value = ''; inp.placeholder = 'uiq-...'; }
+  if (msg) { msg.style.display = 'none'; }
+  showKoToast('KI-Token gelöscht');
+}
+
+// OpenAI Key für Whisper (localStorage: ko_openai_key)
+function saveOpenAiKey() {
+  var inp = document.getElementById('openai-key-input');
+  var k = inp ? inp.value.trim() : '';
+  if (!k) { showKoToast('⚠ Bitte OpenAI-Key eingeben'); return; }
+  localStorage.setItem('ko_openai_key', k);
+  inp.value = '';
+  inp.placeholder = 'Key gesetzt ✓';
+  var st = document.getElementById('openai-key-status');
+  if (st) st.textContent = '✓ Key gesetzt — wird für Whisper-Transkription verwendet';
+  showKoToast('OpenAI-Key gespeichert');
+}
+
+function clearOpenAiKey() {
+  localStorage.removeItem('ko_openai_key');
+  var inp = document.getElementById('openai-key-input');
+  var st  = document.getElementById('openai-key-status');
+  if (inp) { inp.value = ''; inp.placeholder = 'sk-...'; }
+  if (st) st.textContent = 'Nicht gesetzt · benötigt für .mp3/.mp4/.m4a/.wav · ~$0.006/Min · max 25MB';
+  showKoToast('OpenAI-Key gelöscht');
+}
+// ── Ende KI-Token Admin-Hilfsfunktionen ───────────────────────────────────────
 function saveAiToken() {
   const inp = document.getElementById('ai-token-input');
   const k = inp ? inp.value.trim() : '';
@@ -9240,6 +9286,7 @@ function saveAiToken() {
   localStorage.setItem('ko_ai_token', k);
   inp.value = '';
   inp.placeholder = 'Token gesetzt ✓';
+  _updateKiTokenStatus();
   const msg = document.getElementById('ai-token-msg');
   if (msg) { msg.style.display = 'block'; setTimeout(function(){ msg.style.display='none'; }, 3000); }
 }
@@ -11345,7 +11392,7 @@ renderCard = function(t, state){
 };
 
 // Initialize watchlist dropdown on load
-document.addEventListener('DOMContentLoaded', function(){ updateWatchlistDropdown(); });
+document.addEventListener('DOMContentLoaded', function(){ updateWatchlistDropdown(); _updateKiTokenStatus(); });
 
 
 // ═══════════════════════════════════════════════════════════════════════════
