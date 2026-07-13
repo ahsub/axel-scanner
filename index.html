@@ -21543,6 +21543,10 @@ function switchAlphaTab(tab) {
     btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border2)';
     btn.style.fontWeight  = isActive ? '600'           : 'normal';
   });
+  // Options-Desk beim ersten Öffnen laden
+  if (tab === 'options') {
+    if (typeof loadOptionsDesk === 'function') loadOptionsDesk();
+  }
   // Value-Desk beim ersten Öffnen befüllen
   if (tab === 'value') {
     var cards = document.getElementById('value-desk-cards');
