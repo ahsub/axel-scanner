@@ -34,11 +34,7 @@
     font-size: 15px;
   }
 
-  /* ── SIDEBAR NAV ── */
-  .layout {
-    display: flex;
-    min-height: 100vh;
-  }
+  .layout { display: flex; min-height: 100vh; }
 
   nav {
     width: 240px;
@@ -57,972 +53,856 @@
     border-bottom: 1px solid var(--border);
     margin-bottom: 1rem;
   }
+  .nav-brand h1 { font-size: 14px; font-weight: 600; color: var(--accent); letter-spacing: .5px; }
+  .nav-brand p  { font-size: 11px; color: var(--text3); margin-top: 2px; }
 
-  .nav-brand .logo {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--accent);
-    letter-spacing: 2px;
-    font-weight: 600;
+  .nav-group { margin-bottom: .25rem; }
+  .nav-group-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 1px;
+    color: var(--text3); text-transform: uppercase;
+    padding: .75rem 1.5rem .25rem;
   }
-
-  .nav-brand .tagline {
-    font-size: 11px;
-    color: var(--text3);
-    margin-top: 2px;
-  }
-
   nav a {
-    display: block;
-    padding: 6px 1.5rem;
-    font-size: 12px;
-    color: var(--text2);
+    display: block; padding: .45rem 1.5rem;
+    font-size: 13px; color: var(--text2);
     text-decoration: none;
     transition: color .15s, background .15s;
     border-left: 2px solid transparent;
   }
-
   nav a:hover { color: var(--text1); background: var(--bg3); }
-  nav a.active { color: var(--accent); border-left-color: var(--accent); background: rgba(79,142,247,.08); }
+  nav a.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg3); }
 
-  .nav-section {
-    font-size: 10px;
-    color: var(--text3);
-    letter-spacing: 2px;
-    font-weight: 600;
-    padding: 1rem 1.5rem .3rem;
-    text-transform: uppercase;
+  main { flex: 1; padding: 3rem 4rem; max-width: 860px; }
+
+  .page-header { margin-bottom: 3rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+  .page-header h1 { font-size: 26px; font-weight: 600; }
+  .page-header p  { color: var(--text2); margin-top: .5rem; font-size: 14px; }
+
+  section { margin-bottom: 3.5rem; scroll-margin-top: 2rem; }
+  section h2 { font-size: 19px; font-weight: 600; margin-bottom: 1.25rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border); }
+  section h3 { font-size: 15px; font-weight: 600; margin: 1.5rem 0 .6rem; color: var(--text1); }
+  section p  { color: var(--text2); margin-bottom: .85rem; }
+
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;
   }
-
-  /* ── MAIN CONTENT ── */
-  main {
-    flex: 1;
-    max-width: 820px;
-    padding: 3rem 2.5rem;
-  }
-
-  /* ── HERO ── */
-  .hero {
-    margin-bottom: 3rem;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .hero .eyebrow {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--accent);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin-bottom: .75rem;
-  }
-
-  .hero h1 {
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--text1);
-    line-height: 1.2;
-    margin-bottom: .75rem;
-  }
-
-  .hero .subtitle {
-    font-size: 15px;
-    color: var(--text2);
-    max-width: 600px;
-    line-height: 1.6;
-  }
-
-  /* ── SECTIONS ── */
-  section {
-    margin-bottom: 3rem;
-    scroll-margin-top: 2rem;
-  }
-
-  h2 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text1);
-    margin-bottom: 1rem;
-    padding-bottom: .5rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-  }
-
-  h2 .icon {
-    font-size: 1rem;
-    opacity: .8;
-  }
-
-  h3 {
-    font-size: .95rem;
-    font-weight: 600;
-    color: var(--accent);
-    margin: 1.5rem 0 .5rem;
-  }
-
-  p { color: var(--text2); margin-bottom: .75rem; }
-
-  /* ── LEGAL BOX ── */
-  .legal-box {
-    background: rgba(239,68,68,.06);
-    border: 1px solid rgba(239,68,68,.25);
-    border-left: 3px solid var(--red);
-    border-radius: 8px;
-    padding: 1.25rem 1.5rem;
-    margin: 1.5rem 0;
-  }
-
-  .legal-box .legal-title {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 2px;
-    color: var(--red);
-    font-weight: 600;
-    margin-bottom: .75rem;
-    text-transform: uppercase;
-  }
-
-  .legal-box p {
-    color: var(--text2);
-    font-size: 13px;
-    line-height: 1.65;
-    margin-bottom: .5rem;
-  }
-
-  .legal-box p:last-child { margin-bottom: 0; }
-
-  /* ── INFO BOX ── */
-  .info-box {
-    background: rgba(79,142,247,.06);
-    border: 1px solid rgba(79,142,247,.2);
-    border-left: 3px solid var(--accent);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    margin: 1rem 0;
-  }
-
-  .info-box p { color: var(--text2); font-size: 13px; margin: 0; }
-
-  /* ── WARNING BOX ── */
-  .warn-box {
-    background: rgba(245,158,11,.06);
-    border: 1px solid rgba(245,158,11,.2);
-    border-left: 3px solid var(--amber);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    margin: 1rem 0;
-  }
-
-  .warn-box p { color: var(--text2); font-size: 13px; margin: 0; }
-
-  /* ── STEP LIST ── */
-  .steps {
-    display: flex;
-    flex-direction: column;
-    gap: .75rem;
-    margin: 1rem 0;
-  }
-
-  .step {
-    display: flex;
-    gap: 1rem;
-    align-items: flex-start;
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: .875rem 1rem;
-  }
-
-  .step-num {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--accent);
-    background: rgba(79,142,247,.12);
-    border-radius: 4px;
-    padding: 2px 6px;
-    font-weight: 600;
-    min-width: 28px;
-    text-align: center;
-    margin-top: 1px;
-  }
-
-  .step-content strong {
-    display: block;
-    color: var(--text1);
-    font-size: 13px;
-    margin-bottom: 2px;
-  }
-
-  .step-content span {
-    color: var(--text2);
-    font-size: 12px;
-  }
-
-  /* ── FEATURE GRID ── */
-  .feature-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: .75rem;
-    margin: 1rem 0;
-  }
-
-  .feature-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: .875rem 1rem;
-  }
-
-  .feature-card .fc-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text3);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-bottom: .25rem;
-  }
-
-  .feature-card .fc-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text1);
-    margin-bottom: .25rem;
-  }
-
-  .feature-card .fc-desc {
-    font-size: 12px;
-    color: var(--text2);
-    line-height: 1.5;
-  }
-
-  /* ── STRATEGY TABLE ── */
-  .strat-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    margin: 1rem 0;
-  }
-
-  .strat-table th {
-    text-align: left;
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 1px;
-    color: var(--text3);
-    padding: .5rem .75rem;
-    border-bottom: 1px solid var(--border);
-    text-transform: uppercase;
-  }
-
-  .strat-table td {
-    padding: .625rem .75rem;
-    border-bottom: 1px solid var(--border);
-    color: var(--text2);
-    vertical-align: top;
-  }
-
-  .strat-table tr:last-child td { border-bottom: none; }
-  .strat-table tr:hover td { background: var(--bg2); }
+  .card h3 { margin-top: 0; }
 
   .badge {
-    display: inline-block;
-    font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-weight: 600;
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; font-family: var(--mono);
   }
-
   .badge-green  { background: rgba(34,197,94,.15);  color: var(--green); }
   .badge-amber  { background: rgba(245,158,11,.15); color: var(--amber); }
-  .badge-purple { background: rgba(167,139,250,.15);color: var(--purple); }
+  .badge-red    { background: rgba(239,68,68,.15);  color: var(--red); }
   .badge-blue   { background: rgba(79,142,247,.15); color: var(--accent); }
-  .badge-teal   { background: rgba(52,211,153,.15); color: #34d399; }
+  .badge-purple { background: rgba(167,139,250,.15);color: var(--purple); }
 
-  /* ── TERM LIST ── */
-  .term-list { margin: 1rem 0; }
-
-  .term {
-    display: flex;
-    gap: 1rem;
-    padding: .625rem 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px;
+  .notice {
+    background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.25);
+    border-radius: 6px; padding: .85rem 1.1rem; margin: 1rem 0;
+    font-size: 13px; color: var(--amber);
+  }
+  .notice-green {
+    background: rgba(34,197,94,.08); border-color: rgba(34,197,94,.25); color: var(--green);
+  }
+  .notice-blue {
+    background: rgba(79,142,247,.08); border-color: rgba(79,142,247,.25); color: var(--accent);
   }
 
-  .term:last-child { border-bottom: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 1rem 0; }
+  th { text-align: left; padding: .5rem .75rem; background: var(--bg3); color: var(--text3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  td { padding: .55rem .75rem; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--text1); font-weight: 500; }
 
-  .term-key {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--accent);
-    min-width: 80px;
-    font-weight: 600;
-    padding-top: 1px;
+  .steps { display: flex; flex-direction: column; gap: .75rem; margin: 1rem 0; }
+  .step  { display: flex; gap: 1rem; align-items: flex-start; }
+  .step-num {
+    width: 28px; height: 28px; min-width: 28px;
+    background: var(--accent); color: #fff;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; margin-top: 2px;
   }
+  .step-body h4 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .step-body p  { font-size: 13px; color: var(--text2); margin: 0; }
 
-  .term-val { color: var(--text2); line-height: 1.5; }
+  .workflow { display: flex; flex-direction: column; gap: .6rem; margin: 1rem 0; }
+  .wf-item  { display: flex; gap: 1rem; padding: .75rem 1rem; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; align-items: flex-start; }
+  .wf-num   { font-family: var(--mono); font-size: 12px; color: var(--accent); font-weight: 600; min-width: 20px; margin-top: 2px; }
+  .wf-body  h4 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .wf-body  p  { font-size: 13px; color: var(--text2); margin: 0; }
 
-  /* ── FOOTER ── */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+
+  .tag { font-family: var(--mono); font-size: 12px; background: var(--bg3); color: var(--accent); padding: 1px 6px; border-radius: 4px; }
+
+  .legal {
+    background: rgba(239,68,68,.06); border: 1px solid rgba(239,68,68,.2);
+    border-radius: 8px; padding: 1.25rem 1.5rem; margin-bottom: 1rem;
+    font-size: 13px; color: var(--text2); line-height: 1.8;
+  }
+  .legal h4 { color: var(--text1); font-size: 13px; font-weight: 600; margin-bottom: .5rem; }
+
+  .glossary-entry { padding: .6rem 0; border-bottom: 1px solid var(--border); display: flex; gap: 1.5rem; }
+  .glossary-entry:last-child { border-bottom: none; }
+  .glossary-term { font-family: var(--mono); font-size: 13px; color: var(--accent); min-width: 120px; font-weight: 600; }
+  .glossary-def  { font-size: 13px; color: var(--text2); }
+
+  .regime-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: 1rem 0; }
+  .regime-card { padding: .85rem 1rem; border-radius: 6px; border: 1px solid var(--border); }
+  .regime-card h4 { font-size: 12px; font-family: var(--mono); font-weight: 600; margin-bottom: .3rem; }
+  .regime-card p  { font-size: 12px; color: var(--text2); margin: 0; }
+
   footer {
-    margin-top: 4rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border);
-    font-size: 11px;
-    color: var(--text3);
-    line-height: 1.7;
-  }
-
-  /* ── RESPONSIVE ── */
-  @media (max-width: 700px) {
-    nav { display: none; }
-    main { padding: 1.5rem 1rem; }
-    .feature-grid { grid-template-columns: 1fr; }
-    h1 { font-size: 1.5rem; }
+    margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text3); line-height: 1.9;
   }
 </style>
 </head>
 <body>
-
 <div class="layout">
 
 <!-- ── SIDEBAR ── -->
 <nav>
   <div class="nav-brand">
-    <div class="logo">📡 UNDERLYINGIQ</div>
-    <div class="tagline">Bedienungsanleitung v210</div>
+    <h1>📡 UNDERLYINGIQ</h1>
+    <p>Bedienungsanleitung v309</p>
   </div>
 
-  <div class="nav-section">Einführung</div>
-  <a href="#was-ist" class="active">Was ist UnderlyingIQ?</a>
-  <a href="#wozu-nicht">Rechtliche Hinweise</a>
+  <div class="nav-group">
+    <div class="nav-group-label">Einführung</div>
+    <a href="#was-ist">Was ist UnderlyingIQ?</a>
+    <a href="#legal">Rechtliche Hinweise</a>
+  </div>
 
-  <div class="nav-section">Erste Schritte</div>
-  <a href="#setup">Einrichtung</a>
-  <a href="#workflow">Täglicher Workflow</a>
+  <div class="nav-group">
+    <div class="nav-group-label">Erste Schritte</div>
+    <a href="#einrichtung">Einrichtung</a>
+    <a href="#workflow">Täglicher Workflow</a>
+  </div>
 
-  <div class="nav-section">Module</div>
-  <a href="#scanner">Scanner</a>
-  <a href="#morning">Morning Briefing</a>
-  <a href="#alpha">Alpha Desk</a>
-  <a href="#options-desk">Options-Desk</a>
-  <a href="#ki-briefing">KI-Briefing</a>
-  <a href="#makro">Makro-Analyse</a>
+  <div class="nav-group">
+    <div class="nav-group-label">Module</div>
+    <a href="#morning-briefing">Morning Briefing</a>
+    <a href="#alpha-desk">Alpha Desk</a>
+    <a href="#scanner">Scanner</a>
+    <a href="#makro">Makro-Analyse</a>
+    <a href="#ki-briefing">KI-Briefing</a>
+    <a href="#value">Value-Scanner</a>
+  </div>
 
-  <div class="nav-section">Strategien</div>
-  <a href="#strategien">Übersicht</a>
-  <a href="#options-strat">Options-Strategien</a>
+  <div class="nav-group">
+    <div class="nav-group-label">Strategien</div>
+    <a href="#strategien">Übersicht</a>
+    <a href="#options">Options-Strategien</a>
+    <a href="#ko">KO-Zertifikate</a>
+  </div>
 
-  <div class="nav-section">Referenz</div>
-  <a href="#glossar">Glossar</a>
-  <a href="#api-keys">API-Keys einrichten</a>
-  <a href="#faq">FAQ</a>
+  <div class="nav-group">
+    <div class="nav-group-label">Indikatoren</div>
+    <a href="#indikatoren">Neue Indikatoren v5.8</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">Infrastruktur</div>
+    <a href="#architektur">Architektur & Cache</a>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-group-label">Referenz</div>
+    <a href="#glossar">Glossar</a>
+    <a href="#api-keys">API-Keys einrichten</a>
+    <a href="#faq">FAQ</a>
+  </div>
 </nav>
 
 <!-- ── MAIN ── -->
 <main>
 
-  <!-- HERO -->
-  <div class="hero">
-    <div class="eyebrow">Bedienungsanleitung</div>
-    <h1>UnderlyingIQ<br>Market Intelligence Platform</h1>
-    <p class="subtitle">
-      Ein datengetriebenes Tool zur Analyse von Aktienmärkten, technischen Indikatoren
-      und Options-Strategien — für erfahrene Privatanleger, die ihre Entscheidungen
-      auf strukturierten Marktdaten stützen wollen.
-    </p>
-    <p style="margin-top:1rem;font-family:var(--mono);font-size:11px;color:var(--text3)">
+  <div class="page-header">
+    <h1>UnderlyingIQ <span style="color:var(--text3);font-weight:300">Market Intelligence Platform</span></h1>
+    <p>Ein datengetriebenes Tool zur Analyse von Aktienmärkten, technischen Indikatoren
+    und Options-Strategien — für erfahrene Privatanleger, die ihre Entscheidungen
+    auf strukturierten Marktdaten stützen wollen.</p>
+    <p style="margin-top:.5rem;font-size:12px;color:var(--text3)">
       © 2024–2026 Dr. Axel Hildebrand · Alle Rechte vorbehalten · underlyingiq.com
     </p>
   </div>
 
-  <!-- WAS IST -->
+  <!-- ── WAS IST UIQ ── -->
   <section id="was-ist">
-    <h2><span class="icon">📡</span> Was ist UnderlyingIQ?</h2>
-
-    <p>UnderlyingIQ ist eine browserbasierte Market-Intelligence-App für aktive Privatanleger. Sie aggregiert täglich technische Marktdaten aus öffentlichen Quellen, bewertet Aktien nach mehreren Strategiemodellen und stellt die Ergebnisse strukturiert bereit.</p>
+    <h2>📡 Was ist UnderlyingIQ?</h2>
+    <p>UnderlyingIQ ist eine browserbasierte Market-Intelligence-App für aktive Privatanleger.
+    Sie aggregiert täglich technische Marktdaten aus öffentlichen Quellen, bewertet Aktien nach
+    mehreren Strategiemodellen (Momentum, Swing, Mean Reversion, Options-Wheel, Covered Call,
+    KO-Trading) und stellt die Ergebnisse strukturiert bereit.</p>
 
     <h3>Das Leitbild: der Strategie-Router</h3>
-    <p>Kern von UnderlyingIQ ist der <strong>Strategie-Router</strong> — die Antwort auf die Frage, an der die meisten Privatanleger scheitern. Sie lautet nicht „Welche Aktie ist gut?", sondern: <strong>„Welche Strategie passt zum aktuellen Marktregime — und welches Underlying erfüllt deren Kriterien am besten?"</strong> Dieselbe Aktie kann in einem Regime ein Momentum-Kandidat und im nächsten ein Risiko sein. Deshalb führt die App vier Analysestufen in fester Reihenfolge zusammen:</p>
+    <p>Kern von UnderlyingIQ ist der Strategie-Router. Die entscheidende Frage lautet nicht
+    „Welche Aktie ist gut?", sondern: „Welche Strategie passt zum aktuellen Marktregime —
+    und welches Underlying erfüllt deren Kriterien am besten?"</p>
 
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="fc-label">Stufe 1</div>
-        <div class="fc-name">Regime-Erkennung</div>
-        <div class="fc-desc">Die Market State Engine klassifiziert den Gesamtmarkt anhand Z-Score-normalisierter Volatilitäts-, Breiten- und Trenddaten in vier Regime: BULL_QUIET, BULL_FRAGILE, STRESS_UNSTABLE, POST_PANIC_REVERSION.</div>
+    <div class="grid2">
+      <div class="card">
+        <h3 style="color:var(--accent)">Stufe 1 · Regime-Erkennung</h3>
+        <p>Die Market State Engine klassifiziert den Gesamtmarkt anhand Z-Score-normalisierter
+        Volatilitäts-, Breiten- und Trenddaten in vier Regime.</p>
       </div>
-      <div class="feature-card">
-        <div class="fc-label">Stufe 2</div>
-        <div class="fc-name">Strategie-Routing</div>
-        <div class="fc-desc">Jedes Regime hat historisch geeignete und ungeeignete Strategietypen. Der Router zeigt, welche Regelwerke im aktuellen Regime überhaupt in Frage kommen — und welche pausieren.</div>
+      <div class="card">
+        <h3 style="color:var(--accent)">Stufe 2 · Strategie-Routing</h3>
+        <p>Jedes Regime hat historisch geeignete und ungeeignete Strategietypen. Der Router
+        zeigt, welche Regelwerke heute in Frage kommen — und welche pausieren.</p>
       </div>
-      <div class="feature-card">
-        <div class="fc-label">Stufe 3</div>
-        <div class="fc-name">Underlying-Auswahl</div>
-        <div class="fc-desc">Der Scanner filtert aus 700+ Titeln diejenigen, die die technischen Kriterien der gerouteten Strategie erfüllen. Scores messen Kriteriums-Übereinstimmung — sie sind keine Empfehlung.</div>
+      <div class="card">
+        <h3 style="color:var(--accent)">Stufe 3 · Underlying-Auswahl</h3>
+        <p>Der Scanner filtert aus 678+ Titeln diejenigen, die die technischen Kriterien
+        der gerouteten Strategie erfüllen. Scores messen Kriteriums-Übereinstimmung.</p>
       </div>
-      <div class="feature-card">
-        <div class="fc-label">Stufe 4</div>
-        <div class="fc-name">Instrumenten-Kontext</div>
-        <div class="fc-desc">Statistische Einordnung passender Umsetzungsformen (Aktie, Option, Knock-out) mit rechnerischen Preismarken. Auswahl und Entscheidung liegen ausschließlich beim Anleger.</div>
-      </div>
-    </div>
-
-    <div class="info-box">
-      <p><strong>Kurz gesagt:</strong> UnderlyingIQ ist kein Tipp-Generator, sondern ein strukturierter Entscheidungs-Trichter — vom Marktzustand über die Strategie zum Kandidaten. Die finale Due Diligence bleibt immer beim Nutzer.</p>
-    </div>
-
-    <h3>UI-Prinzip: Form follows Function</h3>
-    <p>Seit v243 folgt die Oberfläche konsequent dem Tages-Workflow: Die Seitenleiste ist in <strong>Tagesstart</strong> (Morning Briefing, Alpha Desk), <strong>Markt-Kontext</strong> (Makro inkl. Dark Pool & Institutional Flow), <strong>Trading</strong> (Scanner, Fibonacci, KO-Rechner) und <strong>Verwaltung</strong> (Backlog, Einstellungen) gegliedert. Jede UI-Änderung folgt diesem Prinzip.</p>
-
-    <h3>Wozu dient die App?</h3>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="fc-label">Lernen</div>
-        <div class="fc-name">Investitionsstrategien verstehen</div>
-        <div class="fc-desc">Momentum, Mean Reversion, Options-Wheel, Credit Spreads — die App macht die Logik hinter etablierten Handelsstrategien transparent und nachvollziehbar.</div>
-      </div>
-      <div class="feature-card">
-        <div class="fc-label">Screening</div>
-        <div class="fc-name">Geeignete Ticker finden</div>
-        <div class="fc-desc">Aus einem Universum von 700+ US-Aktien filtert der Scanner täglich Kandidaten heraus, die die technischen Kriterien einer gewählten Strategie erfüllen.</div>
-      </div>
-      <div class="feature-card">
-        <div class="fc-label">Timing</div>
-        <div class="fc-name">Marktphasen erkennen</div>
-        <div class="fc-desc">Market State Engine, VIX-Analyse, Sektor-Rotation und QQQ-Markov-Regime helfen, günstige von ungünstigen Marktphasen zu unterscheiden.</div>
-      </div>
-      <div class="feature-card">
-        <div class="fc-label">Risiko</div>
-        <div class="fc-name">Fehleingaben vermeiden</div>
-        <div class="fc-desc">Earnings-Filter, Überhitzungs-Score und Volatilitäts-Percentile (HVP) signalisieren, wann ein Titel für eine Strategie ungeeignet ist.</div>
+      <div class="card">
+        <h3 style="color:var(--accent)">Stufe 4 · Instrumenten-Kontext</h3>
+        <p>Statistische Einordnung passender Umsetzungsformen (Aktie, Option, KO-Zertifikat)
+        mit rechnerischen Preismarken. Auswahl und Entscheidung liegen beim Anleger.</p>
       </div>
     </div>
 
-    <div class="info-box">
-      <p><strong>Prinzip Due Diligence:</strong> UnderlyingIQ liefert Datenpunkte und strukturierte Analyse als Ausgangsbasis. Die abschließende Bewertung, ob ein Trade sinnvoll ist, liegt immer beim Anleger selbst.</p>
-    </div>
-  </section>
-
-  <!-- RECHTLICHE HINWEISE -->
-  <section id="wozu-nicht">
-    <h2><span class="icon">⚖️</span> Rechtliche Hinweise & Haftungsausschluss</h2>
-
-    <div class="legal-box">
-      <div class="legal-title">§ Kein Anlageberatung — Haftungsausschluss gem. §1 WpHG</div>
-
-      <p><strong>UnderlyingIQ ist eine reine Informationsanwendung.</strong> Sämtliche Inhalte, Analysen, KI-generierten Texte, Scores, Signale und Darstellungen dienen ausschließlich zur allgemeinen Information und stellen keine Anlageberatung, Vermögensverwaltung, Finanzanalyse oder Empfehlung zum Kauf oder Verkauf von Wertpapieren im Sinne des Wertpapierhandelsgesetzes (WpHG), der MiFID II oder der Marktmissbrauchsverordnung (MAR) dar.</p>
-
-      <p><strong>Keine Zulassung nach KWG/WpIG:</strong> Der Betreiber dieser Anwendung ist kein zugelassenes Wertpapierdienstleistungsunternehmen gemäß § 2 WpIG und erbringt keine Wertpapierdienstleistungen im Sinne des § 2 Abs. 8 WpIG. Eine Regulierung oder Aufsicht durch die Bundesanstalt für Finanzdienstleistungsaufsicht (BaFin) besteht nicht.</p>
-
-      <p><strong>Keine Finanzanalyse gem. § 85 WpHG / MAR:</strong> Insbesondere stellen die bereitgestellten Scores (0–100) und Einstufungen (Grades A+ bis D) keine Anlageempfehlungen dar, sondern sind das Ergebnis rein mathematisch-technischer Filterprozesse auf Basis historischer Marktdaten. Die Anwendung führt keine Bewertung der Angemessenheit oder Eignung der Finanzinstrumente für die persönlichen Verhältnisse, die Risikobereitschaft oder die finanzielle Situation des Nutzers durch.</p>
-
-      <p><strong>Keine Anlagevermittlung:</strong> UnderlyingIQ bietet keine Möglichkeit, direkt über die Plattform Wertpapierorders aufzugeben oder Konten bei Brokern zu eröffnen. Es werden keine Verträge über Finanzinstrumente vermittelt. Alle dargestellten Broker-Referenzen (IBKR, CapTrader, Trade Republic) dienen ausschließlich der beispielhaften Erläuterung von Handelsplattformen.</p>
-
-      <p><strong>Eigenverantwortung:</strong> Jede Investitionsentscheidung, die ein Nutzer auf Grundlage von Inhalten dieser App trifft, erfolgt ausschließlich auf eigenes Risiko und in eigener Verantwortung. Der Betreiber übernimmt keine Haftung für finanzielle Verluste, entgangene Gewinne oder sonstige Schäden, die aus der Nutzung der Anwendung oder der Umsetzung von darin dargestellten Informationen entstehen.</p>
-
-      <p><strong>Risikohinweis:</strong> Investitionen in Aktien, Optionen, Knock-out-Zertifikate und andere Derivate sind mit erheblichen Risiken verbunden. Der Wert von Finanzinstrumenten kann sowohl steigen als auch fallen. Ein Totalverlust des eingesetzten Kapitals ist möglich. Vergangene Wertentwicklungen sind kein verlässlicher Indikator für zukünftige Ergebnisse.</p>
-
-      <p><strong>Offenlegung von Interessenkonflikten (gem. MAR Art. 20):</strong> Der Betreiber dieser Plattform ist als privater Investor und Trader an den Finanzmärkten aktiv. Es ist nicht ausgeschlossen, dass der Betreiber zum Zeitpunkt des Screenings durch die App in Wertpapieren oder Derivaten investiert ist oder Positionen hält, die durch die App erfasst, geskort oder dargestellt werden. Eine gezielte Beeinflussung der Screening-Algorithmen zugunsten eigener Positionen findet nicht statt. Nutzer werden darauf hingewiesen, dass dieser potenzielle Interessenkonflikt bei der Nutzung der App-Ergebnisse berücksichtigt werden sollte.</p>
-
-      <p><strong>KI-generierte Inhalte:</strong> Die von Claude (Anthropic) generierten Analysetexte unterliegen dem ausdrücklichen Halluzinations-Verbot ("Strict Extraction Mode"). Dennoch können KI-Systeme fehlerhafte Informationen ausgeben. Alle KI-generierten Inhalte sind mit besonderer Sorgfalt zu prüfen und dürfen nicht ungeprüft als Grundlage für Investitionsentscheidungen verwendet werden.</p>
-
-      <p><strong>Datenbasis:</strong> Die verwendeten Marktdaten stammen aus öffentlich zugänglichen Quellen (Yahoo Finance, CBOE, Treasury.gov). Für Datenfehler, Verzögerungen oder Ausfälle dieser Quellen wird keine Haftung übernommen.</p>
+    <div class="notice notice-blue">
+      UnderlyingIQ ist kein Tipp-Generator, sondern ein strukturierter Entscheidungs-Trichter —
+      vom Marktzustand über die Strategie zum Kandidaten. Die finale Due Diligence bleibt immer beim Nutzer.
     </div>
 
-    <div class="warn-box">
-      <p>⚠️ <strong>Due-Diligence-Gebot:</strong> Vor jeder Investitionsentscheidung sind die Angaben dieser App durch unabhängige Recherche (Unternehmensberichte, IBKR/Broker-Daten, Optionskette, Earnings-Kalender) zu verifizieren. Die App ersetzt keine professionelle Finanzberatung.</p>
-    </div>
-
-    <h3>Begriffsklarstellung: Scores sind keine Signale</h3>
-    <p>Die im Scanner dargestellten Werte sind technische Filter-Ergebnisse, keine Handlungsempfehlungen:</p>
-    <div class="term-list">
-      <div class="term"><div class="term-key">Score 0–100</div><div class="term-val">Grad der Übereinstimmung eines Titels mit den mathematischen Kriterien einer Strategie — keine Kauf- oder Verkaufsempfehlung.</div></div>
-      <div class="term"><div class="term-key">Grade A+/A/B</div><div class="term-val">Algorithmische Einstufung der Kriteriums-Übereinstimmung — keine Bewertung der Eignung für den Nutzer.</div></div>
-      <div class="term"><div class="term-key">KI-basierte Markt-Einschätzung</div><div class="term-val">Automatisierte Daten-Synthese auf Basis historischer Marktdaten — keine personalisierte Anlageberatung.</div></div>
-      <div class="term"><div class="term-key">Trigger/Stop/Target</div><div class="term-val">Rechnerische Preismarken aus technischen Indikatoren (ATR, EMA) — keine Kursvorhersagen oder Garantien.</div></div>
-    </div>
-  </section>
-
-  <!-- SETUP -->
-  <section id="setup">
-    <h2><span class="icon">⚙️</span> Einrichtung</h2>
-
-    <h3>Erster Start</h3>
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">01</div>
-        <div class="step-content">
-          <strong>App öffnen & PIN eingeben</strong>
-          <span>underlyingiq.com aufrufen — den 4-stelligen Zugangscode eingeben.</span>
-        </div>
+    <h3>Die vier Marktregime</h3>
+    <div class="regime-grid">
+      <div class="regime-card" style="border-color:rgba(34,197,94,.3)">
+        <h4 style="color:var(--green)">BULL_QUIET</h4>
+        <p>Ruhiger Aufwärtstrend, VIX niedrig. Momentum, Breakout, KO-Long bevorzugt.</p>
       </div>
-      <div class="step">
-        <div class="step-num">02</div>
-        <div class="step-content">
-          <strong>KI-Token setzen (Einstellungen)</strong>
-          <span>Einstellungen → "UnderlyingIQ KI-Zugang" → Token eintragen → speichern. Ohne Token sind alle KI-Funktionen deaktiviert.</span>
-        </div>
+      <div class="regime-card" style="border-color:rgba(245,158,11,.3)">
+        <h4 style="color:var(--amber)">BULL_FRAGILE</h4>
+        <p>Aufwärtstrend mit erhöhter Volatilität. Selektiv Long, Options-Prämien attraktiv.</p>
       </div>
-      <div class="step">
-        <div class="step-num">03</div>
-        <div class="step-content">
-          <strong>Twelve Data API-Key (optional)</strong>
-          <span>Für erweiterte Scan-Funktionen (MACD, OBV) einen kostenlosen Key von twelvedata.com eintragen.</span>
-        </div>
+      <div class="regime-card" style="border-color:rgba(239,68,68,.3)">
+        <h4 style="color:var(--red)">STRESS_UNSTABLE</h4>
+        <p>Risikoaversion, hoher VIX. Defensiv, Cash-Anteil erhöhen, KO-Positionen klein.</p>
       </div>
-      <div class="step">
-        <div class="step-num">04</div>
-        <div class="step-content">
-          <strong>Watchlisten anlegen</strong>
-          <span>Scanner → Ticker-Feld → Symbole kommagetrennt eingeben → "Speichern". Mehrere Listen möglich (z.B. "Portfolio", "Options-Kandidaten").</span>
-        </div>
+      <div class="regime-card" style="border-color:rgba(167,139,250,.3)">
+        <h4 style="color:var(--purple)">POST_PANIC_REVERSION</h4>
+        <p>Übertriebener Sell-off, Mean Reversion wahrscheinlich. Vorsichtiger Wiedereinstieg.</p>
       </div>
     </div>
   </section>
 
-  <!-- WORKFLOW -->
-  <section id="workflow">
-    <h2><span class="icon">🔄</span> Empfohlener Tagesablauf</h2>
+  <!-- ── LEGAL ── -->
+  <section id="legal">
+    <h2>⚖️ Rechtliche Hinweise & Haftungsausschluss</h2>
+    <div class="legal">
+      <h4>§ Keine Anlageberatung — Haftungsausschluss gem. §1 WpHG</h4>
+      UnderlyingIQ ist eine reine Informationsanwendung. Sämtliche Inhalte, Analysen,
+      KI-generierte Texte, Scores, Signale und Darstellungen dienen ausschließlich zur
+      allgemeinen Information und stellen keine Anlageberatung, Vermögensverwaltung,
+      Finanzanalyse oder Empfehlung zum Kauf oder Verkauf von Wertpapieren im Sinne des
+      WpHG, der MiFID II oder der MAR dar.
+    </div>
+    <div class="legal">
+      <h4>Keine Zulassung nach KWG/WpIG</h4>
+      Der Betreiber ist kein zugelassenes Wertpapierdienstleistungsunternehmen gemäß §2 WpIG
+      und erbringt keine Wertpapierdienstleistungen. Eine Regulierung durch die BaFin besteht nicht.
+    </div>
+    <div class="legal">
+      <h4>Scores sind keine Signale</h4>
+      <table>
+        <tr><th>Begriff</th><th>Bedeutung</th></tr>
+        <tr><td>Score 0–100</td><td>Grad der Übereinstimmung mit mathematischen Kriterien — keine Kaufempfehlung.</td></tr>
+        <tr><td>Grade A+/A/B</td><td>Algorithmische Einstufung — keine Bewertung der Nutzer-Eignung.</td></tr>
+        <tr><td>KI-Einschätzung</td><td>Automatisierte Datensynthese — keine personalisierte Anlageberatung.</td></tr>
+        <tr><td>Trigger/Stop/Target</td><td>Rechnerische Preismarken aus ATR/EMA — keine Kursvorhersagen.</td></tr>
+      </table>
+    </div>
+    <div class="legal">
+      <h4>KI-generierte Inhalte</h4>
+      Die von Claude (Anthropic) generierten Texte unterliegen dem Halluzinations-Verbot
+      (Strict Extraction Mode). Dennoch können KI-Systeme fehlerhafte Informationen ausgeben.
+      Alle KI-Inhalte sind vor Investitionsentscheidungen zu prüfen.
+    </div>
+  </section>
 
+  <!-- ── EINRICHTUNG ── -->
+  <section id="einrichtung">
+    <h2>⚙️ Einrichtung</h2>
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
-        <div class="step-content">
-          <strong>Morning Briefing (7–9 Uhr)</strong>
-          <span>Sidebar → <em>Tagesstart</em> → Morning Briefing. Lädt automatisch die Nachtlauf-Daten (Regime, VIX, Sektoren, Breadth, Fear &amp; Greed, Treasury Stress) und generiert eine KI-Markteinschätzung mit Strategie-Ampel.</span>
+        <div class="step-body">
+          <h4>App öffnen &amp; PIN eingeben</h4>
+          <p>underlyingiq.com aufrufen — 4-stelligen Zugangscode eingeben.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">2</div>
-        <div class="step-content">
-          <strong>Marktregime prüfen</strong>
-          <span>Kopfzeile im Alpha Desk: BULL_QUIET / BULL_FRAGILE / STRESS_UNSTABLE / POST_PANIC_REVERSION. Das Regime bestimmt, welche Strategien der Router heute überhaupt aktiviert.</span>
+        <div class="step-body">
+          <h4>KI-Token setzen (Einstellungen)</h4>
+          <p>Einstellungen → „UnderlyingIQ KI-Zugang" → Token eintragen → speichern.
+          Ohne Token sind alle KI-Funktionen deaktiviert.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">3</div>
-        <div class="step-content">
-          <strong>Alpha Desk: Master-Shortlist sichten</strong>
-          <span>Die regime-gerouteten Top-Kandidaten des Nachtlaufs (inkl. KI-Parametern) — der schnellste Weg zu handelbaren Ideen, ohne selbst zu scannen.</span>
+        <div class="step-body">
+          <h4>Cloud Sync einrichten (optional)</h4>
+          <p>Einstellungen → Cloud Sync → eigenes Token vergeben (6–32 Zeichen).
+          Watchlisten und Backlogs werden dann geräteübergreifend synchronisiert.</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">4</div>
-        <div class="step-content">
-          <strong>Makro-Kontext vertiefen (bei Bedarf)</strong>
-          <span>Sidebar → <em>Markt-Kontext</em> → Makro: Sektor-Überhitzung, Intermarket-Analyse, Treasury Stress, Bull-Frühindikator — und ganz unten Dark Pool &amp; Institutional Flow (DIX/GEX).</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">5</div>
-        <div class="step-content">
-          <strong>Scanner für eigene Ideen</strong>
-          <span>Watchlist oder Sektor-Preset wählen (inkl. Supercycle-Sektoren wie Grid, Precious Metals, Agriculture, Water) → Scan → Titel mit Score ≥70 und Grade A/A+ sind bevorzugte Kandidaten.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">6</div>
-        <div class="step-content">
-          <strong>KI-Briefing, Deep Dive & Broker-Verifikation</strong>
-          <span>Top-Kandidaten per KI-Briefing/Deep Dive analysieren — immer als Entscheidungshilfe, nie als Entscheidung. Anschließend Optionskette und aktuelle Kurse in IBKR/CapTrader verifizieren.</span>
+        <div class="step-body">
+          <h4>Morning Briefing testen</h4>
+          <p>Sidebar → Morning Briefing → Button klicken. Erscheint die KI-Marktanalyse,
+          ist alles korrekt eingerichtet.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- SCANNER -->
-  <section id="scanner">
-    <h2><span class="icon">🔍</span> Scanner</h2>
-
-    <p>Der technische Scanner analysiert Aktien anhand von MACD, OBV, EMA-Stack, RSI, Bollinger Bands und weiteren Indikatoren. Er bewertet jeden Titel auf einer Skala von 0–100.</p>
-
-    <h3>Score-Interpretation</h3>
-    <div class="term-list">
-      <div class="term"><div class="term-key">A+ / 80–100</div><div class="term-val">Alle technischen Signale bullisch · Ideales Setup · Höchste Priorität</div></div>
-      <div class="term"><div class="term-key">A / 70–79</div><div class="term-val">Starkes Signal · Gut geeignet für Einstieg bei passendem Regime</div></div>
-      <div class="term"><div class="term-key">B / 50–69</div><div class="term-val">Gemischte Signale · Abwarten oder nur mit engem Stop</div></div>
-      <div class="term"><div class="term-key">C / &lt;50</div><div class="term-val">Schwaches Signal · Für Long-Strategien ungeeignet</div></div>
-    </div>
-
-    <h3>Strategie-Filter</h3>
-    <p>Der Scanner unterscheidet zwischen Scan-Strategien (bestimmen welche Titel erscheinen) und KI-Strategien (bestimmen wie die Ergebnisse interpretiert werden). Beide können unabhängig voneinander gewählt werden.</p>
-
-    <div class="warn-box">
-      <p>⚠️ <strong>Wochenende & Feiertage:</strong> Der Aggregator liefert die Daten des letzten Handelstags. Im Morning Briefing wird dies mit einem gelben "Handelsfrei"-Badge angezeigt. VIX und Live-Preise stammen aus dem letzten verfügbaren KV-Datensatz.</p>
+  <!-- ── WORKFLOW ── -->
+  <section id="workflow">
+    <h2>🔄 Empfohlener Tagesablauf</h2>
+    <div class="workflow">
+      <div class="wf-item">
+        <div class="wf-num">1</div>
+        <div class="wf-body">
+          <h4>Morning Briefing (7–9 Uhr)</h4>
+          <p>Sidebar → Tagesstart → Morning Briefing. Lädt die Nachtlauf-Daten (Regime, VIX,
+          Sektoren, Breadth, Fear &amp; Greed) und generiert eine KI-Markteinschätzung mit
+          Strategie-Ampel. Ab v309 wird das Briefing serverseitig gecacht — Beta-Tester
+          lösen keinen eigenen API-Call aus.</p>
+        </div>
+      </div>
+      <div class="wf-item">
+        <div class="wf-num">2</div>
+        <div class="wf-body">
+          <h4>Marktregime prüfen</h4>
+          <p>Kopfzeile: BULL_QUIET / BULL_FRAGILE / STRESS_UNSTABLE / POST_PANIC_REVERSION.
+          Das Regime bestimmt, welche Strategien der Router heute aktiviert. Zusätzlich:
+          Markov warnLevel (0–3) gibt Hinweis auf Regime-Instabilität.</p>
+        </div>
+      </div>
+      <div class="wf-item">
+        <div class="wf-num">3</div>
+        <div class="wf-body">
+          <h4>Alpha Desk: Master-Shortlist sichten</h4>
+          <p>Die regime-gerouteten Top-Kandidaten des Nachtlaufs (inkl. KI-Parametern) —
+          schnellster Weg zu handelbaren Ideen ohne eigenen Scan.</p>
+        </div>
+      </div>
+      <div class="wf-item">
+        <div class="wf-num">4</div>
+        <div class="wf-body">
+          <h4>Makro-Kontext vertiefen (bei Bedarf)</h4>
+          <p>Sidebar → Makro: Sektor-Überhitzung, Intermarket, HY-Spread, Net Liquidity,
+          Bull-Frühindikator, FINRA Dark Pool Score. ICS Trend Channel gibt
+          Konsens-Trendrichtung über 6 Zeitrahmen.</p>
+        </div>
+      </div>
+      <div class="wf-item">
+        <div class="wf-num">5</div>
+        <div class="wf-body">
+          <h4>Scanner für eigene Ideen</h4>
+          <p>Watchlist oder Sektor-Preset wählen (inkl. Supercycle-Sektoren: Grid,
+          Precious Metals, Agriculture, Water) → Scan → Titel mit Score ≥70 und
+          Grade A/A+ sind bevorzugte Kandidaten.</p>
+        </div>
+      </div>
+      <div class="wf-item">
+        <div class="wf-num">6</div>
+        <div class="wf-body">
+          <h4>KI-Briefing, Deep Dive &amp; Broker-Verifikation</h4>
+          <p>Top-Kandidaten per KI-Briefing analysieren — immer als Entscheidungshilfe,
+          nie als Entscheidung. Optionskette und Kurse in IBKR/CapTrader verifizieren.</p>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- MORNING BRIEFING -->
-  <section id="morning">
-    <h2><span class="icon">☀️</span> Morning Briefing</h2>
+  <!-- ── MORNING BRIEFING ── -->
+  <section id="morning-briefing">
+    <h2>☀️ Morning Briefing</h2>
+    <p>Das Morning Briefing aggregiert 9 Datenquellen und erstellt eine strukturierte
+    Marktübersicht. Es läuft in 9 Schritten ab und dauert ca. 30–60 Sekunden.</p>
 
-    <p>Das Morning Briefing aggregiert 9 Datenquellen und erstellt eine strukturierte Marktübersicht. Es läuft in 9 Schritten ab und dauert ca. 30–60 Sekunden.</p>
+    <table>
+      <tr><th>Schritt</th><th>Inhalt</th></tr>
+      <tr><td>1/9 Market State Engine</td><td>VVIX, SKEW, VIX, VIX3M — bestimmt das Marktregime</td></tr>
+      <tr><td>2/9 Live-Preise</td><td>S&amp;P 500, Nasdaq, DAX, Öl, Gold</td></tr>
+      <tr><td>3–7/9 Sektor-Analyse</td><td>Überhitzung, Breadth, Intermarket, Bull-Indikator, Sektor RS</td></tr>
+      <tr><td>8/9 Makro-Kontext</td><td>HY-Spread, Net Liquidity (Fed), Treasury Stress</td></tr>
+      <tr><td>9/9 KI-Marktanalyse</td><td>Strukturiertes Briefing mit Strategie-Ampel und Top-Kandidaten</td></tr>
+    </table>
 
-    <div class="steps">
-      <div class="step"><div class="step-num">1/9</div><div class="step-content"><strong>Market State Engine</strong><span>VVIX, SKEW, VIX, VIX3M — bestimmt das aktuelle Marktregime</span></div></div>
-      <div class="step"><div class="step-num">2/9</div><div class="step-content"><strong>Live-Preise</strong><span>S&P 500, Nasdaq, DAX, Öl, Gold</span></div></div>
-      <div class="step"><div class="step-num">3–7/9</div><div class="step-content"><strong>Sektor-Analyse</strong><span>Überhitzung, Breadth, Intermarket, Bull-Indikator, Sektor RS</span></div></div>
-      <div class="step"><div class="step-num">8/9</div><div class="step-content"><strong>Treasury Stress Index</strong><span>Zinsstruktur, Credit Spreads</span></div></div>
-      <div class="step"><div class="step-num">9/9</div><div class="step-content"><strong>KI-Marktanalyse</strong><span>KI analysiert alle gesammelten Daten und erstellt ein strukturiertes Briefing</span></div></div>
+    <div class="notice notice-green">
+      Ab v309: Das Morning Briefing wird serverseitig im Aggregator-Lauf (04:00 UTC) generiert
+      und als <span class="tag">daily_market_snapshot</span> im KV gecacht. Beta-Tester lesen
+      nur aus dem Cache — kein eigener Anthropic-API-Call.
     </div>
 
-    <div class="info-box">
-      <p>Das Tearsheet kann als PDF exportiert oder als JSON-Datenpunkt gespeichert werden.</p>
-    </div>
+    <h3>Strategie-Ampel</h3>
+    <p>Am Ende jedes Briefings erscheint eine Ampel für alle 7 Strategien:</p>
+    <table>
+      <tr><th>Signal</th><th>Bedeutung</th></tr>
+      <tr><td><span class="badge badge-green">🟢 Bevorzugt</span></td><td>Regime + Indikatoren sprechen heute für diese Strategie</td></tr>
+      <tr><td><span class="badge badge-amber">🟡 Situativ</span></td><td>Möglich, aber mit erhöhter Selektivität</td></tr>
+      <tr><td><span class="badge badge-red">🔴 Pausieren</span></td><td>Regime oder Volatilität ungeeignet</td></tr>
+      <tr><td><span class="badge">⬜ Keine Daten</span></td><td>Datenpunkt für diese Regel nicht verfügbar</td></tr>
+    </table>
   </section>
 
-  <!-- ALPHA DESK -->
-  <section id="alpha">
-    <h2><span class="icon">✨</span> Alpha Desk</h2>
-    <p>Der Alpha Desk zeigt die täglich vom Aggregator (04:00 UTC) vorselektierten Top-Kandidaten. Er enthält zwei Tabs:</p>
+  <!-- ── ALPHA DESK ── -->
+  <section id="alpha-desk">
+    <h2>✨ Alpha Desk</h2>
+    <p>Der Alpha Desk zeigt die täglich vom Aggregator (04:00 UTC) vorselektierten
+    Top-Kandidaten aus 678+ Titeln. Zwei Haupt-Tabs:</p>
 
     <h3>Master Shortlist</h3>
-    <p>Bis zu 20 KI-angereicherte Top-Setups aus 700+ Ticker. Jede Karte enthält Trigger, Stop-Loss, Target, CRV und eine KI-generierte Begründung. Filter: Long / Short / Alle.</p>
+    <p>Bis zu 20 KI-angereicherte Top-Setups. Jede Karte enthält Trigger, Stop-Loss,
+    Target, CRV und eine KI-Begründung. Filter: Long / Short / Alle.</p>
 
     <h3>Options-Desk</h3>
-    <p>Top-50 Options-Kandidaten (nur US-Ticker) gefiltert nach HVP, Preis und Strategie-Score. Drei Strategie-Tabs:</p>
-    <div class="term-list">
-      <div class="term"><div class="term-key">CSP</div><div class="term-val">Cash-Secured Put — Aufwärtstrend + hohe HVP + RSI 35–60</div></div>
-      <div class="term"><div class="term-key">CC</div><div class="term-val">Covered Call — Seitwärtsbewegung + Qualitäts-Aktie + moderates HVP</div></div>
-      <div class="term"><div class="term-key">Spread</div><div class="term-val">Credit Spread — HVP ≥60 + stark überverkauft + erste Stabilisierung</div></div>
-    </div>
+    <p>Top-50 Options-Kandidaten (US-Ticker) nach HVP, Preis und Strategie-Score. Drei Tabs:</p>
+    <table>
+      <tr><th>Tab</th><th>Strategie</th><th>Kriterien</th></tr>
+      <tr><td>CSP</td><td>Cash-Secured Put</td><td>Aufwärtstrend + HVP ≥20 + RSI 35–60</td></tr>
+      <tr><td>CC</td><td>Covered Call</td><td>Seitwärtsbewegung + Qualitätsaktie + moderates HVP</td></tr>
+      <tr><td>Spread</td><td>Credit Spread</td><td>HVP ≥60 + stark überverkauft + erste Stabilisierung</td></tr>
+    </table>
   </section>
 
-  <!-- OPTIONS DESK -->
-  <section id="options-desk">
-    <h2><span class="icon">🎯</span> Options-Strategien im Detail</h2>
+  <!-- ── SCANNER ── -->
+  <section id="scanner">
+    <h2>🔍 Scanner</h2>
+    <p>Der technische Scanner analysiert Aktien anhand von MACD, OBV, EMA-Stack, RSI,
+    Bollinger Bands, Fibonacci, KSI und weiteren Indikatoren auf einer Skala 0–100.</p>
 
-    <table class="strat-table">
-      <thead>
-        <tr>
-          <th>Strategie</th>
-          <th>Typ</th>
-          <th>Ideal für</th>
-          <th>Hauptrisiko</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><span class="badge badge-amber">Options-Wheel</span></td>
-          <td>CSP → Aktie → CC</td>
-          <td>Stabile Aufwärtstrend-Aktien $15–$80, HVP ≥40%</td>
-          <td>Andienung bei Kursrückgang</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge-purple">Options ATM/NA</span></td>
-          <td>ATM-CSP + 3-Stufen-Roll</td>
-          <td>Wie Wheel, aber mit systematischem Rollen statt Andienung</td>
-          <td>Margin-Belastung beim Rollen</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge-teal">Options Weekly</span></td>
-          <td>Diagonal Put-Spread</td>
-          <td>Weekly Options-Aktien, 4×/Monat Income, definiertes Risiko</td>
-          <td>Long-Put kostet Kapital</td>
-        </tr>
-      </tbody>
+    <h3>Score-Interpretation</h3>
+    <table>
+      <tr><th>Grade</th><th>Score</th><th>Bedeutung</th></tr>
+      <tr><td><span class="badge badge-green">A+</span></td><td>80–100</td><td>Alle Signale bullisch · Ideales Setup · Höchste Priorität</td></tr>
+      <tr><td><span class="badge badge-blue">A</span></td><td>70–79</td><td>Starkes Signal · Gut geeignet bei passendem Regime</td></tr>
+      <tr><td><span class="badge badge-amber">B</span></td><td>50–69</td><td>Gemischte Signale · Abwarten oder enger Stop</td></tr>
+      <tr><td><span class="badge badge-red">C</span></td><td>&lt;50</td><td>Schwaches Signal · Für Long-Strategien ungeeignet</td></tr>
     </table>
 
-    <div class="warn-box">
-      <p>⚠️ <strong>Optionen-Hinweis:</strong> Alle Prämien-Schätzungen in der App basieren auf HVP (Historical Volatility Percentile) und sind Näherungswerte. Der tatsächliche IV Rank und die Optionskette müssen immer in IBKR/CapTrader verifiziert werden bevor eine Position eröffnet wird.</p>
-    </div>
-
-    <h3>Frühausstieg-Empfehlung (alle Options-Strategien)</h3>
-    <div class="term-list">
-      <div class="term"><div class="term-key">&gt;50% Laufzeit</div><div class="term-val">Schließen bei 50% Prämiengewinn — Kapital für neue Position freisetzen</div></div>
-      <div class="term"><div class="term-key">30–50% Laufzeit</div><div class="term-val">Standard-Ausstieg bei 60% Prämiengewinn</div></div>
-      <div class="term"><div class="term-key">&lt;30% Laufzeit</div><div class="term-val">Mindest-Ziel 70% Prämiengewinn oder bei steigendem Marktrisiko</div></div>
+    <div class="notice">
+      ⚠️ Wochenende &amp; Feiertage: Der Aggregator liefert die Daten des letzten Handelstags.
+      Im Morning Briefing wird dies mit einem „Handelsfrei"-Badge angezeigt.
     </div>
   </section>
 
-  <!-- KI BRIEFING -->
-  <section id="ki-briefing">
-    <h2><span class="icon">🤖</span> KI-Briefing</h2>
+  <!-- ── MAKRO ── -->
+  <section id="makro">
+    <h2>🌐 Makro-Analyse</h2>
+    <p>Der Makro-Tab liefert den Markt-Kontext für den Strategie-Router.</p>
 
-    <p>Das KI-Briefing analysiert die aktuellen Scanner-Ergebnisse oder die Options-Watchlist und erstellt eine strategie-spezifische Kandidatenliste.</p>
+    <table>
+      <tr><th>Indikator</th><th>Quelle</th><th>Bedeutung</th></tr>
+      <tr><td>VIX / VIX3M</td><td>CBOE</td><td>Kurzfristige vs. mittelfristige Volatilitätserwartung</td></tr>
+      <tr><td>VVIX</td><td>CBOE</td><td>Volatilität der Volatilität — misst Tail-Risiko</td></tr>
+      <tr><td>SKEW</td><td>CBOE</td><td>Schieflage der Optionspreise — hohes SKEW = verstecktes Hedging</td></tr>
+      <tr><td>Put/Call-Ratio</td><td>CBOE</td><td>PCR als DIX-Proxy (Dark Pool Interim bis Quiver Quant)</td></tr>
+      <tr><td>Fear &amp; Greed</td><td>CNN</td><td>0–100, Sentiment-Composite aus 7 Datenpunkten</td></tr>
+      <tr><td>HY-Spread</td><td>FRED</td><td>High-Yield Credit Spread — steigend = Risikoaversion</td></tr>
+      <tr><td>Net Liquidity (Fed)</td><td>FRED</td><td>Fed-Bilanz − RRP − TGA — struktureller Rückenwind/Gegenwind</td></tr>
+      <tr><td>FINRA Dark Pool Score</td><td>FINRA ATS/TRF</td><td>Institutioneller Off-Exchange-Anteil als Liquiditäts-Proxy</td></tr>
+      <tr><td>Sektor RS vs. SPY</td><td>Yahoo Finance</td><td>Relative Stärke der 11 GICS-Sektoren</td></tr>
+      <tr><td>ICS Trend Channel</td><td>Aggregator v5.7</td><td>6-Skalen-Konsens (3–47 Bars), Yang-Zhang-Volatilität</td></tr>
+    </table>
+  </section>
+
+  <!-- ── KI-BRIEFING ── -->
+  <section id="ki-briefing">
+    <h2>🤖 KI-Briefing &amp; Deep Dive</h2>
+    <p>Das KI-Briefing analysiert Scanner-Ergebnisse oder die Options-Watchlist und erstellt
+    eine strategie-spezifische Kandidatenliste. Alle Calls laufen über den ko-ai Worker —
+    der Anthropic API-Key bleibt serverside geschützt.</p>
 
     <h3>Verfügbare Strategien</h3>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="fc-label">Long-Strategien</div>
-        <div class="fc-name">Momentum · Swing · Mean Rev. · Breakout · Dividend · Value</div>
-        <div class="fc-desc">BaFin-konform formuliert — deskriptiv, keine direkten Kaufempfehlungen.</div>
-      </div>
-      <div class="feature-card">
-        <div class="fc-label">Options-Strategien</div>
-        <div class="fc-name">Options-Wheel · ATM/NA · Options Weekly</div>
-        <div class="fc-desc">Strike-Schätzungen aus HVP — immer als Näherung kennzeichnen. In IBKR prüfen.</div>
-      </div>
-    </div>
+    <table>
+      <tr><th>Kategorie</th><th>Strategien</th></tr>
+      <tr><td>Long</td><td>Momentum/SEPA · Swing · Mean Reversion · Breakout · Dividend · Value</td></tr>
+      <tr><td>Options</td><td>CSP/Wheel · Covered Call · Credit Spread</td></tr>
+      <tr><td>KO</td><td>KO-Long · KO-Short</td></tr>
+    </table>
 
-    <div class="info-box">
-      <p><strong>Anti-Halluzinations-Garantie:</strong> Alle KI-Calls sind mit expliziten Datendisziplin-Regeln versehen. Das Modell darf ausschließlich Daten aus dem Prompt verwenden. Fehlende Werte werden als "N/A — in IBKR prüfen" gekennzeichnet, niemals erfunden.</p>
+    <div class="notice notice-green">
+      Anti-Halluzinations-Garantie: Alle KI-Calls nutzen Strict Extraction Mode.
+      Das Modell darf ausschließlich Daten aus dem Prompt verwenden. Fehlende Werte
+      werden als „N/A — in IBKR prüfen" ausgegeben, niemals erfunden.
     </div>
   </section>
 
-  <!-- STRATEGIEN -->
+  <!-- ── VALUE SCANNER ── -->
+  <section id="value">
+    <h2>💎 Value-Scanner (Phase 0)</h2>
+    <p>Der Value-Scanner ergänzt den technischen Scanner um fundamentale Filter.
+    Phase 0 enthält:</p>
+    <table>
+      <tr><th>Kriterium</th><th>Schwelle</th></tr>
+      <tr><td>KGV (P/E)</td><td>&lt;20 für Stufe-1-Qualifikation</td></tr>
+      <tr><td>KBV (P/B)</td><td>&lt;3</td></tr>
+      <tr><td>EV/EBITDA</td><td>&lt;15</td></tr>
+      <tr><td>Dividendenrendite</td><td>Optionaler Zusatzfilter</td></tr>
+      <tr><td>Wheel-Kandidaten</td><td>Kombination: Value-Qualifikation + HVP ≥20 + Score ≥30</td></tr>
+    </table>
+    <p>Ergebnisse erscheinen im Alpha Desk unter dem Value-Tab.</p>
+  </section>
+
+  <!-- ── STRATEGIEN ── -->
   <section id="strategien">
-    <h2><span class="icon">📈</span> Strategie-Übersicht</h2>
-
-    <table class="strat-table">
-      <thead>
-        <tr><th>Strategie</th><th>Marktphase</th><th>Haltedauer</th><th>Risiko</th></tr>
-      </thead>
-      <tbody>
-        <tr><td><span class="badge badge-green">Momentum/SEPA</span></td><td>Bull_Quiet</td><td>Wochen–Monate</td><td>Mittel</td></tr>
-        <tr><td><span class="badge badge-blue">Swing</span></td><td>Bull/Neutral</td><td>5–20 Tage</td><td>Mittel</td></tr>
-        <tr><td><span class="badge badge-amber">Mean Reversion</span></td><td>Post-Panic</td><td>3–10 Tage</td><td>Hoch</td></tr>
-        <tr><td><span class="badge badge-green">Breakout</span></td><td>Bull_Quiet</td><td>Tage–Wochen</td><td>Mittel</td></tr>
-        <tr><td><span class="badge badge-amber">Options-Wheel</span></td><td>Alle (HVP≥40)</td><td>30 Tage/Zyklus</td><td>Mittel</td></tr>
-        <tr><td><span class="badge badge-teal">Options Weekly</span></td><td>Alle (HVP≥35)</td><td>7 Tage/Zyklus</td><td>Begrenzt</td></tr>
-        <tr><td><span class="badge badge-purple">KO-Trading</span></td><td>Klarer Trend</td><td>Tage</td><td>Sehr hoch</td></tr>
-      </tbody>
+    <h2>📈 Strategie-Übersicht</h2>
+    <table>
+      <tr><th>Strategie</th><th>Marktphase</th><th>Haltedauer</th><th>Risiko</th></tr>
+      <tr><td>Momentum/SEPA</td><td>BULL_QUIET</td><td>Wochen–Monate</td><td>Mittel</td></tr>
+      <tr><td>Swing-Trading</td><td>Bull/Neutral</td><td>5–20 Tage</td><td>Mittel</td></tr>
+      <tr><td>Mean Reversion Long</td><td>POST_PANIC</td><td>3–10 Tage</td><td>Hoch</td></tr>
+      <tr><td>Breakout</td><td>BULL_QUIET</td><td>Tage–Wochen</td><td>Mittel</td></tr>
+      <tr><td>CSP/Options-Wheel</td><td>Alle (HVP≥20)</td><td>30 Tage/Zyklus</td><td>Mittel</td></tr>
+      <tr><td>Covered Call (CC)</td><td>Seitwärts/Schwach Bull</td><td>7–30 Tage</td><td>Begrenzt</td></tr>
+      <tr><td>Credit Spread</td><td>Alle (HVP≥60)</td><td>7 Tage/Zyklus</td><td>Begrenzt</td></tr>
+      <tr><td>KO-Long</td><td>BULL_QUIET</td><td>Tage</td><td>Sehr hoch</td></tr>
+      <tr><td>KO-Short</td><td>STRESS_UNSTABLE</td><td>Tage</td><td>Sehr hoch</td></tr>
     </table>
   </section>
 
-  <!-- GLOSSAR -->
+  <!-- ── OPTIONS ── -->
+  <section id="options">
+    <h2>🎯 Options-Strategien im Detail</h2>
+
+    <h3>Options-Wheel (CSP → Aktie → CC)</h3>
+    <p>Stabile Aufwärtstrend-Aktien $15–$80, HVP ≥20%. CSP bei Rücksetzer zum EMA50,
+    bei Andienung Covered Call auf Strike oberhalb des Kaufpreises.</p>
+
+    <h3>Covered Call (CC)</h3>
+    <p>Auf bestehende Long-Positionen oder nach Andienung. Strike am nächsten
+    Widerstandslevel oder 1×ATR über aktuellem Kurs. DTE 14–30 Tage.</p>
+
+    <h3>Credit Spread</h3>
+    <p>Bull Put Spread oder Bear Call Spread. Definiertes Risiko. HVP ≥60 für
+    attraktive Prämien. Netto-Kredit mindestens 30% der Spread-Breite.</p>
+
+    <div class="notice">
+      ⚠️ Alle Prämien-Schätzungen basieren auf HVP und sind Näherungswerte.
+      IV Rank und Optionskette immer in IBKR/CapTrader vor Positionseröffnung prüfen.
+    </div>
+
+    <h3>Frühausstieg-Empfehlung</h3>
+    <table>
+      <tr><th>Restlaufzeit</th><th>Ausstieg bei</th></tr>
+      <tr><td>&gt;50% DTE verbleibend</td><td>50% Prämiengewinn</td></tr>
+      <tr><td>30–50% DTE verbleibend</td><td>60% Prämiengewinn</td></tr>
+      <tr><td>&lt;30% DTE verbleibend</td><td>70% Prämiengewinn oder bei steigendem Risiko</td></tr>
+    </table>
+  </section>
+
+  <!-- ── KO-ZERTIFIKATE ── -->
+  <section id="ko">
+    <h2>⚡ KO-Zertifikate</h2>
+    <p>KO-Zertifikate (Knock-Out-Produkte) ermöglichen gehebeltes Trading auf US-Aktien
+    und Indizes. UnderlyingIQ unterstützt die KO-Analyse über Trade Republic.</p>
+
+    <table>
+      <tr><th>Parameter</th><th>Empfehlung</th></tr>
+      <tr><td>Hebel</td><td>Konservativ 2–3× · Moderat 4–6× · Aggressiv &gt;6×</td></tr>
+      <tr><td>Positionsgröße</td><td>Max. 1–2% des Depots pro KO-Position</td></tr>
+      <tr><td>Stop-Loss-Cluster</td><td>Swing-Hoch/-Tief-basierte Stopp-Zonen aus Aggregator v5.8</td></tr>
+      <tr><td>Regime-Bedingung</td><td>KO-Long nur in BULL_QUIET/BULL_FRAGILE</td></tr>
+    </table>
+
+    <div class="notice">
+      KO-Zertifikate können bei Kursberegung bis zur KO-Barriere wertlos verfallen (Totalverlust).
+      Nur mit vollständig verstandenem Risiko handeln.
+    </div>
+  </section>
+
+  <!-- ── NEUE INDIKATOREN ── -->
+  <section id="indikatoren">
+    <h2>🔬 Neue Indikatoren (Aggregator v5.7–v5.8.1)</h2>
+    <p>Mit den Aggregator-Versionen v5.7 und v5.8 wurden sechs neue Indikatoren eingebaut,
+    die täglich für alle 678 Ticker berechnet werden.</p>
+
+    <div class="card">
+      <h3>KSI — Kinetic Slippage Index <span class="badge badge-blue">v5.7</span></h3>
+      <p>Misst Markt-Ineffizienz: <span class="tag">TrueRange² / (Volume × EMA_Vol) × 1M</span>.
+      Hoher KSI = leerer Markt (Umkehr-Signal), nahe 0 = hohe Orderdichte.</p>
+      <p>Felder: <span class="tag">ksi</span> · <span class="tag">ksiSignal</span> ·
+      <span class="tag">ksiSpike</span> · <span class="tag">ksiRatio</span></p>
+      <p style="font-size:12px;color:var(--text3)">ksiRatio = KSI/Signal — dimensionslos, tickerübergreifend vergleichbar. &gt;1 = Ineffizienz steigt.</p>
+    </div>
+
+    <div class="card">
+      <h3>Markov warnLevel <span class="badge badge-blue">v5.7</span></h3>
+      <p>Warnstufen für Regime-Instabilität basierend auf Bull/Bear-Stickiness:</p>
+      <table>
+        <tr><th>Level</th><th>Bedeutung</th></tr>
+        <tr><td><span class="badge badge-green">0 — OK</span></td><td>Regime stabil, Stickiness &gt;60%</td></tr>
+        <tr><td><span class="badge badge-blue">1 — Leicht</span></td><td>Erste Anzeichen von Instabilität</td></tr>
+        <tr><td><span class="badge badge-amber">2 — Mittel</span></td><td>Regime-Wechsel möglich, Vorsicht</td></tr>
+        <tr><td><span class="badge badge-red">3 — Kritisch</span></td><td>Hohe Übergangswahrscheinlichkeit, defensiv agieren</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>ICS Trend Channel — Isotropic Trend Channel <span class="badge badge-blue">v5.7</span></h3>
+      <p>6-Skalen-Konsens (3, 7, 13, 19, 29, 47 Bars) mit Yang-Zhang-Volatilitätsschätzer
+      (drift-invariant, marktübergreifend vergleichbar).</p>
+      <p>Felder: <span class="tag">icsDirection</span> · <span class="tag">icsAngle</span> ·
+      <span class="tag">icsConsensus</span> · <span class="tag">icsConsBull</span> ·
+      <span class="tag">icsConsBear</span> · <span class="tag">icsChannelPos</span></p>
+    </div>
+
+    <div class="card">
+      <h3>RegVP — Regression Volume Profile <span class="badge badge-purple">v5.8</span></h3>
+      <p>OLS Grad-2 Regression auf hl2×200 Bars. Point of Control (POC) aus
+      Regressionsbaseline + Volumengewichtung.</p>
+      <p>Felder: <span class="tag">zScore</span> · <span class="tag">pocLevel</span> ·
+      <span class="tag">distToPocPct</span> · <span class="tag">regTrend</span> ·
+      <span class="tag">chanHigh3sd</span> · <span class="tag">chanLow3sd</span></p>
+    </div>
+
+    <div class="card">
+      <h3>ClusterVP — Cluster Volume Profile <span class="badge badge-purple">v5.8</span></h3>
+      <p>K-Means (k=5) volumengewichtet auf hl2×200 Bars. Identifiziert dominante
+      Preiszonen mit hohem institutionellen Interesse.</p>
+      <p>Felder: <span class="tag">nearestClusterPocDist</span> ·
+      <span class="tag">dominantClusterVol</span> · <span class="tag">clusterDelta</span> ·
+      <span class="tag">priceAboveDominant</span></p>
+    </div>
+
+    <div class="card">
+      <h3>Stop-Loss Clustering (SLC) <span class="badge badge-purple">v5.8</span></h3>
+      <p>Swing-Hoch/-Tief-basierte Stop-Zonen. Zeigt wo gehäufte Stop-Orders
+      zu erwarten sind — wichtig für KO-Einstiegstiming.</p>
+      <p>Felder: <span class="tag">nearestSellStopPct</span> ·
+      <span class="tag">nearestBuyStopPct</span></p>
+    </div>
+  </section>
+
+  <!-- ── ARCHITEKTUR ── -->
+  <section id="architektur">
+    <h2>🏗️ Architektur &amp; Cache</h2>
+
+    <h3>Aggregator-Lauf (täglich, 04:00 UTC Mo–Sa)</h3>
+    <p>GitHub Actions triggert <span class="tag">market_aggregator.py</span> v5.8.1.
+    Der Lauf analysiert 678 Ticker über 22 Watchlisten und schreibt drei KV-Keys:</p>
+    <table>
+      <tr><th>KV-Key</th><th>Inhalt</th><th>Zugriff</th></tr>
+      <tr><td><span class="tag">master_market_data</span></td><td>Vollständiger Aggregator-Output (alle Ticker, Scores, Indikatoren)</td><td>Öffentlich via <span class="tag">/public/</span></td></tr>
+      <tr><td><span class="tag">options_watchlist</span></td><td>Top-50 Options-Kandidaten</td><td>Öffentlich</td></tr>
+      <tr><td><span class="tag">daily_market_snapshot</span></td><td>Serverseitig generiertes Morning Briefing (KI-Text)</td><td>Öffentlich, gecacht</td></tr>
+    </table>
+
+    <h3>ko-watchdog</h3>
+    <p>Cloudflare Worker, Cron 04:15 UTC Mo–Sa. Prüft ob <span class="tag">master_market_data</span>
+    frisch ist. Falls nicht (GHA-Cron ausgefallen) → triggert <span class="tag">workflow_dispatch</span>
+    via GitHub API als Fallback.</p>
+
+    <h3>ko-sync (v2.1)</h3>
+    <p>Cloudflare Worker für User-Sync (Watchlisten, Backlogs) mit Token-Isolation.
+    Seit v2.1: zusätzlicher öffentlicher Endpoint <span class="tag">GET /public/master_market_data</span>
+    ohne Token — Frontend liest KV-Daten darüber.</p>
+
+    <h3>Track Record</h3>
+    <p>Seit 02.07.2026 läuft der offizielle Track Record. Lead-Metrik: <span class="tag">hit30-fresh</span>
+    — Anteil der Shortlist-Kandidaten, die innerhalb von 30 Tagen &gt;5% Kursgewinn erreichen.</p>
+  </section>
+
+  <!-- ── GLOSSAR ── -->
   <section id="glossar">
-    <h2><span class="icon">📖</span> Glossar</h2>
+    <h2>📖 Glossar</h2>
 
-    <div class="term-list">
-      <div class="term"><div class="term-key">HVP</div><div class="term-val">Historical Volatility Percentile — wie hoch ist die aktuelle 30-Tage-Volatilität im Vergleich zu den letzten 252 Handelstagen (0–100%). Hoher HVP = teure Optionsprämien.</div></div>
-      <div class="term"><div class="term-key">VIX</div><div class="term-val">CBOE Volatility Index — misst die implizite 30-Tage-Volatilität des S&P 500. &lt;16 = ruhig, 16–25 = normal, &gt;25 = erhöhte Unsicherheit.</div></div>
-      <div class="term"><div class="term-key">EMA</div><div class="term-val">Exponential Moving Average — gewichteter gleitender Durchschnitt. EMA50 (kurzfristig), EMA200 (langfristig, Trendindikator).</div></div>
-      <div class="term"><div class="term-key">MACD</div><div class="term-val">Moving Average Convergence/Divergence — Momentum-Indikator. Positives Histogramm = bullisch.</div></div>
-      <div class="term"><div class="term-key">OBV</div><div class="term-val">On-Balance Volume — kumulative Volumensumme. Steigendes OBV = institutionelle Akkumulation.</div></div>
-      <div class="term"><div class="term-key">ATR</div><div class="term-val">Average True Range — durchschnittliche Tagesspanne in $. Basis für Stop-Loss-Berechnung (z.B. 2×ATR unter Entry).</div></div>
-      <div class="term"><div class="term-key">CSP</div><div class="term-val">Cash-Secured Put — Verkauf eines Puts mit vollständiger Cash-Absicherung. Prämie sofort kassiert, Pflicht zur Abnahme der Aktie bei Unterschreitung des Strikes.</div></div>
-      <div class="term"><div class="term-key">DTE</div><div class="term-val">Days to Expiration — Restlaufzeit einer Option in Tagen.</div></div>
-      <div class="term"><div class="term-key">CRV</div><div class="term-val">Chance-Risiko-Verhältnis — Gewinnziel ÷ Verlustrisiko. CRV ≥2:1 empfohlen.</div></div>
-      <div class="term"><div class="term-key">Regime</div><div class="term-val">Marktregime der Market State Engine: BULL_QUIET / BULL_FRAGILE / STRESS_UNSTABLE / POST_PANIC_REVERSION.</div></div>
-      <div class="term"><div class="term-key">Markov</div><div class="term-val">Markov 2.0 — statistisches Regime-Erkennungsmodell basierend auf Übergangswahrscheinlichkeiten. pBull2Bear = Wahrscheinlichkeit eines Regimewechsels.</div></div>
-      <div class="term"><div class="term-key">SEPA</div><div class="term-val">Specific Entry Point Analysis (Minervini) — Stage-2-Uptrend + Volatilitätskontraktion + Ausbruch auf hohem Volumen.</div></div>
+    <div class="glossary-entry">
+      <div class="glossary-term">ATR</div>
+      <div class="glossary-def">Average True Range — durchschnittliche Tagesspanne in $. Basis für Stop-Loss-Berechnung (z.B. 2×ATR unter Entry).</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">ClusterVP</div>
+      <div class="glossary-def">K-Means-basiertes Cluster Volume Profile — identifiziert Preiszonen mit hohem institutionellen Volumen.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">CRV</div>
+      <div class="glossary-def">Chance-Risiko-Verhältnis — Gewinnziel ÷ Verlustrisiko. CRV ≥2:1 empfohlen.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">CSP</div>
+      <div class="glossary-def">Cash-Secured Put — Verkauf eines Puts mit vollständiger Cash-Absicherung. Prämie sofort kassiert, Pflicht zur Aktienabnahme bei Strike-Unterschreitung.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">DTE</div>
+      <div class="glossary-def">Days to Expiration — Restlaufzeit einer Option in Tagen.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">EMA</div>
+      <div class="glossary-def">Exponential Moving Average — gewichteter gleitender Durchschnitt. EMA50 (kurzfristig), EMA200 (langfristig, Trendindikator).</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">HVP</div>
+      <div class="glossary-def">Historical Volatility Percentile — wie hoch ist die aktuelle 30-Tage-Volatilität im Vergleich zu den letzten 252 Handelstagen (0–100%). Hoher HVP = teure Optionsprämien. Kein echter IV Rank.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">ICS</div>
+      <div class="glossary-def">Isotropic Trend Channel — 6-Skalen-Konsens mit Yang-Zhang-Volatilität. Gibt Trendrichtung und Kanalposition an.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">KSI</div>
+      <div class="glossary-def">Kinetic Slippage Index — misst Markt-Ineffizienz (TrueRange²/Volumen). Hoher KSI = leerer Markt, Umkehr-Signal möglich.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">MACD</div>
+      <div class="glossary-def">Moving Average Convergence/Divergence — Momentum-Indikator. Positives Histogramm = bullisch.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">Markov</div>
+      <div class="glossary-def">Markov v4 — statistisches Regime-Modell aus Übergangswahrscheinlichkeiten. warnLevel 0–3 zeigt Regime-Stabilität. pBull2Bear = Wechselwahrscheinlichkeit.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">OBV</div>
+      <div class="glossary-def">On-Balance Volume — kumulative Volumensumme. Steigendes OBV = institutionelle Akkumulation.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">PCR</div>
+      <div class="glossary-def">Put/Call-Ratio — Verhältnis gehandelter Put- zu Call-Optionen. Interim-Proxy für Dark Pool Sentiment.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">Regime</div>
+      <div class="glossary-def">Marktregime der Market State Engine: BULL_QUIET / BULL_FRAGILE / STRESS_UNSTABLE / POST_PANIC_REVERSION.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">RegVP</div>
+      <div class="glossary-def">Polynomial Regression Volume Profile — POC aus OLS-Regression auf 200 Bars. Zeigt Überdehnungen (zScore) und Kanalbreite (3σ).</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">SEPA</div>
+      <div class="glossary-def">Specific Entry Point Analysis (Minervini) — Stage-2-Uptrend + Volatilitätskontraktion + Ausbruch auf hohem Volumen.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">SLC</div>
+      <div class="glossary-def">Stop-Loss Clustering — Swing-Hoch/-Tief-basierte Stopp-Zonen. Zeigt wo gehäufte Stop-Orders zu erwarten sind.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">VIX</div>
+      <div class="glossary-def">CBOE Volatility Index — implizite 30-Tage-Volatilität des S&amp;P 500. &lt;16 = ruhig, 16–25 = normal, &gt;25 = erhöhte Unsicherheit.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">VCP</div>
+      <div class="glossary-def">Volatility Contraction Pattern (Minervini) — Serie abnehmender Korrekturen mit sinkenden Volumina vor Breakout. Backlog-Item #16.</div>
+    </div>
+    <div class="glossary-entry">
+      <div class="glossary-term">VVIX</div>
+      <div class="glossary-def">Volatilität des VIX — misst Tail-Risiko und Extrembewegungen im Volatilitätsmarkt.</div>
     </div>
   </section>
 
-
-  <!-- API KEYS -->
+  <!-- ── API KEYS ── -->
   <section id="api-keys">
-    <h2><span class="icon">🔑</span> API-Keys & Zugangsdaten einrichten</h2>
+    <h2>🔑 API-Keys &amp; Zugangsdaten einrichten</h2>
 
-    <p>UnderlyingIQ benötigt bis zu drei externe Zugangsdaten. Alle Keys werden ausschließlich lokal in deinem Browser gespeichert (localStorage) und niemals an Dritte übertragen — mit Ausnahme des direkten API-Calls an den jeweiligen Dienst.</p>
-
-    <div class="info-box">
-      <p><strong>🚀 Schnelleinstieg für Beta-Tester:</strong> Für den ersten Eindruck genügt der <strong>UIQ KI-Token</strong> (Schritt 1) — Morning Briefing und KI-Analysen laufen damit sofort. Den vollen Live-Scanner schaltet der <strong>Twelve Data Key</strong> frei: kostenlose Registrierung nur mit E-Mail-Adresse, dauert etwa 3 Minuten (Anleitung unten). Finnhub ist optional und kann später folgen. Empfohlene Reihenfolge: Token eintragen → Briefing testen → dann Twelve Data.</p>
+    <div class="notice notice-blue">
+      🚀 Schnelleinstieg: Für den ersten Eindruck genügt der UIQ KI-Token (Schritt 1).
+      Morning Briefing und KI-Analysen laufen damit sofort.
     </div>
 
-    <!-- UIQ TOKEN -->
-    <h3>1. UnderlyingIQ KI-Token (Pflicht für alle KI-Funktionen)</h3>
-
-    <div class="info-box">
-      <p>Der KI-Token autorisiert deinen Zugang zum ko-ai Cloudflare Worker, der die Anthropic API serverseitig aufruft. Dein persönlicher Anthropic API-Key bleibt dabei vollständig verborgen — du siehst ihn nie.</p>
-    </div>
-
+    <h3>1. UIQ KI-Token (Pflicht für alle KI-Funktionen)</h3>
+    <p>Autorisiert den Zugang zum ko-ai Cloudflare Worker, der die Anthropic API
+    serverseitig aufruft. Dein Anthropic API-Key bleibt dabei vollständig verborgen.</p>
     <div class="steps">
       <div class="step">
-        <div class="step-num">01</div>
-        <div class="step-content">
-          <strong>Token erhalten</strong>
-          <span>Den persönlichen KI-Zugangs-Token erhältst du vom App-Administrator (Dr. Axel Hildebrand) oder über das Registrierungsformular auf underlyingiq.com.</span>
-        </div>
+        <div class="step-num">1</div>
+        <div class="step-body"><h4>Token erhalten</h4><p>Vom App-Administrator (Dr. Axel Hildebrand) oder über underlyingiq.com.</p></div>
       </div>
       <div class="step">
-        <div class="step-num">02</div>
-        <div class="step-content">
-          <strong>In Einstellungen eintragen</strong>
-          <span>App öffnen → linke Sidebar → "Einstellungen" → Abschnitt "UnderlyingIQ KI-Zugang" → Token in das Feld "KI-Zugangs-Token" eintragen.</span>
-        </div>
+        <div class="step-num">2</div>
+        <div class="step-body"><h4>Einstellungen → KI-Zugang</h4><p>Token in das Feld „KI-Zugangs-Token" eintragen → „Token speichern" klicken.</p></div>
       </div>
       <div class="step">
-        <div class="step-num">03</div>
-        <div class="step-content">
-          <strong>"Token speichern" klicken</strong>
-          <span>Das Feld zeigt danach "Token gesetzt ✓". Alle KI-Funktionen (Morning Briefing, KI-Briefing, Deep Dive, Dark Pool) sind nun aktiv.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">04</div>
-        <div class="step-content">
-          <strong>Test: Morning Briefing aufrufen</strong>
-          <span>Scanner → "Briefing" Button → wenn die KI-Marktanalyse erscheint, ist der Token korrekt. Bei Fehlermeldung: Token exakt kopieren (keine Leerzeichen).</span>
-        </div>
+        <div class="step-num">3</div>
+        <div class="step-body"><h4>Test: Morning Briefing aufrufen</h4><p>Erscheint die KI-Marktanalyse, ist der Token korrekt. Bei Fehler: Token exakt kopieren (keine Leerzeichen).</p></div>
       </div>
     </div>
 
-    <!-- TWELVE DATA -->
-    <h3>2. Twelve Data API-Key (empfohlen für erweiterte Scanner-Funktionen)</h3>
+    <h3>2. Cloud Sync Token (optional)</h3>
+    <p>Eigenes Token (6–32 Zeichen, a–z A–Z 0–9 _ -) vergeben. Watchlisten und
+    Backlogs werden damit geräteübergreifend synchronisiert via ko-sync Worker.</p>
 
-    <div class="info-box">
-      <p>Twelve Data liefert MACD, OBV und weitere Indikatoren für den Live-Scanner. Der kostenlose Plan umfasst 800 Requests/Tag — ausreichend für normale Nutzung.</p>
-    </div>
-
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">01</div>
-        <div class="step-content">
-          <strong>Konto anlegen auf twelvedata.com</strong>
-          <span>Öffne <strong>twelvedata.com</strong> → "Get free API key" → E-Mail-Adresse eingeben → Bestätigungs-Mail öffnen und Link klicken.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">02</div>
-        <div class="step-content">
-          <strong>API-Key kopieren</strong>
-          <span>Nach dem Login: Dashboard → linke Sidebar → "API Keys" → den angezeigten Key (32 Zeichen, z.B. "a1b2c3d4e5f6...") in die Zwischenablage kopieren.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">03</div>
-        <div class="step-content">
-          <strong>In UnderlyingIQ eintragen</strong>
-          <span>Einstellungen → "Twelve Data API-Key" → Key einfügen → "Key speichern" → "Twelve Data Key testen" klicken. ✓ bei AAPL-Preis = Erfolg.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">04</div>
-        <div class="step-content">
-          <strong>Nutzungslimits im Blick behalten</strong>
-          <span>Kostenloser Plan: 800 Requests/Tag, 8 Requests/Minute. Bei intensiver Scanner-Nutzung kann das Limit überschritten werden — dann erscheint "Rate Limit" im Scanner.</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="warn-box">
-      <p>⚠️ <strong>Tipp:</strong> Den API-Key niemals in öffentlichen Chats, E-Mails oder Screenshots weitergeben. Twelve Data zeigt im Dashboard an, wie viele Requests verbraucht wurden.</p>
-    </div>
-
-    <!-- FINNHUB -->
-    <h3>3. Finnhub API-Key (optional — für Earnings-Kalender)</h3>
-
-    <div class="info-box">
-      <p>Finnhub liefert Earnings-Termine für den Earnings-Filter im Scanner. Kostenloser Plan: 60 Calls/Minute. Ohne Finnhub-Key werden Earnings-Daten aus dem internen Cache geladen.</p>
-    </div>
-
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">01</div>
-        <div class="step-content">
-          <strong>Konto anlegen auf finnhub.io</strong>
-          <span>Öffne <strong>finnhub.io</strong> → "Get free API key" → Registrierung mit E-Mail → E-Mail bestätigen.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">02</div>
-        <div class="step-content">
-          <strong>API-Key kopieren</strong>
-          <span>Dashboard → oben rechts steht der API-Key direkt (Format: "c1d2e3f4..." — 20 Zeichen). Kopieren.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">03</div>
-        <div class="step-content">
-          <strong>In UnderlyingIQ eintragen</strong>
-          <span>Einstellungen → "Finnhub API-Key" → Key einfügen → "Key speichern". Der Earnings-Filter ist sofort aktiv.</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ÜBERSICHT -->
-    <h3>Schnellübersicht: Welcher Key wofür?</h3>
-    <table class="strat-table">
-      <thead>
-        <tr><th>Key</th><th>Pflicht?</th><th>Wofür</th><th>Kosten</th><th>Wo eintragen</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><span class="badge badge-purple">UIQ KI-Token</span></td>
-          <td>✅ Ja</td>
-          <td>Morning Briefing, KI-Briefing, Deep Dive, Dark Pool KI</td>
-          <td>Inkl. im Abo</td>
-          <td>Einstellungen → KI-Zugang</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge-blue">Twelve Data</span></td>
-          <td>Empfohlen</td>
-          <td>Live-Scanner MACD/OBV/RSI · 800 Calls/Tag kostenlos</td>
-          <td>Kostenlos</td>
-          <td>Einstellungen → Twelve Data</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge-green">Finnhub</span></td>
-          <td>Optional</td>
-          <td>Earnings-Kalender · ER-Filter im Scanner</td>
-          <td>Kostenlos</td>
-          <td>Einstellungen → Finnhub</td>
-        </tr>
-      </tbody>
+    <h3>Schnellübersicht</h3>
+    <table>
+      <tr><th>Key</th><th>Pflicht?</th><th>Wofür</th><th>Kosten</th></tr>
+      <tr><td>UIQ KI-Token</td><td>✅ Ja</td><td>Morning Briefing, KI-Briefing, Deep Dive</td><td>Inkl. im Abo</td></tr>
+      <tr><td>Cloud Sync Token</td><td>Optional</td><td>Geräteübergreifende Synchronisierung</td><td>Kostenlos</td></tr>
+      <tr><td>OpenAI Key</td><td>Optional</td><td>Whisper Audio-Transkription</td><td>~$0.006/Min</td></tr>
     </table>
 
-    <div class="info-box">
-      <p><strong>Datenschutz:</strong> Alle API-Keys werden ausschließlich im localStorage deines Browsers gespeichert. Sie verlassen deinen Browser nur als Header bei direkten API-Calls an den jeweiligen Anbieter (Twelve Data, Finnhub). Der UnderlyingIQ-Server (Cloudflare) sieht deine Keys niemals.</p>
+    <div class="notice">
+      Datenschutz: Alle Keys werden ausschließlich im localStorage deines Browsers gespeichert.
+      Sie verlassen deinen Browser nur als Header bei direkten API-Calls.
     </div>
   </section>
 
-  <!-- FAQ -->
+  <!-- ── FAQ ── -->
   <section id="faq">
-    <h2><span class="icon">❓</span> Häufige Fragen</h2>
+    <h2>❓ Häufige Fragen</h2>
 
-    <h3>Warum zeigt der VIX "—" oder einen Stern (*)?</h3>
-    <p>Am Wochenende und an Feiertagen gibt Yahoo Finance keinen Live-VIX zurück. Die App zeigt dann den letzten bekannten Wert aus dem Aggregator-Datensatz mit einem Sternchen (*) und dem Datum des letzten Handelstags.</p>
+    <h3>Warum zeigt der VIX „—" oder einen Stern (*)?</h3>
+    <p>Am Wochenende und Feiertagen gibt Yahoo Finance keinen Live-VIX zurück. Die App
+    zeigt den letzten bekannten Wert aus dem Aggregator-Datensatz mit Sternchen (*) und Datum.</p>
 
     <h3>Warum fehlt der HVP-Wert bei manchen Titeln?</h3>
-    <p>HVP benötigt mindestens 282 Handelstage historischer Daten (252 Lookback + 30 Fenster). Neue Titel oder Titel mit kurzer Börsenhistorie haben keinen HVP-Wert und werden vom Options-Desk automatisch ausgeschlossen.</p>
+    <p>HVP benötigt mindestens 282 Handelstage historischer Daten. Neue Titel oder Titel
+    mit kurzer Börsenhistorie haben keinen HVP-Wert und werden vom Options-Desk ausgeschlossen.</p>
 
-    <h3>Was bedeutet "KI-basierte Analyse nicht verfügbar"?</h3>
-    <p>Der KI-Token ist nicht gesetzt oder abgelaufen. Einstellungen → "UnderlyingIQ KI-Zugang" → Token erneut eintragen.</p>
+    <h3>Was bedeutet „KI-basierte Analyse nicht verfügbar"?</h3>
+    <p>Der KI-Token ist nicht gesetzt oder abgelaufen. Einstellungen → „UnderlyingIQ
+    KI-Zugang" → Token erneut eintragen. Alternativ: im Browser-DevTools Console
+    <span class="tag">localStorage.setItem('ko_ai_token', 'dein-token')</span> ausführen.</p>
 
     <h3>Wie oft werden die Daten aktualisiert?</h3>
-    <p>Der Aggregator läuft täglich Montag–Samstag um 06:00 Uhr MEZ (04:00 UTC) nach dem US-After-Hours-Handel. Live-Preise im Scanner werden bei jedem Scan-Aufruf aktualisiert.</p>
+    <p>Der Aggregator läuft täglich Mo–Sa um 04:00 UTC (06:00 MEZ) nach US-After-Hours.
+    ko-watchdog prüft um 04:15 UTC ob der Lauf erfolgreich war und triggert ggf. nach.</p>
+
+    <h3>Was ist der Unterschied zwischen KV und KV 401?</h3>
+    <p>KV 401 erschien bis v308, weil ko-sync v2.0 alle Endpoints hinter Token-Auth
+    stellte. Ab ko-sync v2.1 und Frontend v309 ist <span class="tag">/public/master_market_data</span>
+    ohne Token erreichbar — der Fehler tritt nicht mehr auf.</p>
+
+    <h3>Was bedeuten die Markov warnLevel-Stufen?</h3>
+    <p>warnLevel 0 = Regime stabil. Level 1–2 = zunehmende Instabilität, Positionsgrößen
+    reduzieren. Level 3 = hohe Regime-Wechsel-Wahrscheinlichkeit, defensiv agieren.</p>
 
     <h3>Kann ich die App auf dem Smartphone nutzen?</h3>
-    <p>Ja — underlyingiq.com ist als Progressive Web App (PWA) optimiert. "Zum Home-Bildschirm hinzufügen" für App-ähnliche Nutzung.</p>
+    <p>Ja — underlyingiq.com ist als Progressive Web App (PWA) optimiert.
+    „Zum Home-Bildschirm hinzufügen" für App-ähnliche Nutzung.</p>
 
     <h3>Sind meine Watchlisten sicher gespeichert?</h3>
-    <p>Watchlisten werden lokal im Browser (localStorage) gespeichert. Sie bleiben bei normalem Browsen erhalten, gehen aber beim Löschen des Browser-Caches verloren. Export-Funktion via "Cloud Sync" verfügbar.</p>
+    <p>Watchlisten werden lokal im Browser (localStorage) gespeichert. Mit Cloud Sync
+    (ko-sync, eigenes Token) werden sie zusätzlich in der Cloud gesichert und
+    geräteübergreifend synchronisiert.</p>
+
+    <h3>Was ist der Track Record?</h3>
+    <p>Seit 02.07.2026 wird der offizielle Track Record gemessen. Lead-Metrik:
+    <span class="tag">hit30-fresh</span> — Anteil der Shortlist-Kandidaten, die
+    innerhalb von 30 Tagen &gt;5% Kursgewinn erreichen. Läuft als Phase A (erste 6 Monate).</p>
   </section>
 
   <footer>
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)">
-      <p style="margin:0"><strong>© 2024–2026 Dr. Axel Hildebrand. Alle Rechte vorbehalten.</strong></p>
-      <div style="display:flex;gap:1rem;font-size:11px">
-        <a href="#wozu-nicht" style="color:var(--text3);text-decoration:none">Rechtliche Hinweise</a>
-        <a href="#wozu-nicht" style="color:var(--red);text-decoration:none;font-weight:600">§1 WpHG · Kein Anlageberatung</a>
-        <a href="mailto:info@underlyingiq.com" style="color:var(--text3);text-decoration:none">Kontakt</a>
-      </div>
-    </div>
-    <p style="margin-top:.4rem">
-      UnderlyingIQ™ ist ein geschütztes Produkt von Dr. Axel Hildebrand, Krefeld, Deutschland.
-      Vervielfältigung, Weitergabe, Lizenzierung oder kommerzielle Nutzung — ganz oder in Teilen —
-      sind ohne ausdrückliche schriftliche Genehmigung des Rechteinhabers untersagt.
-      Dies gilt insbesondere für Quellcode, Algorithmen, Scoring-Modelle, Prompt-Architekturen
-      und KI-Systemkonfigurationen.
-    </p>
-    <p style="margin-top:.4rem">Alle Inhalte dienen ausschließlich zur Information. Keine Anlageberatung gem. §1 WpHG. Investitionen in Finanzinstrumente sind mit Risiken verbunden. Handeln auf eigenes Risiko.</p>
-    <p style="margin-top:.4rem">Version v244 · Stand: 06. Juli 2026 · underlyingiq.com</p>
+    <p>© 2024–2026 Dr. Axel Hildebrand. Alle Rechte vorbehalten.</p>
+    <p>UnderlyingIQ™ ist ein geschütztes Produkt von Dr. Axel Hildebrand, Krefeld, Deutschland.
+    Vervielfältigung, Weitergabe oder kommerzielle Nutzung ohne ausdrückliche schriftliche
+    Genehmigung untersagt. Dies gilt insbesondere für Quellcode, Algorithmen, Scoring-Modelle,
+    Prompt-Architekturen und KI-Systemkonfigurationen.</p>
+    <p>Alle Inhalte dienen ausschließlich zur Information. Keine Anlageberatung gem. §1 WpHG.
+    Investitionen in Finanzinstrumente sind mit Risiken verbunden. Handeln auf eigenes Risiko.</p>
+    <p style="margin-top:.5rem;color:var(--accent)">Version v309 · Stand: 13. Juli 2026 · underlyingiq.com</p>
   </footer>
 
 </main>
 </div>
-
-<script>
-// Active nav link on scroll
-const sections = document.querySelectorAll('section[id]');
-const navLinks = document.querySelectorAll('nav a');
-
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      navLinks.forEach(l => l.classList.remove('active'));
-      const active = document.querySelector('nav a[href="#' + entry.target.id + '"]');
-      if (active) active.classList.add('active');
-    }
-  });
-}, { rootMargin: '-20% 0px -70% 0px' });
-
-sections.forEach(s => observer.observe(s));
-</script>
-
 </body>
 </html>
