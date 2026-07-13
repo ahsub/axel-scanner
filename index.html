@@ -15831,7 +15831,7 @@ async function _loadHomeSektorKondensat() {
 
   try {
     var kvUrl = (typeof KoConfig !== 'undefined' ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev')
-              + '/sync/master_market_data';
+              + '/public/master_market_data';
     var kvResp = await fetch(kvUrl, { cache: 'no-store' });
     if (!kvResp.ok) throw new Error('KV nicht erreichbar');
     var kvResp2 = await kvResp.json();
@@ -15886,7 +15886,7 @@ async function loadSektorRS() {
   // ── Zuerst: KV-Cache (Aggregator-Daten) prüfen ─────────────────
   try {
     var kvUrl  = (typeof KoConfig !== 'undefined' ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev')
-               + '/sync/master_market_data';
+               + '/public/master_market_data';
     var kvResp = await fetch(kvUrl, { cache: 'no-store' });
     if (kvResp.ok) {
       var kvResp2 = await kvResp.json();
@@ -21548,7 +21548,7 @@ async function loadOptionsDesk(force) {
   try {
     var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
     if (!window._alphaData) {
-      var rMaster = await fetch(koSync + '/sync/master_market_data', { cache: 'no-store' });
+      var rMaster = await fetch(koSync + '/public/master_market_data', { cache: 'no-store' });
       if (rMaster.ok) {
         var respMaster = await rMaster.json();
         var dataMaster = respMaster.data || respMaster;
@@ -22008,7 +22008,7 @@ async function loadAlphaDashboard(force) {
 
   try {
     var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
-    var r = await fetch(koSync + '/sync/master_market_data', {cache:'no-store'});
+    var r = await fetch(koSync + '/public/master_market_data', {cache:'no-store'});
     if (!r.ok) throw new Error('KV HTTP ' + r.status);
     var resp = await r.json();
     var data = resp.data || resp;
