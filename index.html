@@ -22205,60 +22205,23 @@ async function runAlphaLbKI() {
   var strat = _lbToStrat[_alphaLB] || 'momentum';
   var stratCfg = (typeof KI_STRAT_CONFIG !== 'undefined') ? KI_STRAT_CONFIG[strat] : null;
   if (!stratCfg) { if (statusEl) statusEl.textContent = 'Strategie-Config fehlt'; return; }
-
   if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere…';
-
-  // Kandidaten aus aktuellem Leaderboard
   var lbData = (_alphaData && _alphaData.leaderboards && _alphaData.leaderboards[_alphaLB]) || [];
   var tickers = lbData.slice(0, 15);
-  if (!tickers.length) {
-    if (statusEl) statusEl.textContent = 'Keine Kandidaten im aktiven Tab';
-    return;
-  }
-
-  var regime  = window._lastQqqRegime || (window._currentRegime) || 'neutral';
-  var vix     = _getVixRobust ? _getVixRobust() : '—';
-  var mseRegime = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '—';
-
-  var ctx = 'MARKTKONTEXT:\nVIX: ' + vix + '\nRegime (MSE): ' + mseRegime + '\nMarkov: ' + regime + '
-
-KANDIDATEN ' + _alphaLB.toUpperCase() + ' (Top-' + tickers.length + '):
-'
-    + tickers.map(function(t, i) {
-        return (i+1) + '. ' + (t.sym||t.ticker||'?')
-          + ' Score:' + (t.score||t.compositeScore||'—')
-          + ' Grade:' + (t.grade||'—')
-          + ' RSI:' + (t.rsi ? Math.round(t.rsi) : '—')
-          + ' Kurs:$' + (t.price||'—')
-          + (t.hvp ? ' HVP:' + t.hvp + '%' : '')
-          + (t.atr ? ' ATR:' + t.atr : '');
-      }).join('
-');
-
+  if (!tickers.length) { if (statusEl) statusEl.textContent = 'Keine Kandidaten im aktiven Tab'; return; }
+  var regime = window._lastQqqRegime || window._currentRegime || 'neutral';
+  var vix = _getVixRobust ? _getVixRobust() : '-';
+  var mseRegime = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '-';
+  var tickerLines = tickers.map(function(t, i) {
+    return (i+1) + '. ' + (t.sym||t.ticker||'?') + ' Score:' + (t.score||t.compositeScore||'-') + ' Grade:' + (t.grade||'-') + ' RSI:' + (t.rsi ? Math.round(t.rsi) : '-') + ' Kurs:$' + (t.price||'-') + (t.hvp ? ' HVP:' + t.hvp + '%' : '') + (t.atr ? ' ATR:' + t.atr : '');
+  }).join('\n');
+  var ctx = 'MARKTKONTEXT:\nVIX: ' + vix + '\nRegime (MSE): ' + mseRegime + '\nMarkov: ' + regime + '\n\nKANDIDATEN ' + _alphaLB.toUpperCase() + ' (Top-' + tickers.length + '):\n' + tickerLines;
   var isExpert = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
-  var prompt = getKiSystemPrompt('Strategie-Leaderboard: ' + stratCfg.label)
-    + '
-
-MESSWERTE:
-' + ctx
-    + '
-
-ANALYSE-PERSPEKTIVE: ' + stratCfg.label
-    + '
-Fokus: ' + (stratCfg.focus ? stratCfg.focus.join(', ') : '')
-    + '
-
-Liste die Top-5 Kandidaten mit je 2 Sätzen: Warum passt dieser Titel heute zu '
-    + stratCfg.label + '? Welcher konkrete Trigger fehlt noch oder ist bereits aktiv?';
-
+  var prompt = getKiSystemPrompt('Strategie-Leaderboard: ' + stratCfg.label) + '\n\nMESSWERTE:\n' + ctx + '\n\nANALYSE-PERSPEKTIVE: ' + stratCfg.label + '\nFokus: ' + (stratCfg.focus ? stratCfg.focus.join(', ') : '') + '\n\nListe die Top-5 Kandidaten mit je 2 Saetzen: Warum passt dieser Titel heute zu ' + stratCfg.label + '? Welcher konkrete Trigger fehlt noch oder ist bereits aktiv?';
   try {
     var result = await koAiCall(isExpert ? 'strategy_eic' : 'strategy', prompt, isExpert);
-    // Ergebnis im KI-Briefing-Bereich anzeigen
     var briefEl = document.getElementById('ki-briefing-text') || document.getElementById('rc-action');
-    if (briefEl) {
-      briefEl.textContent = result;
-      briefEl.style.display = '';
-    }
+    if (briefEl) { briefEl.textContent = result; briefEl.style.display = ''; }
     if (statusEl) statusEl.textContent = '✓ ' + stratCfg.label;
     showKoToast('KI-Analyse: ' + stratCfg.label + ' fertig');
   } catch(e) {
@@ -22266,7 +22229,6 @@ Liste die Top-5 Kandidaten mit je 2 Sätzen: Warum passt dieser Titel heute zu '
     console.warn('[AlphaLbKI]', e.message);
   }
 }
-
 function filterAlpha(f) {
   _alphaFilter = f;
   ['all','long','short'].forEach(function(x) {
