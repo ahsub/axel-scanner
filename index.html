@@ -2534,6 +2534,14 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <button class="alpha-lb-tab" data-lb="short_fading_ko" onclick="switchAlphaLB(this,'short_fading_ko')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.15);color:#f97316;cursor:pointer;font-weight:700">⚠️ KO-Short</button>
     </div>
     <div id="alpha-lb-content" style="margin-top:.4rem;min-height:36px;font-size:11px;color:var(--text3)">–</div>
+    <!-- KI-Analyse Button für aktives Leaderboard -->
+    <div style="display:flex;align-items:center;gap:.5rem;margin-top:.4rem">
+      <button onclick="runAlphaLbKI()"
+        style="font-size:11px;padding:4px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);cursor:pointer">
+        🤖 KI-Analyse für diese Strategie
+      </button>
+      <span id="alpha-lb-ki-status" style="font-size:11px;color:var(--text3)"></span>
+    </div>
     <!-- Leaderboard-Karten (NEU 01.07.2026): befüllt sich beim Klick auf Leaderboard-Tab -->
     <div id="alpha-lb-cards" style="display:none;margin-top:.5rem;display:flex;flex-direction:column;gap:.4rem"></div>
   </div>
@@ -22189,6 +22197,78 @@ function switchAlphaLB(btn, key) {
   if (_alphaData) renderAlphaLB(_alphaData.leaderboards, key);
   // AP-B Cache-Disziplin (08.07.2026): Tab-Wechsel löst keinen KI-Call mehr aus.
   // KI-Analyse nur auf expliziten Nutzer-Wunsch.
+}
+
+async function runAlphaLbKI() {
+  if (!getAiToken()) { showKoToast('KI-Token nicht gesetzt'); return; }
+  var statusEl = document.getElementById('alpha-lb-ki-status');
+  var strat = _lbToStrat[_alphaLB] || 'momentum';
+  var stratCfg = (typeof KI_STRAT_CONFIG !== 'undefined') ? KI_STRAT_CONFIG[strat] : null;
+  if (!stratCfg) { if (statusEl) statusEl.textContent = 'Strategie-Config fehlt'; return; }
+
+  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere…';
+
+  // Kandidaten aus aktuellem Leaderboard
+  var lbData = (_alphaData && _alphaData.leaderboards && _alphaData.leaderboards[_alphaLB]) || [];
+  var tickers = lbData.slice(0, 15);
+  if (!tickers.length) {
+    if (statusEl) statusEl.textContent = 'Keine Kandidaten im aktiven Tab';
+    return;
+  }
+
+  var regime  = window._lastQqqRegime || (window._currentRegime) || 'neutral';
+  var vix     = _getVixRobust ? _getVixRobust() : '—';
+  var mseRegime = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '—';
+
+  var ctx = 'MARKTKONTEXT:
+VIX: ' + vix + '
+Regime (MSE): ' + mseRegime + '
+Markov: ' + regime
+    + '
+
+KANDIDATEN ' + _alphaLB.toUpperCase() + ' (Top-' + tickers.length + '):
+'
+    + tickers.map(function(t, i) {
+        return (i+1) + '. ' + (t.sym||t.ticker||'?')
+          + ' Score:' + (t.score||t.compositeScore||'—')
+          + ' Grade:' + (t.grade||'—')
+          + ' RSI:' + (t.rsi ? Math.round(t.rsi) : '—')
+          + ' Kurs:$' + (t.price||'—')
+          + (t.hvp ? ' HVP:' + t.hvp + '%' : '')
+          + (t.atr ? ' ATR:' + t.atr : '');
+      }).join('
+');
+
+  var isExpert = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
+  var prompt = getKiSystemPrompt('Strategie-Leaderboard: ' + stratCfg.label)
+    + '
+
+MESSWERTE:
+' + ctx
+    + '
+
+ANALYSE-PERSPEKTIVE: ' + stratCfg.label
+    + '
+Fokus: ' + (stratCfg.focus ? stratCfg.focus.join(', ') : '')
+    + '
+
+Liste die Top-5 Kandidaten mit je 2 Sätzen: Warum passt dieser Titel heute zu '
+    + stratCfg.label + '? Welcher konkrete Trigger fehlt noch oder ist bereits aktiv?';
+
+  try {
+    var result = await koAiCall(isExpert ? 'strategy_eic' : 'strategy', prompt, isExpert);
+    // Ergebnis im KI-Briefing-Bereich anzeigen
+    var briefEl = document.getElementById('ki-briefing-text') || document.getElementById('rc-action');
+    if (briefEl) {
+      briefEl.textContent = result;
+      briefEl.style.display = '';
+    }
+    if (statusEl) statusEl.textContent = '✓ ' + stratCfg.label;
+    showKoToast('KI-Analyse: ' + stratCfg.label + ' fertig');
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Fehler: ' + e.message;
+    console.warn('[AlphaLbKI]', e.message);
+  }
 }
 
 function filterAlpha(f) {
