@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260713-v319">
+<meta name="version" content="20260713-v320">
 <!-- CHANGELOG (neueste zuerst):
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -20272,7 +20272,7 @@ function getMorningBriefingPrompt(messwerteLines, mseRegime, regime, vixZone, re
 
 var _morningRunning = false;
 
-async function runMorningBriefing() {
+async function runMorningBriefing(forceRefresh) {
   if (_morningRunning) return;
 
   // Morning Briefing lädt IMMER frisch — kein Cache-Rückgriff
@@ -20425,11 +20425,16 @@ async function runMorningBriefing() {
     var _snapshotTs   = null;
 
     // Cache-First: daily_market_snapshot aus KV laden (serverseitig generiert)
+    // EIC-Override: forceRefresh=true überspringt KV-Cache — nur für EIC-User
+    var _eicForce = forceRefresh && (typeof _expertModeActive !== 'undefined') && _expertModeActive && _eicUnlocked;
+    if (_eicForce) {
+      console.log('[Morning] EIC-Refresh: KV-Cache übersprungen');
+    }
     try {
-      var _snapResp = await fetch(
+      var _snapResp = !_eicForce ? await fetch(
         'https://ko-sync.ahildebrand.workers.dev/public/daily_market_snapshot',
         { cache: 'no-store' }
-      );
+      ) : null;
       if (_snapResp.ok) {
         var _snapData = await _snapResp.json();
         if (_snapData.ok && _snapData.briefing && _snapData.generated) {
@@ -20687,6 +20692,18 @@ async function runMorningBriefing() {
     var _homeActive = _homePanel && _homePanel.classList.contains('active');
     if (typeof showPanel === 'function' && !_homeActive) {
       setTimeout(function(){ showPanel('scanner'); }, 800);
+    }
+    // EIC: Refresh-Button einblenden
+    var _refreshBtn = document.getElementById('home-refresh-btn');
+    if (_refreshBtn) {
+      var _isEic = (typeof _expertModeActive !== 'undefined') && _expertModeActive && _eicUnlocked;
+      _refreshBtn.style.display = _isEic ? 'inline-block' : 'none';
+      if (_isEic) {
+        _refreshBtn.title = _snapshotUsed
+          ? 'EIC: Briefing neu generieren (KV-Cache überspringen)'
+          : 'Briefing neu generieren';
+        _refreshBtn.onclick = function() { runMorningBriefing(true); };
+      }
     }
     if (cacheEl) {
       if (_snapshotUsed && _snapshotTs) {
