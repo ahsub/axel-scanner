@@ -22220,11 +22220,7 @@ async function runAlphaLbKI() {
   var vix     = _getVixRobust ? _getVixRobust() : '—';
   var mseRegime = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '—';
 
-  var ctx = 'MARKTKONTEXT:
-VIX: ' + vix + '
-Regime (MSE): ' + mseRegime + '
-Markov: ' + regime
-    + '
+  var ctx = 'MARKTKONTEXT:\nVIX: ' + vix + '\nRegime (MSE): ' + mseRegime + '\nMarkov: ' + regime + '
 
 KANDIDATEN ' + _alphaLB.toUpperCase() + ' (Top-' + tickers.length + '):
 '
