@@ -10184,7 +10184,8 @@ async function autoMakro(){
     sektorContext += 'Rotations-Signal: ' + rotationSignal + '\n';
     sorted.forEach(function(s){
       const trend = s.rs1d >= 0 ? '↑' : '↓';
-      sektorContext += s.sym + ' (' + s.name + '): ' + (s.rs5d>=0?'+':'') + s.rs5d.toFixed(2) + '% 5d, ' + (s.rs1d>=0?'+':'') + s.rs1d.toFixed(2) + '% 1d ' + trend + '\n';
+      var _r5 = (s.rs5d != null ? s.rs5d : 0); var _r1 = (s.rs1d != null ? s.rs1d : 0);
+      sektorContext += s.sym + ' (' + (s.name||s.sym) + '): ' + (_r5>=0?'+':'') + _r5.toFixed(2) + '% 5d, ' + (_r1>=0?'+':'') + _r1.toFixed(2) + '% 1d ' + trend + '\n';
     });
   } else {
     sektorContext = '\n\n[Sektor-RS-Daten nicht geladen — bitte Sektor-Tabelle aktualisieren]\n';
