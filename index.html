@@ -20410,10 +20410,39 @@ async function runMorningBriefing() {
       });
     }
 
-    // ── 9/9: Auto-Makro KI-Analyse ───────────────────────────────
-    setStep('9/9 KI-Makro-Analyse…');
+    // ── 9/9: KI-Briefing — Cache-First (daily_market_snapshot) ──────────────────
+    setStep('9/9 KI-Briefing…');
+    var _snapshotUsed = false;
+    var _snapshotTs   = null;
+
+    // Cache-First: daily_market_snapshot aus KV laden (serverseitig generiert)
+    try {
+      var _snapResp = await fetch(
+        'https://ko-sync.ahildebrand.workers.dev/public/daily_market_snapshot',
+        { cache: 'no-store' }
+      );
+      if (_snapResp.ok) {
+        var _snapData = await _snapResp.json();
+        if (_snapData.ok && _snapData.briefing && _snapData.generated) {
+          // Nur verwenden wenn Snapshot von heute (UTC)
+          var _snapDate = (_snapData.generated || '').slice(0, 10);
+          var _todayUtc = new Date().toISOString().slice(0, 10);
+          if (_snapDate === _todayUtc) {
+            results.kiBriefing       = _snapData.briefing;
+            results.kiBriefingFailed = false;
+            _snapshotUsed = true;
+            _snapshotTs   = _snapData.generated;
+            console.log('[Morning] Briefing aus KV-Cache geladen (' + _snapData.generated + ')');
+          }
+        }
+      }
+    } catch(_snapErr) {
+      console.warn('[Morning] Snapshot-Cache nicht erreichbar:', _snapErr.message);
+    }
+
+    // Fallback: eigener Anthropic-Call (nur wenn kein frischer Cache)
     var antKey = getAiToken();
-    if (antKey) {
+    if (!_snapshotUsed && antKey) {
       // Intermarket-Daten sammeln
       var intermarketScore = document.getElementById('intermarket-score')?.textContent || '—';
       var breadthVal       = document.getElementById('breadth-pct')?.textContent || '—';
@@ -20650,7 +20679,19 @@ async function runMorningBriefing() {
     if (typeof showPanel === 'function' && !_homeActive) {
       setTimeout(function(){ showPanel('scanner'); }, 800);
     }
-    if (cacheEl) cacheEl.textContent = 'Heute ' + results.time + ' Uhr';
+    if (cacheEl) {
+      if (_snapshotUsed && _snapshotTs) {
+        // Zeitstempel des serverseitigen Snapshots in MEZ umrechnen
+        var _snapDt  = new Date(_snapshotTs);
+        var _snapMEZ = _snapDt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' });
+        var _snapDay = _snapDt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Berlin' });
+        cacheEl.textContent = 'Stand: ' + _snapDay + ' · ' + _snapMEZ + ' MEZ (Aggregator-Cache)';
+        cacheEl.style.color = 'var(--green)';
+      } else {
+        cacheEl.textContent = 'Stand: Heute ' + results.time + ' Uhr (live generiert)';
+        cacheEl.style.color = 'var(--text3)';
+      }
+    }
 
   } catch(e) {
     console.error('[Morning Briefing] Fehler:', e);
@@ -20659,7 +20700,12 @@ async function runMorningBriefing() {
     _morningRunning = false;
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<i class="ti ti-check"></i> Briefing abgeschlossen · ' + results.time;
+      btn.innerHTML = _snapshotUsed
+        ? '<i class="ti ti-check"></i> Briefing bereit · Cache ' + (function(ts){
+            var d=new Date(ts);
+            return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Berlin'})+' MEZ';
+          })(_snapshotTs || new Date().toISOString())
+        : '<i class="ti ti-check"></i> Briefing abgeschlossen · ' + results.time;
     }
   }
 }
