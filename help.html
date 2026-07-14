@@ -168,7 +168,7 @@
 <nav>
   <div class="nav-brand">
     <h1>📡 UNDERLYINGIQ</h1>
-    <p>Bedienungsanleitung v309</p>
+    <p>Bedienungsanleitung v328</p>
   </div>
 
   <div class="nav-group">
@@ -686,24 +686,75 @@
     </div>
   </section>
 
+  <!-- ── MCM & VCP (14.07.2026) ── -->
+  <section id="mcm-vcp">
+    <h2>🧭 Market Context Module &amp; VCP Detection <span class="badge badge-blue">v322–v328</span></h2>
+
+    <h3>Market Context Module (MCM)</h3>
+    <p>Das MCM ist die Single Source of Truth für die Strategie-Ampel UND die
+    KI-Marktanalyse — beide lesen jetzt aus demselben <span class="tag">market_context</span>-Objekt,
+    das erst gebaut wird, wenn alle Messwerte vollständig geladen sind (kein
+    Ampel-KI-Widerspruch mehr). Enthält Signal-Flags (ok/caution/risk) für
+    VIX, VVIX, SKEW, PCR, Fear&amp;Greed, Breadth, Treasury Stress, Intermarket
+    und Bull-Indikator, plus drei Calendar-Faktoren: FOMC-, NFP- und
+    CPI-Fenster (aus <span class="tag">macro-calendar.json</span>, mit Karenzzeit
+    um den exakten Decision-Zeitpunkt). Die Strategie-Ampel wird über
+    <span class="tag">calcStrategyGates()</span> berechnet — Regime-Basis-Gates
+    werden bei Bedarf durch den Context verschärft (grün→gelb bei „caution",
+    gelb/grün→rot bei „risk"), nie gelockert. Läuft identisch im Frontend (JS)
+    UND serverseitig im Aggregator (Python-Port seit v5.8.2) — das serverseitig
+    generierte Morning Briefing (Cache-Pfad) nutzt denselben Context wie die
+    Live-Ampel im Browser.</p>
+
+    <h3>Intraday-Vergleich Morgen vs. NYSE <span class="badge badge-blue">v327</span></h3>
+    <p>Im Morning-Briefing-Tearsheet zeigt eine neue Sektion den Unterschied
+    zwischen dem Morgen-Snapshot (Xetra-Lauf) und dem NYSE-Nachmittagslauf —
+    Regime, VIX, Fear&amp;Greed, PCR und aggregiertes Risk-Level im direkten
+    Vergleich. Erscheint erst, sobald ein NYSE-Lauf für den aktuellen Tag
+    vorliegt (üblicherweise ab ~13:30 UTC / 15:30 MESZ).</p>
+
+    <h3>VCP Detection — Volatility Contraction Pattern <span class="badge badge-purple">v5.9</span></h3>
+    <p>Erkennt das Minervini-VCP-Muster: mehrere aufeinanderfolgende, enger
+    werdende Kurskorrekturen im intakten Aufwärtstrend („Coiling" vor einem
+    Breakout). Basiert auf Swing-Hoch/-Tief-Erkennung über die letzten 90
+    Handelstage; die letzte Korrektur muss enger sein als der Durchschnitt
+    der vorherigen (bewusste Toleranz-Regel, keine stur monotone Abfolge).
+    Zusätzliches Gate: Preis muss über dem SMA150 liegen (Trend-Filter).</p>
+    <p><strong>Sprint 1 (aktuell):</strong> reine Preis-Struktur. Volumen-Bestätigung
+    (abnehmendes Volumen in späteren Contractions) ist bewusst noch nicht
+    enthalten — als Sprint 2 vorgemerkt, sobald Praxis-Erfahrung mit dem
+    aktuellen Leaderboard vorliegt.</p>
+    <p>Neues Leaderboard-Tab „📐 VCP" im Alpha Desk. Felder:
+    <span class="tag">vcpDetected</span> · <span class="tag">vcpContractions</span> ·
+    <span class="tag">vcpLastPct</span> · <span class="tag">vcpAvgPrevPct</span></p>
+  </section>
+
   <!-- ── ARCHITEKTUR ── -->
   <section id="architektur">
     <h2>🏗️ Architektur &amp; Cache</h2>
 
-    <h3>Aggregator-Lauf (täglich, 04:00 UTC Mo–Sa)</h3>
-    <p>GitHub Actions triggert <span class="tag">market_aggregator.py</span> v5.8.1.
-    Der Lauf analysiert 678 Ticker über 22 Watchlisten und schreibt drei KV-Keys:</p>
+    <h3>Aggregator-Lauf (zweimal täglich: 03:37 UTC Mo–Sa + 13:30 UTC Mo–Fr)</h3>
+    <p>GitHub Actions triggert <span class="tag">market_aggregator.py</span> v5.9.0.
+    Der Morgen-Lauf (vor Xetra-Öffnung) und der NYSE-Lauf (vor US-Marktöffnung)
+    analysieren das Ticker-Universum über alle Watchlisten und schreiben mehrere
+    KV-Keys, darunter <span class="tag">daily_market_snapshot</span> (Morgen) und
+    <span class="tag">daily_market_snapshot_us</span> (NYSE) für das serverseitige
+    Morning Briefing. Ein zusätzlicher Cloudflare-Worker (<span class="tag">ko-watchdog</span>)
+    dispatcht den Lauf redundant, falls der GitHub-eigene Schedule ausfällt
+    oder stark verzögert ist.</p>
     <table>
       <tr><th>KV-Key</th><th>Inhalt</th><th>Zugriff</th></tr>
       <tr><td><span class="tag">master_market_data</span></td><td>Vollständiger Aggregator-Output (alle Ticker, Scores, Indikatoren)</td><td>Öffentlich via <span class="tag">/public/</span></td></tr>
       <tr><td><span class="tag">options_watchlist</span></td><td>Top-50 Options-Kandidaten</td><td>Öffentlich</td></tr>
-      <tr><td><span class="tag">daily_market_snapshot</span></td><td>Serverseitig generiertes Morning Briefing (KI-Text)</td><td>Öffentlich, gecacht</td></tr>
+      <tr><td><span class="tag">daily_market_snapshot</span></td><td>Serverseitig generiertes Morning Briefing (KI-Text), Morgen-Lauf</td><td>Öffentlich, gecacht</td></tr>
+      <tr><td><span class="tag">daily_market_snapshot_us</span></td><td>Dito, NYSE-Lauf — ermöglicht Intraday-Vergleich</td><td>Öffentlich, gecacht</td></tr>
     </table>
 
     <h3>ko-watchdog</h3>
-    <p>Cloudflare Worker, Cron 04:15 UTC Mo–Sa. Prüft ob <span class="tag">master_market_data</span>
+    <p>Cloudflare Worker, zwei Crons: 04:15 UTC Mo–Sa (Morgen-Lauf) und
+    13:45 UTC Mo–Fr (NYSE-Lauf). Prüft ob <span class="tag">master_market_data</span>
     frisch ist. Falls nicht (GHA-Cron ausgefallen) → triggert <span class="tag">workflow_dispatch</span>
-    via GitHub API als Fallback.</p>
+    via GitHub API als Fallback. Manueller Test: <span class="tag">/trigger</span>-Endpoint.</p>
 
     <h3>ko-sync (v2.1)</h3>
     <p>Cloudflare Worker für User-Sync (Watchlisten, Backlogs) mit Token-Isolation.
@@ -899,7 +950,7 @@
     Prompt-Architekturen und KI-Systemkonfigurationen.</p>
     <p>Alle Inhalte dienen ausschließlich zur Information. Keine Anlageberatung gem. §1 WpHG.
     Investitionen in Finanzinstrumente sind mit Risiken verbunden. Handeln auf eigenes Risiko.</p>
-    <p style="margin-top:.5rem;color:var(--accent)">Version v309 · Stand: 13. Juli 2026 · underlyingiq.com</p>
+    <p style="margin-top:.5rem;color:var(--accent)">Version v328 · Stand: 14. Juli 2026 · underlyingiq.com</p>
   </footer>
 
 </main>

@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260714-v328">
+<meta name="version" content="20260714-v329">
 <!-- CHANGELOG (neueste zuerst):
+     v329: VCP-Setups Leaderboard-Tab im Alpha Desk (Backlog #18 Sprint 1 UI) — 9. Leaderboard-Tab "📐 VCP" ergänzt (switchAlphaLB/renderAlphaLB sind generisch, brauchten nur Tab-Button + Farb-/Strategie-Mapping). Chip-Tooltip zeigt bei VCP-Items zusätzlich Contraction-Anzahl + letzte Korrektur-% (vcpContractions/vcpLastPct aus dem Aggregator-Leaderboard). KI-Analyse-Button vorerst auf bestehende momentum-Strategie gemappt (eigene VCP-Prompt-Strategie wäre eigener Sprint).
      v328: KoMarkov-Cleanup (Zufallsfund aus calc_markov()-Audit, 14.07.2026) — KoMarkov-Namespace (ko-markov.js) war zuvor toter Code, nirgends im Codebase aufgerufen; die tatsaechlich genutzte calcMarkovRegime() wurde an 4 Stellen in fetchQqqRegime() DIREKT aufgerufen statt ueber KoMarkov.calc() (Feature-Flag-Check + try/catch). Jetzt: alle 4 Stellen routen ueber KoMarkov.calc() (Fallback auf Direktaufruf falls KoMarkov nicht geladen). Zusaetzlich: renderQqqBanner()'s eigene 4-zeilige bbColor-Farblogik war 1:1-Duplikat von KoMarkov.levelColor() — konsolidiert.
      v327: Intraday-Vergleich Morgen vs. NYSE (Backlog #1, Übergabeprotokoll 13.07.2026) — neue Sektion im Morning-Briefing-Tearsheet (renderIntradayComparison()), laedt daily_market_snapshot + daily_market_snapshot_us parallel und vergleicht Regime/VIX/Fear&Greed/PCR/Risk-Level aus marketContext.factors (MCM, Single Source of Truth). Faellt sauber zurueck wenn NYSE-Lauf noch nicht stattgefunden hat (vor ~13:30 UTC) oder beide Snapshots identisch sind (kein neuer Lauf seit dem Morgen). Async nachgeladen (Modal oeffnet sofort, Platzhalter "Lädt…"), 3 Testfaelle funktional verifiziert (Delta-Anzeige, NYSE-noch-nicht-verfuegbar, identische Snapshots).
      v326: ZWEI weitere Bugs aus Screenshot-Analyse (Axel, Makro-Tab "Tagesfazit" zeigte VIX 16.3 + Gold $409230 trotz korrektem Gold $4081.10 im Widget darüber). (1) VIX-Stagnation-Root-Cause: fetchVix() (eigene VIX-Quelle für #m-vix, getrennt von den v324/v325-Fixes) wurde an 2 Aufrufstellen durch `if(_vixLevel===null)`-Guards NACH DEM ERSTEN FETCH DER SESSION NIE WIEDER aufgerufen — die intern bereits vorhandene 30min-TTL-Logik in fetchVix() selbst wurde dadurch komplett ausser Kraft gesetzt, VIX blieb de facto für die gesamte Session eingefroren. Fix: Guards entfernt, fetchVix() wird jetzt immer aufgerufen, interne TTL entscheidet. Zusätzlich: fetchVix()'s eigener Proxy-Call bekam ebenfalls _cb=Date.now()+no-store (war in v325 übersehen, eigene Funktion). (2) Gold-Formatierungsbug: generateRuleBasedSummary() nahm bedingungslos deutsches Zahlenformat an (Punkt=Tausender, Komma=Dezimal) und entfernte den Punkt — bei tatsächlich englisch formatierten Live-Werten ("4092.30") wurde dadurch der Dezimalpunkt selbst gelöscht -> "409230" (Faktor 100 Fehler). Neue Hilfsfunktion `_parseLocaleNumber()` erkennt das Format anhand Punkt/Komma-Position, funktional gegen alle 4 bekannten Formate getestet (DE/EN/US-Tausender/Bug-Fall).
@@ -2544,6 +2545,8 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <button class="alpha-lb-tab" data-lb="ko_long" onclick="switchAlphaLB(this,'ko_long')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #818cf8;background:rgba(129,140,248,0.12);color:#818cf8;cursor:pointer">⚡ KO-Long</button>
       <button class="alpha-lb-tab" data-lb="options_csp" onclick="switchAlphaLB(this,'options_csp')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">🎯 CSP/Wheel</button>
       <button class="alpha-lb-tab" data-lb="options_cc" onclick="switchAlphaLB(this,'options_cc')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.08);color:var(--green);cursor:pointer">📋 Cov. Call</button>
+      <!-- NEU (14.07.2026): VCP Detection Leaderboard (Backlog #18, Sprint 1) -->
+      <button class="alpha-lb-tab" data-lb="vcp_setups" onclick="switchAlphaLB(this,'vcp_setups')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #a855f7;background:rgba(168,85,247,0.1);color:#a855f7;cursor:pointer">📐 VCP</button>
     </div>
     <div id="alpha-lb-content" style="margin-top:.4rem;min-height:36px;font-size:11px;color:var(--text3)">–</div>
     <!-- KI-Analyse Button für aktives Leaderboard -->
@@ -22383,7 +22386,8 @@ function renderAlphaLB(lb, key) {
   var col = key === 'long_minervini' ? 'var(--green)'
           : key === 'long_swing'     ? '#06b6d4'
           : key === 'long_mr'        ? 'var(--amber)'
-          : key === 'short_breakdown'? 'var(--red)' : '#f97316';
+          : key === 'short_breakdown'? 'var(--red)'
+          : key === 'vcp_setups'     ? '#a855f7' : '#f97316';
 
   // Chip-Reihe (bestehend, kompakter Überblick)
   var wrap = document.createElement('div');
@@ -22392,7 +22396,9 @@ function renderAlphaLB(lb, key) {
     var chip = document.createElement('div');
     chip.style.cssText = 'font-size:10px;padding:2px 7px;border-radius:5px;background:var(--bg3);border:0.5px solid var(--border2);cursor:pointer';
     var macdStr = x.macd != null ? (x.macd > 0 ? ' ▲' : ' ▼') : '';
-    chip.title = 'Score: ' + x.score + (x.macd != null ? ' · MACD: ' + (x.macd > 0 ? 'bullish' : 'bearish') : '') + ' · Klick: DeepDive';
+    var vcpInfo = (key === 'vcp_setups' && x.vcpContractions != null)
+      ? ' · ' + x.vcpContractions + ' Contractions, letzte ' + (x.vcpLastPct != null ? x.vcpLastPct + '%' : '?') : '';
+    chip.title = 'Score: ' + x.score + (x.macd != null ? ' · MACD: ' + (x.macd > 0 ? 'bullish' : 'bearish') : '') + vcpInfo + ' · Klick: DeepDive';
     chip.innerHTML = '<span style="font-family:var(--mono);font-weight:600;color:' + col + '">' + x.sym + '</span>'
       + '<span style="color:var(--text3)"> ' + x.score + macdStr + '</span>'
       + '<span onclick="(function(e,s){e.stopPropagation();window.open(\'https://www.tradingview.com/chart/?symbol=\'+s,\'_blank\');})(event,\'" + x.sym + "\')" '
@@ -22422,6 +22428,10 @@ var _lbToStrat = {
   ko_long:         'ko',
   options_csp:     'options',
   options_cc:      'weekly_income',
+  // NEU (14.07.2026): VCP ist im Kern ein Momentum/Breakout-Setup — eigene
+  // KI-Prompt-Strategie waere eigener Sprint (KoPrompts.STRATEGIES), erstmal
+  // auf bestehende momentum-Strategie gemappt.
+  vcp_setups:      'momentum',
 };
 
 function switchAlphaLB(btn, key) {
