@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260714-v323">
+<meta name="version" content="20260714-v324">
 <!-- CHANGELOG (neueste zuerst):
+     v324: BUGFIX VIX-Cache-Stagnation — updateMarketWeatherWidget()'s fetchYahoo() rief bei jedem Aufruf eine IDENTISCHE URL auf (kein Cache-Buster), dadurch Cache-Treffer (Browser-HTTP-Cache und/oder CF-Worker-Proxy-Edge-Cache) über Stunden hinweg. Beobachtet von Axel: VIX zeigte 08:20–14:35 Uhr durchgehend 16.24, obwohl VIX real auf 17.33 gestiegen war (externer Gegencheck). Fix: Query-Param `_cb=Date.now()` + `{cache:'no-store'}` erzwingen bei jedem Aufruf eine echte Netzwerk-Anfrage für VVIX/SKEW/VIX/VIX3M. BEKANNTE VERWANDTE EINSCHRÄNKUNG: identisches Muster (kein Cache-Buster) an mind. 5 weiteren corsProxy-Fetch-Stellen (Home-Mover-Widget Aktivste/Volumen/Winner/Loser, Gainers/Losers-Screener, Deep-Dive-Einzeltitel-Fetch) — noch NICHT gefixt, siehe SUITE.md Backlog.
      v323.2: CDN-Hash ko-indicators-loader -> 2c17275 (ko-modules v1.2.1). Fix: macro-calendar.json wurde vom Client same-origin (/macro-calendar.json) gefetcht — der manuelle Deploy-Prozess (index.html+help.html zippen, CF Pages hochladen) nimmt neue statische Dateien nie mit, die Datei war im Git-Repo aber nie live erreichbar (CF gab 404-HTML zurück -> JSON.parse-Crash "Unexpected token <"). Jetzt: Fetch direkt von raw.githubusercontent.com/ahsub/axel-scanner/main/macro-calendar.json, identisch zur Python-Server-Lösung — eine Quelle, entkoppelt vom Deploy-Zip.
      v323.1: showMSEDetail()-Modal (MSE-Detail-Ampel) rief noch direkt KoMarketState.getStrategyGates(regime) auf statt window._lastMseResult zu nutzen — 4. übersehener Ampel-Renderer, Ursache der Home-vs-Modal-Farbabweichung. Fix: Strategie-Farben kommen jetzt aus _lastMseResult, Header (Label/Beschreibung) bleibt Regime-Text. (1) window.renderGateWidget()/renderAllGateWidgets() + Event 'ko:regimeChanged' ersetzen 4 duplizierte Ampel-Render-Blöcke (App-Start, mse-gates in updateMarketWeatherWidget, home-strategy-gates Haupt- + Fallback-Pfad) — jede Stelle die window._lastMseResult ändert dispatched das Event, ALLE Widgets zeichnen synchron neu, kein Refresh-Lag mehr zwischen Makro-Panel und Home-Ampel. Löst die in v322 dokumentierte bekannte Einschränkung. (2) macro-calendar.json v1.1.0 + ko-indicators-loader v1.2.0: FOMC/CPI-Termine gegen federalreserve.gov/bls.gov abgeglichen (Axel, 14.07.2026) — v1.0.0 hatte Timezone '-04:00' hardcodiert, was bei EST-Terminen nach DST-Ende (10.11./10.12.) 1h daneben gelegen hätte. Jetzt: explizite UTC-Zeitstempel (decision_utc/meeting_start_utc), FOMC-Zweitage-Fenster, bufferMinutes für Karenzzeit um den Decision-Moment (FOMC 15min, NFP/CPI 10min).
      v322: MCM (Market Context Module) — Option C, konzeptuell sauber: buildMarketContext() (ko-indicators-loader v1.1.0) baut NACH dem Polling-Gate (vollständiger Datenbasket) den market_context aus der Registry (ko-indicators.json v2.0.0: enabled/weight/signalRules je Indikator + 3 Calendar-Faktoren FOMC/NFP/CPI aus macro-calendar.json, fail-closed). Single Source of Truth für BEIDE Konsumenten: (1) KoMarketState.calcStrategyGates(ctx) (ko-market-state v2.1) — Regime-Basis-Gates + deklarative CONTEXT_DOWNGRADE_RULES (caution: green→amber, risk: green/amber→red, nie Upgrades, Downgrade-Grund in note+_context.downgrades) → window._lastMseResult wird mit finalen Gates überschrieben, renderHomeLanding() nach _applyMorningResults neu aufgerufen. (2) KI-Prompt: contextToPromptLines(ctx) als führender Block + berechnete Ampel-Downgrades mit Auftrag "konsistent erklären, nicht widersprechen". Behebt: KI-Interpretation auf Teildaten / Ampel-KI-Diskrepanz (Ampel war rein regime-basiert ohne Breadth/TSI/DP/Calendar). Bekannte Einschränkung: mse-gates-Widget (Makro-Panel) zeigt bis zum nächsten Widget-Refresh noch Regime-Basis-Gates — Vereinheitlichung Gate-Renderer = nächster Sprint.
@@ -19671,8 +19672,15 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
 
   async function fetchYahoo(sym) {
     try {
-      var url = 'https://query1.finance.yahoo.com/v7/finance/chart/' + encodeURIComponent(sym) + '?interval=1d&range=30d';
-      var r   = await fetch(corsProxy + '/?url=' + encodeURIComponent(url));
+      // BUGFIX (14.07.2026, Axel): VIX blieb ueber Stunden bei identischem Wert
+      // stehen (16.24 von 08:20 bis 14:35 Uhr, waehrend VIX real auf 17.33
+      // gestiegen war) — Ursache: identische URL bei jedem Aufruf, dadurch
+      // Cache-Treffer (Browser-HTTP-Cache und/oder CF-Worker-Proxy-Edge-Cache).
+      // Fix: Cache-Buster-Timestamp im Query-String + {cache:'no-store'}
+      // erzwingt bei jedem Aufruf eine echte Netzwerk-Anfrage.
+      var url = 'https://query1.finance.yahoo.com/v7/finance/chart/' + encodeURIComponent(sym)
+              + '?interval=1d&range=30d&_cb=' + Date.now();
+      var r   = await fetch(corsProxy + '/?url=' + encodeURIComponent(url), { cache: 'no-store' });
       if (!r.ok) return null;
       var j   = await r.json();
       var res = j?.chart?.result?.[0];
