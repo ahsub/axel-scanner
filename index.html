@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260714-v327">
+<meta name="version" content="20260714-v328">
 <!-- CHANGELOG (neueste zuerst):
+     v328: KoMarkov-Cleanup (Zufallsfund aus calc_markov()-Audit, 14.07.2026) — KoMarkov-Namespace (ko-markov.js) war zuvor toter Code, nirgends im Codebase aufgerufen; die tatsaechlich genutzte calcMarkovRegime() wurde an 4 Stellen in fetchQqqRegime() DIREKT aufgerufen statt ueber KoMarkov.calc() (Feature-Flag-Check + try/catch). Jetzt: alle 4 Stellen routen ueber KoMarkov.calc() (Fallback auf Direktaufruf falls KoMarkov nicht geladen). Zusaetzlich: renderQqqBanner()'s eigene 4-zeilige bbColor-Farblogik war 1:1-Duplikat von KoMarkov.levelColor() — konsolidiert.
      v327: Intraday-Vergleich Morgen vs. NYSE (Backlog #1, Übergabeprotokoll 13.07.2026) — neue Sektion im Morning-Briefing-Tearsheet (renderIntradayComparison()), laedt daily_market_snapshot + daily_market_snapshot_us parallel und vergleicht Regime/VIX/Fear&Greed/PCR/Risk-Level aus marketContext.factors (MCM, Single Source of Truth). Faellt sauber zurueck wenn NYSE-Lauf noch nicht stattgefunden hat (vor ~13:30 UTC) oder beide Snapshots identisch sind (kein neuer Lauf seit dem Morgen). Async nachgeladen (Modal oeffnet sofort, Platzhalter "Lädt…"), 3 Testfaelle funktional verifiziert (Delta-Anzeige, NYSE-noch-nicht-verfuegbar, identische Snapshots).
      v326: ZWEI weitere Bugs aus Screenshot-Analyse (Axel, Makro-Tab "Tagesfazit" zeigte VIX 16.3 + Gold $409230 trotz korrektem Gold $4081.10 im Widget darüber). (1) VIX-Stagnation-Root-Cause: fetchVix() (eigene VIX-Quelle für #m-vix, getrennt von den v324/v325-Fixes) wurde an 2 Aufrufstellen durch `if(_vixLevel===null)`-Guards NACH DEM ERSTEN FETCH DER SESSION NIE WIEDER aufgerufen — die intern bereits vorhandene 30min-TTL-Logik in fetchVix() selbst wurde dadurch komplett ausser Kraft gesetzt, VIX blieb de facto für die gesamte Session eingefroren. Fix: Guards entfernt, fetchVix() wird jetzt immer aufgerufen, interne TTL entscheidet. Zusätzlich: fetchVix()'s eigener Proxy-Call bekam ebenfalls _cb=Date.now()+no-store (war in v325 übersehen, eigene Funktion). (2) Gold-Formatierungsbug: generateRuleBasedSummary() nahm bedingungslos deutsches Zahlenformat an (Punkt=Tausender, Komma=Dezimal) und entfernte den Punkt — bei tatsächlich englisch formatierten Live-Werten ("4092.30") wurde dadurch der Dezimalpunkt selbst gelöscht -> "409230" (Faktor 100 Fehler). Neue Hilfsfunktion `_parseLocaleNumber()` erkennt das Format anhand Punkt/Komma-Position, funktional gegen alle 4 bekannten Formate getestet (DE/EN/US-Tausender/Bug-Fall).
      v325: SYSTEMWEITER Cache-Buster-Fix (Axel-Anweisung, 14.07.2026) — alle 9 corsProxy-Fetch-Stellen im Code (day_gainers/day_losers-Screener, fetchYFScreener-Helper, DE-Ticker-Loops x2 im Mover-Modal, fetchSingleForDeepDive, Treasury-Stress fetchYF, VIX-Fallback in calcTreasuryStress) bekommen jetzt _cb=Date.now()-Query-Param + {cache:'no-store'} — identischer Fix wie v324, aber vollständig statt nur im Makro-Widget. Betroffen waren u.a. das Home-Mover-Widget (Aktivste/Volumen/Winner/Loser), das im allerersten Screenshot des Tages ebenfalls bei "—"/"laden" hing.
@@ -15706,10 +15707,9 @@ function renderQqqBanner(markov) {
   // P(Bull→Bear) Trendbruch-Frühwarner
   const pBull2Bear  = markov.pBull2Bear || (m20 ? m20.bull.bear : 0);
   const bbRisk      = markov.bullBearRisk || 'OK';
-  const bbColor     = bbRisk === 'GEFAHR'  ? 'var(--red)'
-                    : bbRisk === 'WARNUNG' ? 'var(--amber)'
-                    : bbRisk === 'ERHOHT'  ? '#f59e0b'
-                    : 'var(--green)';
+  const bbColor     = (typeof KoMarkov !== 'undefined')
+    ? KoMarkov.levelColor(bbRisk)
+    : (bbRisk === 'GEFAHR' ? 'var(--red)' : bbRisk === 'WARNUNG' ? 'var(--amber)' : bbRisk === 'ERHOHT' ? '#f59e0b' : 'var(--green)');
   const bbPct       = Math.round(pBull2Bear * 100);
   const sigBer      = markov.signalBereinigt != null ? markov.signalBereinigt : signal;
 
@@ -15777,7 +15777,7 @@ async function fetchQqqRegime() {
       const j = await r.json();
       if (!j.values || j.values.length < 25) throw new Error('TD zu wenig Daten');
       const closes = [...j.values].reverse().map(function(v){ return parseFloat(v.close); });
-      _qqqRegime = calcMarkovRegime(closes);
+      _qqqRegime = (typeof KoMarkov !== 'undefined') ? KoMarkov.calc(closes) : calcMarkovRegime(closes);
       renderQqqBanner(_qqqRegime);
       return;
     } catch(e) { console.warn('QQQ TD fehlgeschlagen:', e.message, '→ Yahoo Fallback'); }
@@ -15787,7 +15787,7 @@ async function fetchQqqRegime() {
   try {
     const closes = await tryYahooQQQ('https://my-cors-proxy.ahildebrand.workers.dev');
     if (closes.length < 25) throw new Error('zu wenig Daten: ' + closes.length);
-    _qqqRegime = calcMarkovRegime(closes);
+    _qqqRegime = (typeof KoMarkov !== 'undefined') ? KoMarkov.calc(closes) : calcMarkovRegime(closes);
     renderQqqBanner(_qqqRegime);
     return;
   } catch(e) {
@@ -15798,7 +15798,7 @@ async function fetchQqqRegime() {
   try {
     const closes = await tryYahooQQQ(null);
     if (closes.length < 25) throw new Error('zu wenig Daten: ' + closes.length);
-    _qqqRegime = calcMarkovRegime(closes);
+    _qqqRegime = (typeof KoMarkov !== 'undefined') ? KoMarkov.calc(closes) : calcMarkovRegime(closes);
     renderQqqBanner(_qqqRegime);
     return;
   } catch(e) {
@@ -15810,7 +15810,7 @@ async function fetchQqqRegime() {
     try {
       const closes = await tryYahooQQQ('https://my-cors-proxy.ahildebrand.workers.dev');
       if (closes.length >= 25) {
-        _qqqRegime = calcMarkovRegime(closes);
+        _qqqRegime = (typeof KoMarkov !== 'undefined') ? KoMarkov.calc(closes) : calcMarkovRegime(closes);
         renderQqqBanner(_qqqRegime);
       }
     } catch(e) { console.warn('QQQ Retry fehlgeschlagen:', e.message); }
