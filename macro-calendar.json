@@ -1,0 +1,24 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "created": "2026-07-14",
+    "updated": "2026-07-14",
+    "description": "UIQ Makro-Kalender — statische Event-Termine für MCM Calendar-Faktoren (fed_window, nfp_window, cpi_window)",
+    "principle": "FAIL-CLOSED: Fehlt ein Event oder die ganze Datei, wird KEIN Flag gesetzt — die KI bekommt keinen Event-Hinweis statt eines falschen.",
+    "maintenance": "Jährliche Pflege im Dezember für das Folgejahr. FOMC: federalreserve.gov/monetarypolicy/fomccalendars.htm | NFP: erster Freitag im Monat (BLS) | CPI: bls.gov/schedule/news_release/cpi.htm",
+    "verification_status": "FOMC-Termine H2 2026 aus Trainingswissen übernommen — VOR PRODUKTIVBETRIEB gegen federalreserve.gov verifizieren. NFP-Termine = erster Freitag (deterministisch). CPI-Termine: LEER, bitte von bls.gov nachtragen (fail-closed bis dahin)."
+  },
+  "events": [
+    { "date": "2026-07-29", "type": "FOMC", "label": "FOMC-Zinsentscheid Juli", "time_et": "14:00" },
+    { "date": "2026-09-16", "type": "FOMC", "label": "FOMC-Zinsentscheid September", "time_et": "14:00" },
+    { "date": "2026-10-28", "type": "FOMC", "label": "FOMC-Zinsentscheid Oktober", "time_et": "14:00" },
+    { "date": "2026-12-09", "type": "FOMC", "label": "FOMC-Zinsentscheid Dezember", "time_et": "14:00" },
+
+    { "date": "2026-08-07", "type": "NFP", "label": "Non-Farm Payrolls August", "time_et": "08:30" },
+    { "date": "2026-09-04", "type": "NFP", "label": "Non-Farm Payrolls September", "time_et": "08:30" },
+    { "date": "2026-10-02", "type": "NFP", "label": "Non-Farm Payrolls Oktober", "time_et": "08:30" },
+    { "date": "2026-11-06", "type": "NFP", "label": "Non-Farm Payrolls November", "time_et": "08:30" },
+    { "date": "2026-12-04", "type": "NFP", "label": "Non-Farm Payrolls Dezember", "time_et": "08:30" }
+  ],
+  "_todo": "CPI-Termine H2 2026 von https://www.bls.gov/schedule/news_release/cpi.htm nachtragen (type: 'CPI', time_et: '08:30')"
+}

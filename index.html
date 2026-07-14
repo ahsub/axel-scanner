@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260713-v321">
+<meta name="version" content="20260714-v322">
 <!-- CHANGELOG (neueste zuerst):
+     v322: MCM (Market Context Module) — Option C, konzeptuell sauber: buildMarketContext() (ko-indicators-loader v1.1.0) baut NACH dem Polling-Gate (vollständiger Datenbasket) den market_context aus der Registry (ko-indicators.json v2.0.0: enabled/weight/signalRules je Indikator + 3 Calendar-Faktoren FOMC/NFP/CPI aus macro-calendar.json, fail-closed). Single Source of Truth für BEIDE Konsumenten: (1) KoMarketState.calcStrategyGates(ctx) (ko-market-state v2.1) — Regime-Basis-Gates + deklarative CONTEXT_DOWNGRADE_RULES (caution: green→amber, risk: green/amber→red, nie Upgrades, Downgrade-Grund in note+_context.downgrades) → window._lastMseResult wird mit finalen Gates überschrieben, renderHomeLanding() nach _applyMorningResults neu aufgerufen. (2) KI-Prompt: contextToPromptLines(ctx) als führender Block + berechnete Ampel-Downgrades mit Auftrag "konsistent erklären, nicht widersprechen". Behebt: KI-Interpretation auf Teildaten / Ampel-KI-Diskrepanz (Ampel war rein regime-basiert ohne Breadth/TSI/DP/Calendar). Bekannte Einschränkung: mse-gates-Widget (Makro-Panel) zeigt bis zum nächsten Widget-Refresh noch Regime-Basis-Gates — Vereinheitlichung Gate-Renderer = nächster Sprint.
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
      v281: Übersicht-Umbau Schritt 2 (Makro-Kondensat): Sektor Top-3/Flop-3-Kachel im Home-Tab (_loadHomeSektorKondensat, KV-only aus master_market_data/sectorRS, KEIN Live-Yahoo-Fallback — schont API-Budget). Overheat bewusst nicht enthalten (Schwellen laut MB-STATEMENT-DATA-MATRIX §4.3 noch unkalibriert). Kachel klickbar → Makro-Tab, teilt _sektorData mit Makro-Tab (kein Doppel-Load). Div-Bilanz nach Einbau verifiziert (kein neuer v280-artiger Bug).
@@ -20423,6 +20424,39 @@ async function runMorningBriefing(forceRefresh) {
       });
     }
 
+    // ── MCM: Market Context bauen — Single Source of Truth (v322) ────────────
+    // ERST JETZT, nach vollständigem Datenbasket (Polling-Gate oben), wird der
+    // market_context gebaut. Er speist BEIDE Konsumenten identisch:
+    //   1. calcStrategyGates(ctx) → Strategie-Ampel (context-aware Downgrades)
+    //   2. contextToPromptLines(ctx) → KI-Prompt
+    // Nie wieder KI-Interpretation auf Teildaten oder Ampel ohne Breadth/TSI/Calendar.
+    var _marketCtx = null;
+    try {
+      if (typeof buildMarketContext === 'function') {
+        _marketCtx = await buildMarketContext(window._alphaData,
+          (typeof KoMarketState !== 'undefined') ? KoMarketState._lastRegime : null);
+        results.marketContext = _marketCtx;
+        if (_marketCtx && typeof KoMarketState !== 'undefined' && KoMarketState.calcStrategyGates) {
+          var _ctxGates = KoMarketState.calcStrategyGates(_marketCtx);
+          results.strategyGates = _ctxGates;
+          // _lastMseResult mit finalen context-aware Gates überschreiben →
+          // Ampel (Home + MSE-Widget) zeigt den Stand NACH vollständigem Datenbasket
+          window._lastMseResult = Object.assign({}, window._lastMseResult || {}, {
+            regime:     _marketCtx._regime || (window._lastMseResult && window._lastMseResult.regime),
+            strategies: _ctxGates.strategies,
+            action:     _ctxGates.action,
+            _context:   _ctxGates._context,
+          });
+          if (_ctxGates._context.downgrades.length) {
+            console.log('[Morning] Context-Downgrades aktiv: ' +
+              _ctxGates._context.downgrades.map(function(d){ return d.strategy + '→' + d.to; }).join(', '));
+          }
+        }
+      }
+    } catch(_ctxErr) {
+      console.warn('[Morning] Market Context Fehler (fail-open auf Regime-Gates):', _ctxErr.message);
+    }
+
     // ── 9/9: KI-Briefing — Cache-First (daily_market_snapshot) ──────────────────
     setStep('9/9 KI-Briefing…');
     var _snapshotUsed = false;
@@ -20516,6 +20550,24 @@ async function runMorningBriefing(forceRefresh) {
       messwerteLines.push('SNAPSHOT-ZEITPUNKT: ' + _snapDate + ' ' + _snapTime + ' Uhr (live abgerufen)');
       messwerteLines.push('DATENBINDUNG: Alle Kurse, Kennzahlen und Werte AUSSCHLIESSLICH aus diesem Snapshot — Trainingswissen über diesen Ticker ist IRRELEVANT und VERBOTEN.');
       messwerteLines.push('');
+
+      // ── MCM: Market Context als führender Prompt-Block (v322) ─────────
+      // Identische Quelle wie die Strategie-Ampel — inkl. Signal-Flags
+      // (ok/caution/risk) und Calendar-Fenstern (FOMC/NFP/CPI).
+      if (_marketCtx && typeof contextToPromptLines === 'function') {
+        contextToPromptLines(_marketCtx).forEach(function(l){ messwerteLines.push(l); });
+        messwerteLines.push('');
+        // Ampel-Ergebnis der KI mitteilen — sie soll es ERKLÄREN, nicht widersprechen
+        if (results.strategyGates && results.strategyGates._context) {
+          var _dg = results.strategyGates._context.downgrades;
+          messwerteLines.push('--- STRATEGIE-AMPEL (bereits berechnet, regelbasiert) ---');
+          messwerteLines.push(_dg.length
+            ? 'Context-Downgrades: ' + _dg.map(function(d){ return d.strategy + ' ' + d.from + '→' + d.to + ' (' + d.reason + ')'; }).join(' · ')
+            : 'Keine Context-Downgrades — Regime-Basis-Gates gelten unverändert.');
+          messwerteLines.push('AUFGABE: Deine Markteinschätzung muss konsistent mit diesen Gates sein. Erkläre die Datenlage, die zu ihnen führt.');
+          messwerteLines.push('');
+        }
+      }
 
       // Registry-basierter Prompt-Aufbau (ko-indicators-loader.js)
       var _alphaCtx = window._alphaData || null;
@@ -20692,6 +20744,9 @@ async function runMorningBriefing(forceRefresh) {
       }
     } catch(e) { console.warn('[Briefing] Cache-Fehler:', e.message); }
     _applyMorningResults(results);
+    // MCM v322: Home-Ampel neu rendern — zeigt jetzt die finalen context-aware
+    // Gates aus _lastMseResult (nicht mehr den Zwischenstand von Schritt 1/9)
+    if (typeof renderHomeLanding === 'function') { try { renderHomeLanding(); } catch(_e){} }
     // Navigation nach Briefing: nur wenn NICHT von Home-Panel aufgerufen
     var _homePanel = document.getElementById('panel-home');
     var _homeActive = _homePanel && _homePanel.classList.contains('active');
@@ -23258,13 +23313,13 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@43e0fea/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bedd3a/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@03ef406/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1d89a9f/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@03ef406/ko-indicators-loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bedd3a/ko-indicators-loader.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
