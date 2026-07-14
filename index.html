@@ -20427,6 +20427,7 @@ async function runMorningBriefing(forceRefresh) {
     setStep('9/9 KI-Briefing…');
     var _snapshotUsed = false;
     var _snapshotTs   = null;
+    var messwerteLines = []; // immer initialisieren — auch bei Cache-Hit gebraucht (localStorage)
 
     // Cache-First: daily_market_snapshot aus KV laden (serverseitig generiert)
     // EIC-Override: forceRefresh=true überspringt KV-Cache — nur für EIC-User
@@ -20508,7 +20509,7 @@ async function runMorningBriefing(forceRefresh) {
 
       // Nur vorhandene Werte in den Prompt aufnehmen
       // ── Prompt-Aufbau via ko-indicators-registry ────────────────────
-      var messwerteLines = [];
+      messwerteLines = [];
       var _snapTs = new Date();
       var _snapDate = _snapTs.toLocaleDateString('de-DE');
       var _snapTime = _snapTs.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
