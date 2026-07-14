@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260714-v322">
+<meta name="version" content="20260714-v323">
 <!-- CHANGELOG (neueste zuerst):
+     v323: Renderer-Vereinheitlichung (Gemini-Vorschlag, umgesetzt) + Calendar-Fix. (1) window.renderGateWidget()/renderAllGateWidgets() + Event 'ko:regimeChanged' ersetzen 4 duplizierte Ampel-Render-Blöcke (App-Start, mse-gates in updateMarketWeatherWidget, home-strategy-gates Haupt- + Fallback-Pfad) — jede Stelle die window._lastMseResult ändert dispatched das Event, ALLE Widgets zeichnen synchron neu, kein Refresh-Lag mehr zwischen Makro-Panel und Home-Ampel. Löst die in v322 dokumentierte bekannte Einschränkung. (2) macro-calendar.json v1.1.0 + ko-indicators-loader v1.2.0: FOMC/CPI-Termine gegen federalreserve.gov/bls.gov abgeglichen (Axel, 14.07.2026) — v1.0.0 hatte Timezone '-04:00' hardcodiert, was bei EST-Terminen nach DST-Ende (10.11./10.12.) 1h daneben gelegen hätte. Jetzt: explizite UTC-Zeitstempel (decision_utc/meeting_start_utc), FOMC-Zweitage-Fenster, bufferMinutes für Karenzzeit um den Decision-Moment (FOMC 15min, NFP/CPI 10min).
      v322: MCM (Market Context Module) — Option C, konzeptuell sauber: buildMarketContext() (ko-indicators-loader v1.1.0) baut NACH dem Polling-Gate (vollständiger Datenbasket) den market_context aus der Registry (ko-indicators.json v2.0.0: enabled/weight/signalRules je Indikator + 3 Calendar-Faktoren FOMC/NFP/CPI aus macro-calendar.json, fail-closed). Single Source of Truth für BEIDE Konsumenten: (1) KoMarketState.calcStrategyGates(ctx) (ko-market-state v2.1) — Regime-Basis-Gates + deklarative CONTEXT_DOWNGRADE_RULES (caution: green→amber, risk: green/amber→red, nie Upgrades, Downgrade-Grund in note+_context.downgrades) → window._lastMseResult wird mit finalen Gates überschrieben, renderHomeLanding() nach _applyMorningResults neu aufgerufen. (2) KI-Prompt: contextToPromptLines(ctx) als führender Block + berechnete Ampel-Downgrades mit Auftrag "konsistent erklären, nicht widersprechen". Behebt: KI-Interpretation auf Teildaten / Ampel-KI-Diskrepanz (Ampel war rein regime-basiert ohne Breadth/TSI/DP/Calendar). Bekannte Einschränkung: mse-gates-Widget (Makro-Panel) zeigt bis zum nächsten Widget-Refresh noch Regime-Basis-Gates — Vereinheitlichung Gate-Renderer = nächster Sprint.
      v283: Makro-Strip (S&P/NQ/DAX/Oel/Gold) von direktem refreshLivePrices()-Call bei jedem Home-Start auf 2-4h KV-Cache umgestellt (_loadHomeMakroStrip/_fetchHomeStripLive, Key market_strip_snapshot via KoSync, TTL 3h). Erst KV lesen, nur bei Ablauf/Fehlen selbst live laden (^GSPC/^NDX/^GDAXI/CL=F/GC=F) + zurückschreiben — nur erste:r Öffner:in nach TTL-Ablauf macht Live-Call, alle anderen lesen nur. Löst den in v282 benannten Zielkonflikt mit daily_market_snapshot (SUITE.md §7), ohne Aggregator/Cron anzufassen. VIX bewusst NICHT im KV-Snapshot — kommt weiterhin live aus m-vix (gleiche Quelle wie Kopf-Kachel), um keine zweite Quelle für denselben Wert zu schaffen.
      v282: Single-Source-of-Truth-Deep-Debug (Fund: 13/25 Registry-Indikatoren zeigten auf tote domIds). Fixes: (1) imSignalCard() setzt jetzt echtes id+data-value HTML-Attribut (vorher: id-Parameter wurde nie gerendert → im-gold/im-cu/im-aud/im-jpy/im-tnx etc. strukturell unauffindbar für getElementById). (2) Gold+Kupfer als eigene Einzelwert-Signale ergänzt (vorher nur als Cu/Gold-Ratio gescort, keine Einzel-ID) + in Kategorien-Liste aufgenommen (waren dort nie gelistet, wurden nie gerendert). (3) Öl (CL=F) als neuer Ticker in IM_TICKERS ergänzt — fehlte komplett, Registry-Eintrag oil_wti war daher grundsätzlich unbefüllbar. (4) ko-indicators.json: fear_greed domId auf real existierendes cnn-fg-score korrigiert (vorher fear-greed-val, existierte nirgends); sektor_overheat domId auf sektor-overheat-grid korrigiert (vorher overheat-text). Bekannte Einschränkung: sektor_rs/sektor_overheat liefern über domId weiterhin unstrukturierten Grid-Textbrei — echter KI-Wert kommt über separaten sektorTxt-Zusatzblock, nicht über Registry-Pfad.
@@ -5208,37 +5209,87 @@ function unlockApp(){
   // Scanner-Hint: Single Source of Truth aus MB-Cache (v275)
   setTimeout(updateScannerHint, 800);
 
-  // MSE v2.0: Badge sofort aus wiederhergestelltem Regime befüllen
-  setTimeout(function() {
-    if (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) {
-      var gates  = KoMarketState.getStrategyGates(KoMarketState._lastRegime);
-      var badge  = document.getElementById('mse-badge');
-      var action = document.getElementById('rc-action');
-      var gates2 = document.getElementById('mse-gates');
+  // ── MCM v323: Vereinheitlichter Gate-Renderer + Event-Bus ──────────────
+  // Ersetzt 3 duplizierte Ampel-Render-Blöcke (App-Start, mse-gates, home-strategy-gates).
+  // Single Source of Truth: window._lastMseResult. Jede Stelle, die die Ampel
+  // ändert, ruft renderAllGateWidgets() bzw. dispatched 'ko:regimeChanged' —
+  // ALLE registrierten Widgets zeichnen sich synchron neu, kein Refresh-Lag mehr.
+  if (typeof window._gateColorMap === 'undefined') {
+    window._gateColorMap = {
+      green: { col: 'var(--green)', bg: 'rgba(34,197,94,0.12)',  icon: '🟢' },
+      amber: { col: 'var(--amber)', bg: 'rgba(245,158,11,0.12)', icon: '🟡' },
+      red:   { col: 'var(--red)',   bg: 'rgba(239,68,68,0.10)',  icon: '🔴' },
+    };
+  }
+  /**
+   * Rendert eine Strategie-Ampel in ein Ziel-Element.
+   * @param {HTMLElement} el - Ziel-Container
+   * @param {object} result  - window._lastMseResult-kompatibles Objekt ({strategies, ...})
+   * @param {object} opts    - { fontSize, padding, withValueClick } Layout-Varianten der 3 Alt-Renderer
+   */
+  window.renderGateWidget = function(el, result, opts) {
+    if (!el) return;
+    opts = opts || {};
+    if (!result || !result.strategies) {
+      el.innerHTML = opts.emptyText
+        ? '<span style="font-size:11px;color:var(--text3)">' + opts.emptyText + '</span>' : '';
+      return;
+    }
+    var sL     = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_LABELS) || {};
+    var sOrder = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_ORDER) || Object.keys(result.strategies);
+    var cMap   = window._gateColorMap;
+    var fs     = opts.fontSize || '10px';
+    var pad    = opts.padding  || '2px 7px';
+    el.innerHTML = sOrder.filter(function(k) { return result.strategies[k]; }).map(function(k) {
+      var s = result.strategies[k];
+      var c = cMap[s.color || (s.active ? 'green' : 'red')] || cMap.red;
+      var clickFn = (opts.withValueClick && k === 'value')
+        ? 'onclick="(function(){switchToPanel(\'alpha\');setTimeout(function(){switchAlphaTab(\'value\')},100);})()"' : '';
+      var cursor  = (opts.withValueClick && k === 'value') ? 'cursor:pointer' : 'cursor:help';
+      var title   = (s.note || '') + (opts.withValueClick && k === 'value' ? ' — Klicken für Value-Desk' : '');
+      return '<div ' + clickFn + ' title="' + title + '" style="font-size:' + fs + ';padding:' + pad +
+        ';border-radius:10px;background:' + c.bg + ';color:' + c.col + ';border:' + (opts.border || '0') + ';' + cursor + '">' +
+        c.icon + ' ' + (sL[k] || k) + '</div>';
+    }).join('');
+  };
+  /**
+   * Rendert ALLE bekannten Gate-Widgets aus window._lastMseResult neu.
+   * Wird nach jeder Aktualisierung von _lastMseResult aufgerufen (statt
+   * dass jede Aufruferstelle ihr eigenes innerHTML baut).
+   */
+  window.renderAllGateWidgets = function() {
+    var result = window._lastMseResult;
+    window.renderGateWidget(document.getElementById('mse-gates'), result, { fontSize: '10px', border: '0.5px solid' });
+    window.renderGateWidget(document.getElementById('home-strategy-gates'), result,
+      { fontSize: '11px', padding: '3px 9px', withValueClick: true, emptyText: 'Morning Briefing starten für Strategie-Ampel' });
+    // Badge + Action-Text (mse-badge/rc-action) synchron mitziehen
+    if (result) {
+      var badge = document.getElementById('mse-badge');
       if (badge) {
-        badge.textContent      = gates.label;
-        badge.style.color      = gates.color;
-        badge.style.borderLeft = '3px solid ' + gates.color;
-        badge.title            = 'Letztes Regime (' + (KoMarketState._lastUpdate ? new Date(KoMarketState._lastUpdate).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '?') + ') — Morning Briefing aktualisiert';
+        badge.textContent = result.label || (KoMarketState && KoMarketState._lastRegime) || '—';
+        if (result.color) { badge.style.color = result.color; badge.style.borderLeft = '3px solid ' + result.color; }
       }
-      if (action) { action.textContent = gates.action; action.style.color = gates.color; }
-      if (gates2) {
-        var sL = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_LABELS) || {};
-        var sOrder = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_ORDER) || Object.keys(gates.strategies);
-        // 3-Farb-Ampel: green=🟢 aktiv/empfohlen, amber=🟡 möglich, red=🔴 gesperrt
-        var colorMap = {
-          green: { col:'var(--green)',  bg:'rgba(34,197,94,0.12)',  icon:'🟢' },
-          amber: { col:'var(--amber)',  bg:'rgba(245,158,11,0.12)', icon:'🟡' },
-          red:   { col:'var(--red)',    bg:'rgba(239,68,68,0.10)',  icon:'🔴' },
-        };
-        gates2.innerHTML = sOrder.filter(function(k) { return gates.strategies[k]; }).map(function(k) {
-          var s = gates.strategies[k];
-          var cKey = s.color || (s.active ? 'green' : 'red');
-          var c = colorMap[cKey] || colorMap.red;
-          return '<div title="' + s.note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;background:' + c.bg + ';color:' + c.col + ';cursor:help">' + c.icon + ' ' + (sL[k] || k) + '</div>';
-        }).join('');
-      }
-      window._currentRegime = KoMarketState._lastRegime;
+      var actionEl = document.getElementById('rc-action');
+      if (actionEl && result.action) { actionEl.textContent = result.action; if (result.color) actionEl.style.color = result.color; }
+    }
+  };
+  // Event-Bus: 'ko:regimeChanged' — jede Stelle die _lastMseResult ändert,
+  // dispatched dieses Event statt direkt zu rendern. Aktuell 1:1 mit
+  // renderAllGateWidgets(), erlaubt aber zukünftig mehrere Listener
+  // (z.B. Track-Record-Logging) ohne die Aufruferstellen zu ändern.
+  window.addEventListener('ko:regimeChanged', function() { window.renderAllGateWidgets(); });
+
+  // MSE v2.1: Badge + alle Gate-Widgets sofort aus wiederhergestelltem Regime befüllen
+  setTimeout(function() {
+    if (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime && !window._lastMseResult) {
+      var gates = KoMarketState.getStrategyGates(KoMarketState._lastRegime);
+      window._lastMseResult = {
+        regime: KoMarketState._lastRegime, color: gates.color, label: gates.label,
+        action: gates.action, strategies: gates.strategies,
+      };
+      var badge = document.getElementById('mse-badge');
+      if (badge) badge.title = 'Letztes Regime (' + (KoMarketState._lastUpdate ? new Date(KoMarketState._lastUpdate).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '?') + ') — Morning Briefing aktualisiert';
+      window.dispatchEvent(new Event('ko:regimeChanged'));
     }
   }, 200);
   // MSE wird nur via Morning Briefing Button neu geladen — kein API-Autostart
@@ -5379,43 +5430,17 @@ function renderHomeLanding() {
     if (timeEl) timeEl.textContent = '⚡ Marktlage analysieren & Briefing erstellen';
   }
 
-  // Strategie-Ampel befüllen
-  var gatesHomeEl = document.getElementById('home-strategy-gates');
-  if (gatesHomeEl) {
-    var mseResult = window._lastMseResult || null;
-    if (mseResult && mseResult.strategies) {
-      // Single Source of Truth: getStrategyGates aus ko-market-state.js (v275)
-      var _sL = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_LABELS) || {};
-      var _sOrder = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_ORDER) || Object.keys(mseResult.strategies);
-      var _cMap = {
-        green:{col:'var(--green)',bg:'rgba(34,197,94,0.12)',icon:'🟢'},
-        amber:{col:'var(--amber)',bg:'rgba(245,158,11,0.12)',icon:'🟡'},
-        red:  {col:'var(--red)',  bg:'rgba(239,68,68,0.10)', icon:'🔴'},
-      };
-      function _renderAmpel(strategies) {
-        return _sOrder.filter(function(k) { return strategies[k]; }).map(function(k) {
-          var s = strategies[k]; var c=_cMap[s.color||(s.active?'green':'red')]||_cMap.red;
-          // Value-Badge öffnet direkt den Alpha-Desk Value-Tab
-          var clickFn = (k === 'value') ? 'onclick="(function(){switchToPanel(\'alpha\');setTimeout(function(){switchAlphaTab(\'value\')},100);})()"' : '';
-          var cursorStyle = (k === 'value') ? 'cursor:pointer' : 'cursor:help';
-          return '<div '+clickFn+' title="'+(s.note||'')+(k==='value'?' — Klicken für Value-Desk':'')+
-            '" style="font-size:11px;padding:3px 9px;border-radius:10px;background:'+c.bg+';color:'+c.col+';'+cursorStyle+'">'+c.icon+' '+(_sL[k]||k)+'</div>';
-        }).join('');
-      }
-      var _ampelHtml = _renderAmpel(mseResult.strategies);
-      gatesHomeEl.innerHTML = _ampelHtml || '<span style="font-size:11px;color:var(--text3)">Keine Daten</span>';
-    } else if (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) {
+  // Strategie-Ampel befüllen — vereinheitlicht (MCM v323): ein Renderer für
+  // alle Gate-Widgets (siehe window.renderGateWidget / renderAllGateWidgets).
+  // Ersetzt 2 duplizierte Label/Color-Maps (Haupt- + Fallback-Pfad).
+  if (typeof window.renderGateWidget === 'function') {
+    var _mseResult = window._lastMseResult;
+    if (!_mseResult && typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) {
       var _fbG = KoMarketState.getStrategyGates(KoMarketState._lastRegime);
-      if (_fbG && _fbG.strategies) {
-        var _sL2={momentum:'📈 Momentum',breakout:'🚀 Breakout',swing:'🔄 Swing',ko:'⚡ KO-Zertifikat',csp_wheel:'⚙️ CSP/Wheel',atmna:'🎯 ATM/NA',weekly_income:'💰 Weekly Income',value:'💎 Value',dividend:'🏦 Dividende',meanrev:'↩️ Mean Rev.',fading_short:'🔻 Fading Short'};
-        var _cMap2={green:{col:'var(--green)',bg:'rgba(34,197,94,0.12)',icon:'🟢'},amber:{col:'var(--amber)',bg:'rgba(245,158,11,0.12)',icon:'🟡'},red:{col:'var(--red)',bg:'rgba(239,68,68,0.10)',icon:'🔴'}};
-        gatesHomeEl.innerHTML=Object.entries(_fbG.strategies).map(function(e){var k=e[0],s=e[1];var c=_cMap2[s.color||(s.active?'green':'red')]||_cMap2.red;return '<div title="'+(s.note||'')+'" style="font-size:11px;padding:3px 9px;border-radius:10px;background:'+c.bg+';color:'+c.col+';cursor:help">'+c.icon+' '+(_sL2[k]||k)+'</div>';}).join('');
-      } else {
-        gatesHomeEl.innerHTML = '<span style="font-size:11px;color:var(--text3)">Morning Briefing starten für Strategie-Ampel</span>';
-      }
-    } else {
-      gatesHomeEl.innerHTML = '<span style="font-size:11px;color:var(--text3)">Morning Briefing starten für Strategie-Ampel</span>';
+      _mseResult = _fbG ? { regime: KoMarketState._lastRegime, strategies: _fbG.strategies, action: _fbG.action, color: _fbG.color } : null;
     }
+    window.renderGateWidget(document.getElementById('home-strategy-gates'), _mseResult,
+      { fontSize: '11px', padding: '3px 9px', withValueClick: true, emptyText: 'Morning Briefing starten für Strategie-Ampel' });
   }
 
   // Regime + VIX aus DOM lesen (bereits geladen)
@@ -19709,46 +19734,31 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
     }
   }
 
-  // Strategy Gates anzeigen
-  var gatesEl = document.getElementById('mse-gates');
-  if (gatesEl && result) {
-    var strategyLabels = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_LABELS) || {};
-    var strategyOrder  = (typeof KoMarketState !== 'undefined' && KoMarketState.STRATEGY_ORDER) || Object.keys(result.strategies);
-    var _cMapMse = {
-      green: { col:'var(--green)', bg:'rgba(34,197,94,0.1)',  icon:'🟢' },
-      amber: { col:'var(--amber)', bg:'rgba(245,158,11,0.1)', icon:'🟡' },
-      red:   { col:'var(--red)',   bg:'rgba(239,68,68,0.08)', icon:'🔴' },
-    };
-    gatesEl.innerHTML = strategyOrder.filter(function(key) { return result.strategies[key]; }).map(function(key) {
-      var strat = result.strategies[key];
-      var cKey = strat.color || (strat.active ? 'green' : 'red');
-      var c = _cMapMse[cKey] || _cMapMse.red;
-      var label = strategyLabels[key] || key;
-      var note  = strat.note || (strat.active ? 'Handelbar' : 'Nicht empfohlen im aktuellen Regime');
-      return '<div title="' + note + '" style="font-size:10px;padding:2px 7px;border-radius:10px;'
-        + 'background:' + c.bg + ';color:' + c.col + ';border:0.5px solid ' + c.col + ';cursor:help">'
-        + c.icon + ' ' + label + '</div>';
-    }).join('');
-  }
+  // Strategy Gates anzeigen — vereinheitlicht (MCM v323): _lastMseResult setzen,
+  // Event dispatchen, ALLE Widgets (mse-gates + home-strategy-gates) ziehen synchron mit.
+  // Ersetzt den vorherigen mse-gates-only-Renderer (war Ursache des Widget-Lags).
+  window._lastMseResult = result ? {
+    regime: result.regime, color: result.color, label: result.label,
+    action: result.action, strategies: result.strategies,
+  } : window._lastMseResult; // kein Downgrade auf null bei fehlenden Rohdaten
+  window.dispatchEvent(new Event('ko:regimeChanged'));
 
-  // Action Text
+  // Action Text wird von renderAllGateWidgets() mitgesetzt (siehe oben) —
+  // Tooltip-Zusatz für 'Selektiv vorgehen' bleibt hier, da UI-Detail ohne Gate-Bezug.
   var actionEl = document.getElementById('rc-action');
   if (actionEl && result) {
-    // Erklärenden Tooltip bei 'Selektiv vorgehen'
     var actionText = result.action || '';
     if (actionText.includes('Selektiv')) {
       actionEl.title = 'Selektiv = Nur Setups mit Score ≥75, klarem Trend und engem Stop handeln. '
         + 'Positionsgröße reduzieren, keine neuen Strategien aufbauen.';
       actionEl.style.cursor = 'help';
     }
-    actionEl.textContent = actionText;
-    actionEl.style.color = result.color;
   }
 
   // Globale Variable für Scanner-Filter
   window._currentRegime  = result ? result.regime : null;
   window._lastQqqRegime  = result ? result.regime.toLowerCase() : null;
-  window._lastMseResult  = result || null; // für Strategie-Ampel Landing-Page
+  window._lastMseResult  = result ? window._lastMseResult : null; // für Strategie-Ampel Landing-Page
 }
 
 // MSE Detail Modal
@@ -23313,13 +23323,13 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bedd3a/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b70ca70/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@03ef406/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1d89a9f/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bedd3a/ko-indicators-loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b70ca70/ko-indicators-loader.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
