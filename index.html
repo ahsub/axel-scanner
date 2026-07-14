@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260714-v325">
+<meta name="version" content="20260714-v326">
 <!-- CHANGELOG (neueste zuerst):
+     v326: ZWEI weitere Bugs aus Screenshot-Analyse (Axel, Makro-Tab "Tagesfazit" zeigte VIX 16.3 + Gold $409230 trotz korrektem Gold $4081.10 im Widget darüber). (1) VIX-Stagnation-Root-Cause: fetchVix() (eigene VIX-Quelle für #m-vix, getrennt von den v324/v325-Fixes) wurde an 2 Aufrufstellen durch `if(_vixLevel===null)`-Guards NACH DEM ERSTEN FETCH DER SESSION NIE WIEDER aufgerufen — die intern bereits vorhandene 30min-TTL-Logik in fetchVix() selbst wurde dadurch komplett ausser Kraft gesetzt, VIX blieb de facto für die gesamte Session eingefroren. Fix: Guards entfernt, fetchVix() wird jetzt immer aufgerufen, interne TTL entscheidet. Zusätzlich: fetchVix()'s eigener Proxy-Call bekam ebenfalls _cb=Date.now()+no-store (war in v325 übersehen, eigene Funktion). (2) Gold-Formatierungsbug: generateRuleBasedSummary() nahm bedingungslos deutsches Zahlenformat an (Punkt=Tausender, Komma=Dezimal) und entfernte den Punkt — bei tatsächlich englisch formatierten Live-Werten ("4092.30") wurde dadurch der Dezimalpunkt selbst gelöscht -> "409230" (Faktor 100 Fehler). Neue Hilfsfunktion `_parseLocaleNumber()` erkennt das Format anhand Punkt/Komma-Position, funktional gegen alle 4 bekannten Formate getestet (DE/EN/US-Tausender/Bug-Fall).
      v325: SYSTEMWEITER Cache-Buster-Fix (Axel-Anweisung, 14.07.2026) — alle 9 corsProxy-Fetch-Stellen im Code (day_gainers/day_losers-Screener, fetchYFScreener-Helper, DE-Ticker-Loops x2 im Mover-Modal, fetchSingleForDeepDive, Treasury-Stress fetchYF, VIX-Fallback in calcTreasuryStress) bekommen jetzt _cb=Date.now()-Query-Param + {cache:'no-store'} — identischer Fix wie v324, aber vollständig statt nur im Makro-Widget. Betroffen waren u.a. das Home-Mover-Widget (Aktivste/Volumen/Winner/Loser), das im allerersten Screenshot des Tages ebenfalls bei "—"/"laden" hing.
      v324: BUGFIX VIX-Cache-Stagnation — updateMarketWeatherWidget()'s fetchYahoo() rief bei jedem Aufruf eine IDENTISCHE URL auf (kein Cache-Buster), dadurch Cache-Treffer (Browser-HTTP-Cache und/oder CF-Worker-Proxy-Edge-Cache) über Stunden hinweg. Beobachtet von Axel: VIX zeigte 08:20–14:35 Uhr durchgehend 16.24, obwohl VIX real auf 17.33 gestiegen war (externer Gegencheck). Fix: Query-Param `_cb=Date.now()` + `{cache:'no-store'}` erzwingen bei jedem Aufruf eine echte Netzwerk-Anfrage für VVIX/SKEW/VIX/VIX3M. BEKANNTE VERWANDTE EINSCHRÄNKUNG: identisches Muster (kein Cache-Buster) an mind. 5 weiteren corsProxy-Fetch-Stellen (Home-Mover-Widget Aktivste/Volumen/Winner/Loser, Gainers/Losers-Screener, Deep-Dive-Einzeltitel-Fetch) — noch NICHT gefixt, siehe SUITE.md Backlog.
      v323.2: CDN-Hash ko-indicators-loader -> 2c17275 (ko-modules v1.2.1). Fix: macro-calendar.json wurde vom Client same-origin (/macro-calendar.json) gefetcht — der manuelle Deploy-Prozess (index.html+help.html zippen, CF Pages hochladen) nimmt neue statische Dateien nie mit, die Datei war im Git-Repo aber nie live erreichbar (CF gab 404-HTML zurück -> JSON.parse-Crash "Unexpected token <"). Jetzt: Fetch direkt von raw.githubusercontent.com/ahsub/axel-scanner/main/macro-calendar.json, identisch zur Python-Server-Lösung — eine Quelle, entkoppelt vom Deploy-Zip.
@@ -6474,23 +6475,26 @@ async function runScan(){
   // KV zuerst laden, dann VIX (mit Fallback aus KV)
   loadKVMasterData(false).then(function() {
     // VIX aus Yahoo Finance versuchen, dann KV-Fallback
-    if (_vixLevel === null) {
-      fetchVix().then(function(vix) {
-        if (vix) {
-          renderVixAmpel(vix);
-        } else {
-          // Wochenende/Feiertag: KV-Fallback
-          var kvVix = _vixFallbackFromKV();
-          if (kvVix) renderVixAmpel(kvVix);
-        }
-      });
-    } else {
-      renderVixAmpel(_vixLevel);
-    }
+    // BUGFIX (14.07.2026, Axel): dieser Guard verhinderte JEDEN erneuten
+    // fetchVix()-Aufruf nach dem ersten erfolgreichen Fetch der Session —
+    // dadurch blieb VIX stundenlang eingefroren (fetchVix() hat selbst
+    // schon eine korrekte 30min-TTL-Pruefung, die durch diesen aeusseren
+    // "einmal und nie wieder"-Guard komplett ausser Kraft gesetzt wurde).
+    // Fix: immer fetchVix() aufrufen, interne TTL-Logik entscheidet.
+    fetchVix().then(function(vix) {
+      if (vix) {
+        renderVixAmpel(vix);
+      } else {
+        // Wochenende/Feiertag: KV-Fallback
+        var kvVix = _vixFallbackFromKV();
+        if (kvVix) renderVixAmpel(kvVix);
+      }
+    });
   }).catch(function() {
     // KV-Fehler: trotzdem VIX versuchen
-    if (_vixLevel === null) fetchVix().then(function(vix){ if(vix) renderVixAmpel(vix); });
-    else renderVixAmpel(_vixLevel);
+    // BUGFIX (14.07.2026): siehe Kommentar oben — immer fetchVix() aufrufen,
+    // interne TTL-Logik entscheidet ob nachgeladen wird.
+    fetchVix().then(function(vix){ if(vix) renderVixAmpel(vix); });
   });
   if (!_qqqRegime) { if(window._appUnlocked) fetchQqqRegime(); }
   else renderQqqBanner(_qqqRegime);
@@ -10411,6 +10415,33 @@ function loadYahooNewsFromCache(){
   } catch(e){}
 }
 
+/**
+ * BUGFIX (14.07.2026, Axel): Zahlen im UI kommen in ZWEI unterschiedlichen
+ * Formaten vor — deutsches Format bei manueller Admin-Eingabe ("4.081,10",
+ * Punkt=Tausender, Komma=Dezimal) vs. englisches Format bei Live-Fetch-Werten
+ * ("4081.10", Punkt=Dezimal). Der alte Code nahm IMMER deutsches Format an
+ * und entfernte den Punkt bedingungslos — bei englischem Format wurde dabei
+ * der Dezimalpunkt selbst geloescht ("4092.30" -> "409230", Faktor 100 Fehler,
+ * beobachtet als "Gold $409230").
+ * Diese Funktion erkennt das Format anhand der Position von Punkt/Komma.
+ */
+function _parseLocaleNumber(str) {
+  if (str == null) return 0;
+  var s = String(str).replace('$', '').trim();
+  var lastComma = s.lastIndexOf(',');
+  var lastDot   = s.lastIndexOf('.');
+  if (lastComma > lastDot) {
+    // Deutsches Format: Komma ist Dezimaltrennzeichen, Punkte sind Tausender
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else {
+    // Englisches Format (oder keine Trennzeichen): Punkt ist Dezimal,
+    // Kommas sind Tausendertrennzeichen
+    s = s.replace(/,/g, '');
+  }
+  var n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
 function generateRuleBasedSummary(){
   const spEl = document.getElementById('m-sp');
   const vixEl = document.getElementById('m-vix');
@@ -10422,7 +10453,7 @@ function generateRuleBasedSummary(){
   if(vixRaw === '—' || vixRaw === '') return;
   const vix = parseFloat(vixRaw) || 20;
   const btcChg = parseFloat((btcChgEl?.textContent||'0').replace('%','').replace('+','')) || 0;
-  const goldPrice = parseFloat((goldEl?.textContent||'0').replace('$','').replace('.','').replace(',','.')) || 0;
+  const goldPrice = _parseLocaleNumber(goldEl?.textContent);
 
   let verdict = 'neu';
   let verdictText = '';
@@ -14996,9 +15027,9 @@ async function fetchVix() {
   }
   try {
     // VIX via Yahoo Finance (^VIX) - Twelve Data Free Plan hat keinen VIX
-    const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/%5EVIX?interval=1d&range=5d';
+    const yfUrl = 'https://query1.finance.yahoo.com/v7/finance/chart/%5EVIX?interval=1d&range=5d&_cb=' + Date.now();
     const proxy = 'https://my-cors-proxy.ahildebrand.workers.dev/?url=' + encodeURIComponent(yfUrl);
-    const r = await fetch(proxy);
+    const r = await fetch(proxy, { cache: 'no-store' });
     if (!r.ok) return _vixFallbackFromKV();
     const j = await r.json();
     const result = j.chart && j.chart.result && j.chart.result[0];
