@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v331">
+<meta name="version" content="20260715-v332">
 <!-- CHANGELOG (neueste zuerst):
+     v332: Phase 0.5 Arbeitspaket A (Homescreen/Landing) — zwei Luecken gegen die STRATEGIE.md-Spec geschlossen. (1) Sidebar-Titel "UnderlyingIQ" oeffnet jetzt von JEDEM Panel aus die Uebersicht (onclick auf .sidebar-logo) — vorher nur ueber den separaten Home-Nav-Button moeglich, Spec verlangt explizit Rueckkehr "von ueberall per Klick auf Sidebar-Titel". (2) Echter, in einfacher Sprache kuratierter Nutzer-Changelog (USER_CHANGELOG-Array + renderUserChangelog(), durchblaetterbar) ersetzt die bisherige reine Versionsnummer-Anzeige ("v267 · 09.07.2026" ohne jeden Inhalt) — Spec verlangt "Changelog seit letztem Build mit Workflow-/Bedienungs-Auswirkungen". Bereits vorhanden und gegen die Spec verifiziert (keine Aenderung noetig): Datum/Uhrzeit, Morning-Briefing-Status inkl. Uhrzeit und Fehlerzustand, Makro-Einschaetzung (eingebettet im Briefing-Text), Regime/VIX/Fear&Greed, WpHG-Rechtshinweis.
      v331: Intermarket-Auto-Load-Gate in autoMakro() (Backlog #19 Prio 3, Axel-Entscheidung: automatisches Nachladen statt nur Warnung). Vorher: im-vvix/im-aud/im-jpy/im-tip/im-itb/im-vnq/im-irx (dynamisch erzeugte Elemente, existieren erst nach manuellem Klick auf "Laden" im Intermarket-Panel) lieferten der KI still "—"-Platzhalter statt echter Werte, ohne Warnung, falls das Panel noch nie geladen wurde. Fix: neuer Schritt 1.5/3 ruft loadIntermarket() automatisch auf (falls noch nicht geladen) und wartet den Abschluss ab, bevor die KI-Prompt-Daten gesammelt werden — analog zum MCM-Polling-Gate vom 13.07.2026.
      v330: Dead-Code-/Konsistenz-Audit Backlog #19 — erste Umsetzungsrunde (15.07.2026). (1) KRITISCH: calcMarkovRegime()/buildTransitionMatrix()/verifyMarkovLabels()/calcMarkovSignal() waren komplett inline dupliziert (Zeilen ~15426-15606), identisch zur CDN-Version aus ko-markov.js — da spaetere function-Deklarationen im selben Scope fruehere ueberschreiben, lief NUR die Inline-Kopie, die CDN-Version war toter Code trotz Ladens (Multiple-Sources-of-Truth-Risiko). Inline-Kopie entfernt, einzige Quelle jetzt ko-markov.js per CDN. (2) updateRegimeCockpit() + der nie fertiggestellte _origCalcTSI-Wrapper entfernt — liefen bei JEDEM Morning-Briefing-Abschluss inkl. echtem Yahoo-VIX-API-Call, schrieben aber in 4 nicht mehr existierende Elemente (regime-cockpit-Container seit AP-B 08.07. permanent display:none, abgeloest durch MSE-Architektur). (3) m-oil → m-oil2 in 2 aktiv genutzten Funktionen (requestMakroUpdate war selbst tot und wurde entfernt, aber autoMakro() ist aktiv — dort war der Bug real: WTI-Oil-Wert immer "—" statt Live-Kurs, gleiche Fehlerklasse wie der Gold-Formatierungsbug). (4) 27 bestaetigt tote Funktionen entfernt (0 Aufrufstellen nach mehrstufiger Verifikation gegen False Positives wie setTimeout(fn)/.map(fn)/.onclick=fn-Referenzen). Bekannte Einschraenkung, bewusst NICHT geaendert: listIndicators() in ko-indicators-loader.js sieht wie ein absichtliches Debug-Konsolen-Tool aus (Kommentar "fuer Debugging"), listByCategory() in ko-strategies.js hat einen "fuer zukuenftige Module"-Kommentar — beide vermutlich beabsichtigt vorbereitet, nicht versehentlich tot.
      v329: VCP-Setups Leaderboard-Tab im Alpha Desk (Backlog #18 Sprint 1 UI) — 9. Leaderboard-Tab "📐 VCP" ergänzt (switchAlphaLB/renderAlphaLB sind generisch, brauchten nur Tab-Button + Farb-/Strategie-Mapping). Chip-Tooltip zeigt bei VCP-Items zusätzlich Contraction-Anzahl + letzte Korrektur-% (vcpContractions/vcpLastPct aus dem Aggregator-Leaderboard). KI-Analyse-Button vorerst auf bestehende momentum-Strategie gemappt (eigene VCP-Prompt-Strategie wäre eigener Sprint).
@@ -387,7 +388,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 <div id="app">
   <!-- ── SIDEBAR ─────────────────────────────────────────────────────── -->
   <nav class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
+    <div class="sidebar-logo" onclick="showPanel('home')" style="cursor:pointer" title="Zur Übersicht">
       <div class="sidebar-logo-title"><span class="topbar-dot"></span>UnderlyingIQ</div>
       <div class="sidebar-time" id="topbar-time"></div>
     </div>
@@ -5326,6 +5327,43 @@ function changePin(){
 // ─── NAV ─────────────────────────────────────────────────────────────
 // runHomeBriefing → ko-home.js
 
+// ── NUTZER-CHANGELOG (Phase 0.5, Arbeitspaket A, 15.07.2026) ────────────────
+// Getrennt vom technischen Entwickler-Changelog oben in dieser Datei (Funktions-
+// namen, interne Details) — hier NUR in einfacher Sprache, mit Auswirkung auf
+// Bedienung/Verlässlichkeit fuer den Nutzer. Manuell kuratiert, neueste zuerst.
+// Format: { date: 'TT.MM.JJJJ', title: 'Kurztitel', text: 'Ein Satz, was sich
+// aendert und was es fuer die Nutzung bedeutet.' }
+const USER_CHANGELOG = [
+  { date: '15.07.2026', title: 'Ölpreis-Anzeige korrigiert',
+    text: 'Der WTI-Ölpreis in der Marktübersicht zeigte zuvor dauerhaft „—" statt des aktuellen Kurses. Behoben.' },
+  { date: '14.07.2026', title: 'Neue Analyse-Kategorie: VCP-Setups',
+    text: 'Im Alpha Desk erkennt eine neue Kategorie Aktien mit enger werdenden Kurskorrekturen vor einem möglichen Ausbruch.' },
+  { date: '14.07.2026', title: 'Intraday-Vergleich im Morning Briefing',
+    text: 'Das Briefing zeigt jetzt direkt den Unterschied zwischen der Marktlage am Morgen und am Nachmittag (NYSE-Öffnung).' },
+  { date: '14.07.2026', title: 'Marktdaten-Konsistenz verbessert',
+    text: 'Die Strategie-Ampel und die KI-Markteinschätzung nutzen jetzt garantiert dieselbe, vollständige Datengrundlage — keine widersprüchlichen Aussagen mehr.' },
+];
+
+/**
+ * Rendert die letzten Nutzer-Changelog-Einträge im Home-Panel.
+ * Zeigt standardmässig den neuesten Eintrag; Klick blättert durch die
+ * letzten Einträge (einfacher Zaehler, kein Datenbank-Overhead).
+ */
+var _userChangelogIdx = 0;
+function renderUserChangelog() {
+  var el = document.getElementById('home-changelog');
+  if (!el || !USER_CHANGELOG.length) return;
+  var entry = USER_CHANGELOG[_userChangelogIdx % USER_CHANGELOG.length];
+  var hasMore = USER_CHANGELOG.length > 1;
+  el.innerHTML =
+    '<span style="cursor:' + (hasMore ? 'pointer' : 'default') + '"'
+    + (hasMore ? ' onclick="_userChangelogIdx++;renderUserChangelog()" title="Klicken für weitere Neuigkeiten"' : '') + '>'
+    + '<i class="ti ti-sparkles" style="font-size:9px"></i> ' + entry.date + ' — <strong>' + entry.title + '</strong>'
+    + (hasMore ? ' <span style="opacity:.6">(' + ((_userChangelogIdx % USER_CHANGELOG.length) + 1) + '/' + USER_CHANGELOG.length + ')</span>' : '')
+    + '</span>'
+    + '<div style="font-weight:400;color:var(--text3);margin-top:1px">' + entry.text + '</div>';
+}
+
 function renderHomeLanding() {
   // Makro-Strip wird unten via _loadHomeMakroStrip() befüllt (KV-Cache, v283)
 
@@ -5341,22 +5379,9 @@ function renderHomeLanding() {
       + '<span style="margin-left:6px;font-size:11px;color:var(--text3)">' + _date + ' · ' + _time + '</span>';
   }
 
-  // Changelog-Snippet: Build-Version aus Meta-Tag
-  var clEl = document.getElementById('home-changelog');
-  if (clEl) {
-    var verMeta = document.querySelector('meta[name="version"]');
-    var ver = verMeta ? verMeta.getAttribute('content') : '';
-    // Format: '20260709-v267' → 'v267 · 09.07.2026'
-    if (ver) {
-      var parts = ver.split('-v');
-      var vNum  = parts[1] ? 'v' + parts[1] : ver;
-      var rawDate = parts[0] || '';
-      var vDate = rawDate.length === 8
-        ? rawDate.slice(6,8) + '.' + rawDate.slice(4,6) + '.' + rawDate.slice(0,4)
-        : '';
-      clEl.textContent = vNum + (vDate ? ' · ' + vDate : '');
-    }
-  }
+  // Nutzer-Changelog (Phase 0.5 AP A) — ersetzt reine Versionsnummer durch
+  // echten, in einfacher Sprache verständlichen Änderungshinweis
+  renderUserChangelog();
 
   // Letztes Morning Briefing aus localStorage laden
   var today = new Date().toLocaleDateString('de-DE',
