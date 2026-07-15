@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v332">
+<meta name="version" content="20260715-v333">
 <!-- CHANGELOG (neueste zuerst):
+     v333: Phase 0.5 Arbeitspaket B (Trigger-/Cache-Disziplin, Token-Oekonomie) — vollstaendig umgesetzt. (1) Bestaetigungsdialog vor JEDER Morning-Briefing-Neuberechnung (runMorningBriefing() fragt jetzt via window.confirm() nach, bevor ein bestehendes Briefing des Tages ueberschrieben wird — deckt BEIDE bisherigen Trigger-Pfade ab: den normalen home-refresh-btn UND den EIC-Direktaufruf, der runHomeBriefing() bisher komplett umging). Root Cause gefunden: runMorningBriefing() loeschte den Cache bisher UNCONDITIONAL bei jedem Aufruf, unabhaengig vom forceRefresh-Parameter (der ohnehin nie weitergereicht wurde). (2) home-briefing-time verliert Button-Charakter (Spec: "reiner Status mit Datum/Uhrzeit") — von <button> mit onclick zu reinem <span>, kein Trigger-Risiko mehr bei fehlendem Cache. Die "Briefing oeffnen"-Funktion wandert auf home-briefing-text (neue openCachedBriefing(), garantiert NUR Anzeige, niemals Neuberechnung). (3) autoMakro() bekommt dieselbe Rueckfrage-Logik — rief bisher bei JEDEM Klick unconditional die KI auf (Token-Kosten), jetzt Cache-Check gegen ko_makro.date vor Ueberschreiben. (4) Verifiziert, kein Fix noetig: Morning-Briefing-Button-Duplikate in Scanner/Alpha-Desk waren bereits in v247 entfernt (unsichtbarer morning-btn-Stub bestaetigt harmlos), keine Hover-Trigger irgendwo gefunden.
      v332: Phase 0.5 Arbeitspaket A (Homescreen/Landing) — zwei Luecken gegen die STRATEGIE.md-Spec geschlossen. (1) Sidebar-Titel "UnderlyingIQ" oeffnet jetzt von JEDEM Panel aus die Uebersicht (onclick auf .sidebar-logo) — vorher nur ueber den separaten Home-Nav-Button moeglich, Spec verlangt explizit Rueckkehr "von ueberall per Klick auf Sidebar-Titel". (2) Echter, in einfacher Sprache kuratierter Nutzer-Changelog (USER_CHANGELOG-Array + renderUserChangelog(), durchblaetterbar) ersetzt die bisherige reine Versionsnummer-Anzeige ("v267 · 09.07.2026" ohne jeden Inhalt) — Spec verlangt "Changelog seit letztem Build mit Workflow-/Bedienungs-Auswirkungen". Bereits vorhanden und gegen die Spec verifiziert (keine Aenderung noetig): Datum/Uhrzeit, Morning-Briefing-Status inkl. Uhrzeit und Fehlerzustand, Makro-Einschaetzung (eingebettet im Briefing-Text), Regime/VIX/Fear&Greed, WpHG-Rechtshinweis.
      v331: Intermarket-Auto-Load-Gate in autoMakro() (Backlog #19 Prio 3, Axel-Entscheidung: automatisches Nachladen statt nur Warnung). Vorher: im-vvix/im-aud/im-jpy/im-tip/im-itb/im-vnq/im-irx (dynamisch erzeugte Elemente, existieren erst nach manuellem Klick auf "Laden" im Intermarket-Panel) lieferten der KI still "—"-Platzhalter statt echter Werte, ohne Warnung, falls das Panel noch nie geladen wurde. Fix: neuer Schritt 1.5/3 ruft loadIntermarket() automatisch auf (falls noch nicht geladen) und wartet den Abschluss ab, bevor die KI-Prompt-Daten gesammelt werden — analog zum MCM-Polling-Gate vom 13.07.2026.
      v330: Dead-Code-/Konsistenz-Audit Backlog #19 — erste Umsetzungsrunde (15.07.2026). (1) KRITISCH: calcMarkovRegime()/buildTransitionMatrix()/verifyMarkovLabels()/calcMarkovSignal() waren komplett inline dupliziert (Zeilen ~15426-15606), identisch zur CDN-Version aus ko-markov.js — da spaetere function-Deklarationen im selben Scope fruehere ueberschreiben, lief NUR die Inline-Kopie, die CDN-Version war toter Code trotz Ladens (Multiple-Sources-of-Truth-Risiko). Inline-Kopie entfernt, einzige Quelle jetzt ko-markov.js per CDN. (2) updateRegimeCockpit() + der nie fertiggestellte _origCalcTSI-Wrapper entfernt — liefen bei JEDEM Morning-Briefing-Abschluss inkl. echtem Yahoo-VIX-API-Call, schrieben aber in 4 nicht mehr existierende Elemente (regime-cockpit-Container seit AP-B 08.07. permanent display:none, abgeloest durch MSE-Architektur). (3) m-oil → m-oil2 in 2 aktiv genutzten Funktionen (requestMakroUpdate war selbst tot und wurde entfernt, aber autoMakro() ist aktiv — dort war der Bug real: WTI-Oil-Wert immer "—" statt Live-Kurs, gleiche Fehlerklasse wie der Gold-Formatierungsbug). (4) 27 bestaetigt tote Funktionen entfernt (0 Aufrufstellen nach mehrstufiger Verifikation gegen False Positives wie setTimeout(fn)/.map(fn)/.onclick=fn-Referenzen). Bekannte Einschraenkung, bewusst NICHT geaendert: listIndicators() in ko-indicators-loader.js sieht wie ein absichtliches Debug-Konsolen-Tool aus (Kommentar "fuer Debugging"), listByCategory() in ko-strategies.js hat einen "fuer zukuenftige Module"-Kommentar — beide vermutlich beabsichtigt vorbereitet, nicht versehentlich tot.
@@ -566,12 +567,17 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
               Marktlage &amp; Briefing
             </div>
             <div style="display:flex;align-items:center;gap:8px">
-              <button id="home-briefing-time" onclick="runHomeBriefing(false)" style="font-size:10px;color:var(--accent);background:rgba(79,142,247,0.08);border:0.5px solid var(--accent);border-radius:6px;cursor:pointer;padding:3px 8px;white-space:nowrap" title="Letztes Briefing öffnen oder neu erstellen">—</button>
+              <!-- BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket B): reiner Status statt
+                   klickbarer Button — Spec verlangt "'Briefing abgeschlossen'-Bereich
+                   verliert Button-Charakter (reiner Status mit Datum/Uhrzeit)". Vorher
+                   hatte dieses Element Button-Optik + onclick=runHomeBriefing(false),
+                   was bei fehlendem Cache eine ungewollte Neuberechnung ausloesen konnte. -->
+              <span id="home-briefing-time" style="font-size:10px;color:var(--text3);white-space:nowrap">—</span>
               <!-- Neu berechnen: nur sichtbar wenn Briefing bereits vorhanden -->
               <button id="home-refresh-btn" onclick="runHomeBriefing(true)"
                 style="display:none;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);
                 background:transparent;color:var(--text3);font-size:10px;cursor:pointer"
-                title="Briefing neu berechnen (Cache überschreiben)">
+                title="Briefing neu berechnen (fragt vor dem Überschreiben nach)">
                 ↺ Neu
               </button>
             </div>
@@ -588,7 +594,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           </div>
 
           <!-- Briefing-Text -->
-          <div id="home-briefing-text" style="padding:.85rem 1rem;font-size:12px;color:var(--text3);line-height:1.7">
+          <!-- Klick zeigt NUR das gecachte Briefing an (openCachedBriefing()) —
+               garantiert KEIN Trigger für Neuberechnung, siehe Arbeitspaket B -->
+          <div id="home-briefing-text" onclick="openCachedBriefing()" style="padding:.85rem 1rem;font-size:12px;color:var(--text3);line-height:1.7;cursor:pointer" title="Klicken für vollständige Ansicht">
             Noch kein Briefing heute — Button unten klicken.
           </div>
 
@@ -5364,6 +5372,28 @@ function renderUserChangelog() {
     + '<div style="font-weight:400;color:var(--text3);margin-top:1px">' + entry.text + '</div>';
 }
 
+/**
+ * Zeigt das gecachte Morning Briefing an (Tearsheet-Modal) — GARANTIERT
+ * ohne jede Neuberechnung, kein Netzwerk-Call, reine Anzeige aus localStorage.
+ * Ersetzt den frueheren onclick auf 'home-briefing-time' (der Button war und
+ * konnte bei fehlendem Cache versehentlich runMorningBriefing() ausloesen).
+ * Phase 0.5 Arbeitspaket B, 15.07.2026.
+ */
+function openCachedBriefing() {
+  var today    = new Date().toISOString().slice(0, 10);
+  var cacheKey = 'morning_briefing_' + today;
+  try {
+    var cached = JSON.parse(localStorage.getItem(cacheKey));
+    if (cached && cached.kiBriefing) {
+      if (typeof showMorningTearsheet === 'function') showMorningTearsheet(cached);
+      return;
+    }
+  } catch(e) {}
+  if (typeof showKoToast === 'function') {
+    showKoToast('Noch kein Briefing heute — Button unten klicken, um eines zu erstellen.');
+  }
+}
+
 function renderHomeLanding() {
   // Makro-Strip wird unten via _loadHomeMakroStrip() befüllt (KV-Cache, v283)
 
@@ -10031,6 +10061,21 @@ async function autoMakro(){
     showPanel('admin');
     return;
   }
+
+  // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket B): "Morning Briefing UND
+  // Makro-Analyse werden nach Erstberechnung lokal gecacht bis zur explizit
+  // angeforderten Neuberechnung" — autoMakro() rief bisher bei JEDEM Klick
+  // unconditional die KI auf (Token-Kosten), ohne zu pruefen ob fuer heute
+  // schon eine Analyse vorliegt. Fix: Rueckfrage vor Ueberschreiben, analog
+  // zum selben Muster in runMorningBriefing() (siehe dort).
+  const _todayDe = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  try {
+    const _existingMakro = JSON.parse(localStorage.getItem('ko_makro') || '{}');
+    if (_existingMakro && _existingMakro.date === _todayDe && _existingMakro.verdictText) {
+      const _ok = window.confirm('Heutige Markt-Analyse überschreiben und neu berechnen?\n\n(Die bisherige KI-Einschätzung von heute geht dabei verloren.)');
+      if (!_ok) return;
+    }
+  } catch(e) {}
 
   const btn = document.getElementById('auto-makro-btn');
   const status = document.getElementById('live-prices-status');
@@ -19891,11 +19936,27 @@ var _morningRunning = false;
 async function runMorningBriefing(forceRefresh) {
   if (_morningRunning) return;
 
-  // Morning Briefing lädt IMMER frisch — kein Cache-Rückgriff
   var today    = new Date().toISOString().slice(0, 10);
   var cacheKey = 'morning_briefing_' + today;
   var cacheEl  = document.getElementById('morning-cache-info');
 
+  // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket B): "Neuberechnung nur mit
+  // User-Rückfrage" — diese Funktion löschte den Cache bisher UNCONDITIONAL,
+  // egal ob forceRefresh gesetzt war und egal welcher der beiden Aufrufpfade
+  // (home-refresh-btn via runHomeBriefing(true), ODER der EIC-Direktaufruf
+  // weiter unten in dieser Funktion) sie erreicht hat. Einziger sinnvoller
+  // Ort für die Rückfrage: HIER, direkt vor dem Cache-Wipe — deckt beide
+  // Aufrufpfade mit einer einzigen Aenderung ab. Nur fragen, wenn bereits
+  // ein Briefing existiert (beim allerersten Lauf gibt es nichts zu verlieren).
+  try {
+    var _existing = JSON.parse(localStorage.getItem(cacheKey));
+    if (_existing && _existing.kiBriefing) {
+      var _ok = window.confirm('Aktuelles Morning Briefing überschreiben und neu berechnen?\n\n(Das bisherige Briefing von ' + (_existing.time || 'heute') + ' geht dabei verloren.)');
+      if (!_ok) return;
+    }
+  } catch(e) {}
+
+  // Morning Briefing lädt IMMER frisch — kein Cache-Rückgriff (siehe Rückfrage oben)
   // Cache + alle Abhängigkeiten leeren
   try {
     localStorage.removeItem(cacheKey);
