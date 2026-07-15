@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v337">
+<meta name="version" content="20260715-v338">
 <!-- CHANGELOG (neueste zuerst):
+     v338: Scanner-Tab zeigte kompletten rohen KI-Briefing-Text unnoetig doppelt an (Axel-Feedback 15.07.2026, Screenshot: unformatiertes Markdown mit sichtbaren ##/**/||-Zeichen im Market-Weather-Widget). Root Cause: _applyMorningResults() schrieb results.kiBriefing (der GESAMTE Briefing-Text) per .textContent in rc-action — ein Element das eigentlich fuer einen KURZEN Strategie-Hinweis gedacht ist ("Selektiv vorgehen · Nur höchste Qualität handeln", von renderAllGateWidgets()/showMSEDetail() gesetzt) und diesen bei jedem abgeschlossenen Briefing ueberschrieb. Da der vollstaendige Briefing-Text bereits sauber im Home-Panel + Tearsheet-Modal dargestellt wird (mit echtem Markdown-Rendering), war diese Dopplung sowohl unnoetig (Arbeitspaket B: keine Duplikate) als auch fehlerhaft geloest (.textContent rendert kein Markdown). Fix: Block entfernt, kein Ersatz noetig — rc-action behaelt den kurzen Strategie-Hinweis.
      v337: F&G/PCR-Untersuchung abgeschlossen (Axel-Anfrage 15.07.2026) — zwei getrennte Root Causes gefunden und behoben. (1) PCR: ko-indicators.json hatte aggregatorKey="pcr.value", aber das tatsaechliche Aggregator-Schema kennt kein .value-Feld (nur market.pcr.pcr, bestaetigt gegen Run #106 vom 14.07.2026) — PCR-Faktor war dadurch STRUKTURELL nie befuellbar, unabhaengig von Timing. Korrigiert auf "pcr.pcr" (ko-modules Commit 1f40df0), funktional getestet. (2) Fear&Greed: fetchCnnFearGreed() wurde in loadIntermarket() als "parallel laden" OHNE await aufgerufen — der autoMakro()-Gate aus v331 wartete zwar auf loadIntermarket() selbst, nicht aber auf diesen darin fire-and-forget gestarteten Sub-Fetch. Race Condition: buildMarketContext() las cnn-fg-score oft noch als "—", weil der CNN-Fetch zu diesem Zeitpunkt haeufig noch nicht abgeschlossen war. Fix: await ergaenzt. CDN-Hash ko-indicators-loader.js -> 1f40df0.
      v336: Sichtbares Feedback beim Refresh-Chip-Klick (Axel-Feedback zu v335: "unsicher ob es funktioniert, Reaktion erst nach Home-Button-Klick"). Root Cause: _refreshHomeStatusTiles() aenderte beim manuellen Klick oft optisch NICHTS (Regime/VIX waren bereits befuellt, F&G/PCR fehlen im Cache -> Klick wirkte wie "reagiert nicht", obwohl er korrekt lief). Fix: neuer manual-Parameter zeigt jetzt IMMER einen Toast beim expliziten Klick — entweder "Alle Werte aus Cache aktualisiert" oder "Aktualisiert — im Cache fehlen: X, Y" (macht das F&G/PCR-Problem gleichzeitig transparent sichtbar statt stillschweigend), sowie einen dedizierten Hinweis wenn gar kein Briefing-Cache fuer heute existiert. Auto-Aufruf beim Seitenaufruf bleibt unveraendert leise (kein Toast-Spam bei jedem Panel-Wechsel). Funktional getestet (Toast-Text bei fehlenden Faktoren + bei fehlendem Cache verifiziert).
      v335: Zwei Nachbesserungen zu v334 (Axel-Feedback, Screenshot). (1) Refresh-Button fuer die Status-Kacheln war unsichtbar (bloßes <i class="ti ti-refresh"> ohne eigene Groesse/Rahmen) — jetzt sichtbarer Chip-Stil mit Unicode-Fallback ("↻ Refresh"), unabhaengig vom Icon-Font. (2) "Marktaktivität"-Fenster (Aktivste/Volumen/Winner/Loser) hatte bereits einen manuellen "laden"-Button (_loadHomeMover()), wurde aber NIE automatisch beim Seitenaufruf getriggert — blieb bei "—" bis zum manuellen Klick, identisches Muster wie die Status-Kacheln. Fix: einmalig pro Sitzung automatisch geladen (Flag verhindert Mehrfach-Laden bei jedem Panel-Wechsel). Zusaetzlicher Fund dabei: _loadHomeMover() hatte KEINEN Cache-Buster (war nicht in der v325-Systemliste erfasst) — nachtraeglich ergaenzt (_cb=Date.now()+no-store), gleiches Muster wie der gestrige Sprint. Bekannte Einschraenkung: Fear&Greed/PCR koennen "—" bleiben, wenn der gecachte Morning-Briefing-Context an diesem Tag keinen Wert fuer diese Faktoren enthielt (Datenverfuegbarkeits-Timing beim urspruenglichen Briefing-Lauf, kein Bug in der neuen Anzeige-Logik selbst — separates, tieferliegendes Thema fuer eine spaetere Session).
@@ -20575,12 +20576,16 @@ async function runMorningBriefing(forceRefresh) {
 }
 
 function _applyMorningResults(results) {
-  // KI-Briefing im Cockpit anzeigen
-  var actionEl = document.getElementById('rc-action');
-  if (actionEl && results.kiBriefing) {
-    actionEl.textContent = results.kiBriefing;
-    actionEl.style.color = 'var(--text2)';
-  }
+  // BUGFIX (15.07.2026, Axel-Feedback): rc-action zeigte hier bisher den
+  // KOMPLETTEN rohen KI-Briefing-Text (results.kiBriefing, unformatiertes
+  // Markdown inkl. sichtbarer ##/**/|| -Zeichen, da .textContent kein
+  // Markdown rendert) — unnötige Dopplung des Scanner-Tab-Widgets mit dem
+  // vollständigen Briefing (das bereits sauber im Home-Panel + Tearsheet-
+  // Modal dargestellt wird) UND aesthetisch fragwuerdig geloest. rc-action
+  // ist fuer einen KURZEN Strategie-Hinweis gedacht (z.B. "Selektiv
+  // vorgehen · Nur höchste Qualität handeln", gesetzt von renderAllGateWidgets()/
+  // showMSEDetail() weiter oben) — dieser Block hat ihn bei jedem
+  // abgeschlossenen Briefing ueberschrieben. Entfernt, kein Ersatz noetig.
   // updateRegimeCockpit()-Aufruf entfernt (15.07.2026, Backlog #19) — Funktion
   // selbst geloescht, siehe Kommentar bei der ehemaligen Definitionsstelle.
 
