@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v344">
+<meta name="version" content="20260715-v345">
 <!-- CHANGELOG (neueste zuerst):
+     v345: Phase 0.5 Arbeitspaket F (Options Desk als vollwertiger Modus) — 3 von 4 Spec-Punkten umgesetzt, 1 konsistent zurueckgestellt. (1) "Verdrängt statt versteckt darunter": die Strategie-Leaderboard-Leiste (reine Equity-Long/Short-Strategien) blieb bisher AUCH im Options-/Value-Modus sichtbar — verwirrender Rest, kein "vollwertiger" eigenstaendiger Modus-Wechsel. Jetzt nur noch im Shortlist-Modus sichtbar (switchAlphaTab() blendet #alpha-lb-section aus/ein). (2) "KI-enriched Top-Options-Ticker prominent": neue serverseitige KI-Anreicherung fuer die Options-Watchlist (ko-aggregator v5.10.0, enrich_options_watchlist_with_ai(), analog zur Master-Shortlist-Anreicherung) — Top-15 Kandidaten bekommen ein "ki"-Feld mit Strike/DTE/Delta/Praemie-Vorschlag, Strategie-Wahl (CSP/CC/Credit-Spread) bewusst an die KI delegiert statt algorithmisch geraten. Client zeigt das jetzt prominent: Badge pro Karte ("✓ KI: Strategie") + Detail-Box (Strike/DTE/Delta/Risiko) + Gesamt-Status in der Uebersichtszeile ("✓ N KI-angereichert"). (3) "KI-Einschätzung liefert Underlying × Options-Strategie": neuer uebergreifender Button "🎯 Beste Underlying × Strategie-Kombination finden" (runBestOptionsOpportunityKI()) — deterministisch bester Underlying (hoechster Gesamt-Score), KI bestimmt selbst die passende Strategie anhand der Einzel-Scores (vermeidet falsches Score-zu-Strategie-Mapping-Raten). Funktional getestet (Score-Maximum-Auswahl ueber synthetische Ticker-Liste). (4) "Separater Weg fuer favorisierte Options-Strategien" ZURUECKGESTELLT — konsistent zur selben Pareto-Entscheidung wie das analoge "Strategie-Nerds"-Feature in Arbeitspaket E (bedient wiederkehrende Power-User, nicht die Beta-Neulinge).
      v344: REVERT (Axel-Korrektur zu v343 Arbeitspaket E Punkt 2) — Leaderboard-Sektion wieder immer sichtbar, kein Einklappen mehr. Missverstaendnis geklaert: der neue "Beste Chance über alle Strategien"-Button (Punkt 4) sollte ZUSAETZLICH zur bestehenden Leaderboard-Leiste kommen, nicht diese hinter einem Einklapp-Mechanismus verstecken — die alte Leiste mit den strategiespezifischen KI-Buttons hat bereits sehr gute Ergebnisse gezeigt. toggleAlphaLbSection() + der Auto-Aufklapp-Schutz in switchAlphaLB() (ersatzlos) entfernt, HTML-Wrapper zurueckgebaut. "Beste Chance"-Button bleibt bestehen, jetzt korrekt als Ergaenzung ueber der immer sichtbaren Leaderboard-Leiste.
      v343: Phase 0.5 Arbeitspaket E (Alpha Desk konsolidieren) — 4 von 7 Spec-Punkten umgesetzt, 2 bereits erfuellt verifiziert, 1 zurueckgestellt (Pareto-Entscheidung). (1) Erste-Zeile-Zweckerklaerung ergaenzt ("Die von der KI vorgeschlagenen, aussichtsreichsten Aktien..."). (2) Leaderboard-Sektion standardmaessig eingeklappt — nur Master-Shortlist beim Oeffnen sichtbar (toggleAlphaLbSection()), inkl. Auto-Aufklapp-Schutz in switchAlphaLB() falls extern dorthin navigiert wird (z.B. Arbeitspaket-D-Ampel-Chips von heute — sonst waere die Navigation hinter dem eingeklappten Panel unsichtbar geblieben). (3) Enrichment-Rueckfrage: verifiziert bereits strukturell erfuellt, KI-Anreicherung passiert serverseitig im taeglichen Aggregator-Lauf, keine clientseitige Enrichment-Aktion zum Absichern noetig. (4) NEUER uebergreifender Button "🎯 Beste Chance über alle Strategien finden" (runBestOpportunityKI()) — durchsucht ALLE Leaderboards nach dem hoechsten Score unabhaengig von der Strategie, beantwortet direkt "was ist heute die beste Chance", ohne durch 10 Tabs zu klicken. Pareto-Entscheidung (Axel+Claude): gebaut, da hoher Nutzen fuer Cold-Start-Problem bei geringem Aufwand (Scores bereits vorhanden). Funktional getestet (Score-Vergleich ueber mehrere Leaderboards). (5) "Strategie-Nerds"-Feature (favorisierte Strategie, eigene Speicherung + Darstellung) ZURUECKGESTELLT — bedient wiederkehrende Power-User, nicht die externen Beta-Neulinge der Phase 0.5, unklarer Aufwand ohne genauere Spec. (6) Regime-Code ("BULL_QUIET") wird jetzt als menschenlesbares Label angezeigt (KoMarketState.getStrategyGates().label, Single Source of Truth mit der Strategie-Ampel), Rohcode nur noch als Tooltip. (7) Refresh-Button rechts: bereits in frueherer Session entfernt, verifiziert.
      v342: Phase 0.5 Arbeitspaket D (Visuelle Konsistenz Button vs. Info) — beide Spec-Punkte umgesetzt. (1) Strategie-Ampel-Chips: vorher hatten ALLE Chips (ausser "Value") identische Button-Optik (Hintergrund, Rand, Pill-Form) trotz cursor:help — auf Touch-Geraeten (kein Hover) komplett ununterscheidbar von echten Buttons. Jetzt: 7 Strategien mit eindeutiger Alpha-Desk-Leaderboard-Entsprechung (ko→ko_long, momentum→long_minervini, swing→long_swing, meanrev→long_mr, fading_short→short_fading_ko, csp_wheel→options_csp, cc→options_cc, aus der bereits etablierten _lbToStrat-Umkehr-Zuordnung) bekommen ECHTE FUNKTION — Klick navigiert zum passenden Leaderboard-Tab, analog zum bereits bestehenden "Value"-Chip-Muster. Die 4 Strategien ohne eindeutige Entsprechung (breakout, dividend, atmna, weekly_income) bekommen KEINE Button-Optik mehr (flache Info-Pille, nur farbiger Text) statt geraten zu werden. Funktional getestet (generierte Selektor-Strings + onclick-JS-Syntax verifiziert). (2) Regime-Action-Texte ("Selektiv vorgehen · Nur höchste Qualität handeln" etc., ko-modules@c72b7bf): alle 5 bekommen "Gesamteinschätzung: "-Praefix — klaert die Spec-Frage "gilt allgemein oder für die darüber stehenden Strategien?" eindeutig: dies ist eine ALLGEMEINE Regime-Leitlinie, getrennt von der spezifischen Pro-Strategie-Ampel. Bestehende Tooltip-Logik (.includes("Selektiv")) bleibt funktionsfaehig.
@@ -2580,7 +2581,12 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
   <div id="alpha-weather" style="padding:.6rem 1rem;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;gap:1rem;flex-wrap:wrap;align-items:center"></div>
 
   <!-- Strategy Leaderboards (collapsed tabs) -->
-  <div style="padding:.5rem 1rem .25rem;border-bottom:1px solid var(--border)">
+  <!-- BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket F): id ergaenzt, damit diese
+       Sektion (reine Equity-Long/Short-Strategien) im Options-/Value-Modus
+       ausgeblendet werden kann — vorher blieb sie als verwirrender Rest immer
+       sichtbar, auch wenn Options-Desk aktiv war (widerspricht "eigenständiger
+       Ansichts-Modus, der Master-Shortlist verdrängt"). -->
+  <div id="alpha-lb-section" style="padding:.5rem 1rem .25rem;border-bottom:1px solid var(--border)">
     <!-- REVERT (15.07.2026, Axel-Korrektur): Einklapp-Mechanismus rueckgaengig
          gemacht — die Leaderboard-Leiste mit den strategiespezifischen
          KI-Buttons soll wie zuvor IMMER sichtbar bleiben (hat sehr gute
@@ -2662,6 +2668,19 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     <div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">Top-50 Kandidaten &middot; HVP-gewichtet &middot; t&auml;glich aktualisiert</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.6rem;padding:.5rem;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
       <div style="font-size:9px;color:var(--text3);width:100%;margin-bottom:2px">KI-ANALYSE:</div>
+      <!-- NEU (15.07.2026, Phase 0.5 Arbeitspaket F Punkt 3): uebergreifender
+           Button — findet den besten Underlying UND laesst die KI selbst die
+           dazu passende Options-Strategie bestimmen (Wheel/CC/Spread/ATM-NA/
+           Weekly), statt dass der Nutzer vorher eine der 3 Strategie-Buttons
+           raten muss. Deterministische Ticker-Auswahl (hoechster Gesamt-Score),
+           KI entscheidet die Strategie-Passform — analog zum "Beste Chance"-
+           Button im Alpha Desk (Arbeitspaket E), aber Strategie-Wahl an die
+           KI delegiert statt algorithmisch geraten (score->strategie-Mapping
+           bei Options nicht eindeutig, 4 Score-Felder vs. 3 KI-Strategien). -->
+      <button onclick="runBestOptionsOpportunityKI()"
+        style="font-size:11px;padding:4px 12px;border-radius:8px;border:1px solid #818cf8;background:linear-gradient(135deg,rgba(129,140,248,0.15),rgba(168,85,247,0.15));color:#818cf8;cursor:pointer;font-weight:600;width:100%;margin-bottom:4px">
+        🎯 Beste Underlying × Strategie-Kombination finden
+      </button>
       <button onclick="runOptionsKiBriefing('options')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer">Options-Wheel</button>
       <button onclick="runOptionsKiBriefing('atmna')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #a371f7;background:rgba(163,113,247,0.1);color:#a371f7;cursor:pointer">Options ATM/NA</button>
       <button onclick="runOptionsKiBriefing('weekly_income')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #34d399;background:rgba(52,211,153,0.1);color:#34d399;cursor:pointer">Options Weekly</button>
@@ -21519,6 +21538,15 @@ function switchAlphaTab(tab) {
     btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border2)';
     btn.style.fontWeight  = isActive ? '600'           : 'normal';
   });
+  // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket F): "Options-Desk als
+  // vollwertiger Modus ... verdrängt (statt versteckt darunter) die Master-
+  // Shortlist" — die reine Equity-Long/Short-Leaderboard-Leiste (Minervini/
+  // Swing/Mean Rev./KO/etc.) gehoert konzeptionell zum Shortlist-Modus, blieb
+  // aber bisher AUCH im Options-/Value-Modus sichtbar (verwirrender Rest,
+  // kein "vollwertiger", eigenstaendiger Modus-Wechsel). Jetzt: nur im
+  // Shortlist-Modus sichtbar.
+  var lbSection = document.getElementById('alpha-lb-section');
+  if (lbSection) lbSection.style.display = (tab === 'shortlist') ? '' : 'none';
   // Options-Desk beim ersten Öffnen laden
   if (tab === 'options') {
     if (typeof loadOptionsDesk === 'function') loadOptionsDesk();
@@ -21676,8 +21704,13 @@ function renderOptionsDeskCards(data) {
       + '</div>';
     return;
   }
+  // NEU (15.07.2026, Phase 0.5 Arbeitspaket F Punkt 2): Anreicherungs-Status
+  // auf einen Blick, analog zur Master-Shortlist-Meta-Zeile.
+  var kiCount = tickers.filter(function(t){ return !!t.ki; }).length;
   var info = '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">' + filtered.length + ' Kandidaten &middot; Stand: ' + generated + ' &middot; HVP &ge;' + _optionsDeskFilter + '%'
-    + (_optionsMaxPrice != null ? ' &middot; Kurs &le; $' + _optionsMaxPrice : '') + '</div>';
+    + (_optionsMaxPrice != null ? ' &middot; Kurs &le; $' + _optionsMaxPrice : '')
+    + (kiCount > 0 ? ' &middot; <span style="color:#818cf8">✓ ' + kiCount + ' KI-angereichert</span>' : ' &middot; <span style="color:var(--amber)">⚡ ohne KI</span>')
+    + '</div>';
   cardsEl.innerHTML = info + filtered.map(function(t, idx) {
     var hvp = t.hvp || 0;
     var hvpColor = hvp >= 65 ? 'var(--green)' : hvp >= 50 ? 'var(--amber)' : 'var(--text2)';
@@ -21724,12 +21757,28 @@ function renderOptionsDeskCards(data) {
     } else if (sqRisk >= 40) {
       sqBadge = '<span title="Squeeze-Risiko ' + sqRisk + '/100 — moderat erhöht" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(245,158,11,0.1);border:0.5px solid var(--amber);color:var(--amber)">&#x26A0;&#xFE0F; Sq-Risk ' + sqRisk + '</span>';
     }
+    // NEU (15.07.2026, Phase 0.5 Arbeitspaket F Punkt 2): KI-Enrichment
+    // prominent anzeigen (ko-aggregator v5.10.0, enrich_options_watchlist_with_ai()).
+    // t.ki existiert nur fuer Top-15 UND wenn ANTHROPIC_API_KEY beim
+    // Aggregator-Lauf vorhanden war — sonst fehlt das Feld schlicht (fail-closed).
+    var kiBadge = '';
+    var kiDetail = '';
+    if (t.ki) {
+      var kiStratLabel = t.ki.strategy === 'csp' ? 'CSP' : t.ki.strategy === 'covered_call' ? 'Covered Call'
+                        : t.ki.strategy === 'credit_spread' ? 'Credit Spread' : t.ki.strategy;
+      kiBadge = '<span title="KI-angereichert — Setup-Parameter von der KI vorgeschlagen" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(129,140,248,0.12);border:0.5px solid #818cf8;color:#818cf8">✓ KI: ' + kiStratLabel + '</span>';
+      kiDetail = '<div style="margin-top:.3rem;padding:.4rem .5rem;background:rgba(129,140,248,0.06);border-radius:6px;font-size:10px;color:var(--text2)">'
+        + '<b style="color:#818cf8">KI-Vorschlag:</b> Strike ~$' + (t.ki.strikeSuggestion||'--') + ' · DTE ' + (t.ki.dte||'--')
+        + ' · Δ ' + (t.ki.deltaTarget||'--') + ' · Prämie ~' + (t.ki.premiumEstimate||'--') + '%'
+        + (t.ki.keyRisk ? '<div style="margin-top:2px;color:var(--text3)">⚠ ' + t.ki.keyRisk + '</div>' : '')
+        + '</div>';
+    }
     return '<div style="background:var(--bg2);border-radius:10px;padding:.6rem .8rem;border:0.5px solid var(--border2)">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">'
       +   '<span style="font-size:14px;font-weight:700">' + (idx+1) + '. ' + t.sym + (grade ? ' <span style="font-size:9px;color:' + gc + '">' + grade + '</span>' : '') + '</span>'
       +   '<span style="font-size:13px;font-weight:600">$' + (t.price ? t.price.toFixed(2) : '--') + '</span>'
       + '</div>'
-      + (fiboBadge || sqBadge ? '<div style="margin-bottom:.3rem;display:flex;gap:4px;flex-wrap:wrap">' + fiboBadge + sqBadge + '</div>' : '')
+      + (fiboBadge || sqBadge || kiBadge ? '<div style="margin-bottom:.3rem;display:flex;gap:4px;flex-wrap:wrap">' + kiBadge + fiboBadge + sqBadge + '</div>' : '')
       + renderFundamentalFlags(t, 'csp')
       + '<div style="display:flex;gap:.8rem;flex-wrap:wrap;font-size:11px;margin-bottom:.2rem">'
       +   '<span title="' + ivTitle + '"><b style="color:' + ivColor + '">' + ivDisplay + '</b>' + (ivRank != null && ivRank >= 70 ? ' &starf;' : ivRank != null && ivRank >= 50 ? ' &check;' : hvpBadge) + '</span>'
@@ -21737,6 +21786,7 @@ function renderOptionsDeskCards(data) {
       +   '<span>ATR <b>' + (t.atr ? t.atr.toFixed(2) : '--') + '</b></span>'
       +   '<span>&Delta;EMA200 <b style="color:' + d200c + '">' + dist200 + '</b></span>'
       + '</div>'
+      + kiDetail
       + '<div style="display:flex;gap:.5rem;font-size:10px;margin-top:.2rem">'
       +   (t.scoreCsp    ? '<span style="color:var(--amber)">CSP <b>' + t.scoreCsp + '</b></span>' : '')
       +   (t.scoreCc     ? '<span style="color:#06b6d4">CC <b>' + t.scoreCc + '</b></span>' : '')
@@ -21957,6 +22007,66 @@ async function runValueKiBriefing(mode) {
   } catch(e) {
     document.getElementById('ki-modal-body').textContent = 'Fehler: ' + e.message;
     if (statusEl) statusEl.textContent = 'Fehler';
+  }
+}
+
+/**
+ * Phase 0.5 Arbeitspaket F Punkt 3 (15.07.2026): "KI-Einschätzung-Button
+ * liefert Underlying × Options-Strategie." Deterministisch bester Underlying
+ * (hoechster optsScore/Gesamt-Score) — die Wahl der PASSENDEN Options-
+ * Strategie (Wheel/CC/Credit-Spread/ATM-NA/Weekly) wird bewusst an die KI
+ * delegiert, da die 4 Score-Felder (optsScore/scoreCsp/scoreCc/scoreSpread)
+ * nicht 1:1 auf die 3 KI-Strategie-Buttons abbilden — ein algorithmisches
+ * Mapping waere Raten gewesen (vermieden, analog zur Sorgfalt in Arbeitspaket D).
+ */
+async function runBestOptionsOpportunityKI() {
+  if (!getAiToken()) { showKoToast('KI-Token nicht gesetzt'); return; }
+  var statusEl = document.getElementById('options-ki-status');
+  var tickers = (_optionsWatchlist && _optionsWatchlist.tickers)
+    ? _optionsWatchlist.tickers.filter(function(t){ return (t.hvp||0) >= _optionsDeskFilter; })
+    : [];
+  if (!tickers.length) { if (statusEl) statusEl.textContent = 'Keine Daten'; return; }
+
+  var best = tickers.reduce(function(a, b) {
+    var scoreA = a.optsScore || a.score || 0, scoreB = b.optsScore || b.score || 0;
+    return scoreB > scoreA ? b : a;
+  });
+
+  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere ' + best.sym + '…';
+
+  var mkCtx = 'MARKTKONTEXT:\nVIX: ' + (_getVixRobust() || '-') + '\nRegime: ' + (window._lastQqqRegime || 'neutral')
+    + '\n\nBESTER UNDERLYING ÜBER ALLE OPTIONS-STRATEGIEN (Gesamt-Score-Sieger):\n'
+    + best.sym + ' Kurs:$' + (best.price||'--')
+    + ' IVR:' + (best.ivRank != null ? best.ivRank + '%' : (best.hvp ? 'HVP' + best.hvp + '%' : '--'))
+    + ' RSI:' + (best.rsi ? Math.round(best.rsi) : '--')
+    + ' ATR:' + (best.atr||'--') + ' D200:' + (best.dist200!=null ? best.dist200+'%' : '--')
+    + ' Grade:' + (best.grade||'--')
+    + ' Scores — Gesamt:' + (best.optsScore||'-') + ' CSP:' + (best.scoreCsp||'-')
+    + ' CoveredCall:' + (best.scoreCc||'-') + ' CreditSpread:' + (best.scoreSpread||'-');
+  var prompt = getKiSystemPrompt('Beste Options-Kombination') + '\n\nMESSWERTE:\n' + mkCtx
+    + '\n\n' + best.sym + ' hat unter allen aktuell gescannten Options-Kandidaten den höchsten Gesamt-Score. '
+    + 'Bestimme anhand der Einzel-Scores (CSP/Covered Call/Credit Spread), welche Options-Strategie für diesen '
+    + 'Titel aktuell am besten passt, und erkläre in 3-4 Sätzen warum. Nenne die Strategie explizit beim Namen.';
+  try {
+    var text = await koAiCall('ki_briefing', prompt, false);
+    var _existingModal = document.getElementById('ki-modal');
+    if (_existingModal) _existingModal.remove();
+    var modal = document.createElement('div');
+    modal.id = 'ki-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+    modal.innerHTML = '<div style="background:var(--bg);border-radius:16px 16px 0 0;width:100%;max-width:680px;max-height:85vh;overflow-y:auto;padding:1.25rem">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'
+      + '<div><div style="font-size:13px;font-weight:700">🎯 Beste Options-Kombination &mdash; ' + best.sym + '</div>'
+      + '<div style="font-size:11px;color:var(--text3)">Gesamt-Score: ' + (best.optsScore||best.score) + '</div></div>'
+      + '<button onclick="document.getElementById(\'ki-modal\').remove()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer">&times;</button>'
+      + '</div><div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.6">' + text + '</div></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+    if (statusEl) statusEl.textContent = '✓ ' + best.sym;
+    showKoToast('Beste Options-Kombination: ' + best.sym);
+  } catch(e) {
+    if (statusEl) statusEl.textContent = 'Fehler: ' + e.message;
+    console.warn('[BestOptionsKI]', e.message);
   }
 }
 
