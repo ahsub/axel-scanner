@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v335">
+<meta name="version" content="20260715-v336">
 <!-- CHANGELOG (neueste zuerst):
+     v336: Sichtbares Feedback beim Refresh-Chip-Klick (Axel-Feedback zu v335: "unsicher ob es funktioniert, Reaktion erst nach Home-Button-Klick"). Root Cause: _refreshHomeStatusTiles() aenderte beim manuellen Klick oft optisch NICHTS (Regime/VIX waren bereits befuellt, F&G/PCR fehlen im Cache -> Klick wirkte wie "reagiert nicht", obwohl er korrekt lief). Fix: neuer manual-Parameter zeigt jetzt IMMER einen Toast beim expliziten Klick — entweder "Alle Werte aus Cache aktualisiert" oder "Aktualisiert — im Cache fehlen: X, Y" (macht das F&G/PCR-Problem gleichzeitig transparent sichtbar statt stillschweigend), sowie einen dedizierten Hinweis wenn gar kein Briefing-Cache fuer heute existiert. Auto-Aufruf beim Seitenaufruf bleibt unveraendert leise (kein Toast-Spam bei jedem Panel-Wechsel). Funktional getestet (Toast-Text bei fehlenden Faktoren + bei fehlendem Cache verifiziert).
      v335: Zwei Nachbesserungen zu v334 (Axel-Feedback, Screenshot). (1) Refresh-Button fuer die Status-Kacheln war unsichtbar (bloßes <i class="ti ti-refresh"> ohne eigene Groesse/Rahmen) — jetzt sichtbarer Chip-Stil mit Unicode-Fallback ("↻ Refresh"), unabhaengig vom Icon-Font. (2) "Marktaktivität"-Fenster (Aktivste/Volumen/Winner/Loser) hatte bereits einen manuellen "laden"-Button (_loadHomeMover()), wurde aber NIE automatisch beim Seitenaufruf getriggert — blieb bei "—" bis zum manuellen Klick, identisches Muster wie die Status-Kacheln. Fix: einmalig pro Sitzung automatisch geladen (Flag verhindert Mehrfach-Laden bei jedem Panel-Wechsel). Zusaetzlicher Fund dabei: _loadHomeMover() hatte KEINEN Cache-Buster (war nicht in der v325-Systemliste erfasst) — nachtraeglich ergaenzt (_cb=Date.now()+no-store), gleiches Muster wie der gestrige Sprint. Bekannte Einschraenkung: Fear&Greed/PCR koennen "—" bleiben, wenn der gecachte Morning-Briefing-Context an diesem Tag keinen Wert fuer diese Faktoren enthielt (Datenverfuegbarkeits-Timing beim urspruenglichen Briefing-Lauf, kein Bug in der neuen Anzeige-Logik selbst — separates, tieferliegendes Thema fuer eine spaetere Session).
      v334: Home-Status-Kacheln (Regime/VIX/F&G/PCR-GEX) aus Cache befuellt statt leer nach Seitenaufruf (Axel-Anfrage 15.07.2026, Screenshot zeigte "—" trotz vorhandenem Morning Briefing). Root Cause: alle vier Kacheln waren DOM-Kopien aus ANDEREN, evtl. noch nicht besuchten Tabs (m-vix aus Makro-Tab, dp-pcr/dp-gex aus Dark-Pool-Sektion, window._lastRegime/_cnnFearGreed als globale Variablen, die nur nach bestimmten Aktionen gesetzt werden). Fix: neue _refreshHomeStatusTiles() liest stattdessen direkt aus dem gecachten Morning Briefing (marketContext.factors, MCM Single Source of Truth seit 14.07.2026) — reiner localStorage-Read, KEIN Netzwerk-/KI-Call (respektiert Arbeitspaket-B-Cache-Disziplin). Laeuft automatisch am Ende von renderHomeLanding() (jeder Seitenaufruf/Panel-Wechsel zu Home) UND ueber ein neues Refresh-Icon neben den Kacheln fuer expliziten manuellen Re-Sync. GEX bleibt "—" (kein MCM-Faktor, keine gecachte Quelle dafuer vorhanden) — PCR/GEX-Kachel zeigt in diesem Fall nur "PCR X". Funktional getestet mit simuliertem Cache (Regime/VIX/F&G/PCR korrekt uebernommen inkl. Farbkodierung).
      v333: Phase 0.5 Arbeitspaket B (Trigger-/Cache-Disziplin, Token-Oekonomie) — vollstaendig umgesetzt. (1) Bestaetigungsdialog vor JEDER Morning-Briefing-Neuberechnung (runMorningBriefing() fragt jetzt via window.confirm() nach, bevor ein bestehendes Briefing des Tages ueberschrieben wird — deckt BEIDE bisherigen Trigger-Pfade ab: den normalen home-refresh-btn UND den EIC-Direktaufruf, der runHomeBriefing() bisher komplett umging). Root Cause gefunden: runMorningBriefing() loeschte den Cache bisher UNCONDITIONAL bei jedem Aufruf, unabhaengig vom forceRefresh-Parameter (der ohnehin nie weitergereicht wurde). (2) home-briefing-time verliert Button-Charakter (Spec: "reiner Status mit Datum/Uhrzeit") — von <button> mit onclick zu reinem <span>, kein Trigger-Risiko mehr bei fehlendem Cache. Die "Briefing oeffnen"-Funktion wandert auf home-briefing-text (neue openCachedBriefing(), garantiert NUR Anzeige, niemals Neuberechnung). (3) autoMakro() bekommt dieselbe Rueckfrage-Logik — rief bisher bei JEDEM Klick unconditional die KI auf (Token-Kosten), jetzt Cache-Check gegen ko_makro.date vor Ueberschreiben. (4) Verifiziert, kein Fix noetig: Morning-Briefing-Button-Duplikate in Scanner/Alpha-Desk waren bereits in v247 entfernt (unsichtbarer morning-btn-Stub bestaetigt harmlos), keine Hover-Trigger irgendwo gefunden.
@@ -502,7 +503,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
                eigene Groesse/Rahmen — auf dem Screenshot nicht als Button erkennbar.
                Jetzt mit sichtbarem Chip-Stil, Unicode-Fallback-Zeichen unabhaengig
                vom Icon-Font. -->
-          <span onclick="_refreshHomeStatusTiles()" style="cursor:pointer;color:var(--accent);font-size:10px;padding:3px 7px;border-radius:6px;border:0.5px solid var(--border2);white-space:nowrap" title="Werte aus Cache aktualisieren (kein neuer API-Call)">
+          <span onclick="_refreshHomeStatusTiles(true)" style="cursor:pointer;color:var(--accent);font-size:10px;padding:3px 7px;border-radius:6px;border:0.5px solid var(--border2);white-space:nowrap" title="Werte aus Cache aktualisieren (kein neuer API-Call)">
             ↻ Refresh
           </span>
           <div style="margin-left:auto">
@@ -5400,19 +5401,29 @@ function renderUserChangelog() {
  * Truth seit 14.07.2026) — zuverlässiger als die DOM-Kopien aus anderen,
  * evtl. noch nicht besuchten Tabs (Makro/Dark-Pool).
  * Axel-Anfrage 15.07.2026.
+ * @param {boolean} manual - true bei explizitem Klick auf den Refresh-Chip:
+ *   zeigt IMMER eine sichtbare Rueckmeldung (Toast), auch wenn sich kein
+ *   Wert aendert — sonst wirkt ein Klick wie "nichts passiert" (Axel-
+ *   Feedback 15.07.2026: Reaktion nur nach Panel-Wechsel wahrgenommen).
  */
-function _refreshHomeStatusTiles() {
+function _refreshHomeStatusTiles(manual) {
   var today    = new Date().toISOString().slice(0, 10);
   var cacheKey = 'morning_briefing_' + today;
   var cached;
-  try { cached = JSON.parse(localStorage.getItem(cacheKey)); } catch(e) { return; }
+  try { cached = JSON.parse(localStorage.getItem(cacheKey)); } catch(e) { cached = null; }
   var ctx = cached && cached.marketContext;
-  if (!ctx) return; // kein Cache fuer heute -> Kacheln bleiben wie sie sind (DOM-Fallback bereits gelaufen)
+  if (!ctx) {
+    if (manual && typeof showKoToast === 'function') {
+      showKoToast('Kein gecachtes Briefing für heute gefunden — bitte zuerst Morning Briefing erstellen.');
+    }
+    return; // kein Cache fuer heute -> Kacheln bleiben wie sie sind (DOM-Fallback bereits gelaufen)
+  }
 
   var regEl    = document.getElementById('home-regime-val');
   var vixEl2   = document.getElementById('home-vix-val');
   var fgEl     = document.getElementById('home-fg-val');
   var pcrgexEl = document.getElementById('home-pcrgex-val');
+  var _missing = [];
 
   // Cache-Werte sind die zuverlässigere Quelle (MCM Single Source of Truth) —
   // ueberschreibt immer, egal ob die Kachel schon einen (evtl. veralteten
@@ -5420,22 +5431,31 @@ function _refreshHomeStatusTiles() {
   // Refresh-Klick sinnvoll, nicht nur als Lueckenfueller beim Seitenaufruf.
   if (regEl && ctx._regime) {
     regEl.textContent = ctx._regime;
-  }
+  } else if (regEl) { _missing.push('Regime'); }
   var vixVal = ctx.factors && ctx.factors.vix && ctx.factors.vix.value;
   if (vixEl2 && vixVal != null) {
     vixEl2.textContent = vixVal;
     vixEl2.style.color = vixVal < 16 ? 'var(--green)' : vixVal < 25 ? 'var(--amber)' : 'var(--red)';
-  }
+  } else if (vixEl2) { _missing.push('VIX'); }
   var fgVal = ctx.factors && ctx.factors.fear_greed && ctx.factors.fear_greed.value;
   if (fgEl && fgVal != null) {
     fgEl.textContent = fgVal;
     fgEl.style.color = fgVal <= 25 ? 'var(--red)' : fgVal <= 45 ? 'var(--amber)' : fgVal <= 55 ? 'var(--text)'
                       : fgVal <= 75 ? 'var(--green)' : 'var(--amber)';
-  }
+  } else if (fgEl) { _missing.push('F&G'); }
   var pcrVal = ctx.factors && ctx.factors.pcr && ctx.factors.pcr.value;
   if (pcrgexEl && pcrVal != null) {
     // GEX ist kein MCM-Faktor (keine gecachte Quelle dafür) — nur PCR anzeigen
     pcrgexEl.textContent = 'PCR ' + pcrVal;
+  } else if (pcrgexEl) { _missing.push('PCR'); }
+
+  // Sichtbares Feedback bei explizitem Klick — sonst wirkt der Chip wie
+  // "reagiert nicht", wenn zufällig kein Wert sich aendert (z.B. Regime/VIX
+  // waren schon befuellt, F&G/PCR fehlen im Cache -> optisch "nichts passiert").
+  if (manual && typeof showKoToast === 'function') {
+    showKoToast(_missing.length
+      ? '↻ Aktualisiert — im Cache fehlen: ' + _missing.join(', ')
+      : '↻ Alle Werte aus Cache aktualisiert');
   }
 }
 
