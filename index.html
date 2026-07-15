@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v349">
+<meta name="version" content="20260715-v350">
 <!-- CHANGELOG (neueste zuerst):
+     v350: KI-Optionsverfallsdatum-Bug behoben (Axel-Report, ATM-CSP-Kandidat zeigte "3. Aug 2026 (~30 DTE)" — tatsaechlich nur ~19 Tage ab Erstellungsdatum, UND 3.8.2026 ist kein Freitag/Verfallstag). Root Cause: im gesamten KI-Prompt-Kontext fehlte JEDES Datums-Anker — die KI musste "heute" aus ihrem veralteten Trainingswissen raten, Datums-Arithmetik ohne harten Anker ist fuer Sprachmodelle unzuverlaessig. Fix: neue calc3rdFridayExpiration() berechnet das ECHTE Ziel-Verfallsdatum client-seitig (echter 3. Freitag, naeher am DTE-Ziel), heutiges Datum + berechnetes Verfallsdatum werden jetzt in allen 3 KI-Prompt-Kontexten uebergeben (Watchlist-Top-Performer, Options-Desk-Strategie-Buttons, Value-Strategie). ko-strategies.js (@b7a9e52): atmna-Prompt-Text verweist jetzt explizit auf das bereitgestellte Datum statt es selbst zu berechnen — verhindert dass die KI den Wert ignoriert und trotzdem eigenstaendig (falsch) rechnet. Funktional getestet: calc3rdFridayExpiration(30) mit fixiertem Datum 15.07.2026 liefert korrekt 21.08.2026 (verifizierter Freitag, 37 DTE — naeher am 30-Tage-Ziel als Juli-Alternative mit nur 2 DTE oder September mit 65 DTE).
      v349: KRITISCHE BUGFIXES (Axel-Report per Browser-Konsole, 15.07.2026 Abend) — zwei echte Fehler aus der heutigen Session gefunden und behoben. (1) "Uncaught ReferenceError: switchToPanel is not defined" — in renderGateWidget() (Arbeitspaket D) wurde eine nicht-existente Funktion switchToPanel() referenziert statt der tatsaechlich existierenden showPanel(); betraf ALLE 8 klickbaren Strategie-Ampel-Chips (Value + die 7 aus Arbeitspaket D). Korrigiert auf showPanel(), funktional getestet (beide Varianten: Value-Chip + Leaderboard-Chip). (2) "Uncaught SyntaxError: Export getFocus is not defined in module" (ko-modules@6b69795) — beim Entfernen von getFocus()/getLabelList() im Dead-Code-Audit heute Vormittag wurde nur die const-Definition entfernt, nicht die export-Zeile am Dateiende, die diese Namen weiterhin auflistete. Dieser Modul-Ladefehler betraf JEDE Seite, die ko-strategies.js einbindet — vermutlich Ursache fuer weitere Fehlfunktionen bei KI-Analyse-Buttons quer durchs Interface. Export-Zeile bereinigt, als echtes ES-Modul getestet (node --input-type=module, keine Fehler). CDN-Hash aktualisiert.
      v348: Phase 0.5 Arbeitspaket I (Fehler-Kommunikation KI-Aufrufe) — verbleibende 2 von 4 Punkten umgesetzt. Fund: Punkte 1+4 (unterscheidbare 429-Meldungen, echter UI-Zustandswechsel statt Toast) waren bereits in einer frueheren Session (v245) als zentrale showKiError()-Funktion gebaut — STRATEGIE.md-Eintrag war veraltet (beschrieb noch den 08.07.2026-Ist-Zustand vor diesem Fix). Neu ergaenzt: (1) Countdown am Retry-Button bei transienten Rate-Limits (20s, deaktiviert den Button waehrenddessen, live tickender Countdown-Text) — vorher nur ein bloßer Klick-Button ohne Wartezeit-Hinweis. (2) Cache-Fallback auf zuletzt gespeicherte KI-Einschätzung fuer denselben Ticker mit Alters-Anzeige (_cacheKiResultForTicker()/_getCachedKiResultForTicker(), rollierender Cache max. 30 Ticker) — bei einem Fehler steht der Nutzer nicht mehr komplett leer da, sondern sieht "Letzte KI-Einschätzung (vor X Min/Std)". Wichtiger Zusatzfund: die Deep-Dive-Einzeltitel-KI-Analyse (generateDeepDiveKI()) nutzte bisher GAR NICHT die zentrale showKiError() (nur eine rohe Fehlermeldung ohne Retry/Cache-Fallback) — jetzt konsistent mit den anderen KI-Aufrufen umgestellt, inkl. echtem Retry (ruft dieselbe Funktion erneut auf). Generischer "KI-Fehler"-Fall bekommt jetzt ebenfalls einen Retry-Button (vorher nur beim transienten 429-Fall). Funktional getestet (Cache-Speicherung/Abruf + Countdown-Timer-Logik isoliert verifiziert).
      v347: Phase 0.5 Arbeitspaket G Punkte 5+6 (ko-modules@c52bac1). Punkt 5 (Auto-Sinnvoll-Watchlists + Caching): Erst-Nutzer-Empfehlung + Merken der letzten Handelsplatz-Watchlist-Wahl ueber Sessions hinweg (localStorage), empfohlene Liste im Dropdown mit ⭐ markiert. Punkt 6 (Tooltips "KI-Analyse Watchlist Top-Performer" + EIC-Verhalten): Tooltip am Haupt-Button erklaert jetzt was die Funktion tut (Top-25 Ergebnisse, Score≥40, aktueller Scan) + EIC-Modus-Unterschied (Public=WpHG-deskriptiv vs. Expert=detaillierter, verifiziert gegen den tatsaechlichen ko-ai-Worker-Code: expert_mode schaltet zwischen separaten System-Prompts um). Zusaetzlicher Hinweis direkt im Dropdown (nicht nur Tooltip, da Tooltips auf Touch-Geraeten ohne Hover unsichtbar sind). **Arbeitspaket G damit vollstaendig abgeschlossen** (alle 6 Spec-Punkte: 4 als bereits erfuellt/gegenstandslos verifiziert, 2 neu umgesetzt).
@@ -3149,7 +3150,7 @@ window.pinSubmit = function(){
 <!-- ko-strategies.js v2.1.0 — Commit-Hash 02644b8 (15.07.2026, Dead-Code-Audit:
      getFocus/getLabelList entfernt; vorher 785e61e/01.07.2026 Short-Strategie
      fading_short + Regelwerk-Erweiterung). type="module" erforderlich. -->
-<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@6b69795/ko-strategies.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b7a9e52/ko-strategies.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -17017,6 +17018,18 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
   // gemeinsamen Builder via KoPrompts.get(id, ctx) statt stratCfg.prompt(ctx).
   // Value-Strategie: ctx mit Fundamentaldaten aus valueScanner anreichern
   var _kiCtx = { marktkontext: marktkontext, vixStr: vixForPrompt, optsCfg: optsCfg };
+  // BUGFIX (15.07.2026, Axel-Report): heutiges Datum + fuer Options-Strategien
+  // das ECHTE, client-berechnete Ziel-Verfallsdatum ergaenzen — vorher fehlte
+  // jeder Datums-Anker im Prompt, die KI hat dadurch teils falsche Datum/DTE-
+  // Kombinationen ausgegeben (z.B. ein Datum genannt, das nur ~19 statt ~30
+  // Tage entfernt ist, UND kein echter Verfallstag/Freitag war).
+  var _todayForPrompt = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', weekday:'long' });
+  _kiCtx.marktkontext = 'HEUTIGES DATUM: ' + _todayForPrompt + '\n\n' + _kiCtx.marktkontext;
+  if (['atmna', 'csp_wheel', 'weekly_income', 'cc'].indexOf(_kiStrat) !== -1) {
+    var _expInfo = calc3rdFridayExpiration(optsCfg.dte);
+    _kiCtx.marktkontext += '\n\nZIEL-VERFALLSDATUM (bereits berechnet, NICHT selbst berechnen): '
+      + _expInfo.dateStr + ' (Freitag, ' + _expInfo.actualDte + ' Tage ab heute) — dieses Datum in der Analyse verwenden.';
+  }
   if (_kiStrat === 'value') {
     var _isEicNow = (typeof _expertModeActive !== 'undefined' && _expertModeActive)
                  && (typeof _eicUnlocked !== 'undefined' && _eicUnlocked);
@@ -18152,6 +18165,54 @@ function autoTopClearAll() {
 // OPTIONS-KONFIGURATION
 // ══════════════════════════════════════════════════════════════════════════════
 var OPTIONS_CFG_KEY = 'ko_options_cfg';
+
+/**
+ * BUGFIX (15.07.2026, Axel-Report): Berechnet den ECHTEN naechsten 3. Freitag
+ * eines Monats in der Naehe von targetDte Tagen ab heute — client-seitig,
+ * damit die KI dieses Datum NICHT selbst raten muss. Vorher stand nirgends
+ * im Prompt das heutige Datum, die KI hat dadurch teils falsche Kombinationen
+ * aus Datum+DTE ausgegeben (z.B. "3. Aug 2026 (~30 DTE)" bei tatsaechlich nur
+ * ~19 Tagen Abstand vom Erstellungsdatum, UND der 3.8.2026 ist ein Montag,
+ * kein Options-Verfallstag). Klassisches Datums-Rechnungs-Problem, das ein
+ * Sprachmodell ohne harten Anker im Prompt nicht zuverlaessig loesen kann.
+ * @param {number} targetDte - Ziel-Tage bis Verfall (Default 30)
+ * @returns {{date: Date, dateStr: string, actualDte: number}}
+ */
+function calc3rdFridayExpiration(targetDte) {
+  targetDte = targetDte || 30;
+  var today = new Date();
+  var candidateTarget = new Date(today.getTime() + targetDte * 86400000);
+
+  function thirdFridayOfMonth(year, month) {
+    var d = new Date(year, month, 1);
+    var fridayCount = 0;
+    while (true) {
+      if (d.getDay() === 5) {
+        fridayCount++;
+        if (fridayCount === 3) return new Date(d);
+      }
+      d.setDate(d.getDate() + 1);
+      if (d.getMonth() !== month) return null; // Monat hat keinen 3. Freitag mehr (sollte nie passieren)
+    }
+  }
+
+  // Kandidaten: 3. Freitag des Zielmonats + des Folgemonats, dann den
+  // naeher an targetDte liegenden waehlen
+  var f1 = thirdFridayOfMonth(candidateTarget.getFullYear(), candidateTarget.getMonth());
+  var f2 = thirdFridayOfMonth(candidateTarget.getFullYear(), candidateTarget.getMonth() + 1);
+  var f0 = thirdFridayOfMonth(candidateTarget.getFullYear(), candidateTarget.getMonth() - 1);
+
+  var candidates = [f0, f1, f2].filter(Boolean);
+  var best = candidates.reduce(function(a, b) {
+    var diffA = Math.abs((a.getTime() - today.getTime()) / 86400000 - targetDte);
+    var diffB = Math.abs((b.getTime() - today.getTime()) / 86400000 - targetDte);
+    return diffB < diffA ? b : a;
+  });
+
+  var actualDte = Math.round((best.getTime() - today.getTime()) / 86400000);
+  var dateStr = best.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return { date: best, dateStr: dateStr, actualDte: actualDte };
+}
 
 function getOptionsCfg() {
   try {
@@ -22031,7 +22092,8 @@ async function runValueKiBriefing(mode) {
     isEic:   isEic,
     mode:    isWheel ? 'wheel' : 'fundamental',
     tickers: candidates,   // vollständige Objekte mit pe/pb/roic/rs/hvp etc.
-    marktkontext: 'MARKTREGIME: ' + (window._lastMseResult ? window._lastMseResult.regime || '–' : '–')
+    marktkontext: 'HEUTIGES DATUM: ' + new Date().toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric',weekday:'long'})
+      + '\nMARKTREGIME: ' + (window._lastMseResult ? window._lastMseResult.regime || '–' : '–')
       + '\nVIX: ' + (_getVixRobust() || '–')
       + '\nFIN-Archiv: ' + (data.finWeek||'–'),
   };
@@ -22186,6 +22248,11 @@ async function runOptionsKiBriefing(strat) {
           + ' D200:' + (t.dist200!=null ? t.dist200+'%' : '--')
           + ' Grade:' + (t.grade||'--');
       }).join('\n');
+  var _todayForPrompt2 = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', weekday:'long' });
+  var _expInfo2 = calc3rdFridayExpiration(30);
+  mkCtx = 'HEUTIGES DATUM: ' + _todayForPrompt2 + '\n\n' + mkCtx
+    + '\n\nZIEL-VERFALLSDATUM (bereits berechnet, NICHT selbst berechnen): '
+    + _expInfo2.dateStr + ' (Freitag, ' + _expInfo2.actualDte + ' Tage ab heute) — dieses Datum in der Analyse verwenden.';
   var ctx = { marktkontext: mkCtx, optsCfg: { minPrice:15, maxPrice:(_optionsMaxPrice != null ? _optionsMaxPrice : 150), minHvp:_optionsDeskFilter, goodHvp:50, idealHvp:65, erDays:30, dte:30 }, vixStr: String(_getVixRobust()||'--') };
   var prompt = KoPrompts.get(strat, ctx);
   // Open modal
