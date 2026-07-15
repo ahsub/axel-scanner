@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v340">
+<meta name="version" content="20260715-v341">
 <!-- CHANGELOG (neueste zuerst):
+     v341: Phase 0.5 Arbeitspaket C — dritte und letzte Runde: Modell-Herkunftsnennung, Zeitfenster-Labels, Handelsplatz-Wording. (1) 9 nutzersichtbare "Claude"-Erwaehnungen im Kunden-UI generisiert zu "KI" (Oversold-Scan, Meta-Analyse, KI-Briefing-Modal, Status-/Ladetexte, Fehlermeldung) — Spec: "Keine Modell-Herkunftsnennung im UI, nur an dedizierter Programm-Beschreibungsstelle". help.html dient bereits korrekt als diese dedizierte Stelle, dort unveraendert belassen. Ein Admin-Workflow-Text ("JSON aus Claude-Analyse hier einfügen") bewusst NICHT geaendert — beschreibt einen externen Claude.ai-Workflow, keine interne Modell-Branding-Exposition. (2) "15m"/"30m" Dropdown-Optionen auf "15min"/"30min" korrigiert (interner value bleibt unveraendert) — die bereits vorhandenen Zeitfenster-Buttons nutzten schon korrekt "min", dieses eine Dropdown war der einzige uebersehene Fall. (3) "Pre-Market (TR/L&S)"-Status-Badge bekommt einen erklaerenden Tooltip mit den ausgeschriebenen Handelsplatz-Namen (Trade Republic / Lang & Schwarz) — vorher ohne jede Erklaerung fuer Nutzer ohne Trading-Vorwissen. Andere TR-Erwaehnungen ("TR Produktdaten") haben bereits eine erklaerende Unterueberschrift, kein weiterer Fix noetig. **Arbeitspaket C damit vollstaendig abgeschlossen** (alle 5 Spec-Punkte: KI-Analyse-Umbenennung, Kurz-und-bündig-Default, Modell-Herkunft, min-Label, Handelsplatz-Wording).
      v340: Phase 0.5 Arbeitspaket C — zweite Runde: "KI-Analyse" durchgaengig umbenannt + "Kurz und bündig"-Default-Bug gefixt. (1) Alle 10 nutzersichtbaren "KI-Analyse"-Vorkommen auf "KI-basierte Markt-Einschätzung" (grosse Kontexte: Sektionsheader, Modal-Titel) bzw. kompaktes "Markt-Einschätzung" (Buttons, Toasts, Status-Texte) umgestellt — Spec verlangt durchgaengige Umbenennung. Fund dabei: ein Button hatte bereits ein title="KI-basierte Markt-Einschätzung"-Tooltip, aber der SICHTBARE Text sagte noch "KI-Analyse" — halbfertige Vorarbeit einer frueheren Session, jetzt konsistent. "KI-Analysesprache" (Einstellungen-Label) ebenfalls umbenannt zu "Sprachstil der Markt-Einschätzung". (2) ECHTER SPEC-VERSTOSS GEFUNDEN UND GEFIXT: Spec verlangt "Kurz und bündig ALS STANDARD-ANSICHT" — der tatsaechliche Default fuer neue Nutzer (kein localStorage-Wert -> null -> null==='1' ist false) war aber versehentlich die TECHNISCHE Zahlen-Ansicht, das exakte Gegenteil der Vorgabe. Korrigiert: nur eine EXPLIZITE Abwahl ('0') schaltet jetzt auf die Zahlen-Variante um, neue Nutzer bekommen automatisch "Kurz und bündig". Funktional getestet (alle 3 Faelle: neuer Nutzer/explizit an/explizit aus). Verifiziert, bereits korrekt: die zugehoerige Ergebnis-Ueberschrift "EINFACHE SPRACHE · KI-UMFORMULIERUNG" wurde im selben Zug auf "KURZ UND BÜNDIG · KI-UMFORMULIERUNG" korrigiert (war inkonsistent zum bereits korrekt benannten Toggle-Button daneben).
      v339: Phase 0.5 Arbeitspaket C (Sprache/Beschriftung) — erste Runde, unbeschriftete Icon-Buttons (Axel-Beispiel: TV-Button). 5 TradingView-Buttons waren reine Icons (Candlestick-Symbol) mit nur einem Hover-Tooltip, ohne sichtbaren Text — fuer einen fremden Nutzer ohne Trading-Vorwissen nicht selbsterklaerend (Tooltip erfordert zufaelliges Hovern). Alle 5 bekommen jetzt sichtbares "TV"-Label neben dem Icon. Systematische Suche nach weiteren Icon-only-Buttons (title-Attribut + reines Icon, kein Text) ergab 9 Kandidaten — davon 4 als echt mehrdeutig gefixt: Aufklappen/Zuklappen-Chevrons (Arbeitspaket G nennt dies explizit als bekanntes Problem), Backup Export/Import (Pfeilrichtung leicht verwechselbar, wichtige/seltene Aktion), Zwischenablage einfuegen (Clipboard-Icon allein nicht eindeutig einfuegen vs. kopieren), Leeren ("X"-Icon extrem mehrdeutig ohne Kontext: Schliessen? Loeschen? Abbrechen?). Bewusst NICHT geaendert: Token anzeigen/verbergen (Auge), Loeschen (Papierkorb), Watchlist hinzufuegen (Stern) — universell verstandene Icon-Konventionen, Text waere Ueberengineering.
      v338: Scanner-Tab zeigte kompletten rohen KI-Briefing-Text unnoetig doppelt an (Axel-Feedback 15.07.2026, Screenshot: unformatiertes Markdown mit sichtbaren ##/**/||-Zeichen im Market-Weather-Widget). Root Cause: _applyMorningResults() schrieb results.kiBriefing (der GESAMTE Briefing-Text) per .textContent in rc-action — ein Element das eigentlich fuer einen KURZEN Strategie-Hinweis gedacht ist ("Selektiv vorgehen · Nur höchste Qualität handeln", von renderAllGateWidgets()/showMSEDetail() gesetzt) und diesen bei jedem abgeschlossenen Briefing ueberschrieb. Da der vollstaendige Briefing-Text bereits sauber im Home-Panel + Tearsheet-Modal dargestellt wird (mit echtem Markdown-Rendering), war diese Dopplung sowohl unnoetig (Arbeitspaket B: keine Duplikate) als auch fehlerhaft geloest (.textContent rendert kein Markdown). Fix: Block entfernt, kein Ersatz noetig — rc-action behaelt den kurzen Strategie-Hinweis.
@@ -2442,10 +2443,10 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
 
       <!-- Oversold-Kandidaten Tab -->
       <div id="backlog-oversold-tab" style="display:none">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:.5rem">Claude analysiert RSI, OBV, Volumen und Abverkauf-Muster auf Oversold-Wahrscheinlichkeit:</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:.5rem">KI-basierte Analyse von RSI, OBV, Volumen und Abverkauf-Muster auf Oversold-Wahrscheinlichkeit:</div>
         <div style="display:flex;gap:6px;margin-bottom:.75rem">
           <button class="btn btn-sm btn-primary" onclick="runOversoldScan()" style="font-size:11px;flex:1">
-            <i class="ti ti-brain"></i> Oversold-Scan starten (Claude)
+            <i class="ti ti-brain"></i> Oversold-Scan starten
           </button>
           <button class="btn btn-sm" onclick="clearOversoldList()" style="font-size:11px;color:var(--red);border-color:var(--red)">
             <i class="ti ti-trash"></i>
@@ -2453,7 +2454,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         </div>
         <div id="backlog-oversold-list" style="font-size:12px;color:var(--text3);text-align:center;padding:1.5rem">
           <i class="ti ti-trending-down" style="font-size:24px;display:block;margin-bottom:.5rem"></i>
-          Scan starten — Claude bewertet alle gescannten Titel auf Oversold-Signal
+          Scan starten — KI bewertet alle gescannten Titel auf Oversold-Signal
         </div>
       </div>
 
@@ -2486,7 +2487,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
             <i class="ti ti-player-play"></i> Backtest starten
           </button>
           <button class="btn btn-sm" id="bt-meta-btn" onclick="runMetaAnalysis()" style="font-size:11px;flex:1;background:linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.2));border-color:#818cf8;color:#818cf8" disabled>
-            <i class="ti ti-brain"></i> Meta-Analyse (Claude)
+            <i class="ti ti-brain"></i> Meta-Analyse
           </button>
         </div>
 
@@ -7992,8 +7993,8 @@ function renderCard(t,state){
        ' onchange="setCardTF(this)"'+
        ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-weight:600">'+
        '<option value="1d">1T ✓</option>'+
-       '<option value="15m">15m</option>'+
-       '<option value="30m">30m</option>'+
+       '<option value="15m">15min</option>'+
+       '<option value="30m">30min</option>'+
        '<option value="1h">1h</option>'+
        '<option value="4h">4h</option>'+
      '</select>'+
@@ -10226,7 +10227,7 @@ async function autoMakro(){
   const oil2   = document.getElementById('m-oil2')?.textContent   || '—';
   const today  = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
 
-  if(status) status.textContent = 'Schritt 2/3: Claude analysiert Marktlage…';
+  if(status) status.textContent = 'Schritt 2/3: KI analysiert Marktlage…';
 
   // Step 3: Call Claude API
   // Include Yahoo Finance headlines if available
@@ -10360,7 +10361,7 @@ async function autoMakro(){
   try {
     // KI-Call via ko-ai Worker (System-Prompt + API-Key serverside)
     const text = await koAiCall('makro', prompt, false);
-    if(!text) throw new Error('Keine Antwort von Claude');
+    if(!text) throw new Error('Keine Antwort von der KI erhalten');
 
     // Parse JSON from response — robust gegen Sonderzeichen und abgeschnittene Antworten
     let clean = text.replace(/```json|```/g,'').trim();
@@ -10649,7 +10650,16 @@ function updateSessionBar(){
   bar.style.borderColor = s.color.includes('var') ? 'rgba(255,255,255,0.1)' : s.color+'40';
   if(dot) dot.style.background = s.color;
   if(dot && s.session === 'us') dot.style.boxShadow = '0 0 6px '+s.color;
-  if(label){ label.textContent = s.icon + ' ' + s.label; label.style.color = s.color; }
+  if(label){
+    label.textContent = s.icon + ' ' + s.label;
+    label.style.color = s.color;
+    // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket C): "TR/L&S" war ohne
+    // jede Erklaerung — fuer einen Nutzer ohne Trading-Vorwissen nicht
+    // selbsterklaerend. Tooltip mit ausgeschriebenen Handelsplatz-Namen.
+    label.title = s.session === 'premarket'
+      ? 'Vorbörslicher Handel bei den deutschen Neobrokern Trade Republic (TR) und Lang & Schwarz (L&S)'
+      : '';
+  }
   const now = new Date();
   if(timeEl) timeEl.textContent = now.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' MESZ';
 }
@@ -17276,7 +17286,7 @@ function csvSaveConfirm(tickers) {
     <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:0.5px solid var(--border)">
       <div>
         <div style="font-size:15px;font-weight:600">KI-Briefing</div>
-        <div style="font-size:11px;color:var(--text3)">Technische Filterung · Claude Daten-Synthese</div>
+        <div style="font-size:11px;color:var(--text3)">Technische Filterung · KI-basierte Daten-Synthese</div>
       </div>
       <button onclick="document.getElementById('ki-briefing-modal').style.display='none'"
         style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px">✕</button>
@@ -18188,7 +18198,7 @@ async function runOversoldScan() {
 
   el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text3)">'
     + '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;font-size:1.5rem"></i>'
-    + '<div style="margin-top:.5rem">Claude analysiert Oversold-Signale...</div></div>';
+    + '<div style="margin-top:.5rem">KI analysiert Oversold-Signale...</div></div>';
 
   // Kandidaten aufbereiten (RSI < 50, Kurs > 5% unter MA50 oder 52W-Hoch-Abstand > 15%)
   const candidates = [];
@@ -18247,7 +18257,7 @@ async function runOversoldScan() {
     const results = parsed.candidates || [];
 
     if (!results.length) {
-      el.innerHTML = '<div style="color:var(--amber);padding:1rem;text-align:center">Claude hat keine Titel mit ausreichendem Rebound-Potenzial (≥40) gefunden.</div>';
+      el.innerHTML = '<div style="color:var(--amber);padding:1rem;text-align:center">Keine Titel mit ausreichendem Rebound-Potenzial (≥40) gefunden.</div>';
       return;
     }
 
@@ -18801,7 +18811,7 @@ async function runMetaAnalysis() {
   const metaEl = document.getElementById('bt-meta-output');
   if (!metaEl) return;
   metaEl.style.display = 'block';
-  metaEl.innerHTML = '<div style="text-align:center;color:var(--text3)"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Claude analysiert deine Backtesting-Daten...</div>';
+  metaEl.innerHTML = '<div style="text-align:center;color:var(--text3)"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> KI analysiert deine Backtesting-Daten...</div>';
 
   if (!getAiToken()) { metaEl.innerHTML = '<div style="color:var(--red)">KI-Token nicht gesetzt — bitte im Admin-Tab eintragen.</div>'; return; }
 
@@ -23038,7 +23048,7 @@ async function generateDpKI(data, scoreObj, signal) {
   // Loading-State
   contentEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:var(--text3);font-size:12px;padding:.25rem 0">'
     + '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i>'
-    + ' Claude analysiert Marktdaten…</div>';
+    + ' KI analysiert Marktdaten…</div>';
 
   // Prompt zusammenbauen
   // v10.07.2026 (Option B, Axel-Entscheidung): DIX/GEX-Volumen-Heuristik NICHT
