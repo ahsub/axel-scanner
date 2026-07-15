@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v339">
+<meta name="version" content="20260715-v340">
 <!-- CHANGELOG (neueste zuerst):
+     v340: Phase 0.5 Arbeitspaket C — zweite Runde: "KI-Analyse" durchgaengig umbenannt + "Kurz und bündig"-Default-Bug gefixt. (1) Alle 10 nutzersichtbaren "KI-Analyse"-Vorkommen auf "KI-basierte Markt-Einschätzung" (grosse Kontexte: Sektionsheader, Modal-Titel) bzw. kompaktes "Markt-Einschätzung" (Buttons, Toasts, Status-Texte) umgestellt — Spec verlangt durchgaengige Umbenennung. Fund dabei: ein Button hatte bereits ein title="KI-basierte Markt-Einschätzung"-Tooltip, aber der SICHTBARE Text sagte noch "KI-Analyse" — halbfertige Vorarbeit einer frueheren Session, jetzt konsistent. "KI-Analysesprache" (Einstellungen-Label) ebenfalls umbenannt zu "Sprachstil der Markt-Einschätzung". (2) ECHTER SPEC-VERSTOSS GEFUNDEN UND GEFIXT: Spec verlangt "Kurz und bündig ALS STANDARD-ANSICHT" — der tatsaechliche Default fuer neue Nutzer (kein localStorage-Wert -> null -> null==='1' ist false) war aber versehentlich die TECHNISCHE Zahlen-Ansicht, das exakte Gegenteil der Vorgabe. Korrigiert: nur eine EXPLIZITE Abwahl ('0') schaltet jetzt auf die Zahlen-Variante um, neue Nutzer bekommen automatisch "Kurz und bündig". Funktional getestet (alle 3 Faelle: neuer Nutzer/explizit an/explizit aus). Verifiziert, bereits korrekt: die zugehoerige Ergebnis-Ueberschrift "EINFACHE SPRACHE · KI-UMFORMULIERUNG" wurde im selben Zug auf "KURZ UND BÜNDIG · KI-UMFORMULIERUNG" korrigiert (war inkonsistent zum bereits korrekt benannten Toggle-Button daneben).
      v339: Phase 0.5 Arbeitspaket C (Sprache/Beschriftung) — erste Runde, unbeschriftete Icon-Buttons (Axel-Beispiel: TV-Button). 5 TradingView-Buttons waren reine Icons (Candlestick-Symbol) mit nur einem Hover-Tooltip, ohne sichtbaren Text — fuer einen fremden Nutzer ohne Trading-Vorwissen nicht selbsterklaerend (Tooltip erfordert zufaelliges Hovern). Alle 5 bekommen jetzt sichtbares "TV"-Label neben dem Icon. Systematische Suche nach weiteren Icon-only-Buttons (title-Attribut + reines Icon, kein Text) ergab 9 Kandidaten — davon 4 als echt mehrdeutig gefixt: Aufklappen/Zuklappen-Chevrons (Arbeitspaket G nennt dies explizit als bekanntes Problem), Backup Export/Import (Pfeilrichtung leicht verwechselbar, wichtige/seltene Aktion), Zwischenablage einfuegen (Clipboard-Icon allein nicht eindeutig einfuegen vs. kopieren), Leeren ("X"-Icon extrem mehrdeutig ohne Kontext: Schliessen? Loeschen? Abbrechen?). Bewusst NICHT geaendert: Token anzeigen/verbergen (Auge), Loeschen (Papierkorb), Watchlist hinzufuegen (Stern) — universell verstandene Icon-Konventionen, Text waere Ueberengineering.
      v338: Scanner-Tab zeigte kompletten rohen KI-Briefing-Text unnoetig doppelt an (Axel-Feedback 15.07.2026, Screenshot: unformatiertes Markdown mit sichtbaren ##/**/||-Zeichen im Market-Weather-Widget). Root Cause: _applyMorningResults() schrieb results.kiBriefing (der GESAMTE Briefing-Text) per .textContent in rc-action — ein Element das eigentlich fuer einen KURZEN Strategie-Hinweis gedacht ist ("Selektiv vorgehen · Nur höchste Qualität handeln", von renderAllGateWidgets()/showMSEDetail() gesetzt) und diesen bei jedem abgeschlossenen Briefing ueberschrieb. Da der vollstaendige Briefing-Text bereits sauber im Home-Panel + Tearsheet-Modal dargestellt wird (mit echtem Markdown-Rendering), war diese Dopplung sowohl unnoetig (Arbeitspaket B: keine Duplikate) als auch fehlerhaft geloest (.textContent rendert kein Markdown). Fix: Block entfernt, kein Ersatz noetig — rc-action behaelt den kurzen Strategie-Hinweis.
      v337: F&G/PCR-Untersuchung abgeschlossen (Axel-Anfrage 15.07.2026) — zwei getrennte Root Causes gefunden und behoben. (1) PCR: ko-indicators.json hatte aggregatorKey="pcr.value", aber das tatsaechliche Aggregator-Schema kennt kein .value-Feld (nur market.pcr.pcr, bestaetigt gegen Run #106 vom 14.07.2026) — PCR-Faktor war dadurch STRUKTURELL nie befuellbar, unabhaengig von Timing. Korrigiert auf "pcr.pcr" (ko-modules Commit 1f40df0), funktional getestet. (2) Fear&Greed: fetchCnnFearGreed() wurde in loadIntermarket() als "parallel laden" OHNE await aufgerufen — der autoMakro()-Gate aus v331 wartete zwar auf loadIntermarket() selbst, nicht aber auf diesen darin fire-and-forget gestarteten Sub-Fetch. Race Condition: buildMarketContext() las cnn-fg-score oft noch als "—", weil der CNN-Fetch zu diesem Zeitpunkt haeufig noch nicht abgeschlossen war. Fix: await ergaenzt. CDN-Hash ko-indicators-loader.js -> 1f40df0.
@@ -702,7 +703,7 @@ background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);borde
           style="display:flex;align-items:center;gap:5px;padding:6px 10px;font-size:12px;font-weight:500;
 background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);border-radius:8px;cursor:pointer"
           title="KI-basierte Markt-Einschätzung">
-          <i class="ti ti-brain" style="color:var(--accent)"></i> KI-Analyse
+          <i class="ti ti-brain" style="color:var(--accent)"></i> Markt-Einschätzung
         </button>
 
         <!-- Trennlinie -->
@@ -1441,7 +1442,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <span style="color:var(--text3);font-size:10px;display:block;margin-top:2px">FINRA regShoDaily · SPY/QQQ/IWM/DIA · strukturell höher als klassischer S&amp;P-500-DIX, nicht 1:1 vergleichbar</span>
     </div>
     <div id="dp-dix-info" style="font-size:11px;color:var(--text3);margin-top:.5rem;line-height:1.5;padding:6px 8px;background:var(--bg3);border-radius:6px">
-      <b>⚠ Volumen-Heuristik</b> (kein echter DIX/GEX) — Formel aus SPY-Volumen/OBV, bewusst auf plausiblen Wertebereich skaliert, aber ohne echte Dark-Pool- oder Optionsketten-Datenbasis. Nur zur groben Orientierung, nicht für KI-Analysen verwendet.<br>
+      <b>⚠ Volumen-Heuristik</b> (kein echter DIX/GEX) — Formel aus SPY-Volumen/OBV, bewusst auf plausiblen Wertebereich skaliert, aber ohne echte Dark-Pool- oder Optionsketten-Datenbasis. Nur zur groben Orientierung, nicht für die KI-basierte Markt-Einschätzung verwendet.<br>
       <span style="color:var(--amber)">Echtes Markt-Level-GEX (SqueezeMetrics/Quiver Quant) weiterhin kostenpflichtig — Umstellung geplant sobald finanzierbar.</span>
     </div>
   </div>
@@ -1546,7 +1547,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     </div>
 
     <div id="dp-ki-footer" style="display:none;margin-top:.6rem;font-size:10px;color:var(--text3);text-align:right">
-      <i class="ti ti-robot"></i> KI-Analyse · <span id="dp-ki-time"></span> · Rein deskriptive Datenanalyse · Keine Anlageberatung gem. §1 WpHG
+      <i class="ti ti-robot"></i> KI-basierte Markt-Einschätzung · <span id="dp-ki-time"></span> · Rein deskriptive Datenanalyse · Keine Anlageberatung gem. §1 WpHG
     </div>
   </div>
 
@@ -2153,7 +2154,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between">
           <div>
-            <div style="font-size:13px;font-weight:500">KI-Analysesprache</div>
+            <div style="font-size:13px;font-weight:500">Sprachstil der Markt-Einschätzung</div>
             <div style="font-size:11px;color:var(--text3)">Fachsprache / Kurz und bündig</div>
           </div>
           <button id="simple-lang-toggle" onclick="toggleSimpleLanguage(this)"
@@ -2580,7 +2581,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     <div style="display:flex;align-items:center;gap:.5rem;margin-top:.4rem">
       <button onclick="runAlphaLbKI()"
         style="font-size:11px;padding:4px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);cursor:pointer">
-        🤖 KI-Analyse für diese Strategie
+        🤖 Markt-Einschätzung für diese Strategie
       </button>
       <span id="alpha-lb-ki-status" style="font-size:11px;color:var(--text3)"></span>
     </div>
@@ -2850,7 +2851,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       </div>
 
       <div style="background:var(--bg3);border-radius:10px;padding:.75rem;border-left:3px solid #818cf8">
-        <div style="font-size:12px;font-weight:600;color:#818cf8;margin-bottom:3px">④ KI-Analyse</div>
+        <div style="font-size:12px;font-weight:600;color:#818cf8;margin-bottom:3px">④ KI-basierte Markt-Einschätzung</div>
         <div style="font-size:11px;color:var(--text2)">Karte öffnen → <b>KI ▾</b> → Strategie wählen</div>
         <div style="font-size:10px;color:var(--text3);margin-top:3px">→ Markov 2.0 · IVP · Bull-Score · Intermarket fließen ein</div>
       </div>
@@ -5148,7 +5149,12 @@ function _initTheme() {
   setTheme(theme);
   setFontSize(fsize);
   // Kurz &amp; bündig wiederherstellen
-  _simpleLanguage = localStorage.getItem('ko_simple_lang') === '1';
+  // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket C): Spec verlangt "Kurz und
+  // bündig ALS STANDARD-ANSICHT" — vorher war der Default fuer neue Nutzer
+  // (kein localStorage-Wert -> null -> null==='1' ist false) versehentlich
+  // die technische Zahlen-Ansicht, das Gegenteil der Spec-Vorgabe. Jetzt:
+  // nur eine EXPLIZITE Abwahl ('0') schaltet auf die Zahlen-Variante um.
+  _simpleLanguage = localStorage.getItem('ko_simple_lang') !== '0';
   var slBtn = document.getElementById('simple-lang-toggle');
   if (slBtn && _simpleLanguage) {
     slBtn.style.background = 'var(--green)'; slBtn.style.color = '#fff';
@@ -5156,8 +5162,8 @@ function _initTheme() {
   }
 }
 
-// ── EINFACHE SPRACHE Toggle ──────────────────────────────────────────────────
-var _simpleLanguage = false;
+// ── KURZ UND BÜNDIG Toggle (Spec-Default seit 15.07.2026: AN) ────────────────
+var _simpleLanguage = true;
 
 function toggleSimpleLanguage(btn) {
   _simpleLanguage = !_simpleLanguage;
@@ -16430,7 +16436,7 @@ function _showKiBriefingForStrat(strat) {
       '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:12px">'
       + '<i class="ti ti-brain" style="font-size:1.5rem;display:block;margin-bottom:.5rem"></i>'
       + 'Strategie gewählt: <b>' + strat + '</b><br>'
-      + '<span style="font-size:11px">KI-Analyse starten → Button oben im Modal</span>'
+      + '<span style="font-size:11px">Markt-Einschätzung starten → Button oben im Modal</span>'
       + '</div>';
   }
 }
@@ -19181,7 +19187,7 @@ async function generateDeepDiveKI(sym, name, raw, state) {
       .replace(/\n\n/g, '<br><br>')
       .replace(/\n/g, '<br>');
     document.getElementById('dd-ki-text').innerHTML = '<div style="font-size:13px;line-height:1.8;color:var(--text)">' + html + '</div>';
-    document.getElementById('dd-ki-status').textContent = 'KI-Analyse · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' · Keine Anlageberatung gem. §1 WpHG';
+    document.getElementById('dd-ki-status').textContent = 'KI-basierte Markt-Einschätzung · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' · Keine Anlageberatung gem. §1 WpHG';
 
     // Kontext-Analyse Box
     var score = state.compositeScore || 50;
@@ -20609,7 +20615,7 @@ function _applyMorningResults(results) {
     fb.innerHTML = '<div style="background:var(--bg2);border-radius:12px;padding:1.5rem;max-width:500px;width:100%">'
       + '<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:1rem">Morning Briefing Zusammenfassung</div>'
       + '<pre style="font-size:11px;color:var(--text);white-space:pre-wrap;line-height:1.6">'
-      + (results.kiBriefing || 'Keine KI-Analyse verfügbar') + '</pre>'
+      + (results.kiBriefing || 'Keine Markt-Einschätzung verfügbar') + '</pre>'
       + '<button onclick="closeTearsheet()" style="margin-top:1rem;padding:6px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;font-size:12px">Schließen</button>'
       + '</div>';
     document.body.appendChild(fb);
@@ -21099,10 +21105,10 @@ function showMorningTearsheet(results) {
         + (results.kiBriefing ? '<button id="ts-simple-btn" onclick="generateSimpleTearsheet()" style="font-size:10px;padding:3px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer" title="Allgemeinverständliche Umformulierung"><i class=\"ti ti-text-size\"></i> Kurz und bündig</button>' : '')
       + '</div>'
       + '<div id="ts-ki-text" style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap;min-height:120px">'
-        + (results.kiBriefing || '<span style="color:var(--text3)">KI-Token nicht gesetzt — KI-Analyse nicht verfügbar.</span>')
+        + (results.kiBriefing || '<span style="color:var(--text3)">KI-Token nicht gesetzt — Markt-Einschätzung nicht verfügbar.</span>')
       + '</div>'
       + '<div id="ts-simple-result" style="display:none;margin-top:.75rem;padding:.75rem;background:var(--bg3);border-radius:8px;border-left:2px solid var(--accent)">'
-        + '<div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:.4rem">EINFACHE SPRACHE · KI-UMFORMULIERUNG</div>'
+        + '<div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:.4rem">KURZ UND BÜNDIG · KI-UMFORMULIERUNG</div>'
         + '<div id="ts-simple-text" style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap"></div>'
       + '</div>'
     + '</div>'
@@ -22123,14 +22129,14 @@ async function runAlphaLbKI() {
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
     modal.innerHTML = '<div style="background:var(--bg);border-radius:16px 16px 0 0;width:100%;max-width:680px;max-height:85vh;overflow-y:auto;padding:1.25rem">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'
-      + '<div><div style="font-size:13px;font-weight:700">KI-Analyse &mdash; ' + stratCfg.label + '</div>'
+      + '<div><div style="font-size:13px;font-weight:700">KI-basierte Markt-Einschätzung &mdash; ' + stratCfg.label + '</div>'
       + '<div style="font-size:11px;color:var(--text3)">' + _alphaLB + ' &middot; Top-' + tickers.length + ' Kandidaten</div></div>'
       + '<button onclick="document.getElementById(\'ki-modal\').remove()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer">&times;</button>'
       + '</div><div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.6">' + result + '</div></div>';
     document.body.appendChild(modal);
     modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
     if (statusEl) statusEl.textContent = '\u2713 ' + stratCfg.label;
-    showKoToast('KI-Analyse: ' + stratCfg.label + ' fertig');
+    showKoToast('Markt-Einschätzung: ' + stratCfg.label + ' fertig');
   } catch(e) {
     if (statusEl) statusEl.textContent = 'Fehler: ' + e.message;
     console.warn('[AlphaLbKI]', e.message);
