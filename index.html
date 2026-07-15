@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v345">
+<meta name="version" content="20260715-v346">
 <!-- CHANGELOG (neueste zuerst):
+     v346: Phase 0.5 Arbeitspaket G (Scanner-Tab Neuordnung) — Punkt 1 (Marktstimmungs-Anzeige vereinheitlicht) + Punkte 2/3/4 als bereits erfuellt verifiziert. Root Cause Punkt 1: Scanner-Tab zeigte die MSE-Regime (VVIX/SKEW/VIX-basiert, clientseitig, Grundlage der Strategie-Ampel seit dem MCM-Sprint), Alpha Desk zeigte die Aggregator-Regime (Markov-Ketten-basiert, serverseitig, steuert welche Ticker in welche Leaderboards kommen) — zwei legitime, aber unterschiedliche Klassifikationen mit identisch aussehenden Badges, dadurch teils widersprüchliche gleichzeitige Anzeige (z.B. NEUTRAL vs. BULL_QUIET). Axel-Entscheidung: Anzeige vereinheitlichen (Single Source of Truth fuer das was der Nutzer sieht), aber NICHT die Aggregator-interne Markov-Regime anfassen (kein Risiko fuer die Leaderboard-Ticker-Auswahl). Alpha Desk zeigt jetzt dieselbe MSE-Regime wie Scanner, Aggregator-Regime bleibt im Tooltip fuer technische Rueckfragen sichtbar. Fallback falls MSE noch nicht geladen: alte Aggregator-Anzeige. Funktional getestet (beide Faelle). Bereits erfuellt verifiziert: Punkt 2 (Strategie-Buttons funktional/Info-Chips) nutzt bereits dieselbe renderGateWidget()-Funktion aus Arbeitspaket D; Punkt 3 (Aufklappen/Zuklappen beschriftet) bereits in Arbeitspaket C gefixt; Punkt 4 ("Scan" vs. "Live" per Mouse-over erklaeren) ist gegenstandslos — der "Live"-Button existiert nicht mehr als HTML-Element (nur noch tote, sicher geguardete JS-Referenzen), nichts mehr zu erklaeren.
      v345: Phase 0.5 Arbeitspaket F (Options Desk als vollwertiger Modus) — 3 von 4 Spec-Punkten umgesetzt, 1 konsistent zurueckgestellt. (1) "Verdrängt statt versteckt darunter": die Strategie-Leaderboard-Leiste (reine Equity-Long/Short-Strategien) blieb bisher AUCH im Options-/Value-Modus sichtbar — verwirrender Rest, kein "vollwertiger" eigenstaendiger Modus-Wechsel. Jetzt nur noch im Shortlist-Modus sichtbar (switchAlphaTab() blendet #alpha-lb-section aus/ein). (2) "KI-enriched Top-Options-Ticker prominent": neue serverseitige KI-Anreicherung fuer die Options-Watchlist (ko-aggregator v5.10.0, enrich_options_watchlist_with_ai(), analog zur Master-Shortlist-Anreicherung) — Top-15 Kandidaten bekommen ein "ki"-Feld mit Strike/DTE/Delta/Praemie-Vorschlag, Strategie-Wahl (CSP/CC/Credit-Spread) bewusst an die KI delegiert statt algorithmisch geraten. Client zeigt das jetzt prominent: Badge pro Karte ("✓ KI: Strategie") + Detail-Box (Strike/DTE/Delta/Risiko) + Gesamt-Status in der Uebersichtszeile ("✓ N KI-angereichert"). (3) "KI-Einschätzung liefert Underlying × Options-Strategie": neuer uebergreifender Button "🎯 Beste Underlying × Strategie-Kombination finden" (runBestOptionsOpportunityKI()) — deterministisch bester Underlying (hoechster Gesamt-Score), KI bestimmt selbst die passende Strategie anhand der Einzel-Scores (vermeidet falsches Score-zu-Strategie-Mapping-Raten). Funktional getestet (Score-Maximum-Auswahl ueber synthetische Ticker-Liste). (4) "Separater Weg fuer favorisierte Options-Strategien" ZURUECKGESTELLT — konsistent zur selben Pareto-Entscheidung wie das analoge "Strategie-Nerds"-Feature in Arbeitspaket E (bedient wiederkehrende Power-User, nicht die Beta-Neulinge).
      v344: REVERT (Axel-Korrektur zu v343 Arbeitspaket E Punkt 2) — Leaderboard-Sektion wieder immer sichtbar, kein Einklappen mehr. Missverstaendnis geklaert: der neue "Beste Chance über alle Strategien"-Button (Punkt 4) sollte ZUSAETZLICH zur bestehenden Leaderboard-Leiste kommen, nicht diese hinter einem Einklapp-Mechanismus verstecken — die alte Leiste mit den strategiespezifischen KI-Buttons hat bereits sehr gute Ergebnisse gezeigt. toggleAlphaLbSection() + der Auto-Aufklapp-Schutz in switchAlphaLB() (ersatzlos) entfernt, HTML-Wrapper zurueckgebaut. "Beste Chance"-Button bleibt bestehen, jetzt korrekt als Ergaenzung ueber der immer sichtbaren Leaderboard-Leiste.
      v343: Phase 0.5 Arbeitspaket E (Alpha Desk konsolidieren) — 4 von 7 Spec-Punkten umgesetzt, 2 bereits erfuellt verifiziert, 1 zurueckgestellt (Pareto-Entscheidung). (1) Erste-Zeile-Zweckerklaerung ergaenzt ("Die von der KI vorgeschlagenen, aussichtsreichsten Aktien..."). (2) Leaderboard-Sektion standardmaessig eingeklappt — nur Master-Shortlist beim Oeffnen sichtbar (toggleAlphaLbSection()), inkl. Auto-Aufklapp-Schutz in switchAlphaLB() falls extern dorthin navigiert wird (z.B. Arbeitspaket-D-Ampel-Chips von heute — sonst waere die Navigation hinter dem eingeklappten Panel unsichtbar geblieben). (3) Enrichment-Rueckfrage: verifiziert bereits strukturell erfuellt, KI-Anreicherung passiert serverseitig im taeglichen Aggregator-Lauf, keine clientseitige Enrichment-Aktion zum Absichern noetig. (4) NEUER uebergreifender Button "🎯 Beste Chance über alle Strategien finden" (runBestOpportunityKI()) — durchsucht ALLE Leaderboards nach dem hoechsten Score unabhaengig von der Strategie, beantwortet direkt "was ist heute die beste Chance", ohne durch 10 Tabs zu klicken. Pareto-Entscheidung (Axel+Claude): gebaut, da hoher Nutzen fuer Cold-Start-Problem bei geringem Aufwand (Scores bereits vorhanden). Funktional getestet (Score-Vergleich ueber mehrere Leaderboards). (5) "Strategie-Nerds"-Feature (favorisierte Strategie, eigene Speicherung + Darstellung) ZURUECKGESTELLT — bedient wiederkehrende Power-User, nicht die externen Beta-Neulinge der Phase 0.5, unklarer Aufwand ohne genauere Spec. (6) Regime-Code ("BULL_QUIET") wird jetzt als menschenlesbares Label angezeigt (KoMarketState.getStrategyGates().label, Single Source of Truth mit der Strategie-Ampel), Rohcode nur noch als Tooltip. (7) Refresh-Button rechts: bereits in frueherer Session entfernt, verifiziert.
@@ -22175,19 +22176,35 @@ function renderAlphaDashboard(data) {
   // ── Meta-Zeile ─────────────────────────────────────────────────────────────
   var metaEl = document.getElementById('alpha-meta');
   if (metaEl) {
-    var regColor = sm.regimeUsed && sm.regimeUsed.includes('BULL') ? 'var(--green)'
-                 : sm.regimeUsed && sm.regimeUsed.includes('STRESS') ? 'var(--red)' : 'var(--amber)';
-    // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket E): "Marktzustands-Bezeichnung
-    // muss aus Briefing/Makro herleitbar oder erklärt sein" — vorher stand hier
-    // der rohe interne Regime-Code (z.B. "BULL_QUIET") ohne jede Uebersetzung.
-    // Nutzt jetzt dasselbe menschenlesbare Label wie die Strategie-Ampel
-    // (KoMarketState.getStrategyGates().label, Single Source of Truth),
-    // Rohcode bleibt als Tooltip fuer technische Rueckfragen erhalten.
-    var regLabel = sm.regimeUsed || '—';
-    var regTitle = '';
-    if (typeof KoMarketState !== 'undefined' && KoMarketState.getStrategyGates && sm.regimeUsed) {
-      var _g = KoMarketState.getStrategyGates(sm.regimeUsed);
-      if (_g && _g.label) { regLabel = _g.label; regTitle = 'Interner Regime-Code: ' + sm.regimeUsed; }
+    // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket G Punkt 1): "Marktstimmungs-
+    // Anzeige konsistent zur Alpha-Desk-Anzeige (heute widersprüchlich)" —
+    // vorher zeigte Alpha Desk die AGGREGATOR-Regime (sm.regimeUsed, Markov-
+    // Ketten-basiert, steuert welche Ticker serverseitig in welche Leaderboards
+    // kommen), waehrend der Scanner-Tab die MSE-Regime zeigt (VVIX/SKEW/VIX-
+    // basiert, clientseitig, steuert die Strategie-Ampel + KI-Prompt seit dem
+    // MCM-Sprint) — zwei LEGITIME, aber unterschiedliche Klassifikationen mit
+    // optisch identischen Badges, dadurch teils widersprüchliche Anzeige
+    // (z.B. "NEUTRAL" hier, "BULL_QUIET" dort, gleichzeitig).
+    // Vereinheitlichung (Axel-Entscheidung 15.07.2026): NUR die Anzeige wird
+    // vereinheitlicht (beide Panels zeigen jetzt dieselbe MSE-Regime als das,
+    // was der Nutzer sieht) — die Aggregator-interne Markov-Regime bleibt
+    // UNVERAENDERT fuer die Leaderboard-Ticker-Auswahl (kein Risiko, dort
+    // versehentlich die Stock-Selection-Logik zu veraendern). sm.regimeUsed
+    // bleibt im Tooltip sichtbar fuer technische Rueckfragen.
+    var mseRegimeCode = (typeof KoMarketState !== 'undefined') ? KoMarketState._lastRegime : null;
+    var regLabel, regColor, regTitle;
+    if (mseRegimeCode && typeof KoMarketState !== 'undefined' && KoMarketState.getStrategyGates) {
+      var _g = KoMarketState.getStrategyGates(mseRegimeCode);
+      regLabel = (_g && _g.label) || mseRegimeCode;
+      regColor = mseRegimeCode.includes('BULL') ? 'var(--green)' : mseRegimeCode.includes('STRESS') ? 'var(--red)' : 'var(--amber)';
+      regTitle = 'MSE-Regime (Strategie-Ampel-Grundlage): ' + mseRegimeCode
+        + (sm.regimeUsed ? ' · Aggregator-Regime (Leaderboard-Auswahl): ' + sm.regimeUsed : '');
+    } else {
+      // Fallback falls MSE noch nicht geladen: alte Aggregator-Regime-Anzeige
+      regLabel = sm.regimeUsed || '—';
+      regColor = sm.regimeUsed && sm.regimeUsed.includes('BULL') ? 'var(--green)'
+               : sm.regimeUsed && sm.regimeUsed.includes('STRESS') ? 'var(--red)' : 'var(--amber)';
+      regTitle = 'Aggregator-Regime (Leaderboard-Auswahl), MSE noch nicht geladen: ' + (sm.regimeUsed || '—');
     }
     metaEl.innerHTML =
       '<span style="color:' + regColor + ';font-weight:600" title="' + regTitle + '">' + regLabel + '</span>' +
