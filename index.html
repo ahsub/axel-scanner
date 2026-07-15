@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v338">
+<meta name="version" content="20260715-v339">
 <!-- CHANGELOG (neueste zuerst):
+     v339: Phase 0.5 Arbeitspaket C (Sprache/Beschriftung) — erste Runde, unbeschriftete Icon-Buttons (Axel-Beispiel: TV-Button). 5 TradingView-Buttons waren reine Icons (Candlestick-Symbol) mit nur einem Hover-Tooltip, ohne sichtbaren Text — fuer einen fremden Nutzer ohne Trading-Vorwissen nicht selbsterklaerend (Tooltip erfordert zufaelliges Hovern). Alle 5 bekommen jetzt sichtbares "TV"-Label neben dem Icon. Systematische Suche nach weiteren Icon-only-Buttons (title-Attribut + reines Icon, kein Text) ergab 9 Kandidaten — davon 4 als echt mehrdeutig gefixt: Aufklappen/Zuklappen-Chevrons (Arbeitspaket G nennt dies explizit als bekanntes Problem), Backup Export/Import (Pfeilrichtung leicht verwechselbar, wichtige/seltene Aktion), Zwischenablage einfuegen (Clipboard-Icon allein nicht eindeutig einfuegen vs. kopieren), Leeren ("X"-Icon extrem mehrdeutig ohne Kontext: Schliessen? Loeschen? Abbrechen?). Bewusst NICHT geaendert: Token anzeigen/verbergen (Auge), Loeschen (Papierkorb), Watchlist hinzufuegen (Stern) — universell verstandene Icon-Konventionen, Text waere Ueberengineering.
      v338: Scanner-Tab zeigte kompletten rohen KI-Briefing-Text unnoetig doppelt an (Axel-Feedback 15.07.2026, Screenshot: unformatiertes Markdown mit sichtbaren ##/**/||-Zeichen im Market-Weather-Widget). Root Cause: _applyMorningResults() schrieb results.kiBriefing (der GESAMTE Briefing-Text) per .textContent in rc-action — ein Element das eigentlich fuer einen KURZEN Strategie-Hinweis gedacht ist ("Selektiv vorgehen · Nur höchste Qualität handeln", von renderAllGateWidgets()/showMSEDetail() gesetzt) und diesen bei jedem abgeschlossenen Briefing ueberschrieb. Da der vollstaendige Briefing-Text bereits sauber im Home-Panel + Tearsheet-Modal dargestellt wird (mit echtem Markdown-Rendering), war diese Dopplung sowohl unnoetig (Arbeitspaket B: keine Duplikate) als auch fehlerhaft geloest (.textContent rendert kein Markdown). Fix: Block entfernt, kein Ersatz noetig — rc-action behaelt den kurzen Strategie-Hinweis.
      v337: F&G/PCR-Untersuchung abgeschlossen (Axel-Anfrage 15.07.2026) — zwei getrennte Root Causes gefunden und behoben. (1) PCR: ko-indicators.json hatte aggregatorKey="pcr.value", aber das tatsaechliche Aggregator-Schema kennt kein .value-Feld (nur market.pcr.pcr, bestaetigt gegen Run #106 vom 14.07.2026) — PCR-Faktor war dadurch STRUKTURELL nie befuellbar, unabhaengig von Timing. Korrigiert auf "pcr.pcr" (ko-modules Commit 1f40df0), funktional getestet. (2) Fear&Greed: fetchCnnFearGreed() wurde in loadIntermarket() als "parallel laden" OHNE await aufgerufen — der autoMakro()-Gate aus v331 wartete zwar auf loadIntermarket() selbst, nicht aber auf diesen darin fire-and-forget gestarteten Sub-Fetch. Race Condition: buildMarketContext() las cnn-fg-score oft noch als "—", weil der CNN-Fetch zu diesem Zeitpunkt haeufig noch nicht abgeschlossen war. Fix: await ergaenzt. CDN-Hash ko-indicators-loader.js -> 1f40df0.
      v336: Sichtbares Feedback beim Refresh-Chip-Klick (Axel-Feedback zu v335: "unsicher ob es funktioniert, Reaktion erst nach Home-Button-Klick"). Root Cause: _refreshHomeStatusTiles() aenderte beim manuellen Klick oft optisch NICHTS (Regime/VIX waren bereits befuellt, F&G/PCR fehlen im Cache -> Klick wirkte wie "reagiert nicht", obwohl er korrekt lief). Fix: neuer manual-Parameter zeigt jetzt IMMER einen Toast beim expliziten Klick — entweder "Alle Werte aus Cache aktualisiert" oder "Aktualisiert — im Cache fehlen: X, Y" (macht das F&G/PCR-Problem gleichzeitig transparent sichtbar statt stillschweigend), sowie einen dedizierten Hinweis wenn gar kein Briefing-Cache fuer heute existiert. Auto-Aufruf beim Seitenaufruf bleibt unveraendert leise (kein Toast-Spam bei jedem Panel-Wechsel). Funktional getestet (Toast-Text bei fehlenden Faktoren + bei fehlendem Cache verifiziert).
@@ -758,8 +759,8 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
           <optgroup label="── ⭐ Meine Watchlisten ──" id="watchlist-options"></optgroup>
         </select>
         <!-- KV-Modus Badge -->
-        <button onclick="expandAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="expand-all-btn" title="Alle aufklappen"><i class="ti ti-chevrons-down"></i></button>
-        <button onclick="collapseAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="collapse-all-btn" title="Alle zuklappen"><i class="ti ti-chevrons-up"></i></button>
+        <button onclick="expandAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="expand-all-btn" title="Alle Ticker-Karten aufklappen"><i class="ti ti-chevrons-down"></i> Alle auf</button>
+        <button onclick="collapseAllCards()" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);display:none" id="collapse-all-btn" title="Alle Ticker-Karten zuklappen"><i class="ti ti-chevrons-up"></i> Alle zu</button>
         <!-- kv-mode-badge entfernt (v275) — Aggregator via Dropdown erreichbar -->
         <!-- scan-mode-seg in Steuerleiste (v253) -->
         </div>
@@ -1258,7 +1259,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         </select>
         <div id="world-index-result" style="font-size:13px;font-weight:600;font-family:var(--mono);min-width:80px;text-align:right">—</div>
         <div id="world-index-chg" style="font-size:11px;min-width:55px;text-align:right">—</div>
-        <button id="world-index-tv-btn" style="display:none;padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border:0.5px solid rgba(26,188,156,0.4);color:#1abc9c;border-radius:6px;cursor:pointer" title="TradingView Chart"><i class="ti ti-chart-candle"></i></button>
+        <button id="world-index-tv-btn" style="display:none;padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border:0.5px solid rgba(26,188,156,0.4);color:#1abc9c;border-radius:6px;cursor:pointer" title="Chart auf TradingView öffnen"><i class="ti ti-chart-candle"></i> TV</button>
         <a id="world-index-info-btn" href="#" target="_blank" rel="noopener" style="display:none;padding:3px 8px;font-size:11px;background:var(--blue-bg);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;text-decoration:none;align-items:center;gap:4px" title="Index-Zusammensetzung (Börsenwebsite)"><i class="ti ti-external-link"></i> Komponenten</a>
         <button id="world-index-mover-btn" onclick="loadIndexMovers()" style="display:none;padding:3px 8px;font-size:11px;background:var(--blue-bg);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer" title="Top Mover für diesen Index"><i class="ti ti-flame"></i> Mover</button>
       </div>
@@ -2361,13 +2362,13 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
         <span><i class="ti ti-archive" style="margin-right:4px"></i>Scan-Backlog</span>
         <div style="display:flex;gap:6px;align-items:center">
-          <button onclick="exportBacklogData()" title="Backup exportieren"
-            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px">
-            <i class="ti ti-download"></i>
+          <button onclick="exportBacklogData()" title="Backup exportieren (Datei herunterladen)"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 6px;display:flex;align-items:center;gap:3px">
+            <i class="ti ti-download"></i> Export
           </button>
-          <button onclick="importBacklogData()" title="Backup importieren"
-            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px">
-            <i class="ti ti-upload"></i>
+          <button onclick="importBacklogData()" title="Backup importieren (Datei hochladen)"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 6px;display:flex;align-items:center;gap:3px">
+            <i class="ti ti-upload"></i> Import
           </button>
           <button onclick="koSyncManual()" title="Cloud-Sync (ko-sync Worker)"
             style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:2px 4px">
@@ -2916,11 +2917,11 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         onkeydown="if(event.key==='Enter'&&event.ctrlKey)ytAnalyze()"
         oninput="ytUniversalInputChanged(this)"></textarea>
       <div style="position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px">
-        <button onclick="ytPasteUniversal()" class="btn btn-sm" title="Aus Zwischenablage einfügen" style="font-size:10px;padding:3px 7px">
-          <i class="ti ti-clipboard"></i>
+        <button onclick="ytPasteUniversal()" class="btn btn-sm" title="Text aus Zwischenablage einfügen" style="font-size:10px;padding:3px 7px">
+          <i class="ti ti-clipboard"></i> Einfügen
         </button>
-        <button onclick="document.getElementById('yt-universal-input').value=''" class="btn btn-sm" title="Leeren" style="font-size:10px;padding:3px 7px">
-          <i class="ti ti-x"></i>
+        <button onclick="document.getElementById('yt-universal-input').value=''" class="btn btn-sm" title="Eingabefeld leeren" style="font-size:10px;padding:3px 7px">
+          <i class="ti ti-x"></i> Leeren
         </button>
       </div>
       <!-- Auto-Erkennung Badge -->
@@ -8125,7 +8126,7 @@ function renderCard(t,state){
     '<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:2px;background:#f0a93a;border-top:2px dashed #f0a93a"></span>OBV</span>'+
     '<button class="btn btn-sm" data-sym="'+t.sym+'" onclick="useInRechner(this.dataset.sym)" style="margin-left:auto;padding:3px 8px;font-size:11px"><i class="ti ti-calculator"></i> Rechner</button>'+
     '<button class="btn btn-sm" data-sym="'+t.sym+'" data-name="'+encodeURIComponent(t.name||t.sym)+'" onclick="openDeepDive(this.dataset.sym, decodeURIComponent(this.dataset.name))" style="padding:3px 8px;font-size:11px;background:rgba(139,92,246,0.12);border-color:rgba(139,92,246,0.4);color:#8b5cf6" title="KI Deep Dive Analyse"><i class="ti ti-brain"></i> Deep Dive</button>'+
-    '<button class="btn btn-sm tv-chart-btn" data-sym="'+t.sym+'" data-name="'+encodeURIComponent(t.name||t.sym)+'" data-de="'+(window.currentMarket==='de'?'1':'0')+'" style="padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c" title="TradingView Chart"><i class="ti ti-chart-candle"></i></button>'+
+    '<button class="btn btn-sm tv-chart-btn" data-sym="'+t.sym+'" data-name="'+encodeURIComponent(t.name||t.sym)+'" data-de="'+(window.currentMarket==='de'?'1':'0')+'" style="padding:3px 8px;font-size:11px;background:rgba(26,188,156,0.12);border-color:rgba(26,188,156,0.4);color:#1abc9c" title="Chart auf TradingView öffnen"><i class="ti ti-chart-candle"></i> TV</button>'+
     (window.currentMarket!=='de'?'<button class="btn btn-sm tv-de-btn" data-sym="'+t.sym+'" data-name="'+encodeURIComponent(t.name||t.sym)+'" style="padding:3px 8px;font-size:11px;background:rgba(52,194,110,0.1);border-color:rgba(52,194,110,0.3);color:var(--green)" title="DE-Chart auf Tradegate">🇩🇪</button>':'')+
     '<button class="btn btn-sm" data-sym="'+t.sym+'" onclick="openWatchlistModal(this.dataset.sym)" style="padding:3px 8px;font-size:11px" title="Zu Watchlist hinzufügen"><i class="ti ti-star"></i></button>'+
     '</div>'+
@@ -12940,7 +12941,7 @@ function renderMoverModalCards(items, isDE){
       scoreBadge+signalDot+'<span style="flex:1"></span>'+
       '<span style="font-family:var(--mono);font-size:13px;font-weight:500">'+cur+priceStr+'</span>'+
       '<span style="font-size:13px;font-weight:600;min-width:60px;text-align:right;color:'+chgColor+'">'+(Math.abs(chg||0)>=3?'⚡ ':'')+chgTxt+'</span>'+
-      '<button class="tv-chart-btn" data-sym="'+item.sym+'" data-name="'+encodeURIComponent(item.sym)+'" data-de="'+(isDE?'1':'0')+'" style="padding:3px 7px;font-size:11px;background:rgba(26,188,156,0.12);border:0.5px solid rgba(26,188,156,0.4);color:#1abc9c;border-radius:6px;cursor:pointer;flex-shrink:0" title="TradingView Chart"><i class="ti ti-chart-candle"></i></button>'+
+      '<button class="tv-chart-btn" data-sym="'+item.sym+'" data-name="'+encodeURIComponent(item.sym)+'" data-de="'+(isDE?'1':'0')+'" style="padding:3px 7px;font-size:11px;background:rgba(26,188,156,0.12);border:0.5px solid rgba(26,188,156,0.4);color:#1abc9c;border-radius:6px;cursor:pointer;flex-shrink:0" title="Chart auf TradingView öffnen"><i class="ti ti-chart-candle"></i> TV</button>'+
       deFlagBtn+'</div>';
   }).join('');
 
@@ -13101,7 +13102,7 @@ async function loadIndexMovers(){
       + '</span>'
       + '<button class="tv-chart-btn" data-sym="' + item.sym + '" data-name="' + encodeURIComponent(item.sym) + '" data-de="' + (isDE?'1':'0') + '" '
         + 'style="padding:2px 6px;font-size:10px;background:rgba(26,188,156,0.12);border:0.5px solid rgba(26,188,156,0.4);color:#1abc9c;border-radius:5px;cursor:pointer" '
-        + 'title="TradingView"><i class="ti ti-chart-candle"></i></button>'
+        + 'title="Chart auf TradingView öffnen"><i class="ti ti-chart-candle"></i> TV</button>'
       + '</div>';
   }).join('')
   + '<div style="font-size:10px;color:var(--text3);margin-top:6px;text-align:right">'
@@ -22052,7 +22053,7 @@ function renderAlphaLB(lb, key) {
     chip.innerHTML = '<span style="font-family:var(--mono);font-weight:600;color:' + col + '">' + x.sym + '</span>'
       + '<span style="color:var(--text3)"> ' + x.score + macdStr + '</span>'
       + '<span onclick="(function(e,s){e.stopPropagation();window.open(\'https://www.tradingview.com/chart/?symbol=\'+s,\'_blank\');})(event,\'" + x.sym + "\')" '
-      + 'style="margin-left:4px;color:var(--text3);cursor:pointer;font-size:9px" title="TradingView">📈</span>';
+      + 'style="margin-left:4px;color:var(--text3);cursor:pointer;font-size:9px" title="Chart auf TradingView öffnen">📈TV</span>';
     chip.onclick = (function(s){ return function(){ openDeepDive(s,s); }; })(x.sym);
     wrap.appendChild(chip);
   });
