@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v343">
+<meta name="version" content="20260715-v344">
 <!-- CHANGELOG (neueste zuerst):
+     v344: REVERT (Axel-Korrektur zu v343 Arbeitspaket E Punkt 2) — Leaderboard-Sektion wieder immer sichtbar, kein Einklappen mehr. Missverstaendnis geklaert: der neue "Beste Chance über alle Strategien"-Button (Punkt 4) sollte ZUSAETZLICH zur bestehenden Leaderboard-Leiste kommen, nicht diese hinter einem Einklapp-Mechanismus verstecken — die alte Leiste mit den strategiespezifischen KI-Buttons hat bereits sehr gute Ergebnisse gezeigt. toggleAlphaLbSection() + der Auto-Aufklapp-Schutz in switchAlphaLB() (ersatzlos) entfernt, HTML-Wrapper zurueckgebaut. "Beste Chance"-Button bleibt bestehen, jetzt korrekt als Ergaenzung ueber der immer sichtbaren Leaderboard-Leiste.
      v343: Phase 0.5 Arbeitspaket E (Alpha Desk konsolidieren) — 4 von 7 Spec-Punkten umgesetzt, 2 bereits erfuellt verifiziert, 1 zurueckgestellt (Pareto-Entscheidung). (1) Erste-Zeile-Zweckerklaerung ergaenzt ("Die von der KI vorgeschlagenen, aussichtsreichsten Aktien..."). (2) Leaderboard-Sektion standardmaessig eingeklappt — nur Master-Shortlist beim Oeffnen sichtbar (toggleAlphaLbSection()), inkl. Auto-Aufklapp-Schutz in switchAlphaLB() falls extern dorthin navigiert wird (z.B. Arbeitspaket-D-Ampel-Chips von heute — sonst waere die Navigation hinter dem eingeklappten Panel unsichtbar geblieben). (3) Enrichment-Rueckfrage: verifiziert bereits strukturell erfuellt, KI-Anreicherung passiert serverseitig im taeglichen Aggregator-Lauf, keine clientseitige Enrichment-Aktion zum Absichern noetig. (4) NEUER uebergreifender Button "🎯 Beste Chance über alle Strategien finden" (runBestOpportunityKI()) — durchsucht ALLE Leaderboards nach dem hoechsten Score unabhaengig von der Strategie, beantwortet direkt "was ist heute die beste Chance", ohne durch 10 Tabs zu klicken. Pareto-Entscheidung (Axel+Claude): gebaut, da hoher Nutzen fuer Cold-Start-Problem bei geringem Aufwand (Scores bereits vorhanden). Funktional getestet (Score-Vergleich ueber mehrere Leaderboards). (5) "Strategie-Nerds"-Feature (favorisierte Strategie, eigene Speicherung + Darstellung) ZURUECKGESTELLT — bedient wiederkehrende Power-User, nicht die externen Beta-Neulinge der Phase 0.5, unklarer Aufwand ohne genauere Spec. (6) Regime-Code ("BULL_QUIET") wird jetzt als menschenlesbares Label angezeigt (KoMarketState.getStrategyGates().label, Single Source of Truth mit der Strategie-Ampel), Rohcode nur noch als Tooltip. (7) Refresh-Button rechts: bereits in frueherer Session entfernt, verifiziert.
      v342: Phase 0.5 Arbeitspaket D (Visuelle Konsistenz Button vs. Info) — beide Spec-Punkte umgesetzt. (1) Strategie-Ampel-Chips: vorher hatten ALLE Chips (ausser "Value") identische Button-Optik (Hintergrund, Rand, Pill-Form) trotz cursor:help — auf Touch-Geraeten (kein Hover) komplett ununterscheidbar von echten Buttons. Jetzt: 7 Strategien mit eindeutiger Alpha-Desk-Leaderboard-Entsprechung (ko→ko_long, momentum→long_minervini, swing→long_swing, meanrev→long_mr, fading_short→short_fading_ko, csp_wheel→options_csp, cc→options_cc, aus der bereits etablierten _lbToStrat-Umkehr-Zuordnung) bekommen ECHTE FUNKTION — Klick navigiert zum passenden Leaderboard-Tab, analog zum bereits bestehenden "Value"-Chip-Muster. Die 4 Strategien ohne eindeutige Entsprechung (breakout, dividend, atmna, weekly_income) bekommen KEINE Button-Optik mehr (flache Info-Pille, nur farbiger Text) statt geraten zu werden. Funktional getestet (generierte Selektor-Strings + onclick-JS-Syntax verifiziert). (2) Regime-Action-Texte ("Selektiv vorgehen · Nur höchste Qualität handeln" etc., ko-modules@c72b7bf): alle 5 bekommen "Gesamteinschätzung: "-Praefix — klaert die Spec-Frage "gilt allgemein oder für die darüber stehenden Strategien?" eindeutig: dies ist eine ALLGEMEINE Regime-Leitlinie, getrennt von der spezifischen Pro-Strategie-Ampel. Bestehende Tooltip-Logik (.includes("Selektiv")) bleibt funktionsfaehig.
      v341: Phase 0.5 Arbeitspaket C — dritte und letzte Runde: Modell-Herkunftsnennung, Zeitfenster-Labels, Handelsplatz-Wording. (1) 9 nutzersichtbare "Claude"-Erwaehnungen im Kunden-UI generisiert zu "KI" (Oversold-Scan, Meta-Analyse, KI-Briefing-Modal, Status-/Ladetexte, Fehlermeldung) — Spec: "Keine Modell-Herkunftsnennung im UI, nur an dedizierter Programm-Beschreibungsstelle". help.html dient bereits korrekt als diese dedizierte Stelle, dort unveraendert belassen. Ein Admin-Workflow-Text ("JSON aus Claude-Analyse hier einfügen") bewusst NICHT geaendert — beschreibt einen externen Claude.ai-Workflow, keine interne Modell-Branding-Exposition. (2) "15m"/"30m" Dropdown-Optionen auf "15min"/"30min" korrigiert (interner value bleibt unveraendert) — die bereits vorhandenen Zeitfenster-Buttons nutzten schon korrekt "min", dieses eine Dropdown war der einzige uebersehene Fall. (3) "Pre-Market (TR/L&S)"-Status-Badge bekommt einen erklaerenden Tooltip mit den ausgeschriebenen Handelsplatz-Namen (Trade Republic / Lang & Schwarz) — vorher ohne jede Erklaerung fuer Nutzer ohne Trading-Vorwissen. Andere TR-Erwaehnungen ("TR Produktdaten") haben bereits eine erklaerende Unterueberschrift, kein weiterer Fix noetig. **Arbeitspaket C damit vollstaendig abgeschlossen** (alle 5 Spec-Punkte: KI-Analyse-Umbenennung, Kurz-und-bündig-Default, Modell-Herkunft, min-Label, Handelsplatz-Wording).
@@ -2580,15 +2581,12 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
 
   <!-- Strategy Leaderboards (collapsed tabs) -->
   <div style="padding:.5rem 1rem .25rem;border-bottom:1px solid var(--border)">
-    <!-- BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket E): "Beim Öffnen zunächst
-         nur Master-Shortlist zeigen" — vorher waren Leaderboard-Tabs, KI-Button
-         UND Master-Shortlist beim Oeffnen alle gleichzeitig sichtbar (zu viel
-         auf einmal fuer einen neuen Nutzer). Jetzt: eingeklappt per Default,
-         ein Klick auf die Ueberschrift oeffnet bei Bedarf. -->
-    <div onclick="toggleAlphaLbSection()" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:.4rem" title="Strategie-Leaderboards ein-/ausklappen">
-      <i class="ti ti-chevron-right" id="alpha-lb-chevron" style="font-size:12px;transition:transform .2s"></i> STRATEGIE LEADERBOARDS <span style="font-weight:400;letter-spacing:0;opacity:.7">(optional — nach Strategie filtern)</span>
-    </div>
-    <div id="alpha-lb-section-body" style="display:none">
+    <!-- REVERT (15.07.2026, Axel-Korrektur): Einklapp-Mechanismus rueckgaengig
+         gemacht — die Leaderboard-Leiste mit den strategiespezifischen
+         KI-Buttons soll wie zuvor IMMER sichtbar bleiben (hat sehr gute
+         Ergebnisse gezeigt), der neue "Beste Chance"-Button kommt nur
+         ZUSAETZLICH dazu, ersetzt/versteckt sie nicht. -->
+    <div style="font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:.4rem">STRATEGIE LEADERBOARDS</div>
     <div style="display:flex;gap:5px;flex-wrap:wrap" id="alpha-lb-tabs">
       <button class="alpha-lb-tab active-lb" data-lb="long_minervini" onclick="switchAlphaLB(this,'long_minervini')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.12);color:var(--green);cursor:pointer">🚀 Minervini</button>
       <button class="alpha-lb-tab" data-lb="long_swing" onclick="switchAlphaLB(this,'long_swing')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #06b6d4;background:rgba(6,182,212,0.08);color:#06b6d4;cursor:pointer">🔄 Swing</button>
@@ -2613,9 +2611,9 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       </button>
       <span id="alpha-lb-ki-status" style="font-size:11px;color:var(--text3)"></span>
     </div>
+      
     <!-- Leaderboard-Karten (NEU 01.07.2026): befüllt sich beim Klick auf Leaderboard-Tab -->
     <div id="alpha-lb-cards" style="display:none;margin-top:.5rem;display:flex;flex-direction:column;gap:.4rem"></div>
-    </div>
   </div>
 
   <!-- Master Shortlist Cards -->
@@ -22182,31 +22180,14 @@ var _lbToStrat = {
 };
 
 /**
- * Phase 0.5 Arbeitspaket E (15.07.2026): Strategie-Leaderboards ein-/ausklappen.
- * Standardmaessig eingeklappt (Spec: "Beim Öffnen zunächst nur Master-
- * Shortlist zeigen") — wird nur bei explizitem Wunsch des Nutzers geoeffnet.
+ * REVERT (15.07.2026, Axel-Korrektur zu Arbeitspaket E Punkt 2): Die
+ * Einklapp-/Aufklapp-Logik wurde entfernt — die Leaderboard-Leiste bleibt
+ * wie zuvor immer sichtbar (hat sehr gute Ergebnisse gezeigt).
+ * toggleAlphaLbSection() + der Auto-Aufklapp-Schutz in switchAlphaLB()
+ * wurden ersatzlos gestrichen, da alpha-lb-section-body nicht mehr existiert.
  */
-function toggleAlphaLbSection() {
-  var body = document.getElementById('alpha-lb-section-body');
-  var chevron = document.getElementById('alpha-lb-chevron');
-  if (!body) return;
-  var isOpen = body.style.display !== 'none';
-  body.style.display = isOpen ? 'none' : 'block';
-  if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(90deg)';
-}
-
 function switchAlphaLB(btn, key) {
   _alphaLB = key;
-  // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket E): Sektion muss automatisch
-  // aufklappen, sonst bleibt eine externe Navigation hierher (z.B. Klick auf
-  // einen Strategie-Ampel-Chip, siehe Arbeitspaket D) unsichtbar hinter dem
-  // standardmaessig eingeklappten Panel.
-  var body = document.getElementById('alpha-lb-section-body');
-  var chevron = document.getElementById('alpha-lb-chevron');
-  if (body && body.style.display === 'none') {
-    body.style.display = 'block';
-    if (chevron) chevron.style.transform = 'rotate(90deg)';
-  }
   document.querySelectorAll('.alpha-lb-tab').forEach(function(b){ b.style.opacity = '0.5'; });
   btn.style.opacity = '1';
   if (_alphaData) renderAlphaLB(_alphaData.leaderboards, key);
