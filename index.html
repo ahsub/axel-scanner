@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v347">
+<meta name="version" content="20260715-v348">
 <!-- CHANGELOG (neueste zuerst):
+     v348: Phase 0.5 Arbeitspaket I (Fehler-Kommunikation KI-Aufrufe) — verbleibende 2 von 4 Punkten umgesetzt. Fund: Punkte 1+4 (unterscheidbare 429-Meldungen, echter UI-Zustandswechsel statt Toast) waren bereits in einer frueheren Session (v245) als zentrale showKiError()-Funktion gebaut — STRATEGIE.md-Eintrag war veraltet (beschrieb noch den 08.07.2026-Ist-Zustand vor diesem Fix). Neu ergaenzt: (1) Countdown am Retry-Button bei transienten Rate-Limits (20s, deaktiviert den Button waehrenddessen, live tickender Countdown-Text) — vorher nur ein bloßer Klick-Button ohne Wartezeit-Hinweis. (2) Cache-Fallback auf zuletzt gespeicherte KI-Einschätzung fuer denselben Ticker mit Alters-Anzeige (_cacheKiResultForTicker()/_getCachedKiResultForTicker(), rollierender Cache max. 30 Ticker) — bei einem Fehler steht der Nutzer nicht mehr komplett leer da, sondern sieht "Letzte KI-Einschätzung (vor X Min/Std)". Wichtiger Zusatzfund: die Deep-Dive-Einzeltitel-KI-Analyse (generateDeepDiveKI()) nutzte bisher GAR NICHT die zentrale showKiError() (nur eine rohe Fehlermeldung ohne Retry/Cache-Fallback) — jetzt konsistent mit den anderen KI-Aufrufen umgestellt, inkl. echtem Retry (ruft dieselbe Funktion erneut auf). Generischer "KI-Fehler"-Fall bekommt jetzt ebenfalls einen Retry-Button (vorher nur beim transienten 429-Fall). Funktional getestet (Cache-Speicherung/Abruf + Countdown-Timer-Logik isoliert verifiziert).
      v347: Phase 0.5 Arbeitspaket G Punkte 5+6 (ko-modules@c52bac1). Punkt 5 (Auto-Sinnvoll-Watchlists + Caching): Erst-Nutzer-Empfehlung + Merken der letzten Handelsplatz-Watchlist-Wahl ueber Sessions hinweg (localStorage), empfohlene Liste im Dropdown mit ⭐ markiert. Punkt 6 (Tooltips "KI-Analyse Watchlist Top-Performer" + EIC-Verhalten): Tooltip am Haupt-Button erklaert jetzt was die Funktion tut (Top-25 Ergebnisse, Score≥40, aktueller Scan) + EIC-Modus-Unterschied (Public=WpHG-deskriptiv vs. Expert=detaillierter, verifiziert gegen den tatsaechlichen ko-ai-Worker-Code: expert_mode schaltet zwischen separaten System-Prompts um). Zusaetzlicher Hinweis direkt im Dropdown (nicht nur Tooltip, da Tooltips auf Touch-Geraeten ohne Hover unsichtbar sind). **Arbeitspaket G damit vollstaendig abgeschlossen** (alle 6 Spec-Punkte: 4 als bereits erfuellt/gegenstandslos verifiziert, 2 neu umgesetzt).
      v346: Phase 0.5 Arbeitspaket G (Scanner-Tab Neuordnung) — Punkt 1 (Marktstimmungs-Anzeige vereinheitlicht) + Punkte 2/3/4 als bereits erfuellt verifiziert. Root Cause Punkt 1: Scanner-Tab zeigte die MSE-Regime (VVIX/SKEW/VIX-basiert, clientseitig, Grundlage der Strategie-Ampel seit dem MCM-Sprint), Alpha Desk zeigte die Aggregator-Regime (Markov-Ketten-basiert, serverseitig, steuert welche Ticker in welche Leaderboards kommen) — zwei legitime, aber unterschiedliche Klassifikationen mit identisch aussehenden Badges, dadurch teils widersprüchliche gleichzeitige Anzeige (z.B. NEUTRAL vs. BULL_QUIET). Axel-Entscheidung: Anzeige vereinheitlichen (Single Source of Truth fuer das was der Nutzer sieht), aber NICHT die Aggregator-interne Markov-Regime anfassen (kein Risiko fuer die Leaderboard-Ticker-Auswahl). Alpha Desk zeigt jetzt dieselbe MSE-Regime wie Scanner, Aggregator-Regime bleibt im Tooltip fuer technische Rueckfragen sichtbar. Fallback falls MSE noch nicht geladen: alte Aggregator-Anzeige. Funktional getestet (beide Faelle). Bereits erfuellt verifiziert: Punkt 2 (Strategie-Buttons funktional/Info-Chips) nutzt bereits dieselbe renderGateWidget()-Funktion aus Arbeitspaket D; Punkt 3 (Aufklappen/Zuklappen beschriftet) bereits in Arbeitspaket C gefixt; Punkt 4 ("Scan" vs. "Live" per Mouse-over erklaeren) ist gegenstandslos — der "Live"-Button existiert nicht mehr als HTML-Element (nur noch tote, sicher geguardete JS-Referenzen), nichts mehr zu erklaeren.
      v345: Phase 0.5 Arbeitspaket F (Options Desk als vollwertiger Modus) — 3 von 4 Spec-Punkten umgesetzt, 1 konsistent zurueckgestellt. (1) "Verdrängt statt versteckt darunter": die Strategie-Leaderboard-Leiste (reine Equity-Long/Short-Strategien) blieb bisher AUCH im Options-/Value-Modus sichtbar — verwirrender Rest, kein "vollwertiger" eigenstaendiger Modus-Wechsel. Jetzt nur noch im Shortlist-Modus sichtbar (switchAlphaTab() blendet #alpha-lb-section aus/ein). (2) "KI-enriched Top-Options-Ticker prominent": neue serverseitige KI-Anreicherung fuer die Options-Watchlist (ko-aggregator v5.10.0, enrich_options_watchlist_with_ai(), analog zur Master-Shortlist-Anreicherung) — Top-15 Kandidaten bekommen ein "ki"-Feld mit Strike/DTE/Delta/Praemie-Vorschlag, Strategie-Wahl (CSP/CC/Credit-Spread) bewusst an die KI delegiert statt algorithmisch geraten. Client zeigt das jetzt prominent: Badge pro Karte ("✓ KI: Strategie") + Detail-Box (Strike/DTE/Delta/Risiko) + Gesamt-Status in der Uebersichtszeile ("✓ N KI-angereichert"). (3) "KI-Einschätzung liefert Underlying × Options-Strategie": neuer uebergreifender Button "🎯 Beste Underlying × Strategie-Kombination finden" (runBestOptionsOpportunityKI()) — deterministisch bester Underlying (hoechster Gesamt-Score), KI bestimmt selbst die passende Strategie anhand der Einzel-Scores (vermeidet falsches Score-zu-Strategie-Mapping-Raten). Funktional getestet (Score-Maximum-Auswahl ueber synthetische Ticker-Liste). (4) "Separater Weg fuer favorisierte Options-Strategien" ZURUECKGESTELLT — konsistent zur selben Pareto-Entscheidung wie das analoge "Strategie-Nerds"-Feature in Arbeitspaket E (bedient wiederkehrende Power-User, nicht die Beta-Neulinge).
@@ -3983,13 +3984,21 @@ async function koAiCall(action, payload, expertMode) {
 //   isRateLimit=true + Tageslimit → Reset-Zeit + Info-Text
 //   isRateLimit=true ohne Limit   → Anthropic 429, kurz warten + Retry-Button
 //   sonstiger Fehler              → generische Fehlermeldung
-function showKiError(el, err, retryFn) {
+// BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket I): zwei fehlende Stuecke ergaenzt.
+// (1) Countdown am Retry-Button (Spec: "sichtbarer Retry-Button MIT Countdown"
+//     bei transienten Limits) — vorher nur ein bloßer Klick-Button ohne
+//     Wartezeit-Hinweis. (2) cachedFallback-Parameter: zeigt die zuletzt
+//     gespeicherte KI-Einschätzung fuer denselben Ticker mit Alters-Anzeige an,
+//     statt bei einem Fehler komplett leer dazustehen (Spec: "Cache-Fallback
+//     auf zuletzt gespeicherte KI-Einschätzung für denselben Ticker mit
+//     Alters-Anzeige").
+var _kiRetryCountdownId = 0;
+function showKiError(el, err, retryFn, cachedFallback) {
   if (!el) return;
   var isRL = err && err.isRateLimit;
-  var msg, sub, showRetry = false;
+  var msg, sub, showRetry = false, countdownSec = 0;
 
   if (isRL && err.rlLimit) {
-    // Tageslimit des UIQ-Workers
     msg = '⏳ KI-Tageskontingent ausgeschöpft';
     sub = 'Heute bereits ' + (err.rlUsed||'?') + '&thinsp;/&thinsp;' + err.rlLimit
         + ' Anfragen gesendet. Reset um 00:00 UTC'
@@ -3997,14 +4006,29 @@ function showKiError(el, err, retryFn) {
         + '<p style="margin:.4rem 0 0">Tipp: gecachte Ergebnisse bleiben sichtbar — '
         + 'kein Datenverlust.';
   } else if (isRL) {
-    // Anthropic-seitiges 429 (zu viele parallele Requests)
     msg = '⏱ Zu viele Anfragen gleichzeitig';
     sub = 'Kurz warten und erneut versuchen.';
     showRetry = !!retryFn;
+    countdownSec = 20; // typische Anthropic-RPM-Erholzeit
   } else {
     msg = '⚠️ KI-Fehler';
     sub = err ? err.message : 'Unbekannter Fehler';
+    showRetry = !!retryFn; // auch bei generischen Fehlern Retry anbieten (war vorher nur bei transientem 429)
   }
+
+  var cacheHtml = '';
+  if (cachedFallback && cachedFallback.text) {
+    var ageMin = Math.round((Date.now() - cachedFallback.ts) / 60000);
+    var ageStr = ageMin < 60 ? ageMin + ' Min' : Math.round(ageMin/60) + ' Std';
+    cacheHtml = '<div style="margin-top:.6rem;padding:.6rem;background:var(--bg2);border-radius:8px;border:0.5px solid var(--border2)">'
+      + '<div style="font-size:10px;color:var(--text3);margin-bottom:.3rem">📋 Letzte KI-Einschätzung (vor ' + ageStr + ')</div>'
+      + '<div style="font-size:12px;color:var(--text2);line-height:1.6">' + cachedFallback.text + '</div>'
+      + '</div>';
+  }
+
+  _kiRetryCountdownId++;
+  var thisCountdownId = _kiRetryCountdownId;
+  var retryBtnId = 'ki-retry-btn-' + thisCountdownId;
 
   el.innerHTML =
     '<div style="color:var(--red);padding:.75rem 1rem;border:0.5px solid var(--red);'
@@ -4012,12 +4036,60 @@ function showKiError(el, err, retryFn) {
     + '<div style="font-weight:600;margin-bottom:.25rem">' + msg + '</div>'
     + '<p style="margin:0;color:var(--text2)">' + sub + '</p>'
     + (showRetry
-        ? '<button onclick="(' + retryFn.toString() + ')()" '
+        ? '<button id="' + retryBtnId + '" onclick="(' + retryFn.toString() + ')()" '
+          + (countdownSec > 0 ? 'disabled ' : '')
           + 'style="margin-top:.5rem;padding:3px 10px;font-size:11px;border-radius:6px;'
-          + 'border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer">'
-          + '↺ Erneut versuchen</button>'
+          + 'border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;opacity:' + (countdownSec > 0 ? '0.5' : '1') + '">'
+          + '↺ Erneut versuchen' + (countdownSec > 0 ? ' <span id="' + retryBtnId + '-cd">(' + countdownSec + 's)</span>' : '')
+          + '</button>'
         : '')
-    + '</div>';
+    + '</div>'
+    + cacheHtml;
+
+  if (showRetry && countdownSec > 0) {
+    var remaining = countdownSec;
+    var iv = setInterval(function() {
+      remaining--;
+      var btn = document.getElementById(retryBtnId);
+      var cdSpan = document.getElementById(retryBtnId + '-cd');
+      if (!btn) { clearInterval(iv); return; } // Element wurde entfernt (neuer Aufruf/Navigation)
+      if (remaining <= 0) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        if (cdSpan) cdSpan.remove();
+        clearInterval(iv);
+      } else if (cdSpan) {
+        cdSpan.textContent = '(' + remaining + 's)';
+      }
+    }, 1000);
+  }
+}
+
+/**
+ * Speichert eine erfolgreiche Ticker-KI-Einschätzung als Fallback fuer
+ * spaetere Fehlerfaelle (Phase 0.5 Arbeitspaket I Punkt 3). Kleiner,
+ * rollierender Cache (max 30 Ticker) um localStorage nicht unbegrenzt
+ * wachsen zu lassen.
+ */
+function _cacheKiResultForTicker(sym, text) {
+  try {
+    var key = 'ko_ki_ticker_cache';
+    var cache = JSON.parse(localStorage.getItem(key) || '{}');
+    cache[sym] = { text: text, ts: Date.now() };
+    // Rollierend begrenzen: aelteste Eintraege entfernen wenn >30
+    var keys = Object.keys(cache);
+    if (keys.length > 30) {
+      keys.sort(function(a,b){ return cache[a].ts - cache[b].ts; });
+      delete cache[keys[0]];
+    }
+    localStorage.setItem(key, JSON.stringify(cache));
+  } catch(e) {}
+}
+function _getCachedKiResultForTicker(sym) {
+  try {
+    var cache = JSON.parse(localStorage.getItem('ko_ki_ticker_cache') || '{}');
+    return cache[sym] || null;
+  } catch(e) { return null; }
 }
 
 function _rlResetIn() {
@@ -19296,6 +19368,8 @@ async function generateDeepDiveKI(sym, name, raw, state) {
       .replace(/\n/g, '<br>');
     document.getElementById('dd-ki-text').innerHTML = '<div style="font-size:13px;line-height:1.8;color:var(--text)">' + html + '</div>';
     document.getElementById('dd-ki-status').textContent = 'KI-basierte Markt-Einschätzung · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' · Keine Anlageberatung gem. §1 WpHG';
+    // Phase 0.5 Arbeitspaket I Punkt 3: Ergebnis fuer Cache-Fallback speichern
+    _cacheKiResultForTicker(sym, html);
 
     // Kontext-Analyse Box
     var score = state.compositeScore || 50;
@@ -19322,7 +19396,13 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     }
 
   } catch(e) {
-    document.getElementById('dd-ki-text').innerHTML = '<div style="color:var(--red);font-size:12px">Fehler: ' + e.message + '</div>';
+    // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket I): nutzte bisher NICHT die
+    // zentrale showKiError() (unterscheidbare 429-Meldungen, Retry-Button,
+    // Cache-Fallback) — sondern eine simple rohe Fehlermeldung ohne jede
+    // Wiederherstellungs-Option. Jetzt konsistent mit den anderen KI-Aufrufen.
+    var _cachedFallback = _getCachedKiResultForTicker(sym);
+    showKiError(document.getElementById('dd-ki-text'), e,
+      function(){ generateDeepDiveKI(sym, name, raw, state); }, _cachedFallback);
   }
 }
 
