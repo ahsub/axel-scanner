@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260714-v329">
+<meta name="version" content="20260715-v330">
 <!-- CHANGELOG (neueste zuerst):
+     v330: Dead-Code-/Konsistenz-Audit Backlog #19 — erste Umsetzungsrunde (15.07.2026). (1) KRITISCH: calcMarkovRegime()/buildTransitionMatrix()/verifyMarkovLabels()/calcMarkovSignal() waren komplett inline dupliziert (Zeilen ~15426-15606), identisch zur CDN-Version aus ko-markov.js — da spaetere function-Deklarationen im selben Scope fruehere ueberschreiben, lief NUR die Inline-Kopie, die CDN-Version war toter Code trotz Ladens (Multiple-Sources-of-Truth-Risiko). Inline-Kopie entfernt, einzige Quelle jetzt ko-markov.js per CDN. (2) updateRegimeCockpit() + der nie fertiggestellte _origCalcTSI-Wrapper entfernt — liefen bei JEDEM Morning-Briefing-Abschluss inkl. echtem Yahoo-VIX-API-Call, schrieben aber in 4 nicht mehr existierende Elemente (regime-cockpit-Container seit AP-B 08.07. permanent display:none, abgeloest durch MSE-Architektur). (3) m-oil → m-oil2 in 2 aktiv genutzten Funktionen (requestMakroUpdate war selbst tot und wurde entfernt, aber autoMakro() ist aktiv — dort war der Bug real: WTI-Oil-Wert immer "—" statt Live-Kurs, gleiche Fehlerklasse wie der Gold-Formatierungsbug). (4) 27 bestaetigt tote Funktionen entfernt (0 Aufrufstellen nach mehrstufiger Verifikation gegen False Positives wie setTimeout(fn)/.map(fn)/.onclick=fn-Referenzen). Bekannte Einschraenkung, bewusst NICHT geaendert: listIndicators() in ko-indicators-loader.js sieht wie ein absichtliches Debug-Konsolen-Tool aus (Kommentar "fuer Debugging"), listByCategory() in ko-strategies.js hat einen "fuer zukuenftige Module"-Kommentar — beide vermutlich beabsichtigt vorbereitet, nicht versehentlich tot.
      v329: VCP-Setups Leaderboard-Tab im Alpha Desk (Backlog #18 Sprint 1 UI) — 9. Leaderboard-Tab "📐 VCP" ergänzt (switchAlphaLB/renderAlphaLB sind generisch, brauchten nur Tab-Button + Farb-/Strategie-Mapping). Chip-Tooltip zeigt bei VCP-Items zusätzlich Contraction-Anzahl + letzte Korrektur-% (vcpContractions/vcpLastPct aus dem Aggregator-Leaderboard). KI-Analyse-Button vorerst auf bestehende momentum-Strategie gemappt (eigene VCP-Prompt-Strategie wäre eigener Sprint).
      v328: KoMarkov-Cleanup (Zufallsfund aus calc_markov()-Audit, 14.07.2026) — KoMarkov-Namespace (ko-markov.js) war zuvor toter Code, nirgends im Codebase aufgerufen; die tatsaechlich genutzte calcMarkovRegime() wurde an 4 Stellen in fetchQqqRegime() DIREKT aufgerufen statt ueber KoMarkov.calc() (Feature-Flag-Check + try/catch). Jetzt: alle 4 Stellen routen ueber KoMarkov.calc() (Fallback auf Direktaufruf falls KoMarkov nicht geladen). Zusaetzlich: renderQqqBanner()'s eigene 4-zeilige bbColor-Farblogik war 1:1-Duplikat von KoMarkov.levelColor() — konsolidiert.
      v327: Intraday-Vergleich Morgen vs. NYSE (Backlog #1, Übergabeprotokoll 13.07.2026) — neue Sektion im Morning-Briefing-Tearsheet (renderIntradayComparison()), laedt daily_market_snapshot + daily_market_snapshot_us parallel und vergleicht Regime/VIX/Fear&Greed/PCR/Risk-Level aus marketContext.factors (MCM, Single Source of Truth). Faellt sauber zurueck wenn NYSE-Lauf noch nicht stattgefunden hat (vor ~13:30 UTC) oder beide Snapshots identisch sind (kein neuer Lauf seit dem Morgen). Async nachgeladen (Modal oeffnet sofort, Platzhalter "Lädt…"), 3 Testfaelle funktional verifiziert (Delta-Anzeige, NYSE-noch-nicht-verfuegbar, identische Snapshots).
@@ -3615,9 +3616,9 @@ const TIER_FEATURES_DEFAULT = {
   admin:   { kiBriefing: true,  bearScanner: true,  deepDive: true,  expertMode: true,  maxWatchlists: -1 },
 };
 
-function getUserTier()     { return _userTier || 'admin'; }  // Fallback admin solange Phase 1
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: getUserTier() war unbenutzt]  // Fallback admin solange Phase 1
 function getUserFeatures() { return _userFeatures || TIER_FEATURES_DEFAULT['admin']; }
-function hasFeature(feat)  { return getUserFeatures()[feat] === true; }
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: hasFeature() war unbenutzt]
 
 async function verifyUserToken() {
   const token = getAiToken();
@@ -4286,19 +4287,7 @@ function closeWorkflowModal(permanent) {
 // ── YOUTUBE MODAL STEUERUNG ───────────────────────────────────────────────
 var _ytSource = 'youtube';
 
-function showYtModal() {
-  var modal = document.getElementById('yt-modal');
-  if (modal) {
-    modal.style.display = 'flex';
-    ytRenderHistory();
-    // Textarea char-counter
-    var ta = document.getElementById('yt-text-input');
-    if (ta) ta.oninput = function() {
-      var cc = document.getElementById('yt-char-count');
-      if (cc) cc.textContent = ta.value.length + ' / 8000 Zeichen';
-    };
-  }
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: showYtModal() war unbenutzt]
 
 function closeYtModal() {
   var modal = document.getElementById('yt-modal');
@@ -4472,23 +4461,7 @@ async function ytPasteUniversal() {
   } catch(e) { showKoToast('Clipboard: ' + e.message); }
 }
 
-function ytSetSource(btn, src) {
-  _ytSource = src;
-  document.querySelectorAll('.yt-src-btn').forEach(function(b) {
-    b.style.background = '';
-    b.style.color = '';
-    b.style.borderColor = '';
-  });
-  if (btn) {
-    btn.style.background = src === 'youtube' ? 'rgba(239,68,68,0.15)' : 'rgba(79,142,247,0.15)';
-    btn.style.color = src === 'youtube' ? '#ef4444' : 'var(--accent)';
-    btn.style.borderColor = src === 'youtube' ? '#ef4444' : 'var(--accent)';
-  }
-  // Input-Bereiche togglen
-  document.getElementById('yt-input-youtube').style.display = src === 'youtube' ? 'block' : 'none';
-  document.getElementById('yt-input-text').style.display    = src === 'text'    ? 'block' : 'none';
-  document.getElementById('yt-input-url').style.display     = src === 'url'     ? 'block' : 'none';
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: ytSetSource() war unbenutzt]
 
 async function ytPaste(inputId) {
   try {
@@ -4519,7 +4492,7 @@ function ytSetStrategy(btn, strat) {
 
 // ytPaste: generische Version mit inputId-Parameter oben definiert.
 // Dieser Aufruf ohne Parameter nutzt den hardcoded Default 'yt-url-input':
-function ytPasteDefault() { ytPaste('yt-url-input'); }
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: ytPasteDefault() war unbenutzt]
 
 function ytShowLoading(msg) {
   document.getElementById('yt-loading').style.display = 'block';
@@ -4951,21 +4924,9 @@ function earningsScoreMalus(er) {
 // ─────────────────────────────────────────────────────────────────
 
 
-async function finnhubQuote(sym){
-  const key = getFinnhubKey();
-  if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
-  const r = await fetch('https://finnhub.io/api/v1/quote?symbol='+sym+'&token='+key);
-  if(!r.ok) throw new Error('Finnhub HTTP '+r.status);
-  return r.json();
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: finnhubQuote() war unbenutzt]
 
-async function finnhubCandles(sym, resolution, from, to){
-  const key = getFinnhubKey();
-  if(!key) throw new Error('Finnhub API-Key nicht gesetzt (Admin-Tab)');
-  const r = await fetch('https://finnhub.io/api/v1/stock/candle?symbol='+sym+'&resolution='+resolution+'&from='+from+'&to='+to+'&token='+key);
-  if(!r.ok) throw new Error('Finnhub candle HTTP '+r.status);
-  return r.json();
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: finnhubCandles() war unbenutzt]
 
 const TF_CONFIG = {
   '15m': {label:'15min Intraday · MACD (12/26/9)', macdPeriods:[12,26,9], lookback:60*60*24*5},
@@ -5183,10 +5144,7 @@ function toggleSimpleLanguage(btn) {
   showKoToast(_simpleLanguage ? '✓ Kurz und bündig aktiv' : 'Zurück zur Fachsprache');
 }
 
-function getSimpleLangSuffix() {
-  if (!_simpleLanguage) return '';
-  return '\n\n== SPRACHE ==\nSchreibe diese Analyse kurz und bündig. Vermeide Fachbegriffe wo möglich. Wenn du Fachbegriffe verwendest, erkläre sie kurz in Klammern. Halte Sätze kurz. Ziel: auch Börseneinsteiger sollen die Analyse verstehen.';
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: getSimpleLangSuffix() war unbenutzt]
 
 function unlockApp(){
   document.getElementById('pin-screen').style.display='none';
@@ -5213,8 +5171,8 @@ function unlockApp(){
   verifyUserToken().catch(e => console.warn('[Auth] verifyUserToken:', e.message));
   // Expert-Modus Status wiederherstellen
   setTimeout(initExpertMode, 500);
-  // Market Regime Cockpit befüllen
-  setTimeout(updateRegimeCockpit, 1500);
+  // Market Regime Cockpit befüllen — Aufruf entfernt (15.07.2026, Backlog #19),
+  // Funktion war totes Legacy-Widget (regime-cockpit permanent display:none)
   // Scanner-Hint: Single Source of Truth aus MB-Cache (v275)
   setTimeout(updateScannerHint, 800);
 
@@ -5828,10 +5786,7 @@ async function tdThrottledFetch(url,cacheKey){
 }
 function clearTdCache(){try{localStorage.removeItem(TD_CACHE_KEY);}catch(e){}}
 
-function toggleCustom(){
-  document.getElementById('custom-wrap').style.display=
-    document.getElementById('ticker-preset').value==='custom'?'block':'none';
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: toggleCustom() war unbenutzt]
 
 // ══ TICKER LOOKUP: Yahoo Finance Search (keine hardcoded DB) ══════════════
 // Alle Klarnamen werden direkt über Yahoo aufgelöst — immer aktuell, kein Pflegeaufwand
@@ -7640,81 +7595,10 @@ function computePdhlScore(raw) {
 }
 
 // PDH/PDL/PWH/PWL aus Twelve Data (1day, 10 Bars) - 1 TD-Credit
-async function fetchPdhlLevels(sym, tdKey, proxy) {
-  // Eigener Cache - 8h TTL
-  const ck = 'pdhl_' + sym;
-  const cached = getTdCacheEntry(ck);
-  if(cached) return cached;
-  const url = proxy + 'twelvedata/time_series?symbol=' + encodeURIComponent(sym)
-              + '&interval=1day&outputsize=10&apikey=' + tdKey;
-  try {
-    const res  = await fetch(url);
-    const json = await res.json();
-    if (!json.values || json.values.length < 2) return null;
-    const yesterday = json.values[1];
-    const weekBars  = json.values.slice(2, 7);
-    const pwh = weekBars.length > 0 ? Math.max.apply(null, weekBars.map(function(b){ return parseFloat(b.high); })) : null;
-    const pwl = weekBars.length > 0 ? Math.min.apply(null, weekBars.map(function(b){ return parseFloat(b.low);  })) : null;
-    const result = { pdh: parseFloat(yesterday.high), pdl: parseFloat(yesterday.low), pwh: pwh, pwl: pwl };
-    setTdCacheEntry(ck, result);
-    return result;
-  } catch(e) {
-    console.warn('fetchPdhlLevels:', e.message);
-    return null;
-  }
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: fetchPdhlLevels() war unbenutzt]
 
 // MTF-Daten: 1h + 1day EMA21/50 + RSI14 - 2 TD-Credits
-async function fetchMtfData(sym, tdKey, proxy) {
-  // Eigener Cache - 4h TTL
-  const ck = 'mtf_' + sym;
-  const cached = getTdCacheEntry(ck);
-  if(cached) return cached;
-  const tfs = [{tf:'1h',interval:'1h'},{tf:'1day',interval:'1day'}];
-  const results = [];
-  for (let ti = 0; ti < tfs.length; ti++) {
-    const t = tfs[ti];
-    // Kurze Pause zwischen Requests um Rate-Limit zu vermeiden
-    if(ti > 0) await new Promise(function(r){ setTimeout(r, 1200); });
-    const url = proxy + 'twelvedata/time_series?symbol=' + encodeURIComponent(sym)
-                + '&interval=' + t.interval + '&outputsize=60&apikey=' + tdKey;
-    try {
-      const res  = await fetch(url);
-      const json = await res.json();
-      if (!json.values || json.values.length < 20) {
-        results.push({ tf: t.tf, emaFast: null, emaSlow: null, rsi: null });
-        continue;
-      }
-      const closes = json.values.map(function(b){ return parseFloat(b.close); }).reverse();
-      function calcEma(data, len) {
-        const k = 2 / (len + 1);
-        let ema = data.slice(0, len).reduce(function(a,b){ return a+b; }, 0) / len;
-        for (let i = len; i < data.length; i++) { ema = data[i] * k + ema * (1 - k); }
-        return ema;
-      }
-      function calcRsi(data, len) {
-        const changes = data.slice(1).map(function(v, i){ return v - data[i]; });
-        const gains   = changes.map(function(c){ return c > 0 ? c : 0; });
-        const losses  = changes.map(function(c){ return c < 0 ? -c : 0; });
-        let avgGain = gains.slice(0, len).reduce(function(a,b){ return a+b; }, 0) / len;
-        let avgLoss = losses.slice(0, len).reduce(function(a,b){ return a+b; }, 0) / len;
-        for (let i = len; i < gains.length; i++) {
-          avgGain = (avgGain * (len - 1) + gains[i]) / len;
-          avgLoss = (avgLoss * (len - 1) + losses[i]) / len;
-        }
-        return avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
-      }
-      results.push({ tf: t.tf, emaFast: calcEma(closes, 21), emaSlow: calcEma(closes, 50), rsi: calcRsi(closes, 14) });
-    } catch(e) {
-      console.warn('fetchMtfData', t.tf, e.message);
-      results.push({ tf: t.tf, emaFast: null, emaSlow: null, rsi: null });
-    }
-  }
-  if(results.some(function(r){ return r.emaFast != null; })) {
-    setTdCacheEntry(ck, results);
-  }
-  return results;
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: fetchMtfData() war unbenutzt]
 
 function processData(raw){
   // KV-Shortcut: gecachter State aus loadScannerFromKV
@@ -8473,6 +8357,13 @@ function renderMakro(d){
   document.getElementById('m-sp').textContent=d.sp||'—';
   document.getElementById('m-nq').textContent=d.nq||'—';
   document.getElementById('m-vix').textContent=d.vix||'—';
+  // BEKANNTE EINSCHRAENKUNG (15.07.2026, Dead-Code-Audit Backlog #19): 'm-oil'
+  // Anzeige-Element existiert NICHT im HTML (anders als m-sp/m-nq/m-vix
+  // daneben) -- dieser Write ist ein stiller No-Op. Gehoert zum manuellen
+  // Admin-Eingabepfad (Pendant: Eingabefeld 'm-oil-in'), separat von der
+  // Live-Fetch-Kette 'm-oil2' (WTI, CL=F). Architekturentscheidung noetig:
+  // fehlendes m-oil-Anzeigeelement wiederherstellen, ODER manuellen
+  // Oil-Eingabepfad als obsolet entfernen (m-oil2 deckt WTI bereits live ab).
   { const _elMOil=document.getElementById('m-oil'); if(_elMOil) _elMOil.textContent=d.oil||'—'; }
   // Crypto
   const cryptos=[
@@ -9179,42 +9070,7 @@ function startLiveRefresh(){
   liveRefreshInterval = setInterval(refreshLivePrices, 60 * 60 * 1000);
 }
 
-function requestMakroUpdate(){
-  const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-  // Build context from live prices already loaded
-  const sp = document.getElementById('m-sp')?.textContent||'—';
-  const nq = document.getElementById('m-nq')?.textContent||'—';
-  const vix = document.getElementById('m-vix')?.textContent||'—';
-  const oil = document.getElementById('m-oil')?.textContent||'—';
-  const btc = document.getElementById('m-btc')?.textContent||'—';
-  const eth = document.getElementById('m-eth')?.textContent||'—';
-  const gold = document.getElementById('m-gold')?.textContent||'—';
-
-  const prompt = 'MAKRO_UPDATE_REQUEST '+today+': Bitte erstelle eine aktuelle Makro-Tageseinschätzung für UnderlyingIQ als JSON.\n\n'+
-    'Aktuelle Live-Daten (gerade abgerufen):\n'+
-    '- S&P 500: '+sp+'\n'+
-    '- Nasdaq: '+nq+'\n'+
-    '- VIX: '+vix+'\n'+
-    '- WTI Öl: '+oil+'\n'+
-    '- Bitcoin: '+btc+'\n'+
-    '- Ethereum: '+eth+'\n'+
-    '- Gold: '+gold+'\n\n'+
-    'Bitte JSON im Admin-Tab Format mit: sp, nq, vix, oil, verdict (bull/neu/bear), verdictText, factors (Array mit icon/title/desc).';
-
-  if(navigator.clipboard){
-    navigator.clipboard.writeText(prompt).then(function(){
-      const status = document.getElementById('live-prices-status');
-      if(status){
-        status.style.display='block';
-        status.style.color='var(--accent)';
-        status.innerHTML='<i class="ti ti-copy"></i> Anfrage mit Live-Daten kopiert — in Claude Chat einfügen (Cmd+V).<br><span style="font-size:10px;opacity:.8">Tipp: Erst "Live-Preise" klicken damit aktuelle Kurse enthalten sind.</span>';
-        setTimeout(function(){ status.style.display='none'; }, 8000);
-      }
-    });
-  } else {
-    console.log('[DEBUG prompt]', prompt);
-  }
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: requestMakroUpdate() war unbenutzt]
 
 async function testTwelveKey(){
   const key = getTwelveKey();
@@ -9273,14 +9129,7 @@ async function testProxy(){
 function getAnthropicKey(){ return localStorage.getItem('ko_ant_key') || ''; }
 function setAnthropicKey(k){ localStorage.setItem('ko_ant_key', k.trim()); }
 
-function saveAnthropicKey(){
-  const k = document.getElementById('ant-key-input') && document.getElementById('ant-key-input').value.trim();
-  if(!k){ showKoToast('⚠ Bitte Key eingeben'); return; }
-  setAnthropicKey(k);
-  document.getElementById('ant-key-input').value = '';
-  const msg = document.getElementById('ant-key-msg');
-  if (msg) { msg.style.display = 'block'; setTimeout(function(){ msg.style.display='none'; }, 3000); }
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: saveAnthropicKey() war unbenutzt]
 
 // ── KI-Token (ko-ai Worker) ────────────────────────────────────────────────
 function saveAiToken() {
@@ -9294,12 +9143,7 @@ function saveAiToken() {
   if (msg) { msg.style.display = 'block'; setTimeout(function(){ msg.style.display='none'; }, 3000); }
 }
 
-function clearAiToken() {
-  localStorage.removeItem('ko_ai_token');
-  const inp = document.getElementById('ai-token-input');
-  if (inp) { inp.value = ''; inp.placeholder = 'uiq-...'; }
-  showKoToast('KI-Token gelöscht');
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: clearAiToken() war unbenutzt]
 
 
 
@@ -10173,7 +10017,7 @@ async function autoMakro(){
   const sp  = document.getElementById('m-sp')?.textContent  || '—';
   const nq  = document.getElementById('m-nq')?.textContent  || '—';
   const vix = document.getElementById('m-vix')?.textContent || '—';
-  const oil = document.getElementById('m-oil')?.textContent || '—';
+  const oil = document.getElementById('m-oil2')?.textContent || '—';
   const btc = document.getElementById('m-btc')?.textContent || '—';
   const eth = document.getElementById('m-eth')?.textContent || '—';
   const sol = document.getElementById('m-sol')?.textContent || '—';
@@ -10939,10 +10783,7 @@ function getLastTradingDayLabel(){
   return null; // Normal trading day/time
 }
 
-function isWeekend(){
-  const dow = new Date().getUTCDay();
-  return dow === 0 || dow === 6;
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: isWeekend() war unbenutzt]
 
 // Store last loaded movers for scan-all
 window.lastMovers = [];
@@ -11926,18 +11767,7 @@ function renderJournal(){ if(!document.getElementById('panel-journal')) return; 
   }).join('');
 }
 
-function addPosition(sym, entry, ko, turboEntry, anzahl, note){
-  const pos = {
-    sym: sym||'', name:'', status:'open',
-    entry: entry||'', ko: ko||'',
-    turboEntry: turboEntry||'', anzahl: anzahl||'',
-    einsatz: ((parseFloat(turboEntry)||0)*(parseFloat(anzahl)||0)).toFixed(2),
-    pnl: 0, note: note||'',
-    date: new Date().toLocaleDateString('de-DE')
-  };
-  journalData.unshift(pos);
-  saveJournal();
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: addPosition() war unbenutzt]
 
 function closePosition(idx){
   const price = prompt('Verkaufspreis Turbo (€):');
@@ -12041,23 +11871,7 @@ function loadScoreWeights(){
 var spyData = null; // cached SPY closes
 var spyLoadTime = 0;
 
-async function fetchSPYData(){
-  // Cache for 1 hour
-  if(spyData && (Date.now()-spyLoadTime) < 3600000) return spyData;
-  try{
-    const tdKey=getTwelveKey();
-    if(!tdKey) return null;
-    const tdUrl='https://api.twelvedata.com/time_series?symbol=SPY&interval=1day&outputsize=220&apikey='+tdKey;
-    const r=await fetch(PROXY+'?url='+encodeURIComponent(tdUrl));
-    const j=await r.json();
-    if(j.status==='error'||!j.values) return null;
-    spyData=[...j.values].reverse().map(function(v){return parseFloat(v.close);});
-    // QQQ-Regime berechnen (nutzt SPY-Logik, aber mit QQQ-Daten)
-    if(window._appUnlocked) fetchQqqRegime();
-    spyLoadTime=Date.now();
-    return spyData;
-  }catch(e){ return null; }
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: fetchSPYData() war unbenutzt]
 
 function calcRS(stockCloses, spyCloses){
   if(!stockCloses||!spyCloses||stockCloses.length<63||spyCloses.length<63) return null;
@@ -12252,44 +12066,7 @@ function loadMktPhase(){
 
 
 // ─── LIVE P&L ─────────────────────────────────────────────────────────────────
-async function refreshJournalPrices(){
-  const fhKey=getFinnhubKey();
-  if(!fhKey||!journalData.length) return;
-  const openPositions=journalData.filter(function(p){return p.status!=='closed'&&p.sym;});
-  if(!openPositions.length) return;
-  
-  const btn=document.getElementById('journal-refresh-btn');
-  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i>';}
-  
-  await Promise.all(openPositions.map(function(p){
-    return fetch('https://finnhub.io/api/v1/quote?symbol='+p.sym+'&token='+fhKey)
-      .then(function(r){return r.json();})
-      .then(function(d){
-        if(!d||!d.c) return;
-        const currentPrice=d.c;
-        const anzahl=parseFloat(p.anzahl)||1;
-        const ratio=parseFloat(p.ratio)||0.01;
-        // Estimate turbo current price from underlying move
-        const entryUnderlying=parseFloat(p.entry)||currentPrice;
-        const ko=parseFloat(p.ko)||0;
-        const entryTurbo=parseFloat(p.turboEntry)||0;
-        if(entryTurbo>0&&entryUnderlying>0&&ko>0){
-          const underlyingMove=currentPrice-entryUnderlying;
-          const turboMove=underlyingMove*ratio;
-          const currentTurbo=Math.max(0,entryTurbo+turboMove);
-          const einsatz=entryTurbo*anzahl;
-          const currentValue=currentTurbo*anzahl;
-          p.livePnl=(currentValue-einsatz).toFixed(2);
-          p.liveTurboPrice=currentTurbo.toFixed(3);
-          p.liveUnderlying=currentPrice.toFixed(2);
-          p.liveKoAbstand=ko>0?((currentPrice-ko)/currentPrice*100).toFixed(1):null;
-        }
-      }).catch(function(){});
-  }));
-  
-  renderJournal();
-  if(btn){btn.disabled=false;btn.innerHTML='<i class="ti ti-refresh"></i> Live P&L';}
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: refreshJournalPrices() war unbenutzt]
 
 
 // ─── SEKTOR-ROTATION ──────────────────────────────────────────────────────────
@@ -13644,19 +13421,7 @@ function leWLScanNow(){
   setTimeout(function(){ runScan(); }, 200);
 }
 
-function leWLAddToScanner(){
-  var name = window._leActiveWatchlist;
-  if(!name){ showKoToast('⚠ Keine Watchlist ausgewählt'); return; }
-  closeListEditor();
-  showPanel('scanner');
-  // Trigger preset selection
-  var sel = document.getElementById('ticker-preset');
-  if(sel){
-    // Find option with this WL value
-    var opt = Array.from(sel.options).find(function(o){ return o.value==='wl:'+name; });
-    if(opt){ sel.value='wl:'+name; onPresetChange(); }
-  }
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: leWLAddToScanner() war unbenutzt]
 
 function leShowStatus(msg, color){
   var el = document.getElementById('le-status');
@@ -13903,16 +13668,7 @@ function renderAdminWLList(){
   }).join('');
 }
 
-function loadGistUrlField(){
-  var DEFAULT_GIST = 'https://gist.githubusercontent.com/ahsub/bbbfed945e4d8292fbb300cf4012cfa5/raw/4dc45670fb3e50dd1df3fc832413047961d78558/ibd50.json';
-  var saved = localStorage.getItem('ko_ibd_gist_url') || DEFAULT_GIST;
-  var el = document.getElementById('ibd-gist-url');
-  if(el) el.value = saved;
-  // Auto-save default if nothing saved yet
-  if(!localStorage.getItem('ko_ibd_gist_url')){
-    localStorage.setItem('ko_ibd_gist_url', DEFAULT_GIST);
-  }
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: loadGistUrlField() war unbenutzt]
 
 // ─── IBD FILTERED SCAN ────────────────────────────────────────────────────────
 function scanFilteredIBD(scanAll){
@@ -14392,11 +14148,8 @@ function closeEicModal() {
 }
 
 
-function eicPinCancel() { closeEicModal(); }
-function eicSetPin() {
-  // Legacy-Funktion → leitet zu Modal weiter
-  showEicPinModal();
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: eicPinCancel() war unbenutzt]
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: eicSetPin() war unbenutzt]
 function eicPinPress(d) {
   if (_eicPinEntry.length >= 6) return;
   _eicPinEntry += d;
@@ -15423,187 +15176,15 @@ async function fetchSektorOverheat() {
   return results;
 }
 
-function buildTransitionMatrix(regimes, stride) {
-  // FIX 1: Stride-Sampling — nur nicht-überlappende Fenster
-  // stride=1 → Legacy (überlappend, statistisch unehrlich)
-  // stride=lookback → Markov 2.0 (nicht-überlappend, statistisch korrekt)
-  let bb=0,bs=0,br=0, sb=0,ss=0,sr=0, rb=0,rs=0,rr=0;
-  for (let i = stride; i < regimes.length; i += stride) {
-    const prev = regimes[i - stride];
-    const curr = regimes[i];
-    if      (prev === 1)  { if(curr===1) bb++; else if(curr===0) bs++; else br++; }
-    else if (prev === 0)  { if(curr===1) sb++; else if(curr===0) ss++; else sr++; }
-    else                  { if(curr===1) rb++; else if(curr===0) rs++; else rr++; }
-  }
-  const fromBull = bb+bs+br || 1;
-  const fromSide = sb+ss+sr || 1;
-  const fromBear = rb+rs+rr || 1;
-  return {
-    // Transition-Wahrscheinlichkeiten (Zeilen summieren auf 1)
-    bull: { bull:bb/fromBull, side:bs/fromBull, bear:br/fromBull },
-    side: { bull:sb/fromSide, side:ss/fromSide, bear:sr/fromSide },
-    bear: { bull:rb/fromBear, side:rs/fromBear, bear:rr/fromBear },
-    // Stickiness = Diagonal
-    bullSticky: Math.round(bb/fromBull*100),
-    sideSticky: Math.round(ss/fromSide*100),
-    bearSticky: Math.round(rr/fromBear*100),
-    // Rohzahlen für Transparenz
-    counts: { bb,bs,br, sb,ss,sr, rb,rs,rr }
-  };
-}
-
-function verifyMarkovLabels(regimes, closes) {
-  // FIX 2: Label-Verifikation gegen bekannte historische Perioden
-  // Wir prüfen ob BEAR-Regime in stark fallenden Perioden korrekt detektiert wird
-  // Nutzt die letzten 252 Bars (ca. 1 Jahr) als Prüfbereich
-  if (!closes || closes.length < 100) return { ok: true, note: 'zu wenig Daten' };
-
-  // Größter Drawdown im verfügbaren Zeitraum
-  let maxDrop = 0, maxDropIdx = -1;
-  for (let i = 20; i < closes.length; i++) {
-    const drop = (closes[i] - closes[i-20]) / closes[i-20] * 100;
-    if (drop < maxDrop) { maxDrop = drop; maxDropIdx = i; }
-  }
-  // Größter Anstieg
-  let maxRise = 0, maxRiseIdx = -1;
-  for (let i = 20; i < closes.length; i++) {
-    const rise = (closes[i] - closes[i-20]) / closes[i-20] * 100;
-    if (rise > maxRise) { maxRise = rise; maxRiseIdx = i; }
-  }
-
-  const regimeAtDrop = maxDropIdx >= 0 ? regimes[Math.min(maxDropIdx, regimes.length-1)] : null;
-  const regimeAtRise = maxRiseIdx >= 0 ? regimes[Math.min(maxRiseIdx, regimes.length-1)] : null;
-
-  const dropOk = regimeAtDrop === -1; // Stärkster Drawdown → BEAR erwartet
-  const riseOk = regimeAtRise === 1;  // Stärkster Anstieg → BULL erwartet
-
-  return {
-    ok: dropOk && riseOk,
-    dropOk, riseOk,
-    maxDrop: Math.round(maxDrop*10)/10,
-    maxRise: Math.round(maxRise*10)/10,
-    regimeAtDrop, regimeAtRise,
-    note: (!dropOk || !riseOk) ? 'WARNUNG: Label-Verifikation fehlgeschlagen — Schwellwerte prüfen' : 'Labels verifiziert ✓'
-  };
-}
-
-function calcMarkovSignal(matrix, currentRegime) {
-  // Signal = P(bull morgen) − P(bear morgen) aus aktuellem Regime
-  let row;
-  if      (currentRegime === 1)  row = matrix.bull;
-  else if (currentRegime === 0)  row = matrix.side;
-  else                           row = matrix.bear;
-  return Math.round((row.bull - row.bear) * 100) / 100; // −1 bis +1
-}
-
-function calcMarkovRegime(closes, lookback, bullThresh, bearThresh, smoothLen) {
-  lookback   = lookback   || 21;
-  // Adaptiver Lookback: bei wenigen Bars kleineres Lookback
-  if (closes && closes.length < 80 && lookback > 10) lookback = 10;
-  else if (closes && closes.length < 120 && lookback > 15) lookback = 15;
-  bullThresh = bullThresh || 3.0;
-  bearThresh = bearThresh || 3.0;
-  smoothLen  = smoothLen  || 5;
-  if (!closes || closes.length < lookback * 2 + 5) return null; // mind. 47 Bars
-
-  const n = closes.length;
-
-  // ── State Labels ──────────────────────────────────────────────────────
-  // Vollständige History labeln (für beide Matrizen)
-  const regimes = [];
-  for (let i = lookback; i < n; i++) {
-    const logRet = Math.log(closes[i] / closes[i - lookback]) * 100;
-    regimes.push(logRet >= bullThresh ? 1 : logRet <= -bearThresh ? -1 : 0);
-  }
-  const rn = regimes.length;
-
-  // FIX 2: Label-Verifikation
-  const labelCheck = verifyMarkovLabels(regimes, closes);
-
-  // ── Transition-Matrizen (FIX 1: beide zeigen) ─────────────────────────
-  // Legacy: stride=1 (überlappend, statistisch unehrlich)
-  const matrixLegacy = buildTransitionMatrix(regimes, 1);
-  // Markov 2.0: adaptiver Stride
-  // Mindestens 10 nicht-überlappende Übergänge für stabile Matrix
-  // Wenn zu wenige Bars: Stride halbieren bis min. 10 Fenster
-  let stride20 = lookback;
-  while (stride20 > 3 && Math.floor(rn / stride20) < 10) {
-    stride20 = Math.max(3, Math.floor(stride20 / 2));
-  }
-  const strideNote = stride20 < lookback ? ' (adaptiert:' + stride20 + ')' : '';
-  const matrix20     = buildTransitionMatrix(regimes, stride20);
-
-  // Primär: Markov 2.0 Matrix für alle Signale
-  const currentRegime = regimes[rn - 1];
-  const prevRegime    = regimes[rn - 2];
-
-  // FIX 3 FILTER Mode: Signal aus 2.0 Matrix
-  const signal = calcMarkovSignal(matrix20, currentRegime);
-
-  // Stickiness aus 2.0 Matrix
-  const bullSticky = matrix20.bullSticky;
-  const bearSticky = matrix20.bearSticky;
-  const sideSticky = matrix20.sideSticky;
-  const sticky = currentRegime === 1 ? bullSticky : currentRegime === -1 ? bearSticky : sideSticky;
-
-  // Warnstufe
-  const warnBull = 60;
-  const warnBear = 55;
-  const bullGap  = warnBull - bullSticky;
-  const bearGap  = bearSticky - warnBear;
-  let warnLevel  = 0;
-  if (currentRegime === 1 && bullSticky < warnBull) {
-    warnLevel = bullGap > 15 ? 3 : bullGap > 8 ? 2 : 1;
-  } else if (currentRegime === -1 && bearSticky > warnBear) {
-    warnLevel = bearGap > 15 ? 3 : bearGap > 8 ? 2 : 1;
-  }
-
-  // FILTER Mode: Long erlaubt wenn signal > threshold
-  const filterThreshold = (typeof window !== 'undefined' && window._markovFilterThreshold) || 0.1;
-  const filterMode = signal > filterThreshold ? 'LONG_OK'
-                   : signal < -filterThreshold ? 'SHORT_OK'
-                   : 'FLAT';
-
-  // Bereinigtes σ-Signal: P(bull)-P(bear) - k×P(Bull→Bear)
-  const pBull2Bear = (matrix20 && matrix20.bull) ? matrix20.bull.bear : 0;
-  const K_TRENDBRUCH = (typeof KoConfig !== "undefined" && KoConfig.markov) ? KoConfig.markov.kTrendbruch : 2.5; // Gewichtungsfaktor für Trendbruch-Risiko
-  const signalBereinigt = Math.max(-1, Math.min(1,
-    signal - K_TRENDBRUCH * pBull2Bear
-  ));
-  // P(Bull→Bear) Alarm: >15% ist Warnung, >25% ist Gefahr
-  const bullBearRisk = pBull2Bear > 0.25 ? 'GEFAHR'
-    : pBull2Bear > 0.15 ? 'WARNUNG'
-    : pBull2Bear > 0.08 ? 'ERHOHT'
-    : 'OK';
-
-  return {
-    // Kern
-    regime: currentRegime,
-    signal: signal,               // Rohsignal P(bull)-P(bear)
-    signalBereinigt: signalBereinigt, // Bereinigt um Trendbruch-Risiko
-    pBull2Bear: pBull2Bear,       // Trendbruch-Wahrscheinlichkeit
-    bullBearRisk: bullBearRisk,   // OK/ERHÖHT/WARNUNG/GEFAHR
-    filterMode: filterMode,       // 'LONG_OK', 'SHORT_OK', 'FLAT'
-    // Stickiness (aus 2.0 Matrix)
-    bullSticky: bullSticky,
-    bearSticky: bearSticky,
-    sideSticky: sideSticky,
-    sticky: sticky,
-    // Matrizen
-    matrix20: matrix20,           // FIX 1: Stride-sampled (statistisch korrekt)
-    matrixLegacy: matrixLegacy,   // FIX 1: Legacy (zum Vergleich)
-    // Validierung
-    labelCheck: labelCheck,       // FIX 2: Label-Verifikation
-    // Meta
-    warnLevel: warnLevel,
-    bullGap: Math.round(bullGap * 10) / 10,
-    regimeChanged: currentRegime !== prevRegime,
-    strideUsed: stride20,
-    strideNote: strideNote,
-    // Warnung wenn Legacy vs 2.0 stark abweichen (nur wenn genug Daten)
-    matrixDivergence: Math.floor(rn / stride20) >= 8 && Math.abs(matrix20.bullSticky - matrixLegacy.bullSticky) > 15
-  };
-}
+// BUGFIX (15.07.2026, Dead-Code-Audit Backlog #19): buildTransitionMatrix() +
+// calcMarkovRegime() waren HIER komplett verdoppelt inline vorhanden -- identisch
+// zur CDN-Version aus ko-markov.js (Zeile ~3063 dieser Datei). Da spaetere
+// function-Deklarationen im selben Scope frühere stillschweigend ueberschreiben,
+// lief NUR diese Inline-Kopie zur Laufzeit -- die CDN-Version war TOTER CODE,
+// obwohl sie geladen wurde. Jede kuenftige Aenderung an ko-markov.js haette ohne
+// diesen Fix keinerlei Wirkung auf das Produktivverhalten gehabt (Multiple-
+// Sources-of-Truth-Risiko). Fix: Inline-Kopie entfernt, einzige verbleibende
+// Quelle ist jetzt ko-markov.js ueber die CDN-Einbindung.
 
 // Markov-Badge HTML fuer Ticker-Karte
 function markovBadgeHtml(markov) {
@@ -16301,13 +15882,7 @@ function markScanned(sym, fromCache) {
   setScanRegistry(reg);
 }
 
-function isInScanRegistry(sym) {
-  const reg = getScanRegistry();
-  const entry = reg[sym];
-  if (!entry) return null;
-  if (Date.now() - entry.ts > SR_TTL) return null;
-  return entry;
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: isInScanRegistry() war unbenutzt]
 
 function clearScanRegistry() {
   try { localStorage.removeItem(SR_KEY); } catch(e) {}
@@ -16352,9 +15927,7 @@ function doRescan(sym, tfArg) {
   setTimeout(function(){ rescanTickerTF(sym, tf); }, 20);
 }
 
-function rescanTicker(sym) {
-  doRescan(sym);
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: rescanTicker() war unbenutzt]
 
 async function rescanTickerTF(sym, tf) {
   const card = document.getElementById('card-' + sym);
@@ -17987,9 +17560,7 @@ var AUTO_TOP_N = (typeof KoConfig !== 'undefined' ? KoConfig.autoTop.n : 40);
 var AUTO_TOP_MIN_SCORE = (typeof KoConfig !== 'undefined' ? KoConfig.autoTop.minScore : 50);
 var AUTO_TOP_MIN_BULL = (typeof KoConfig !== 'undefined' ? KoConfig.autoTop.minBull : 2);
 
-function autoTopGetTodayKey() {
-  return new Date().toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'});
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: autoTopGetTodayKey() war unbenutzt]
 
 function autoTopListName() {
   // Fester Name pro Markt → kumulative Befüllung über mehrere Scans
@@ -18011,69 +17582,7 @@ function autoTopMerge(allScored) {
   }
 }
 // Legacy-Fallback entfernt — nur noch für Syntaxprüfung
-function _autoTopMergeLegacy_disabled(allScored) { // DISABLED
-  // Legacy Fallback
-  try {
-    var cfg = JSON.parse(localStorage.getItem(AUTO_TOP_KEY + '_cfg') || '{}');
-    var n = cfg.n || AUTO_TOP_N;
-    var minScore = cfg.minScore !== undefined ? cfg.minScore : AUTO_TOP_MIN_SCORE;
-    var minBull = cfg.minBull !== undefined ? cfg.minBull : AUTO_TOP_MIN_BULL;
-
-    // Kandidaten aus diesem Scan filtern
-    var candidates = allScored.filter(function(r) {
-      return r.score >= minScore && r.bullCount >= minBull;
-    });
-    if (!candidates.length) return;
-
-    // Bestehende Auto-Top-Liste für heute laden
-    var wls = getWatchlists();
-    var listName = autoTopListName();
-    var existing = [];
-    if (wls[listName]) {
-      existing = wls[listName].split(',').map(function(s){ return s.trim(); }).filter(Boolean);
-    }
-
-    // Bestehende Scores aus tickerData laden
-    var scoreMap = {};
-    existing.forEach(function(sym) {
-      var d = tickerData[sym];
-      if (d) {
-        var s = processData ? processData(d) : d;
-        scoreMap[sym] = s ? (s.compositeScore || 0) : 0;
-      } else {
-        scoreMap[sym] = 0;
-      }
-    });
-
-    // Neue Kandidaten einfügen oder bestehende ersetzen wenn Score besser
-    candidates.forEach(function(c) {
-      if (scoreMap[c.sym] !== undefined) {
-        // Bereits drin: Score aktualisieren
-        scoreMap[c.sym] = Math.max(scoreMap[c.sym], c.score);
-      } else {
-        // Neu: hinzufügen
-        scoreMap[c.sym] = c.score;
-      }
-    });
-
-    // Nach Score sortieren, Top-N behalten
-    var merged = Object.keys(scoreMap)
-      .map(function(sym){ return { sym: sym, score: scoreMap[sym] }; })
-      .sort(function(a,b){ return b.score - a.score; })
-      .slice(0, n)
-      .map(function(x){ return x.sym; });
-
-    if (!merged.length) return;
-
-    wls[listName] = merged.join(', ');
-    saveWatchlistsWithSync(wls, listName);
-    updateWatchlistDropdown();
-    var _mktLabel = window.currentMarket==='de'?'DE':'US';
-    var _ts = new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-    var _dt = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
-    showKoToast('📊 Top40-' + _mktLabel + ' · ' + merged.length + ' Titel · zuletzt ' + _dt + ' ' + _ts);
-  } catch(e) { console.warn('autoTopMerge:', e); }
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: _autoTopMergeLegacy_disabled() war unbenutzt]
 
 // Auto-Top Konfiguration lesen/schreiben
 function autoTopGetCfg() {
@@ -20866,7 +20375,8 @@ function _applyMorningResults(results) {
     actionEl.textContent = results.kiBriefing;
     actionEl.style.color = 'var(--text2)';
   }
-  updateRegimeCockpit();
+  // updateRegimeCockpit()-Aufruf entfernt (15.07.2026, Backlog #19) — Funktion
+  // selbst geloescht, siehe Kommentar bei der ehemaligen Definitionsstelle.
 
   // Toast
   var summary = [];
@@ -20896,15 +20406,7 @@ function _applyMorningResults(results) {
 }
 
 // ── EXPANDABLE CARD TOGGLE — programmweit ────────────────────────────────
-function toggleCard(sym) {
-  var el = document.getElementById("card-" + sym);
-  if (!el) return;
-  el.classList.toggle("expanded");
-  // Auto-scroll: expanded card soll sichtbar bleiben
-  if (el.classList.contains("expanded")) {
-    setTimeout(function(){ el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, 50);
-  }
-}
+// [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: toggleCard() war unbenutzt]
 function expandAllCards() {
   document.querySelectorAll(".card").forEach(function(c){ c.classList.add("expanded"); });
 }
@@ -21463,80 +20965,17 @@ function showToast(msg) {
   setTimeout(function(){ t.remove(); }, 4000);
 }
 
-// ── MARKET REGIME COCKPIT (Autostart) ────────────────────────────────────────
-async function updateRegimeCockpit() {
-  var cockpit   = document.getElementById('regime-cockpit');
-  var regimeEl  = document.getElementById('rc-regime');
-  var vixEl     = document.getElementById('rc-vix');
-  var dpEl      = document.getElementById('rc-dp');
-  var tsiEl     = document.getElementById('rc-tsi');
-  var actionEl  = document.getElementById('rc-action');
-  if (!cockpit) return;
+// BUGFIX (15.07.2026, Dead-Code-Audit Backlog #19): updateRegimeCockpit() +
+// der nie fertiggestellte _origCalcTSI-Wrapper wurden hier entfernt. Beide
+// gehoerten zum alten "Market Regime Cockpit"-Widget, dessen Container
+// ('regime-cockpit') bereits seit dem AP-B-Refactor (08.07.2026) permanent
+// display:none ist (abgeloest durch die MSE-Architektur, siehe ko-market-state.js
+// + renderAllGateWidgets()). Die Funktion lief bei JEDEM Morning-Briefing-
+// Abschluss trotzdem weiter -- inklusive eines echten Yahoo-VIX-API-Calls --
+// und schrieb in vier nicht mehr existierende Elemente (rc-regime/rc-vix/
+// rc-dp/rc-tsi), sauber geguardet aber komplett wirkungslos. rc-action bleibt
+// erhalten (separates, aktiv genutztes Element, siehe _applyMorningResults()).
 
-  // VIX aus DOM (wird durch Makro-Tab geladen) oder direkt
-  // VIX robust lesen — Fallback-Kaskade (Gemini-Fix)
-  var vix = _getVixRobust();
-  // Falls immer noch null — Yahoo Finance versuchen
-  if (!vix) {
-    try {
-      var corsProxy = (typeof KoConfig !== 'undefined') ? KoConfig.api.corsProxy : 'https://my-cors-proxy.ahildebrand.workers.dev';
-      var r = await fetch(corsProxy + '/?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v7/finance/chart/%5EVIX?interval=1d&range=5d&_cb=' + Date.now()), { cache: 'no-store' });
-      if (r.ok) {
-        var j   = await r.json();
-        var res = j?.chart?.result?.[0];
-        if (res) vix = res.meta.regularMarketPrice;
-      }
-    } catch(e) {}
-  }
-  if (!vix) vix = _getVixRobust(); // Nochmal nach Yahoo-Versuch
-
-  // VIX Zone
-  var vixZone  = !vix ? 0 : vix < 12 ? 1 : vix < 16 ? 2 : vix < 20 ? 3 : vix < 28 ? 4 : vix < 36 ? 5 : 6;
-  var vixColor = vixZone <= 2 ? 'var(--green)' : vixZone <= 3 ? 'var(--amber)' : 'var(--red)';
-
-  // Markov Regime aus letztem Scan
-  var regime    = window._lastQqqRegime || null;
-  var regColor  = !regime ? 'var(--text3)' : regime === 'bull' ? 'var(--green)' : regime === 'bear' ? 'var(--red)' : 'var(--amber)';
-  var regLabel  = !regime ? '— Regime' : regime === 'bull' ? '🟢 Bull-Regime' : regime === 'bear' ? '🔴 Bear-Regime' : '🟡 Sideways';
-
-  // Dark Pool Score
-  var dpScore = window._dpLastScore || null;
-  var dpColor = !dpScore ? 'var(--text3)' : dpScore >= 60 ? 'var(--green)' : dpScore >= 40 ? 'var(--amber)' : 'var(--red)';
-
-  // Treasury Stress (wenn berechnet)
-  var tsiScore = window._lastTsiScore || null;
-  var tsiColor = !tsiScore ? 'var(--text3)' : tsiScore > 60 ? 'var(--red)' : tsiScore > 35 ? 'var(--amber)' : 'var(--green)';
-
-  // Update DOM
-  if (regimeEl) { regimeEl.textContent = regLabel; regimeEl.style.color = regColor; regimeEl.style.background = 'var(--bg3)'; }
-  if (vixEl)    { vixEl.textContent    = vix ? 'VIX ' + vix.toFixed(1) : 'VIX —'; vixEl.style.color = vixColor; }
-  if (dpEl)     { dpEl.textContent     = dpScore ? 'Flow ' + dpScore : 'Flow —'; dpEl.style.color = dpColor; }
-  if (tsiEl)    { tsiEl.textContent    = tsiScore ? 'Stress ' + tsiScore : 'Stress —'; tsiEl.style.color = tsiColor; }
-
-  // Handlungsampel
-  var actionText, actionColor;
-  if (vixZone >= 5 || (tsiScore && tsiScore > 60)) {
-    actionText  = '🔴 Hohes Risiko — Defensive Positionierung · Treasury-Stress erhöht';
-    actionColor = 'var(--red)';
-  } else if (regime === 'bear' || vixZone >= 4) {
-    actionText  = '🟠 Erhöhtes Risiko — Positionsgrößen reduzieren · Selektiv vorgehen';
-    actionColor = 'var(--amber)';
-  } else if (regime === 'bull' && vixZone <= 3) {
-    actionText  = '🟢 Stabiles Umfeld — Long-Setups mit A+/A-Qualität bevorzugen';
-    actionColor = 'var(--green)';
-  } else {
-    actionText  = '🟡 Neutral — Marktdaten vor Scan laden für vollständige Analyse';
-    actionColor = 'var(--text3)';
-  }
-
-  if (actionEl) { actionEl.textContent = actionText; actionEl.style.color = actionColor; }
-
-  // TSI Score für spätere Verwendung speichern
-  // (wird nach calcTreasuryStress() aktualisiert)
-}
-
-// TSI Score nach Berechnung in Cockpit übertragen
-var _origCalcTSI = window.calcTreasuryStress;
 
 // ── SWING-TRADING FILTER & ANALYSE ───────────────────────────────────────────
 
