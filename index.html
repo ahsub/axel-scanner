@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v334">
+<meta name="version" content="20260715-v335">
 <!-- CHANGELOG (neueste zuerst):
+     v335: Zwei Nachbesserungen zu v334 (Axel-Feedback, Screenshot). (1) Refresh-Button fuer die Status-Kacheln war unsichtbar (bloßes <i class="ti ti-refresh"> ohne eigene Groesse/Rahmen) — jetzt sichtbarer Chip-Stil mit Unicode-Fallback ("↻ Refresh"), unabhaengig vom Icon-Font. (2) "Marktaktivität"-Fenster (Aktivste/Volumen/Winner/Loser) hatte bereits einen manuellen "laden"-Button (_loadHomeMover()), wurde aber NIE automatisch beim Seitenaufruf getriggert — blieb bei "—" bis zum manuellen Klick, identisches Muster wie die Status-Kacheln. Fix: einmalig pro Sitzung automatisch geladen (Flag verhindert Mehrfach-Laden bei jedem Panel-Wechsel). Zusaetzlicher Fund dabei: _loadHomeMover() hatte KEINEN Cache-Buster (war nicht in der v325-Systemliste erfasst) — nachtraeglich ergaenzt (_cb=Date.now()+no-store), gleiches Muster wie der gestrige Sprint. Bekannte Einschraenkung: Fear&Greed/PCR koennen "—" bleiben, wenn der gecachte Morning-Briefing-Context an diesem Tag keinen Wert fuer diese Faktoren enthielt (Datenverfuegbarkeits-Timing beim urspruenglichen Briefing-Lauf, kein Bug in der neuen Anzeige-Logik selbst — separates, tieferliegendes Thema fuer eine spaetere Session).
      v334: Home-Status-Kacheln (Regime/VIX/F&G/PCR-GEX) aus Cache befuellt statt leer nach Seitenaufruf (Axel-Anfrage 15.07.2026, Screenshot zeigte "—" trotz vorhandenem Morning Briefing). Root Cause: alle vier Kacheln waren DOM-Kopien aus ANDEREN, evtl. noch nicht besuchten Tabs (m-vix aus Makro-Tab, dp-pcr/dp-gex aus Dark-Pool-Sektion, window._lastRegime/_cnnFearGreed als globale Variablen, die nur nach bestimmten Aktionen gesetzt werden). Fix: neue _refreshHomeStatusTiles() liest stattdessen direkt aus dem gecachten Morning Briefing (marketContext.factors, MCM Single Source of Truth seit 14.07.2026) — reiner localStorage-Read, KEIN Netzwerk-/KI-Call (respektiert Arbeitspaket-B-Cache-Disziplin). Laeuft automatisch am Ende von renderHomeLanding() (jeder Seitenaufruf/Panel-Wechsel zu Home) UND ueber ein neues Refresh-Icon neben den Kacheln fuer expliziten manuellen Re-Sync. GEX bleibt "—" (kein MCM-Faktor, keine gecachte Quelle dafuer vorhanden) — PCR/GEX-Kachel zeigt in diesem Fall nur "PCR X". Funktional getestet mit simuliertem Cache (Regime/VIX/F&G/PCR korrekt uebernommen inkl. Farbkodierung).
      v333: Phase 0.5 Arbeitspaket B (Trigger-/Cache-Disziplin, Token-Oekonomie) — vollstaendig umgesetzt. (1) Bestaetigungsdialog vor JEDER Morning-Briefing-Neuberechnung (runMorningBriefing() fragt jetzt via window.confirm() nach, bevor ein bestehendes Briefing des Tages ueberschrieben wird — deckt BEIDE bisherigen Trigger-Pfade ab: den normalen home-refresh-btn UND den EIC-Direktaufruf, der runHomeBriefing() bisher komplett umging). Root Cause gefunden: runMorningBriefing() loeschte den Cache bisher UNCONDITIONAL bei jedem Aufruf, unabhaengig vom forceRefresh-Parameter (der ohnehin nie weitergereicht wurde). (2) home-briefing-time verliert Button-Charakter (Spec: "reiner Status mit Datum/Uhrzeit") — von <button> mit onclick zu reinem <span>, kein Trigger-Risiko mehr bei fehlendem Cache. Die "Briefing oeffnen"-Funktion wandert auf home-briefing-text (neue openCachedBriefing(), garantiert NUR Anzeige, niemals Neuberechnung). (3) autoMakro() bekommt dieselbe Rueckfrage-Logik — rief bisher bei JEDEM Klick unconditional die KI auf (Token-Kosten), jetzt Cache-Check gegen ko_makro.date vor Ueberschreiben. (4) Verifiziert, kein Fix noetig: Morning-Briefing-Button-Duplikate in Scanner/Alpha-Desk waren bereits in v247 entfernt (unsichtbarer morning-btn-Stub bestaetigt harmlos), keine Hover-Trigger irgendwo gefunden.
      v332: Phase 0.5 Arbeitspaket A (Homescreen/Landing) — zwei Luecken gegen die STRATEGIE.md-Spec geschlossen. (1) Sidebar-Titel "UnderlyingIQ" oeffnet jetzt von JEDEM Panel aus die Uebersicht (onclick auf .sidebar-logo) — vorher nur ueber den separaten Home-Nav-Button moeglich, Spec verlangt explizit Rueckkehr "von ueberall per Klick auf Sidebar-Titel". (2) Echter, in einfacher Sprache kuratierter Nutzer-Changelog (USER_CHANGELOG-Array + renderUserChangelog(), durchblaetterbar) ersetzt die bisherige reine Versionsnummer-Anzeige ("v267 · 09.07.2026" ohne jeden Inhalt) — Spec verlangt "Changelog seit letztem Build mit Workflow-/Bedienungs-Auswirkungen". Bereits vorhanden und gegen die Spec verifiziert (keine Aenderung noetig): Datum/Uhrzeit, Morning-Briefing-Status inkl. Uhrzeit und Fehlerzustand, Makro-Einschaetzung (eingebettet im Briefing-Text), Regime/VIX/Fear&Greed, WpHG-Rechtshinweis.
@@ -496,9 +497,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           </div>
           <!-- Refresh: liest NUR aus bereits vorhandenem Cache nach, kein Netzwerk-/KI-Call
                (15.07.2026, Axel-Anfrage — Kacheln blieben nach Seitenaufruf oft bei "—",
-               weil sie DOM-Kopien aus anderen, noch nicht besuchten Tabs waren) -->
-          <span onclick="_refreshHomeStatusTiles()" style="cursor:pointer;color:var(--text3);font-size:12px" title="Werte aus Cache aktualisieren (kein neuer API-Call)">
-            <i class="ti ti-refresh"></i>
+               weil sie DOM-Kopien aus anderen, noch nicht besuchten Tabs waren).
+               BUGFIX: erste Version war ein bloßes <i class="ti ti-refresh"> ohne
+               eigene Groesse/Rahmen — auf dem Screenshot nicht als Button erkennbar.
+               Jetzt mit sichtbarem Chip-Stil, Unicode-Fallback-Zeichen unabhaengig
+               vom Icon-Font. -->
+          <span onclick="_refreshHomeStatusTiles()" style="cursor:pointer;color:var(--accent);font-size:10px;padding:3px 7px;border-radius:6px;border:0.5px solid var(--border2);white-space:nowrap" title="Werte aus Cache aktualisieren (kein neuer API-Call)">
+            ↻ Refresh
           </span>
           <div style="margin-left:auto">
             <!-- Aktivitäts-Spinner (sichtbar während Analyse läuft) -->
@@ -5573,6 +5578,17 @@ function renderHomeLanding() {
   // reiner localStorage-Read, KEIN Netzwerk-/KI-Call, respektiert Arbeitspaket B.
   try { _refreshHomeStatusTiles(); } catch(e) { console.warn('[HomeStatus]', e.message); }
 
+  // BUGFIX (15.07.2026, Axel-Anfrage): "Marktaktivität" (Aktivste/Volumen/
+  // Winner/Loser) hatte bereits einen manuellen "laden"-Button, wurde aber
+  // NIE automatisch beim Seitenaufruf getriggert — blieb bei "—" bis zum
+  // manuellen Klick. Fix: einmalig pro Sitzung automatisch laden (Flag
+  // verhindert Mehrfach-Laden bei jedem Panel-Wechsel; manueller Button
+  // funktioniert weiterhin jederzeit fuer einen echten Refresh).
+  if (!window._homeMoverAutoLoaded) {
+    window._homeMoverAutoLoaded = true;
+    try { _loadHomeMover(); } catch(e) { console.warn('[HomeMover]', e.message); }
+  }
+
   // Sektor Top-3/Flop-3 (v281) — KV-Cache, non-blocking
   try { _loadHomeSektorKondensat(); } catch(e) { console.warn('[HomeSektor]', e.message); }
 
@@ -5621,8 +5637,8 @@ async function _loadHomeMover() {
 
   async function fetchScreen(scrId) {
     var url = corsProxy + '/?url=' + encodeURIComponent(
-      'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=' + scrId + '&count=10');
-    var r = await fetch(url);
+      'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&lang=en-US&region=US&scrIds=' + scrId + '&count=10&_cb=' + Date.now());
+    var r = await fetch(url, { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var j = await r.json();
     return (j?.finance?.result?.[0]?.quotes || [])
