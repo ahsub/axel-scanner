@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260716-v356">
+<meta name="version" content="20260716-v357">
 <!-- CHANGELOG (neueste zuerst):
+     v357: Batch 4 (16.07.2026). (1) Scanner KI-Dropdown Nomenklatur: 'KO-Trading' → 'KO-Zertifikat', 'Options-Wheel' → 'CSP/Wheel' (laut Taxonomie-Dokument v1.0). (2) Leaderboard-KI-Button umbenannt: 'Markt-Einschätzung fuer diese Strategie' → 'KI-Strategieempfehlung fuer dieses Leaderboard' (konsistent mit Scanner-Button U2). (3) U5/U7: runAlphaLbKI() bricht fruehzeitig ab mit klarem Hinweis wenn Leaderboard keine Bewertungsmetriken hat (short_breakdown/short_fading/vcp_setups) — statt generischer KI-Analyse auf ungeeigneter Datengrundlage. (4) switchAlphaLB() dimmt KI-Button optisch auf 40% Opazitaet + zeigt Tooltip wenn keine Metriken vorhanden — visuelles Feedback schon vor dem Klick.
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
@@ -2697,7 +2698,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     <div style="display:flex;align-items:center;gap:.5rem;margin-top:.4rem">
       <button onclick="runAlphaLbKI()"
         style="font-size:11px;padding:4px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(79,142,247,0.1);color:var(--accent);cursor:pointer">
-        🤖 Markt-Einschätzung für diese Strategie
+        🤖 KI-Strategieempfehlung für dieses Leaderboard
       </button>
       <span id="alpha-lb-ki-status" style="font-size:11px;color:var(--text3)"></span>
     </div>
@@ -16652,9 +16653,9 @@ function toggleKiDropdown(anchorEl) {
   }
 
   var strategies = [
-    { strat:'ko',       label:'⚡ KO-Trading' },
+    { strat:'ko',       label:'⚡ KO-Zertifikat' },
     { strat:'momentum', label:'📈 Momentum' },
-    { strat:'options',  label:'🎯 Options-Wheel' },
+    { strat:'options',  label:'🎯 CSP/Wheel' },
     { strat:'swing',    label:'🔄 Swing-Trading' },
     { strat:'meanrev',  label:'↩️ Mean Reversion' },
     { strat:'breakout', label:'🚀 Breakout' },
@@ -22590,6 +22591,21 @@ function switchAlphaLB(btn, key) {
   if (_alphaData) renderAlphaLB(_alphaData.leaderboards, key);
   // AP-B Cache-Disziplin (08.07.2026): Tab-Wechsel löst keinen KI-Call mehr aus.
   // KI-Analyse nur auf expliziten Nutzer-Wunsch.
+
+  // U5/U7 (16.07.2026): KI-Button visuell dimmen wenn keine Metriken definiert
+  var _noMetrics = ['short_breakdown','short_fading','vcp_setups'];
+  var kiBtn = document.querySelector('#alpha-lb-section button[onclick="runAlphaLbKI()"]');
+  var kiStatus = document.getElementById('alpha-lb-ki-status');
+  if (kiBtn) {
+    var hasMetrics = _noMetrics.indexOf(key) === -1;
+    kiBtn.style.opacity = hasMetrics ? '1' : '0.4';
+    kiBtn.title = hasMetrics ? '' : 'Bewertungsmetriken für dieses Leaderboard noch nicht definiert';
+    if (kiStatus && !hasMetrics) {
+      kiStatus.innerHTML = '<span style="color:var(--text3);font-size:10px">⚠ Metriken ausstehend</span>';
+    } else if (kiStatus && hasMetrics) {
+      kiStatus.innerHTML = '';
+    }
+  }
 }
 
 /**
@@ -22692,6 +22708,22 @@ async function runBestOpportunityKI() {
 async function runAlphaLbKI() {
   if (!getAiToken()) { showKoToast('KI-Token nicht gesetzt'); return; }
   var statusEl = document.getElementById('alpha-lb-ki-status');
+
+  // U5/U7 (16.07.2026): Leaderboards ohne definierte Bewertungsmetriken
+  // zeigen einen klaren Hinweis statt eine generische KI-Analyse zu starten,
+  // die auf ungeeigneter Datengrundlage basieren würde.
+  var _noMetricsLBs = {
+    short_breakdown: 'Breakdown',
+    short_fading:    'Fading',
+    vcp_setups:      'VCP',
+  };
+  if (_noMetricsLBs[_alphaLB]) {
+    if (statusEl) statusEl.innerHTML =
+      '<span style="color:var(--amber)">⚠ ' + _noMetricsLBs[_alphaLB] +
+      ': Bewertungsmetriken noch nicht definiert — KI-Empfehlung nicht verfügbar.</span>';
+    return;
+  }
+
   var strat = _lbToStrat[_alphaLB] || 'momentum';
   var stratCfg = (typeof KI_STRAT_CONFIG !== 'undefined') ? KI_STRAT_CONFIG[strat] : null;
   if (!stratCfg) { if (statusEl) statusEl.textContent = 'Strategie-Config fehlt'; return; }
