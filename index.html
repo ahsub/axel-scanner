@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260715-v350">
+<meta name="version" content="20260716-v351">
 <!-- CHANGELOG (neueste zuerst):
+     v351: Phase 0.5 Arbeitspaket J (Mobile-Tauglichkeit) — erste Runde nach Ist-Zustand-Audit. (1) Handelsplatz-Dropdown-Fix: fehlendes Rechts-Clamping gefunden (ko-modules@f6e398e) — Dropdown konnte auf schmalen Bildschirmen ueber den rechten Rand hinausragen, jetzt beidseitig geklemmt wie das bereits korrekt implementierte ki-float-menu. (2) Touch-Target-Erweiterung: unsichtbare Klickflaechen-Erweiterung (::after, 5px) fuer alle Buttons/[onclick]-Elemente im Mobile-Breakpoint — viele Buttons hatten nur 2-4px Padding, deutlich unter der 44x44px-Empfehlung. Bewusst als reine CSS-Ergaenzung ohne Aenderung der hunderten Einzelstellen, mit Ausschluss von Elementen die bereits eigene Inline-Positionierung haben (sonst wuerde die unsichtbare Klickflaeche an falscher Stelle landen). (3) Grid-Spalten-Reduktion: 3-5-spaltige Grids (34 Fundstellen, meist Inline-Styles) werden im Mobile-Breakpoint per Attribut-Selektor auf 2 Spalten reduziert, ohne die Einzelstellen anzufassen. Bekannte Einschraenkung: NICHT auf einem echten Geraet/Emulator visuell verifiziert, nur Syntax- und Klammer-Balance-geprueft — sollte bei naechster Gelegenheit auf einem echten Smartphone gegengecheckt werden, insbesondere ob die Touch-Target-Erweiterung bei eng benachbarten Chips (Leaderboard-Tabs) nicht zu Fehlklicks fuehrt. Verbleibend fuer spaetere Runden: 6 Tabellen ohne overflow-x:auto-Wrapper (niedriges Risiko, nur 2-5 Spalten), Modal-/Dropdown-Verhalten auf sehr schmalen Screens weiter pruefen.
      v350: KI-Optionsverfallsdatum-Bug behoben (Axel-Report, ATM-CSP-Kandidat zeigte "3. Aug 2026 (~30 DTE)" — tatsaechlich nur ~19 Tage ab Erstellungsdatum, UND 3.8.2026 ist kein Freitag/Verfallstag). Root Cause: im gesamten KI-Prompt-Kontext fehlte JEDES Datums-Anker — die KI musste "heute" aus ihrem veralteten Trainingswissen raten, Datums-Arithmetik ohne harten Anker ist fuer Sprachmodelle unzuverlaessig. Fix: neue calc3rdFridayExpiration() berechnet das ECHTE Ziel-Verfallsdatum client-seitig (echter 3. Freitag, naeher am DTE-Ziel), heutiges Datum + berechnetes Verfallsdatum werden jetzt in allen 3 KI-Prompt-Kontexten uebergeben (Watchlist-Top-Performer, Options-Desk-Strategie-Buttons, Value-Strategie). ko-strategies.js (@b7a9e52): atmna-Prompt-Text verweist jetzt explizit auf das bereitgestellte Datum statt es selbst zu berechnen — verhindert dass die KI den Wert ignoriert und trotzdem eigenstaendig (falsch) rechnet. Funktional getestet: calc3rdFridayExpiration(30) mit fixiertem Datum 15.07.2026 liefert korrekt 21.08.2026 (verifizierter Freitag, 37 DTE — naeher am 30-Tage-Ziel als Juli-Alternative mit nur 2 DTE oder September mit 65 DTE).
      v349: KRITISCHE BUGFIXES (Axel-Report per Browser-Konsole, 15.07.2026 Abend) — zwei echte Fehler aus der heutigen Session gefunden und behoben. (1) "Uncaught ReferenceError: switchToPanel is not defined" — in renderGateWidget() (Arbeitspaket D) wurde eine nicht-existente Funktion switchToPanel() referenziert statt der tatsaechlich existierenden showPanel(); betraf ALLE 8 klickbaren Strategie-Ampel-Chips (Value + die 7 aus Arbeitspaket D). Korrigiert auf showPanel(), funktional getestet (beide Varianten: Value-Chip + Leaderboard-Chip). (2) "Uncaught SyntaxError: Export getFocus is not defined in module" (ko-modules@6b69795) — beim Entfernen von getFocus()/getLabelList() im Dead-Code-Audit heute Vormittag wurde nur die const-Definition entfernt, nicht die export-Zeile am Dateiende, die diese Namen weiterhin auflistete. Dieser Modul-Ladefehler betraf JEDE Seite, die ko-strategies.js einbindet — vermutlich Ursache fuer weitere Fehlfunktionen bei KI-Analyse-Buttons quer durchs Interface. Export-Zeile bereinigt, als echtes ES-Modul getestet (node --input-type=module, keine Fehler). CDN-Hash aktualisiert.
      v348: Phase 0.5 Arbeitspaket I (Fehler-Kommunikation KI-Aufrufe) — verbleibende 2 von 4 Punkten umgesetzt. Fund: Punkte 1+4 (unterscheidbare 429-Meldungen, echter UI-Zustandswechsel statt Toast) waren bereits in einer frueheren Session (v245) als zentrale showKiError()-Funktion gebaut — STRATEGIE.md-Eintrag war veraltet (beschrieb noch den 08.07.2026-Ist-Zustand vor diesem Fix). Neu ergaenzt: (1) Countdown am Retry-Button bei transienten Rate-Limits (20s, deaktiviert den Button waehrenddessen, live tickender Countdown-Text) — vorher nur ein bloßer Klick-Button ohne Wartezeit-Hinweis. (2) Cache-Fallback auf zuletzt gespeicherte KI-Einschätzung fuer denselben Ticker mit Alters-Anzeige (_cacheKiResultForTicker()/_getCachedKiResultForTicker(), rollierender Cache max. 30 Ticker) — bei einem Fehler steht der Nutzer nicht mehr komplett leer da, sondern sieht "Letzte KI-Einschätzung (vor X Min/Std)". Wichtiger Zusatzfund: die Deep-Dive-Einzeltitel-KI-Analyse (generateDeepDiveKI()) nutzte bisher GAR NICHT die zentrale showKiError() (nur eine rohe Fehlermeldung ohne Retry/Cache-Fallback) — jetzt konsistent mit den anderen KI-Aufrufen umgestellt, inkl. echtem Retry (ruft dieselbe Funktion erneut auf). Generischer "KI-Fehler"-Fall bekommt jetzt ebenfalls einen Retry-Button (vorher nur beim transienten 429-Fall). Funktional getestet (Cache-Speicherung/Abruf + Countdown-Timer-Logik isoliert verifiziert).
@@ -232,6 +233,43 @@ input,select,button,textarea{font-family:var(--font);font-size:14px}
   .nav-btn.alpha-btn.active{border-top-color:#a78bfa}
   .nav-btn i{font-size:19px;width:auto}
   .main-content{margin-left:0;padding-bottom:56px}
+
+  /* BUGFIX (16.07.2026, Mobile-Audit Arbeitspaket J): Touch-Target-Erweiterung.
+     Sehr viele Buttons/Chips im gesamten Interface nutzen Inline-Styles mit
+     2-4px Padding — deutlich unter der ~44x44px-Empfehlung fuer Finger-
+     Bedienung. Inline-Styles lassen sich per CSS-Klasse nicht ueberschreiben,
+     daher hier: unsichtbare Klickflaechen-Erweiterung per ::after statt
+     tatsaechlicher Groessenaenderung — betrifft die GESAMTE App mit einer
+     einzigen Regel, ohne die hunderten Einzelstellen anzufassen. Bewusst
+     moderate 5px-Erweiterung (nicht mehr), um Ueberlappungen zwischen eng
+     benachbarten Chips (z.B. Leaderboard-Tabs, TV/Refresh-Buttons) zu vermeiden.
+     position:relative noetig, damit ::after sich daran orientiert — betrifft
+     nur Elemente ohne bereits gesetztes position (haeufigster Fall). */
+  button:not([style*="position"]), .btn:not([style*="position"]),
+  [onclick]:not([style*="position"]) {
+    position: relative;
+  }
+  button:not([style*="position"])::after, .btn:not([style*="position"])::after,
+  [onclick]:not([style*="position"])::after {
+    content: '';
+    position: absolute;
+    top: -5px; left: -5px; right: -5px; bottom: -5px;
+  }
+
+  /* BUGFIX (16.07.2026, Mobile-Audit Arbeitspaket J): feste 3-5-spaltige
+     Grids (34 Fundstellen im gesamten Interface, meist Inline-Styles mit
+     unterschiedlichen Werten) auf 2 Spalten reduzieren — bei <700px Breite
+     sind 4-5 Spalten pro Zeile zu eng fuer Zahl+Label. Attribut-Selektor
+     matcht auf den Inline-Style-Inhalt, keine Aenderung an den 34 Einzel-
+     stellen noetig. !important noetig, um Inline-Styles zu ueberschreiben
+     (einzige Moeglichkeit, da CSS-Klassen Inline-Styles sonst nicht
+     schlagen koennen).
+  */
+  [style*="grid-template-columns:repeat(5"],
+  [style*="grid-template-columns:repeat(4"],
+  [style*="grid-template-columns:repeat(3"] {
+    grid-template-columns: repeat(2,1fr) !important;
+  }
 }
 
 /* Keyboard / animation helpers */
@@ -23584,7 +23622,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c72b7bf/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c52bac1/ko-scanner.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1d89a9f/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
