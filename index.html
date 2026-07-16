@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260716-v354">
+<meta name="version" content="20260716-v355">
 <!-- CHANGELOG (neueste zuerst):
+     v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
      v353: Zwei Axel-Anfragen umgesetzt. (1) ETF-Modul-Loesung fuer Sektor-Holdings (ko-aggregator v5.11.0): Client-Hinweistext im ETF-Holdings-Modal aktualisiert (war noch "Aktuell nur für XLK verfügbar", jetzt "Verfügbar für XLK/XLY/XLF/XLE/XLV/XLI/XLU"). (2) Versionsnummer beim Home-Button (Kosmetik): neuer kleiner Tag neben dem "UnderlyingIQ"-Titel, liest dynamisch aus dem bestehenden <meta name="version">-Tag (kein zweiter, potenziell veraltender Versions-String) — zeigt automatisch die jeweils aktuell deployte Version (z.B. "v353"). Funktional getestet (String-Parsing-Logik gegen zwei Beispiel-Versionsstrings).
      v352: Mobile Bottom-Bar-Ueberlauf behoben (Axel-Feedback: "äussere Extrempositionen nicht mehr klickbar/sichtbar"). Root Cause: 9 Nav-Buttons x min-width:60px = 540px Mindestbreite — passt nicht auf typische Handybreite (375-414px), Bottom-Bar musste horizontal scrollen (unuebliches Muster fuer eine Tab-Leiste, niemand erwartet dort seitwaertiges Wischen). Fix: Standard-Mobile-Pattern uebernommen (Instagram/Twitter etc. begrenzen die Bottom-Bar auf ~4-5 direkt sichtbare Items) — 4 Kern-Workflow-Items bleiben immer sichtbar (Übersicht, Alpha Desk, Scanner, Makro), 5 seltener genutzte Items (Fibonacci, KO-Rechner, Backlog, Einstellungen, Cloud Sync) wandern auf Mobile hinter einen neuen "Mehr"-Button, der ein Sheet mit diesen 5 Optionen oeffnet. 4+1=5 Items x 60px = 300px, passt komfortabel auch auf die schmalsten gaengigen Bildschirme. Funktional getestet (Menü-HTML-Aufbau mit gemocktem DOM). Bekannte Einschraenkung: Auswahl der 4 "Kern"-Items ist meine Einschaetzung basierend auf dem im Reifekriterium beschriebenen Workflow — falls Axel eine andere Priorisierung bevorzugt (z.B. Backlog wichtiger als Makro), ist das eine einfache Klassen-Umsortierung, kein struktureller Umbau.
@@ -559,6 +560,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           </div>
         </div>
 
+        <!-- Aktion-Button: ganz oben, vor Regime-Banner (U9b: 16.07.2026) -->
+        <div style="margin-bottom:.75rem">
+          <button id="home-start-btn" onclick="runHomeBriefing(false)"
+            style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--accent);
+            background:rgba(79,142,247,0.1);color:var(--accent);font-size:13px;
+            font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+            <i class="ti ti-chart-radar"></i> Marktlage analysieren &amp; Briefing erstellen
+          </button>
+        </div>
+
         <!-- Markt-Status Zeile: Regime + VIX kompakt -->
         <div id="home-regime-card" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:.6rem 1rem;margin-bottom:.75rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:.5rem;cursor:pointer" onclick="showPanel('makro')" title="Details im Makro-Tab">
@@ -680,17 +691,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             </div>
           </div>
 
-          <!-- Aktion-Button — oben, vor Briefing-Text (U9: 16.07.2026) -->
-          <div style="padding:.6rem 1rem;border-bottom:0.5px solid var(--border2)">
-            <button id="home-start-btn" onclick="runHomeBriefing(false)"
-              style="width:100%;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);
-              background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;
-              font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-              <i class="ti ti-chart-radar"></i> Marktlage analysieren &amp; Briefing erstellen
-            </button>
-          </div>
+        </div>
 
-          <!-- Makro-Schnellansicht (aus localStorage) -->
+        <!-- Rechtshinweis -->
           <div id="home-makro-strip" style="padding:.6rem 1rem;border-bottom:0.5px solid var(--border2);display:flex;gap:1rem;flex-wrap:wrap;font-size:11px;color:var(--text3)">
             <span>S&P <span id="hm-sp" style="color:var(--text);font-weight:600">—</span></span>
             <span>NQ <span id="hm-nq" style="color:var(--text);font-weight:600">—</span></span>
