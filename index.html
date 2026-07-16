@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260716-v353">
+<meta name="version" content="20260716-v354">
 <!-- CHANGELOG (neueste zuerst):
+     v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
      v353: Zwei Axel-Anfragen umgesetzt. (1) ETF-Modul-Loesung fuer Sektor-Holdings (ko-aggregator v5.11.0): Client-Hinweistext im ETF-Holdings-Modal aktualisiert (war noch "Aktuell nur für XLK verfügbar", jetzt "Verfügbar für XLK/XLY/XLF/XLE/XLV/XLI/XLU"). (2) Versionsnummer beim Home-Button (Kosmetik): neuer kleiner Tag neben dem "UnderlyingIQ"-Titel, liest dynamisch aus dem bestehenden <meta name="version">-Tag (kein zweiter, potenziell veraltender Versions-String) — zeigt automatisch die jeweils aktuell deployte Version (z.B. "v353"). Funktional getestet (String-Parsing-Logik gegen zwei Beispiel-Versionsstrings).
      v352: Mobile Bottom-Bar-Ueberlauf behoben (Axel-Feedback: "äussere Extrempositionen nicht mehr klickbar/sichtbar"). Root Cause: 9 Nav-Buttons x min-width:60px = 540px Mindestbreite — passt nicht auf typische Handybreite (375-414px), Bottom-Bar musste horizontal scrollen (unuebliches Muster fuer eine Tab-Leiste, niemand erwartet dort seitwaertiges Wischen). Fix: Standard-Mobile-Pattern uebernommen (Instagram/Twitter etc. begrenzen die Bottom-Bar auf ~4-5 direkt sichtbare Items) — 4 Kern-Workflow-Items bleiben immer sichtbar (Übersicht, Alpha Desk, Scanner, Makro), 5 seltener genutzte Items (Fibonacci, KO-Rechner, Backlog, Einstellungen, Cloud Sync) wandern auf Mobile hinter einen neuen "Mehr"-Button, der ein Sheet mit diesen 5 Optionen oeffnet. 4+1=5 Items x 60px = 300px, passt komfortabel auch auf die schmalsten gaengigen Bildschirme. Funktional getestet (Menü-HTML-Aufbau mit gemocktem DOM). Bekannte Einschraenkung: Auswahl der 4 "Kern"-Items ist meine Einschaetzung basierend auf dem im Reifekriterium beschriebenen Workflow — falls Axel eine andere Priorisierung bevorzugt (z.B. Backlog wichtiger als Makro), ist das eine einfache Klassen-Umsortierung, kein struktureller Umbau.
      v351: Phase 0.5 Arbeitspaket J (Mobile-Tauglichkeit) — erste Runde nach Ist-Zustand-Audit. (1) Handelsplatz-Dropdown-Fix: fehlendes Rechts-Clamping gefunden (ko-modules@f6e398e) — Dropdown konnte auf schmalen Bildschirmen ueber den rechten Rand hinausragen, jetzt beidseitig geklemmt wie das bereits korrekt implementierte ki-float-menu. (2) Touch-Target-Erweiterung: unsichtbare Klickflaechen-Erweiterung (::after, 5px) fuer alle Buttons/[onclick]-Elemente im Mobile-Breakpoint — viele Buttons hatten nur 2-4px Padding, deutlich unter der 44x44px-Empfehlung. Bewusst als reine CSS-Ergaenzung ohne Aenderung der hunderten Einzelstellen, mit Ausschluss von Elementen die bereits eigene Inline-Positionierung haben (sonst wuerde die unsichtbare Klickflaeche an falscher Stelle landen). (3) Grid-Spalten-Reduktion: 3-5-spaltige Grids (34 Fundstellen, meist Inline-Styles) werden im Mobile-Breakpoint per Attribut-Selektor auf 2 Spalten reduziert, ohne die Einzelstellen anzufassen. Bekannte Einschraenkung: NICHT auf einem echten Geraet/Emulator visuell verifiziert, nur Syntax- und Klammer-Balance-geprueft — sollte bei naechster Gelegenheit auf einem echten Smartphone gegengecheckt werden, insbesondere ob die Touch-Target-Erweiterung bei eng benachbarten Chips (Leaderboard-Tabs) nicht zu Fehlklicks fuehrt. Verbleibend fuer spaetere Runden: 6 Tabellen ohne overflow-x:auto-Wrapper (niedriges Risiko, nur 2-5 Spalten), Modal-/Dropdown-Verhalten auf sehr schmalen Screens weiter pruefen.
@@ -449,15 +450,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <!-- ── SIDEBAR ─────────────────────────────────────────────────────── -->
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-logo" onclick="showPanel('home')" style="cursor:pointer" title="Zur Übersicht">
-      <div class="sidebar-logo-title"><span class="topbar-dot"></span>UnderlyingIQ
-        <!-- BUGFIX (16.07.2026, Axel-Anfrage "Kosmetik"): Versionsnummer beim
-             Home-Button anzeigen. Liest dynamisch aus dem bestehenden
-             <meta name="version">-Tag statt einer zweiten, potenziell
-             veraltenden Kopie -- so kann diese Anzeige nie aus dem Sync mit
-             der tatsaechlich deployten Version laufen. -->
-        <span id="sidebar-version-tag" style="font-size:9px;font-weight:400;color:var(--text3);margin-left:4px"></span>
-      </div>
+      <div class="sidebar-logo-title"><span class="topbar-dot"></span>UnderlyingIQ</div>
       <div class="sidebar-time" id="topbar-time"></div>
+      <!-- Versionstag linksbündig unter Datum/Uhrzeit (16.07.2026) -->
+      <span id="sidebar-version-tag" style="font-size:9px;font-weight:400;color:var(--text3);display:block;margin-top:1px"></span>
     </div>
     <script>
       (function() {
@@ -476,10 +472,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <i class="ti ti-home" aria-hidden="true" style="color:var(--accent)"></i>
       <span class="nav-btn-label" style="color:var(--accent)">Übersicht<span class="nav-btn-sub">Briefing-Status &amp; Tagesstart</span></span>
     </button>
-    <button class="nav-btn alpha-btn" id="nav-alpha" onclick="showPanel('alpha');setTimeout(loadAlphaDashboard,80)">
-      <i class="ti ti-sparkles" aria-hidden="true"></i>
-      <span class="nav-btn-label">Alpha Desk<span class="nav-btn-sub">Technische Filterung · Algorithmus-Ergebnisse</span></span>
-    </button>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">Markt-Kontext</div>
     <button class="nav-btn" id="nav-makro" onclick="showPanel('makro')">
@@ -488,6 +480,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </button>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">Trading</div>
+    <button class="nav-btn alpha-btn" id="nav-alpha" onclick="showPanel('alpha');setTimeout(loadAlphaDashboard,80)">
+      <i class="ti ti-sparkles" aria-hidden="true"></i>
+      <span class="nav-btn-label">Alpha Desk<span class="nav-btn-sub">Technische Filterung · Algorithmus-Ergebnisse</span></span>
+    </button>
     <button class="nav-btn" id="nav-scanner" onclick="showPanel('scanner')">
       <i class="ti ti-radar" aria-hidden="true"></i>
       <span class="nav-btn-label">Scanner<span class="nav-btn-sub">Aktien scannen &amp; filtern</span></span>
@@ -495,10 +491,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <button class="nav-btn nav-mobile-secondary" id="nav-fibo" onclick="showPanel('fibo');buildFiboTab()">
       <i class="ti ti-chart-arrows-vertical" aria-hidden="true"></i>
       <span class="nav-btn-label">Fibonacci<span class="nav-btn-sub">Levels &amp; Retracements</span></span>
-    </button>
-    <button class="nav-btn nav-mobile-secondary" id="nav-rechner" onclick="showPanel('rechner')">
-      <i class="ti ti-calculator" aria-hidden="true"></i>
-      <span class="nav-btn-label">KO-Rechner<span class="nav-btn-sub">Hebelprodukte berechnen</span></span>
     </button>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">Verwaltung</div>
@@ -688,6 +680,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             </div>
           </div>
 
+          <!-- Aktion-Button — oben, vor Briefing-Text (U9: 16.07.2026) -->
+          <div style="padding:.6rem 1rem;border-bottom:0.5px solid var(--border2)">
+            <button id="home-start-btn" onclick="runHomeBriefing(false)"
+              style="width:100%;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);
+              background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;
+              font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+              <i class="ti ti-chart-radar"></i> Marktlage analysieren &amp; Briefing erstellen
+            </button>
+          </div>
+
           <!-- Makro-Schnellansicht (aus localStorage) -->
           <div id="home-makro-strip" style="padding:.6rem 1rem;border-bottom:0.5px solid var(--border2);display:flex;gap:1rem;flex-wrap:wrap;font-size:11px;color:var(--text3)">
             <span>S&P <span id="hm-sp" style="color:var(--text);font-weight:600">—</span></span>
@@ -705,15 +707,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             Noch kein Briefing heute — Button unten klicken.
           </div>
 
-          <!-- Aktion-Button -->
-          <div style="padding:.6rem 1rem;border-top:0.5px solid var(--border2)">
-            <button id="home-start-btn" onclick="runHomeBriefing(false)"
-              style="width:100%;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);
-              background:rgba(79,142,247,0.1);color:var(--accent);font-size:12px;
-              font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-              <i class="ti ti-chart-radar"></i> Marktlage analysieren &amp; Briefing erstellen
-            </button>
-          </div>
         </div>
 
         <!-- Rechtshinweis -->
@@ -795,7 +788,7 @@ background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);borde
           style="display:flex;align-items:center;gap:5px;padding:6px 10px;font-size:12px;font-weight:500;
 background:var(--bg3);color:var(--text2);border:0.5px solid var(--border2);border-radius:8px;cursor:pointer"
           title="Analysiert die Top-25 Ergebnisse (Score ≥40) deines aktuellen Scans für eine gewählte Strategie. Im EIC/Expert-Modus detaillierter, sonst rein beschreibend gemäß §1 WpHG.">
-          <i class="ti ti-brain" style="color:var(--accent)"></i> Markt-Einschätzung
+          <i class="ti ti-brain" style="color:var(--accent)"></i> KI-Strategieempfehlung
         </button>
 
         <!-- Trennlinie -->
@@ -6025,12 +6018,9 @@ async function _fetchHomeStripLive() {
 }
 
 /**
- * Mobile "Mehr"-Menü (16.07.2026, Axel-Feedback: Bottom-Bar-Randpositionen
- * nicht klickbar/sichtbar auf schmalen Bildschirmen). Zeigt die 5 sekundären
- * Nav-Items (Fibonacci, KO-Rechner, Backlog, Einstellungen, Cloud Sync) als
- * Sheet — Standard-Mobile-Pattern statt einer horizontal scrollenden
- * Bottom-Bar mit 9 Items (540px Mindestbreite, passt nicht auf ~375-414px
- * Handybreite).
+ * Mobile "Mehr"-Menü (16.07.2026). Zeigt die sekundären Nav-Items
+ * (Fibonacci, Backlog, Einstellungen, Cloud Sync) als Sheet —
+ * Standard-Mobile-Pattern. KO-Rechner entfernt (S3, 16.07.2026).
  */
 function toggleMobileMoreMenu() {
   var menu = document.getElementById('mobile-more-menu');
@@ -19343,6 +19333,7 @@ async function fetchSingleForDeepDive(sym, name) {
     var url  = 'https://query1.finance.yahoo.com/v7/finance/chart/' + encodeURIComponent(sym)
              + '?interval=1d&period1=' + from + '&period2=' + to;
     var r = await fetch(corsProxy + '/?url=' + encodeURIComponent(url), { cache: 'no-store' });
+    var j = await r.json();
     var res = j?.chart?.result?.[0];
     if (!res) throw new Error('Keine Daten');
 
@@ -22611,36 +22602,51 @@ async function runBestOpportunityKI() {
   if (!getAiToken()) { showKoToast('KI-Token nicht gesetzt'); return; }
   var statusEl = document.getElementById('alpha-best-opp-status');
   var lbs = (_alphaData && _alphaData.leaderboards) || {};
-  var best = null, bestLbKey = null;
+
+  // Top-5 über alle Leaderboards sammeln (statt nur Platz 1)
+  var allCandidates = [];
   Object.keys(lbs).forEach(function(lbKey) {
     (lbs[lbKey] || []).forEach(function(t) {
-      var score = t.score || t.compositeScore || 0;
-      if (!best || score > (best.score || best.compositeScore || 0)) {
-        best = t; bestLbKey = lbKey;
-      }
+      allCandidates.push({ ticker: t, lbKey: lbKey, score: t.score || t.compositeScore || 0 });
     });
   });
-  if (!best) { if (statusEl) statusEl.textContent = 'Keine Kandidaten geladen'; return; }
+  allCandidates.sort(function(a, b) { return b.score - a.score; });
+  var top5 = allCandidates.slice(0, 5);
 
+  if (!top5.length) { if (statusEl) statusEl.textContent = 'Keine Kandidaten geladen'; return; }
+
+  var best = top5[0].ticker;
+  var bestLbKey = top5[0].lbKey;
   var strat = _lbToStrat[bestLbKey] || 'momentum';
   var stratCfg = (typeof KI_STRAT_CONFIG !== 'undefined') ? KI_STRAT_CONFIG[strat] : null;
   if (!stratCfg) { if (statusEl) statusEl.textContent = 'Strategie-Config fehlt'; return; }
 
-  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere ' + (best.sym||best.ticker) + '…';
+  if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere Top-5…';
 
   var vix = _getVixRobust ? _getVixRobust() : '-';
   var mseRegime = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '-';
-  var tLine = (best.sym||best.ticker||'?') + ' Score:' + (best.score||best.compositeScore||'-') + ' Grade:' + (best.grade||'-')
-    + ' RSI:' + (best.rsi ? Math.round(best.rsi) : '-') + ' Kurs:$' + (best.price||'-')
-    + (best.hvp ? ' HVP:' + best.hvp + '%' : '') + (best.atr ? ' ATR:' + best.atr : '');
+
+  var candidateLines = top5.map(function(c, i) {
+    var t = c.ticker;
+    var lbStrat = _lbToStrat[c.lbKey] || c.lbKey;
+    var stratLabel = (typeof KI_STRAT_CONFIG !== 'undefined' && KI_STRAT_CONFIG[lbStrat]) ? KI_STRAT_CONFIG[lbStrat].label : c.lbKey;
+    return (i+1) + '. ' + (t.sym||t.ticker||'?')
+      + ' [' + stratLabel + ']'
+      + ' Score:' + (t.score||t.compositeScore||'-')
+      + ' Grade:' + (t.grade||'-')
+      + ' RSI:' + (t.rsi ? Math.round(t.rsi) : '-')
+      + ' Kurs:$' + (t.price||'-')
+      + (t.hvp ? ' HVP:' + t.hvp + '%' : '')
+      + (t.atr ? ' ATR:' + t.atr : '');
+  }).join('\n');
+
   var ctx = 'MARKTKONTEXT:\nVIX: ' + vix + '\nRegime (MSE): ' + mseRegime
-    + '\n\nBESTER KANDIDAT ÜBER ALLE STRATEGIEN (Leaderboard: ' + bestLbKey.toUpperCase() + '):\n' + tLine;
+    + '\n\nTOP-5 KANDIDATEN ÜBER ALLE STRATEGIEN:\n' + candidateLines;
   var isExpert = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
-  var prompt = getKiSystemPrompt('Beste Chance über alle Strategien: ' + stratCfg.label) + '\n\nMESSWERTE:\n' + ctx
-    + '\n\nANALYSE-PERSPEKTIVE: ' + stratCfg.label + '\nFokus: ' + (stratCfg.focus ? stratCfg.focus.join(', ') : '')
-    + '\n\nDieser Titel hat den höchsten Score unter ALLEN aktuell gescannten Strategien. '
-    + 'Erkläre in 3-4 Sätzen: Warum ist ' + (best.sym||best.ticker) + ' heute die aussichtsreichste Chance? '
-    + 'Welcher konkrete Trigger ist bereits aktiv oder fehlt noch?';
+  var prompt = getKiSystemPrompt('Beste Chancen über alle Strategien — Top-5') + '\n\nMESSWERTE:\n' + ctx
+    + '\n\nAnalysiere diese 5 Kandidaten aus verschiedenen Strategien. '
+    + 'Erkläre für jeden in 1-2 Sätzen: Warum ist dieser Titel heute interessant und welche Strategie passt? '
+    + 'Hebe am Ende den einen stärksten Kandidaten hervor und begründe die Wahl.';
   try {
     var result = await koAiCall('ki_briefing', prompt, isExpert);
     var _existingModal = document.getElementById('ki-modal');
@@ -22650,14 +22656,30 @@ async function runBestOpportunityKI() {
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
     modal.innerHTML = '<div style="background:var(--bg);border-radius:16px 16px 0 0;width:100%;max-width:680px;max-height:85vh;overflow-y:auto;padding:1.25rem">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">'
-      + '<div><div style="font-size:13px;font-weight:700">🎯 Beste Chance &mdash; ' + (best.sym||best.ticker) + ' &middot; ' + stratCfg.label + '</div>'
-      + '<div style="font-size:11px;color:var(--text3)">Gefunden in: ' + bestLbKey + ' &middot; Score ' + (best.score||best.compositeScore) + '</div></div>'
+      + '<div><div style="font-size:13px;font-weight:700">🎯 Beste Chancen — Top-5 über alle Strategien</div>'
+      + '<div style="font-size:11px;color:var(--text3)">Regime: ' + mseRegime + ' · VIX: ' + vix + '</div></div>'
       + '<button onclick="document.getElementById(\'ki-modal\').remove()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer">&times;</button>'
-      + '</div><div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.6">' + result + '</div></div>';
+      + '</div>'
+      + '<div style="margin-bottom:.75rem;display:flex;flex-direction:column;gap:4px">'
+      + top5.map(function(c, i) {
+          var t = c.ticker;
+          var lbStrat = _lbToStrat[c.lbKey] || c.lbKey;
+          var stratLabel = (typeof KI_STRAT_CONFIG !== 'undefined' && KI_STRAT_CONFIG[lbStrat]) ? KI_STRAT_CONFIG[lbStrat].label : c.lbKey;
+          var scoreColor = (t.score||t.compositeScore||0) >= 70 ? 'var(--green)' : (t.score||t.compositeScore||0) >= 50 ? 'var(--amber)' : 'var(--red)';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg2);border-radius:8px;' + (i===0?'border:0.5px solid var(--accent)':'border:0.5px solid var(--border)') + '">'
+            + '<span style="font-size:11px;font-weight:700;min-width:18px;color:var(--text3)">' + (i+1) + '.</span>'
+            + '<span style="font-size:12px;font-weight:700;min-width:50px">' + (t.sym||t.ticker||'?') + '</span>'
+            + '<span style="font-size:10px;color:var(--text3);flex:1">' + stratLabel + '</span>'
+            + '<span style="font-size:11px;font-weight:700;color:' + scoreColor + '">Score ' + (t.score||t.compositeScore||'-') + '</span>'
+            + (i===0 ? '<span style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(79,142,247,0.15);color:var(--accent)">⭐ Top</span>' : '')
+            + '</div>';
+        }).join('')
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.6">' + result + '</div></div>';
     document.body.appendChild(modal);
     modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
-    if (statusEl) statusEl.textContent = '✓ ' + (best.sym||best.ticker) + ' · ' + stratCfg.label;
-    showKoToast('Beste Chance: ' + (best.sym||best.ticker) + ' (' + stratCfg.label + ')');
+    if (statusEl) statusEl.textContent = '✓ Top-5 · Bester: ' + (best.sym||best.ticker) + ' (' + stratCfg.label + ')';
+    showKoToast('Beste Chancen: Top-5 geladen');
   } catch(e) {
     if (statusEl) statusEl.textContent = 'Fehler: ' + e.message;
     console.warn('[BestOpportunityKI]', e.message);
