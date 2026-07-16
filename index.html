@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260716-v351">
+<meta name="version" content="20260716-v352">
 <!-- CHANGELOG (neueste zuerst):
+     v352: Mobile Bottom-Bar-Ueberlauf behoben (Axel-Feedback: "äussere Extrempositionen nicht mehr klickbar/sichtbar"). Root Cause: 9 Nav-Buttons x min-width:60px = 540px Mindestbreite — passt nicht auf typische Handybreite (375-414px), Bottom-Bar musste horizontal scrollen (unuebliches Muster fuer eine Tab-Leiste, niemand erwartet dort seitwaertiges Wischen). Fix: Standard-Mobile-Pattern uebernommen (Instagram/Twitter etc. begrenzen die Bottom-Bar auf ~4-5 direkt sichtbare Items) — 4 Kern-Workflow-Items bleiben immer sichtbar (Übersicht, Alpha Desk, Scanner, Makro), 5 seltener genutzte Items (Fibonacci, KO-Rechner, Backlog, Einstellungen, Cloud Sync) wandern auf Mobile hinter einen neuen "Mehr"-Button, der ein Sheet mit diesen 5 Optionen oeffnet. 4+1=5 Items x 60px = 300px, passt komfortabel auch auf die schmalsten gaengigen Bildschirme. Funktional getestet (Menü-HTML-Aufbau mit gemocktem DOM). Bekannte Einschraenkung: Auswahl der 4 "Kern"-Items ist meine Einschaetzung basierend auf dem im Reifekriterium beschriebenen Workflow — falls Axel eine andere Priorisierung bevorzugt (z.B. Backlog wichtiger als Makro), ist das eine einfache Klassen-Umsortierung, kein struktureller Umbau.
      v351: Phase 0.5 Arbeitspaket J (Mobile-Tauglichkeit) — erste Runde nach Ist-Zustand-Audit. (1) Handelsplatz-Dropdown-Fix: fehlendes Rechts-Clamping gefunden (ko-modules@f6e398e) — Dropdown konnte auf schmalen Bildschirmen ueber den rechten Rand hinausragen, jetzt beidseitig geklemmt wie das bereits korrekt implementierte ki-float-menu. (2) Touch-Target-Erweiterung: unsichtbare Klickflaechen-Erweiterung (::after, 5px) fuer alle Buttons/[onclick]-Elemente im Mobile-Breakpoint — viele Buttons hatten nur 2-4px Padding, deutlich unter der 44x44px-Empfehlung. Bewusst als reine CSS-Ergaenzung ohne Aenderung der hunderten Einzelstellen, mit Ausschluss von Elementen die bereits eigene Inline-Positionierung haben (sonst wuerde die unsichtbare Klickflaeche an falscher Stelle landen). (3) Grid-Spalten-Reduktion: 3-5-spaltige Grids (34 Fundstellen, meist Inline-Styles) werden im Mobile-Breakpoint per Attribut-Selektor auf 2 Spalten reduziert, ohne die Einzelstellen anzufassen. Bekannte Einschraenkung: NICHT auf einem echten Geraet/Emulator visuell verifiziert, nur Syntax- und Klammer-Balance-geprueft — sollte bei naechster Gelegenheit auf einem echten Smartphone gegengecheckt werden, insbesondere ob die Touch-Target-Erweiterung bei eng benachbarten Chips (Leaderboard-Tabs) nicht zu Fehlklicks fuehrt. Verbleibend fuer spaetere Runden: 6 Tabellen ohne overflow-x:auto-Wrapper (niedriges Risiko, nur 2-5 Spalten), Modal-/Dropdown-Verhalten auf sehr schmalen Screens weiter pruefen.
      v350: KI-Optionsverfallsdatum-Bug behoben (Axel-Report, ATM-CSP-Kandidat zeigte "3. Aug 2026 (~30 DTE)" — tatsaechlich nur ~19 Tage ab Erstellungsdatum, UND 3.8.2026 ist kein Freitag/Verfallstag). Root Cause: im gesamten KI-Prompt-Kontext fehlte JEDES Datums-Anker — die KI musste "heute" aus ihrem veralteten Trainingswissen raten, Datums-Arithmetik ohne harten Anker ist fuer Sprachmodelle unzuverlaessig. Fix: neue calc3rdFridayExpiration() berechnet das ECHTE Ziel-Verfallsdatum client-seitig (echter 3. Freitag, naeher am DTE-Ziel), heutiges Datum + berechnetes Verfallsdatum werden jetzt in allen 3 KI-Prompt-Kontexten uebergeben (Watchlist-Top-Performer, Options-Desk-Strategie-Buttons, Value-Strategie). ko-strategies.js (@b7a9e52): atmna-Prompt-Text verweist jetzt explizit auf das bereitgestellte Datum statt es selbst zu berechnen — verhindert dass die KI den Wert ignoriert und trotzdem eigenstaendig (falsch) rechnet. Funktional getestet: calc3rdFridayExpiration(30) mit fixiertem Datum 15.07.2026 liefert korrekt 21.08.2026 (verifizierter Freitag, 37 DTE — naeher am 30-Tage-Ziel als Juli-Alternative mit nur 2 DTE oder September mit 65 DTE).
      v349: KRITISCHE BUGFIXES (Axel-Report per Browser-Konsole, 15.07.2026 Abend) — zwei echte Fehler aus der heutigen Session gefunden und behoben. (1) "Uncaught ReferenceError: switchToPanel is not defined" — in renderGateWidget() (Arbeitspaket D) wurde eine nicht-existente Funktion switchToPanel() referenziert statt der tatsaechlich existierenden showPanel(); betraf ALLE 8 klickbaren Strategie-Ampel-Chips (Value + die 7 aus Arbeitspaket D). Korrigiert auf showPanel(), funktional getestet (beide Varianten: Value-Chip + Leaderboard-Chip). (2) "Uncaught SyntaxError: Export getFocus is not defined in module" (ko-modules@6b69795) — beim Entfernen von getFocus()/getLabelList() im Dead-Code-Audit heute Vormittag wurde nur die const-Definition entfernt, nicht die export-Zeile am Dateiende, die diese Namen weiterhin auflistete. Dieser Modul-Ladefehler betraf JEDE Seite, die ko-strategies.js einbindet — vermutlich Ursache fuer weitere Fehlfunktionen bei KI-Analyse-Buttons quer durchs Interface. Export-Zeile bereinigt, als echtes ES-Modul getestet (node --input-type=module, keine Fehler). CDN-Hash aktualisiert.
@@ -228,6 +229,8 @@ input,select,button,textarea{font-family:var(--font);font-size:14px}
 @media(max-width:700px){
   .sidebar{width:100%;height:56px;bottom:0;top:auto;flex-direction:row;align-items:center;border-right:none;border-top:0.5px solid var(--border);overflow:hidden;overflow-x:auto}
   .sidebar-logo,.sidebar-section,.sidebar-divider,.sidebar-spacer,.nav-btn-sub{display:none}
+  .nav-mobile-secondary{display:none}
+  #nav-mobile-more{display:flex !important}
   .nav-btn{flex-direction:column;align-items:center;gap:2px;padding:.4rem .5rem;min-width:60px;font-size:9px;border-left:none;border-top:2px solid transparent;justify-content:center}
   .nav-btn.active{border-top-color:var(--accent);border-left-color:transparent}
   .nav-btn.alpha-btn.active{border-top-color:#a78bfa}
@@ -470,31 +473,49 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <i class="ti ti-radar" aria-hidden="true"></i>
       <span class="nav-btn-label">Scanner<span class="nav-btn-sub">Aktien scannen &amp; filtern</span></span>
     </button>
-    <button class="nav-btn" id="nav-fibo" onclick="showPanel('fibo');buildFiboTab()">
+    <button class="nav-btn nav-mobile-secondary" id="nav-fibo" onclick="showPanel('fibo');buildFiboTab()">
       <i class="ti ti-chart-arrows-vertical" aria-hidden="true"></i>
       <span class="nav-btn-label">Fibonacci<span class="nav-btn-sub">Levels &amp; Retracements</span></span>
     </button>
-    <button class="nav-btn" id="nav-rechner" onclick="showPanel('rechner')">
+    <button class="nav-btn nav-mobile-secondary" id="nav-rechner" onclick="showPanel('rechner')">
       <i class="ti ti-calculator" aria-hidden="true"></i>
       <span class="nav-btn-label">KO-Rechner<span class="nav-btn-sub">Hebelprodukte berechnen</span></span>
     </button>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">Verwaltung</div>
-    <button class="nav-btn" id="nav-backlog" onclick="showPanel('backlog');renderBacklogPanel()">
+    <button class="nav-btn nav-mobile-secondary" id="nav-backlog" onclick="showPanel('backlog');renderBacklogPanel()">
       <i class="ti ti-archive" aria-hidden="true"></i>
       <span class="nav-btn-label">Backlog<span class="nav-btn-sub">Watchlist &amp; Tracking</span></span>
     </button>
-    <button class="nav-btn" id="nav-admin" onclick="showPanel('admin')">
+    <button class="nav-btn nav-mobile-secondary" id="nav-admin" onclick="showPanel('admin')">
       <i class="ti ti-settings" aria-hidden="true"></i>
       <span class="nav-btn-label">Einstellungen<span class="nav-btn-sub">API-Keys · EIC · Config</span></span>
     </button>
     <div class="sidebar-spacer"></div>
     <div class="sidebar-divider"></div>
-    <button class="nav-btn" id="nav-sync" onclick="showSyncModal()" title="Synchronisiert Watchlisten und Morning Briefing zwischen Geräten (Cloudflare KV)">
+    <button class="nav-btn nav-mobile-secondary" id="nav-sync" onclick="showSyncModal()" title="Synchronisiert Watchlisten und Morning Briefing zwischen Geräten (Cloudflare KV)">
       <i class="ti ti-cloud" id="sync-icon" aria-hidden="true"></i>
       <span class="nav-btn-label">Cloud Sync<span class="nav-btn-sub" id="sync-label">Daten synchronisieren</span></span>
     </button>
+    <!-- BUGFIX (16.07.2026, Axel-Feedback: "äussere Extrempositionen nicht mehr
+         klickbar/sichtbar"): 9 Nav-Buttons x min-width:60px = 540px -- passt
+         nicht in typische Handybreite (375-414px), Bottom-Bar musste horizontal
+         scrollen (unuebliches Muster, niemand erwartet das bei einer Tab-Leiste).
+         Fix: 5 seltener genutzte Items (.nav-mobile-secondary) werden auf Mobile
+         hinter einem "Mehr"-Button gebuendelt -- Standard-Pattern (Instagram/
+         Twitter etc. begrenzen die Bottom-Bar auf ~4-5 direkt sichtbare Items).
+         Nur auf Mobile sichtbar (display:none per Default, siehe @media-Regel). -->
+    <button class="nav-btn" id="nav-mobile-more" onclick="toggleMobileMoreMenu()" style="display:none">
+      <i class="ti ti-dots" aria-hidden="true"></i>
+      <span class="nav-btn-label">Mehr</span>
+    </button>
   </nav>
+
+  <!-- Mobile "Mehr"-Menü: Sheet mit den 5 sekundaeren Nav-Items -->
+  <div id="mobile-more-menu" style="display:none;position:fixed;bottom:56px;left:0;right:0;background:var(--bg2);
+    border-top:0.5px solid var(--border2);border-radius:12px 12px 0 0;box-shadow:0 -8px 32px rgba(0,0,0,0.4);
+    z-index:500;padding:.5rem"></div>
+
 
   <!-- ── MAIN CONTENT ─────────────────────────────────────────────────── -->
   <div class="main-content">
@@ -5982,6 +6003,44 @@ async function _fetchHomeStripLive() {
     } catch(e) { /* einzelner Ticker-Fehler stoppt nicht die anderen */ }
   }
   return Object.keys(out).length ? out : null;
+}
+
+/**
+ * Mobile "Mehr"-Menü (16.07.2026, Axel-Feedback: Bottom-Bar-Randpositionen
+ * nicht klickbar/sichtbar auf schmalen Bildschirmen). Zeigt die 5 sekundären
+ * Nav-Items (Fibonacci, KO-Rechner, Backlog, Einstellungen, Cloud Sync) als
+ * Sheet — Standard-Mobile-Pattern statt einer horizontal scrollenden
+ * Bottom-Bar mit 9 Items (540px Mindestbreite, passt nicht auf ~375-414px
+ * Handybreite).
+ */
+function toggleMobileMoreMenu() {
+  var menu = document.getElementById('mobile-more-menu');
+  if (!menu) return;
+  var isOpen = menu.style.display !== 'none';
+  if (isOpen) { menu.style.display = 'none'; return; }
+
+  var secondaryBtns = document.querySelectorAll('.nav-mobile-secondary');
+  menu.innerHTML = Array.from(secondaryBtns).map(function(btn) {
+    var icon = btn.querySelector('i');
+    var labelEl = btn.querySelector('.nav-btn-label');
+    // Nur den Haupttext (ohne .nav-btn-sub-Unterzeile) fuer die kompakte Menü-Zeile
+    var label = labelEl ? labelEl.childNodes[0].textContent : btn.id;
+    return '<div onclick="document.getElementById(\'' + btn.id + '\').click();toggleMobileMoreMenu()" '
+      + 'style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;cursor:pointer;font-size:14px;color:var(--text)">'
+      + (icon ? '<i class="' + icon.className + '" style="font-size:18px;width:24px"></i>' : '')
+      + label + '</div>';
+  }).join('');
+
+  menu.style.display = 'block';
+  setTimeout(function() {
+    document.addEventListener('click', function _closeMore(e) {
+      var moreBtn = document.getElementById('nav-mobile-more');
+      if (!menu.contains(e.target) && e.target !== moreBtn && !moreBtn.contains(e.target)) {
+        menu.style.display = 'none';
+        document.removeEventListener('click', _closeMore);
+      }
+    });
+  }, 10);
 }
 
 function showPanel(id){
