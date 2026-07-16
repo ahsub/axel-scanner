@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260716-v352">
+<meta name="version" content="20260716-v353">
 <!-- CHANGELOG (neueste zuerst):
+     v353: Zwei Axel-Anfragen umgesetzt. (1) ETF-Modul-Loesung fuer Sektor-Holdings (ko-aggregator v5.11.0): Client-Hinweistext im ETF-Holdings-Modal aktualisiert (war noch "Aktuell nur für XLK verfügbar", jetzt "Verfügbar für XLK/XLY/XLF/XLE/XLV/XLI/XLU"). (2) Versionsnummer beim Home-Button (Kosmetik): neuer kleiner Tag neben dem "UnderlyingIQ"-Titel, liest dynamisch aus dem bestehenden <meta name="version">-Tag (kein zweiter, potenziell veraltender Versions-String) — zeigt automatisch die jeweils aktuell deployte Version (z.B. "v353"). Funktional getestet (String-Parsing-Logik gegen zwei Beispiel-Versionsstrings).
      v352: Mobile Bottom-Bar-Ueberlauf behoben (Axel-Feedback: "äussere Extrempositionen nicht mehr klickbar/sichtbar"). Root Cause: 9 Nav-Buttons x min-width:60px = 540px Mindestbreite — passt nicht auf typische Handybreite (375-414px), Bottom-Bar musste horizontal scrollen (unuebliches Muster fuer eine Tab-Leiste, niemand erwartet dort seitwaertiges Wischen). Fix: Standard-Mobile-Pattern uebernommen (Instagram/Twitter etc. begrenzen die Bottom-Bar auf ~4-5 direkt sichtbare Items) — 4 Kern-Workflow-Items bleiben immer sichtbar (Übersicht, Alpha Desk, Scanner, Makro), 5 seltener genutzte Items (Fibonacci, KO-Rechner, Backlog, Einstellungen, Cloud Sync) wandern auf Mobile hinter einen neuen "Mehr"-Button, der ein Sheet mit diesen 5 Optionen oeffnet. 4+1=5 Items x 60px = 300px, passt komfortabel auch auf die schmalsten gaengigen Bildschirme. Funktional getestet (Menü-HTML-Aufbau mit gemocktem DOM). Bekannte Einschraenkung: Auswahl der 4 "Kern"-Items ist meine Einschaetzung basierend auf dem im Reifekriterium beschriebenen Workflow — falls Axel eine andere Priorisierung bevorzugt (z.B. Backlog wichtiger als Makro), ist das eine einfache Klassen-Umsortierung, kein struktureller Umbau.
      v351: Phase 0.5 Arbeitspaket J (Mobile-Tauglichkeit) — erste Runde nach Ist-Zustand-Audit. (1) Handelsplatz-Dropdown-Fix: fehlendes Rechts-Clamping gefunden (ko-modules@f6e398e) — Dropdown konnte auf schmalen Bildschirmen ueber den rechten Rand hinausragen, jetzt beidseitig geklemmt wie das bereits korrekt implementierte ki-float-menu. (2) Touch-Target-Erweiterung: unsichtbare Klickflaechen-Erweiterung (::after, 5px) fuer alle Buttons/[onclick]-Elemente im Mobile-Breakpoint — viele Buttons hatten nur 2-4px Padding, deutlich unter der 44x44px-Empfehlung. Bewusst als reine CSS-Ergaenzung ohne Aenderung der hunderten Einzelstellen, mit Ausschluss von Elementen die bereits eigene Inline-Positionierung haben (sonst wuerde die unsichtbare Klickflaeche an falscher Stelle landen). (3) Grid-Spalten-Reduktion: 3-5-spaltige Grids (34 Fundstellen, meist Inline-Styles) werden im Mobile-Breakpoint per Attribut-Selektor auf 2 Spalten reduziert, ohne die Einzelstellen anzufassen. Bekannte Einschraenkung: NICHT auf einem echten Geraet/Emulator visuell verifiziert, nur Syntax- und Klammer-Balance-geprueft — sollte bei naechster Gelegenheit auf einem echten Smartphone gegengecheckt werden, insbesondere ob die Touch-Target-Erweiterung bei eng benachbarten Chips (Leaderboard-Tabs) nicht zu Fehlklicks fuehrt. Verbleibend fuer spaetere Runden: 6 Tabellen ohne overflow-x:auto-Wrapper (niedriges Risiko, nur 2-5 Spalten), Modal-/Dropdown-Verhalten auf sehr schmalen Screens weiter pruefen.
      v350: KI-Optionsverfallsdatum-Bug behoben (Axel-Report, ATM-CSP-Kandidat zeigte "3. Aug 2026 (~30 DTE)" — tatsaechlich nur ~19 Tage ab Erstellungsdatum, UND 3.8.2026 ist kein Freitag/Verfallstag). Root Cause: im gesamten KI-Prompt-Kontext fehlte JEDES Datums-Anker — die KI musste "heute" aus ihrem veralteten Trainingswissen raten, Datums-Arithmetik ohne harten Anker ist fuer Sprachmodelle unzuverlaessig. Fix: neue calc3rdFridayExpiration() berechnet das ECHTE Ziel-Verfallsdatum client-seitig (echter 3. Freitag, naeher am DTE-Ziel), heutiges Datum + berechnetes Verfallsdatum werden jetzt in allen 3 KI-Prompt-Kontexten uebergeben (Watchlist-Top-Performer, Options-Desk-Strategie-Buttons, Value-Strategie). ko-strategies.js (@b7a9e52): atmna-Prompt-Text verweist jetzt explizit auf das bereitgestellte Datum statt es selbst zu berechnen — verhindert dass die KI den Wert ignoriert und trotzdem eigenstaendig (falsch) rechnet. Funktional getestet: calc3rdFridayExpiration(30) mit fixiertem Datum 15.07.2026 liefert korrekt 21.08.2026 (verifizierter Freitag, 37 DTE — naeher am 30-Tage-Ziel als Juli-Alternative mit nur 2 DTE oder September mit 65 DTE).
@@ -448,9 +449,27 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   <!-- ── SIDEBAR ─────────────────────────────────────────────────────── -->
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-logo" onclick="showPanel('home')" style="cursor:pointer" title="Zur Übersicht">
-      <div class="sidebar-logo-title"><span class="topbar-dot"></span>UnderlyingIQ</div>
+      <div class="sidebar-logo-title"><span class="topbar-dot"></span>UnderlyingIQ
+        <!-- BUGFIX (16.07.2026, Axel-Anfrage "Kosmetik"): Versionsnummer beim
+             Home-Button anzeigen. Liest dynamisch aus dem bestehenden
+             <meta name="version">-Tag statt einer zweiten, potenziell
+             veraltenden Kopie -- so kann diese Anzeige nie aus dem Sync mit
+             der tatsaechlich deployten Version laufen. -->
+        <span id="sidebar-version-tag" style="font-size:9px;font-weight:400;color:var(--text3);margin-left:4px"></span>
+      </div>
       <div class="sidebar-time" id="topbar-time"></div>
     </div>
+    <script>
+      (function() {
+        var verMeta = document.querySelector('meta[name="version"]');
+        var tagEl = document.getElementById('sidebar-version-tag');
+        if (!verMeta || !tagEl) return;
+        var ver = verMeta.getAttribute('content') || '';
+        // Format: '20260716-v352' → 'v352'
+        var parts = ver.split('-v');
+        if (parts[1]) tagEl.textContent = 'v' + parts[1];
+      })();
+    </script>
     <div class="sidebar-section">Tagesstart</div>
     <button class="nav-btn" id="nav-home" onclick="showPanel('home')"
       style="border-left:3px solid var(--accent);background:rgba(79,142,247,0.06)">
@@ -16194,7 +16213,7 @@ function showEtfHoldingsModal(etfSym) {
     bodyHtml = '<div style="padding:1.5rem;text-align:center;color:var(--text3)">'
       + '<i class="ti ti-chart-pie" style="font-size:28px;display:block;margin-bottom:.5rem"></i>'
       + 'Für <b>' + etfSym + '</b> sind noch keine Holdings-Daten hinterlegt.<br>'
-      + '<span style="font-size:12px">Aktuell nur für XLK verfügbar (Proof-of-Concept, 11.07.2026).</span>'
+      + '<span style="font-size:12px">Verfügbar für XLK/XLY/XLF/XLE/XLV/XLI/XLU (ETF-Modul-Lösung seit 16.07.2026) — nach dem nächsten Aggregator-Lauf sollten Daten vorliegen.</span>'
       + '</div>';
   } else {
     var sourceNote = sh.source === 'ssga_ucits_proxy'
