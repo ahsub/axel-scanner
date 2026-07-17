@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v363">
+<meta name="version" content="20260717-v364">
 <!-- CHANGELOG (neueste zuerst):
+     v364: BUGFIX Ampel-Diskrepanz — minimaler korrekter Fix (17.07.2026). Konsolenanalyse bewies: calcStrategyGates() lief korrekt (3 Downgrades) aber danach wurde kein ko:regimeChanged gefeuert — Ampel blieb auf altem Stand. Fix: window.dispatchEvent(ko:regimeChanged) direkt nach _lastMseResult-Update in runMorningBriefing() eingefuegt. renderAllGateWidgets() zeichnet dann alle Ampeln (Home, Scanner, MSE-Detail) synchron neu mit MCM-Gates. MCM-Startup-Gate aus renderHomeLanding entfernt (war zu frueh, Registry noch nicht bereit). Dieser Fix ist minimal und beweisbar: Ampeln aendern sich sichtbar kurz nach Seitenaufruf wenn MCM fertig ist.
      v363: BUGFIX Ampel finale Loesung (17.07.2026, nach Konsolen-Diagnose). Root Cause vollstaendig bewiesen: (1) KoMarketState.restoreLastRegime() stellt Regime + Basis-Gates wieder her aber nie _lastMseResult; (2) buildMarketContext()/calcStrategyGates() wurden nur in runMorningBriefing() aufgerufen — beim Seitenaufruf ohne frisches Briefing nie. Loesung: MCM-Startup-Gate am Ende von renderHomeLanding() — einmalig pro Session (Flag _mcmStartupDone), laedt _alphaData falls null, baut MCM-Kontext, ruft calcStrategyGates() auf, ueberschreibt _lastMseResult mit MCM-Gates inkl. _context, feuert ko:regimeChanged. updateMarketWeatherWidget() zurueck auf einfaches Basis-Gate (v362-Aenderung revertiert — hatte Widget-Aufruf verhindert weil _alphaData beim Start immer null). Konsolenbeweis: [MCM-Startup] Gates aktualisiert — N Downgrades muss erscheinen.
      v362: BUGFIX Ampel-Diskrepanz finale Loesung (17.07.2026). Root Cause jetzt vollstaendig: buildMarketContext()/calcStrategyGates() wurden NUR in runMorningBriefing() aufgerufen — bei Seitenaufruf mit gecachtem Briefing liefen sie zwar (ko-indicators-loader intern), aber das Ergebnis wurde nie in _lastMseResult geschrieben. Alle bisherigen Fixes (Schutz vor Ueberschreiben, Fallback-Entfernung) bekampften Symptome. Echte Loesung: updateMarketWeatherWidget() ruft jetzt SELBST buildMarketContext() + calcStrategyGates() auf wenn _alphaData verfuegbar — identisch zum Briefing-Flow. Damit sind MCM-Context-Downgrades immer aktiv, unabhaengig davon ob das Briefing in dieser Session neu erstellt wurde. Fallback auf Basis-Gates bleibt wenn _alphaData noch nicht geladen.
      v361: BUGFIX Ampel-Farbdiskrepanz 2. Runde (17.07.2026). Root Cause vollstaendig: updateMarketWeatherWidget() setzte _lastMseResult bei JEDEM Aufruf (Seitenaufruf, Panel-Wechsel, Polling) mit Regime-Basis-Gates — OHNE MCM-Kontext-Downgrades. Damit wurden die MCM-Gates die Morning Briefing korrekt via calcStrategyGates() gesetzt hatte sofort wieder ueberschrieben. Fix: _lastMseResult in updateMarketWeatherWidget() wird nur noch gesetzt wenn noch KEIN MCM-Ergebnis vorhanden ist (erkennbar an _context-Feld). MCM-Gates behalten dauerhaft Prioritaet. Zusaetzlich: no-op Reassignment-Zeile (result ? _lastMseResult : null) entfernt. Nach diesem Fix: Ampel-Farben in Uebersicht, Scanner, MSE-Detail und Leaderboard-KI-Hint sind identisch und basieren alle auf demselben MCM-Ergebnis.
@@ -5898,43 +5899,8 @@ function renderHomeLanding() {
     window._trInterval = setInterval(_updateTrackRecord, 60000);
   }
 
-  // MCM-Startup-Gate (17.07.2026 finale Loesung): Beim ersten Seitenaufruf
-  // _alphaData laden und danach MCM + calcStrategyGates() ausfuehren —
-  // so hat die Ampel beim Start den korrekten MCM-Stand mit Context-Downgrades,
-  // ohne auf ein neues Morning Briefing warten zu muessen.
-  // Einmalig pro Session (Flag verhindert Mehrfach-Calls bei Panel-Wechsel).
-  if (!window._mcmStartupDone) {
-    window._mcmStartupDone = true;
-    (async function() {
-      try {
-        if (!window._alphaData) {
-          if (typeof loadAlphaDashboard === 'function') {
-            await loadAlphaDashboard(false);
-          }
-        }
-        if (window._alphaData && typeof buildMarketContext === 'function'
-            && typeof KoMarketState !== 'undefined' && KoMarketState.calcStrategyGates) {
-          var _ctx = await buildMarketContext(window._alphaData, KoMarketState._lastRegime);
-          if (_ctx) {
-            var _gates = KoMarketState.calcStrategyGates(_ctx);
-            window._lastMseResult = Object.assign({}, window._lastMseResult || {}, {
-              regime:   KoMarketState._lastRegime,
-              color:    (window._lastMseResult || {}).color,
-              label:    (window._lastMseResult || {}).label,
-              action:   _gates.action,
-              strategies: _gates.strategies,
-              _context: _gates._context,
-            });
-            window.dispatchEvent(new Event('ko:regimeChanged'));
-            console.log('[MCM-Startup] Gates aktualisiert —',
-              (_gates._context.downgrades || []).length + ' Downgrades');
-          }
-        }
-      } catch(e) {
-        console.warn('[MCM-Startup] fehlgeschlagen:', e.message);
-      }
-    })();
-  }
+  // MCM-Startup-Gate: wird NICHT hier ausgeführt (Registry noch nicht bereit).
+  // Stattdessen: ko:indicatorsReady-Listener unten im Init-Block (einmalig).
 }
 
 // ── Home 4-Spalten Mover (v284) ───────────────────────────────────────────
@@ -20646,6 +20612,8 @@ async function runMorningBriefing(forceRefresh) {
             console.log('[Morning] Context-Downgrades aktiv: ' +
               _ctxGates._context.downgrades.map(function(d){ return d.strategy + '→' + d.to; }).join(', '));
           }
+          // Ampel sofort neu rendern mit MCM-Gates (17.07.2026)
+          window.dispatchEvent(new Event('ko:regimeChanged'));
         }
       }
     } catch(_ctxErr) {
