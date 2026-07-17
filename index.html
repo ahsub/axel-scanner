@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v366">
+<meta name="version" content="20260717-v367">
 <!-- CHANGELOG (neueste zuerst):
+     v367: S6 TradingView Layout-Link (17.07.2026): Einstellungs-Tab bekommt neues Feld "Mein Chart-Layout" — optionaler URL-Input, wird in localStorage (ko_tv_layout_url) gespeichert. Im TV-Modal erscheint jetzt ein zusaetzlicher Button "Mein Layout" (amber) wenn ein Layout-Link gesetzt ist. So oeffnet TV direkt das persoenliche gespeicherte Layout statt des Default-Charts. TV-Login-Status haengt vom Browser ab (nicht steuerbar).
      v366: B3 KI-Modal-Positionierung (17.07.2026): alle 5 Bottom-Sheet-Modals (runBestOpportunityKI, runAlphaLbKI, openKiBriefing, showMSEDetail, weitere) von reinem Bottom-Sheet auf zentriertes Modal umgestellt — border-radius:16px 16px 0 0 → 16px (vollständig gerundet), width:100% → width:min(100%,680px), margin:auto 0 0 fuer korrekte Zentrierung. Auf Mobile bleibt das Verhalten durch align-items:flex-end erhalten (Sheet klebt unten), auf Desktop erscheint Modal zentriert ohne am Rand zu kleben.
      v365: U3 Nomenklatur (17.07.2026): ko-strategies.js label + hint von 'KO-Trading' auf 'KO-Zertifikat' geaendert (Taxonomie v1.0). CDN-Hash ko-strategies.js aktualisiert: b7a9e52 → d61f574.
      v364: BUGFIX Ampel-Diskrepanz — minimaler korrekter Fix (17.07.2026). Konsolenanalyse bewies: calcStrategyGates() lief korrekt (3 Downgrades) aber danach wurde kein ko:regimeChanged gefeuert — Ampel blieb auf altem Stand. Fix: window.dispatchEvent(ko:regimeChanged) direkt nach _lastMseResult-Update in runMorningBriefing() eingefuegt. renderAllGateWidgets() zeichnet dann alle Ampeln (Home, Scanner, MSE-Detail) synchron neu mit MCM-Gates. MCM-Startup-Gate aus renderHomeLanding entfernt (war zu frueh, Registry noch nicht bereit). Dieser Fix ist minimal und beweisbar: Ampeln aendern sich sichtbar kurz nach Seitenaufruf wenn MCM fertig ist.
@@ -1702,7 +1703,30 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         <i class="ti ti-lock"></i> Admin-Bereich — Konfiguration &amp; Datenverwaltung
       </div>
 
-      <!-- ═══ EXTRA-TICKER REVIEW (NEU 30.06.2026) ═══════════════════════════ -->
+      <!-- ═══ TRADINGVIEW LAYOUT-LINK (S6, 17.07.2026) ════════════════════ -->
+      <div class="sec"><i class="ti ti-brand-tradingview"></i> TradingView Mein Chart-Layout</div>
+      <div class="card" style="margin-bottom:.75rem">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:.6rem;line-height:1.5">
+          Optionaler Link zu deinem persönlichen TradingView-Chart-Layout.
+          Wenn gesetzt, erscheint im TV-Modal ein Button „Mein Layout" der direkt
+          dein gespeichertes Layout öffnet (du musst im Browser bei TV eingeloggt sein).
+          <br><span style="color:var(--text3)">Beispiel: https://www.tradingview.com/chart/AbCdEfGh/</span>
+        </div>
+        <div class="field" style="display:flex;gap:6px;align-items:center">
+          <input id="tv-layout-url" type="url" placeholder="https://www.tradingview.com/chart/..." 
+            style="flex:1;font-size:12px;font-family:var(--mono)"
+            oninput="localStorage.setItem('ko_tv_layout_url', this.value.trim())">
+          <button class="btn btn-sm" onclick="
+            var el=document.getElementById('tv-layout-url');
+            localStorage.removeItem('ko_tv_layout_url');
+            el.value='';
+            showKoToast('TV-Layout-Link gelöscht');
+          " style="font-size:11px;color:var(--text3)"><i class="ti ti-x"></i></button>
+        </div>
+        <div style="margin-top:.4rem;font-size:10px;color:var(--text3)" id="tv-layout-status"></div>
+      </div>
+
+
       <div class="sec" style="display:flex;align-items:center;justify-content:space-between">
         <span><i class="ti ti-list-check"></i> Extra-Ticker-Vorschläge</span>
         <button class="btn btn-sm" onclick="loadExtraTickerReview()" style="font-size:11px;padding:3px 9px">
@@ -6095,6 +6119,14 @@ function showPanel(id){
     if(inp&&getFinnhubKey()) inp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
     const tdInp=document.getElementById('td-key-input');
     if(tdInp&&getTwelveKey()) tdInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
+    // S6: TV-Layout-URL aus localStorage wiederherstellen
+    var tvLayoutInp = document.getElementById('tv-layout-url');
+    var tvLayoutStatus = document.getElementById('tv-layout-status');
+    if (tvLayoutInp) {
+      var savedUrl = localStorage.getItem('ko_tv_layout_url') || '';
+      tvLayoutInp.value = savedUrl;
+      if (tvLayoutStatus) tvLayoutStatus.textContent = savedUrl ? '✓ Layout-Link gesetzt' : '';
+    }
     const antInp=document.getElementById('ant-key-input');
     if(antInp&&getAnthropicKey()) antInp.placeholder='Key gesetzt ✓ (neu eingeben zum Ändern)';
     const aiTokInp=document.getElementById('ai-token-input');
@@ -12858,6 +12890,7 @@ function openTVChart(sym, name, isDE) {
       + '</div>'
       + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
         + '<a href="' + tvFullUrl + '" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent);text-decoration:none;padding:4px 8px;border-radius:6px;background:var(--blue-bg);border:0.5px solid var(--accent);white-space:nowrap"><i class="ti ti-external-link"></i> TradingView öffnen</a>'
+        + (localStorage.getItem('ko_tv_layout_url') ? '<a href="' + localStorage.getItem('ko_tv_layout_url') + '" target="_blank" rel="noopener" style="font-size:11px;color:var(--amber);text-decoration:none;padding:4px 8px;border-radius:6px;background:rgba(251,191,36,0.1);border:0.5px solid var(--amber);white-space:nowrap"><i class="ti ti-layout-dashboard"></i> Mein Layout</a>' : '')
         + (isDE ? '<a href="' + xetrUrl + '" target="_blank" rel="noopener" style="font-size:11px;color:var(--green);text-decoration:none;padding:4px 8px;border-radius:6px;background:rgba(52,194,110,0.1);border:0.5px solid var(--green);white-space:nowrap"><i class="ti ti-external-link"></i> Xetra</a>' : '')
         + '<button onclick="document.getElementById(\'tv-modal\').remove()" style="background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer;padding:4px 6px;line-height:1">✕</button>'
       + '</div>'
