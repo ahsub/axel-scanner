@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v372">
+<meta name="version" content="20260717-v373">
 <!-- CHANGELOG (neueste zuerst):
+     v373: Gemini-Analyse BULL_FRAGILE umgesetzt (17.07.2026, Axel-Input). (1) BREADTH-FILTER VALIDIERT: ndx_breadth war bereits als CONTEXT_DOWNGRADE_RULE aktiv (caution ≤50%, risk ≤35% — praktisch identisch mit Gemini-Empfehlung "mind. 50-60% ueber 50-Tage-Schnitt"), kein neuer Bau noetig. VCP nachtraeglich in ALLE relevanten Downgrade-Regeln ergaenzt (treasury_stress/ndx_breadth/intermarket_score/vix/vvix/pcr/fear_greed/bull_indicator/calendar-windows) — war zuvor nicht abgesichert. Collar bewusst ausgenommen (Absicherung soll bei Stress NICHT gesperrt werden). (2) ATR-POSITIONSGRÖSSE MIT REGIME-KOPPLUNG: calcDdPosition() im DeepDive-Rechner reduziert jetzt automatisch das eingegebene Risiko-% bei BULL_FRAGILE (-35%) und STRESS_UNSTABLE (-50%) nach Gemini-Formel-Empfehlung ("systematisches De-Leveraging um 25-50% bei Regimewechsel") — Reduktion transparent sichtbar im Ergebnis-Text (Original-% und Effektiv-% beide angezeigt), kein stilles Overriding der Nutzereingabe. CDN-Hash ko-market-state: → 8838fb4.
      v372: Collar/Protective-Put Proxy-Strategie fuer BULL_FRAGILE (17.07.2026, Axel-Entscheidung nach Pareto-Abwaegung). Statt vollem Optionsketten-Feed + Positions-Import (Sprint-Aufwand) eine schlanke Proxy-Variante nach demselben Muster wie CSP/Wheel: ATR-basierte Strike-Naeherung (Put 1-1.5x ATR unter Kurs, Call 1-2x ATR ueber Kurs fuer vollen Collar), klare Einschraenkung dass echte Strikes/Praemien in IBKR/CapTrader verifiziert werden muessen. Regime-Gates: BULL_FRAGILE Prioritaet 1 (genau die identifizierte Luecke aus der Regime-Coverage-Analyse), BULL_QUIET/POST_PANIC nicht noetig, STRESS_UNSTABLE zu spaet fuer Neuabsicherung, NEUTRAL optional. Ergaenzt in ko-strategies.js, ko-prompts.js (Prompt), ko-market-state.js (STRATEGY_ORDER/LABELS + alle 5 Gates), Scanner-Dropdown. Vollstaendige Herleitung: UIQ-Suite/docs/REGIME-COVERAGE-ANALYSE.md.
      v371: Strategie-Fundus-Bereinigung nach Regime-Coverage-Analyse (17.07.2026, Axel-Entscheidungen). (1) VALUE + DIVIDEND GROWTH ENTFERNT: beide hatten in KEINEM der 5 MSE-Regime Prioritaet-1-Status (objektiver Beleg: Buy-and-Hold-Konzepte, keine Timing-Strategien). Entfernt aus: ko-strategies.js (Strategie-Bloecke), ko-prompts.js (Prompt-Bloecke inkl. Carlin/Graham-Value-Analyse mit FIN-Archiv-Datenbindung), ko-market-state.js (STRATEGY_ORDER, STRATEGY_LABELS, alle 5 Regime-Gates), index.html (Scanner-Dropdown, DeepDive-Quick-Buttons, Alpha-Desk Value-Tab-Button — Panel-DOM + renderValueDeskCards() bleiben dormant fuer spaetere DepotIQ-Wiederverwendung). (2) VCP IN REGIME-GATES ERGAENZT: war zuvor nur im Frontend (Prompt/Leaderboard) aktiv, fehlte komplett in getStrategyGates() — Ampel zeigte fuer VCP nichts an. Jetzt in allen 5 Regimen bewertet: BULL_QUIET Prioritaet 1 (ideales Contraction-Umfeld), BULL_FRAGILE/STRESS_UNSTABLE/POST_PANIC gesperrt (keine Struktur moeglich), NEUTRAL abwartend. (3) FADING SHORT ALS EXPERIMENTELL MARKIERT: Label in STRATEGY_LABELS + Leaderboard-Tab + DeepDive-Button zeigen jetzt \ud83e\uddea-Kennzeichnung und Tooltip \"Edge-These noch nicht verifiziert\" — Metriken-Vervollstaendigung zurueckgestellt bis Axel Backtest/Evidenzgrundlage liefert. CDN-Hashes ko-strategies/ko-prompts/ko-market-state: → bf7c816. Vollstaendige Begruendung: UIQ-Suite/docs/REGIME-COVERAGE-ANALYSE.md.
      v370: VCP im Scanner-Dropdown (17.07.2026, Axel-Nachfrage): VCP-Setup fehlte im Scanner 'KI-Strategieempfehlung'-Dropdown (nur im Alpha Desk als Leaderboard-Tab vorhanden). Ergaenzt: { strat:'vcp', label:'📐 VCP-Setup' } zwischen Breakout und Dividend Growth. openKiBriefing('vcp') funktioniert automatisch da generisch ueber KoPrompts.get() — keine Whitelist noetig, VCP-Prompt aus v369 wird direkt genutzt.
@@ -19635,13 +19636,31 @@ async function generateDeepDiveKI(sym, name, raw, state) {
 
 function calcDdPosition() {
   var depot   = parseFloat(document.getElementById('dd-depot')?.value) || 0;
-  var risk    = parseFloat(document.getElementById('dd-risk')?.value)  || 1;
+  var riskInput = parseFloat(document.getElementById('dd-risk')?.value)  || 1;
   var barrier = parseFloat(document.getElementById('dd-barrier')?.value) || 0;
   var raw     = _ddCurrentSym && window.tickerData && window.tickerData[_ddCurrentSym];
   var price   = raw ? (raw.price || 0) : 0;
   var atr     = raw ? (raw.atr || null) : null;
   var res     = document.getElementById('dd-position-result');
   if (!res) return;
+
+  // Regime-gekoppeltes De-Leveraging (17.07.2026, Gemini-Analyse BULL_FRAGILE):
+  // "Sobald der Markt von Bull-Quiet in eine volatile Phase wechselt,
+  // reduzieren systematische Setups die Standard-Positionsgroessen
+  // regelbasiert um 25% bis 50%." Reduktion ist TRANSPARENT sichtbar,
+  // nicht stillschweigend — Nutzer sieht den Original- und den Effektiv-Wert.
+  var currentRegime = (typeof KoMarketState !== 'undefined') ? KoMarketState._lastRegime : null;
+  var regimeFactor = 1;
+  var regimeNote = '';
+  if (currentRegime === 'BULL_FRAGILE') {
+    regimeFactor = 0.65; // -35%, Mittelwert der Gemini-Spanne 25-50%
+    regimeNote = ' · <span style="color:var(--amber)">⚠ BULL_FRAGILE: Risiko auf ' + Math.round(riskInput * regimeFactor * 100) / 100 + '% reduziert (-35%)</span>';
+  } else if (currentRegime === 'STRESS_UNSTABLE') {
+    regimeFactor = 0.5; // -50%, obere Grenze der Spanne bei akutem Stress
+    regimeNote = ' · <span style="color:var(--red)">⚠ STRESS_UNSTABLE: Risiko auf ' + Math.round(riskInput * regimeFactor * 100) / 100 + '% reduziert (-50%)</span>';
+  }
+  var risk = riskInput * regimeFactor;
+
   if (!barrier || !price || barrier >= price) {
     res.textContent = '— (KO-Barriere eingeben)';
     return;
@@ -19662,6 +19681,7 @@ function calcDdPosition() {
     + ' · €' + posValue.toLocaleString('de-DE') + ' Positionswert'
     + ' · €' + Math.round(riskAmount) + ' Risiko'
     + ' · Hebel ~' + leverage.toFixed(1) + 'x'
+    + regimeNote
     + (atrHint ? '<br><span style="color:var(--amber);font-size:11px">' + atrHint + '</span>' : '');
 }
 
@@ -23829,7 +23849,7 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bcfe18/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@8838fb4/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bcfe18/ko-prompts.js">
