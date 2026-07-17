@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v371">
+<meta name="version" content="20260717-v372">
 <!-- CHANGELOG (neueste zuerst):
+     v372: Collar/Protective-Put Proxy-Strategie fuer BULL_FRAGILE (17.07.2026, Axel-Entscheidung nach Pareto-Abwaegung). Statt vollem Optionsketten-Feed + Positions-Import (Sprint-Aufwand) eine schlanke Proxy-Variante nach demselben Muster wie CSP/Wheel: ATR-basierte Strike-Naeherung (Put 1-1.5x ATR unter Kurs, Call 1-2x ATR ueber Kurs fuer vollen Collar), klare Einschraenkung dass echte Strikes/Praemien in IBKR/CapTrader verifiziert werden muessen. Regime-Gates: BULL_FRAGILE Prioritaet 1 (genau die identifizierte Luecke aus der Regime-Coverage-Analyse), BULL_QUIET/POST_PANIC nicht noetig, STRESS_UNSTABLE zu spaet fuer Neuabsicherung, NEUTRAL optional. Ergaenzt in ko-strategies.js, ko-prompts.js (Prompt), ko-market-state.js (STRATEGY_ORDER/LABELS + alle 5 Gates), Scanner-Dropdown. Vollstaendige Herleitung: UIQ-Suite/docs/REGIME-COVERAGE-ANALYSE.md.
      v371: Strategie-Fundus-Bereinigung nach Regime-Coverage-Analyse (17.07.2026, Axel-Entscheidungen). (1) VALUE + DIVIDEND GROWTH ENTFERNT: beide hatten in KEINEM der 5 MSE-Regime Prioritaet-1-Status (objektiver Beleg: Buy-and-Hold-Konzepte, keine Timing-Strategien). Entfernt aus: ko-strategies.js (Strategie-Bloecke), ko-prompts.js (Prompt-Bloecke inkl. Carlin/Graham-Value-Analyse mit FIN-Archiv-Datenbindung), ko-market-state.js (STRATEGY_ORDER, STRATEGY_LABELS, alle 5 Regime-Gates), index.html (Scanner-Dropdown, DeepDive-Quick-Buttons, Alpha-Desk Value-Tab-Button — Panel-DOM + renderValueDeskCards() bleiben dormant fuer spaetere DepotIQ-Wiederverwendung). (2) VCP IN REGIME-GATES ERGAENZT: war zuvor nur im Frontend (Prompt/Leaderboard) aktiv, fehlte komplett in getStrategyGates() — Ampel zeigte fuer VCP nichts an. Jetzt in allen 5 Regimen bewertet: BULL_QUIET Prioritaet 1 (ideales Contraction-Umfeld), BULL_FRAGILE/STRESS_UNSTABLE/POST_PANIC gesperrt (keine Struktur moeglich), NEUTRAL abwartend. (3) FADING SHORT ALS EXPERIMENTELL MARKIERT: Label in STRATEGY_LABELS + Leaderboard-Tab + DeepDive-Button zeigen jetzt \ud83e\uddea-Kennzeichnung und Tooltip \"Edge-These noch nicht verifiziert\" — Metriken-Vervollstaendigung zurueckgestellt bis Axel Backtest/Evidenzgrundlage liefert. CDN-Hashes ko-strategies/ko-prompts/ko-market-state: → bf7c816. Vollstaendige Begruendung: UIQ-Suite/docs/REGIME-COVERAGE-ANALYSE.md.
      v370: VCP im Scanner-Dropdown (17.07.2026, Axel-Nachfrage): VCP-Setup fehlte im Scanner 'KI-Strategieempfehlung'-Dropdown (nur im Alpha Desk als Leaderboard-Tab vorhanden). Ergaenzt: { strat:'vcp', label:'📐 VCP-Setup' } zwischen Breakout und Dividend Growth. openKiBriefing('vcp') funktioniert automatisch da generisch ueber KoPrompts.get() — keine Whitelist noetig, VCP-Prompt aus v369 wird direkt genutzt.
      v369: VCP-Strategie aktiviert (17.07.2026): (1) ko-strategies.js: VCP-Strategie mit label/hint/color/intro/focus/task/maxWords ergaenzt. (2) ko-prompts.js: VCP-Prompt mit Minervini-Methodik, vcpContractions/vcpLastPct-Datenfeldern, 4-Punkte-Aufgabenstruktur. (3) index.html: vcp_setups → 'vcp' statt 'momentum' in _lbToStrat. vcp_setups aus allen No-Metrics-Listen entfernt (renderAlphaLB, switchAlphaLB, runAlphaLbKI) — VCP zeigt jetzt Kandidaten + KI-Button aktiv. CDN-Hashes aktualisiert: ko-strategies d61f574→a9aeec9, ko-prompts 1d89a9f→a9aeec9.
@@ -3263,7 +3264,7 @@ window.pinSubmit = function(){
 <!-- ko-strategies.js v2.1.0 — Commit-Hash 02644b8 (15.07.2026, Dead-Code-Audit:
      getFocus/getLabelList entfernt; vorher 785e61e/01.07.2026 Short-Strategie
      fading_short + Regelwerk-Erweiterung). type="module" erforderlich. -->
-<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@bf7c816/ko-strategies.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bcfe18/ko-strategies.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -16712,6 +16713,7 @@ function toggleKiDropdown(anchorEl) {
     { strat:'meanrev',  label:'↩️ Mean Reversion' },
     { strat:'breakout', label:'🚀 Breakout' },
     { strat:'vcp',      label:'📐 VCP-Setup' },
+    { strat:'collar',   label:'🛡️ Collar/Protective Put' },
     { strat:'atmna',        label:'⚙️ Options ATM/NA' },
     { strat:'weekly_income',  label:'📅 Options Weekly' },
   ];
@@ -23827,10 +23829,10 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@bf7c816/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bcfe18/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@bf7c816/ko-prompts.js">
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bcfe18/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1f40df0/ko-indicators-loader.js"></script>
