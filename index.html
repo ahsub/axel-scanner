@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v369">
+<meta name="version" content="20260717-v370">
 <!-- CHANGELOG (neueste zuerst):
+     v370: VCP im Scanner-Dropdown (17.07.2026, Axel-Nachfrage): VCP-Setup fehlte im Scanner 'KI-Strategieempfehlung'-Dropdown (nur im Alpha Desk als Leaderboard-Tab vorhanden). Ergaenzt: { strat:'vcp', label:'📐 VCP-Setup' } zwischen Breakout und Dividend Growth. openKiBriefing('vcp') funktioniert automatisch da generisch ueber KoPrompts.get() — keine Whitelist noetig, VCP-Prompt aus v369 wird direkt genutzt.
      v369: VCP-Strategie aktiviert (17.07.2026): (1) ko-strategies.js: VCP-Strategie mit label/hint/color/intro/focus/task/maxWords ergaenzt. (2) ko-prompts.js: VCP-Prompt mit Minervini-Methodik, vcpContractions/vcpLastPct-Datenfeldern, 4-Punkte-Aufgabenstruktur. (3) index.html: vcp_setups → 'vcp' statt 'momentum' in _lbToStrat. vcp_setups aus allen No-Metrics-Listen entfernt (renderAlphaLB, switchAlphaLB, runAlphaLbKI) — VCP zeigt jetzt Kandidaten + KI-Button aktiv. CDN-Hashes aktualisiert: ko-strategies d61f574→a9aeec9, ko-prompts 1d89a9f→a9aeec9.
      v368: U10 Fear & Greed Fix (17.07.2026): CNN-Endpunkt (production.dataviz.cnn.io) blockierte CORS-Proxy mit HTTP 418 (Bot-Detection). Loesung: fetchCnnFearGreed() in ko-data.js auf alternative.me/fng/ umgestellt — direkte Fetch ohne Proxy, hat korrekte CORS-Header, liefert identischen F&G-Index. Rating-Mapping auf Deutsch (Extreme Angst/Angst/Neutral/Gier/Extreme Gier). CDN-Hash ko-data.js: 03ef406 → c3fa765.
      v367: S6 TradingView Layout-Link (17.07.2026): Einstellungs-Tab bekommt neues Feld "Mein Chart-Layout" — optionaler URL-Input, wird in localStorage (ko_tv_layout_url) gespeichert. Im TV-Modal erscheint jetzt ein zusaetzlicher Button "Mein Layout" (amber) wenn ein Layout-Link gesetzt ist. So oeffnet TV direkt das persoenliche gespeicherte Layout statt des Default-Charts. TV-Login-Status haengt vom Browser ab (nicht steuerbar).
@@ -16709,6 +16710,7 @@ function toggleKiDropdown(anchorEl) {
     { strat:'swing',    label:'🔄 Swing-Trading' },
     { strat:'meanrev',  label:'↩️ Mean Reversion' },
     { strat:'breakout', label:'🚀 Breakout' },
+    { strat:'vcp',      label:'📐 VCP-Setup' },
     { strat:'dividend', label:'💰 Dividend Growth' },
     { strat:'atmna',        label:'⚙️ Options ATM/NA' },
     { strat:'weekly_income',  label:'📅 Options Weekly' },
