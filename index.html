@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v367">
+<meta name="version" content="20260717-v368">
 <!-- CHANGELOG (neueste zuerst):
+     v368: U10 Fear & Greed Fix (17.07.2026): CNN-Endpunkt (production.dataviz.cnn.io) blockierte CORS-Proxy mit HTTP 418 (Bot-Detection). Loesung: fetchCnnFearGreed() in ko-data.js auf alternative.me/fng/ umgestellt — direkte Fetch ohne Proxy, hat korrekte CORS-Header, liefert identischen F&G-Index. Rating-Mapping auf Deutsch (Extreme Angst/Angst/Neutral/Gier/Extreme Gier). CDN-Hash ko-data.js: 03ef406 → c3fa765.
      v367: S6 TradingView Layout-Link (17.07.2026): Einstellungs-Tab bekommt neues Feld "Mein Chart-Layout" — optionaler URL-Input, wird in localStorage (ko_tv_layout_url) gespeichert. Im TV-Modal erscheint jetzt ein zusaetzlicher Button "Mein Layout" (amber) wenn ein Layout-Link gesetzt ist. So oeffnet TV direkt das persoenliche gespeicherte Layout statt des Default-Charts. TV-Login-Status haengt vom Browser ab (nicht steuerbar).
      v366: B3 KI-Modal-Positionierung (17.07.2026): alle 5 Bottom-Sheet-Modals (runBestOpportunityKI, runAlphaLbKI, openKiBriefing, showMSEDetail, weitere) von reinem Bottom-Sheet auf zentriertes Modal umgestellt — border-radius:16px 16px 0 0 → 16px (vollständig gerundet), width:100% → width:min(100%,680px), margin:auto 0 0 fuer korrekte Zentrierung. Auf Mobile bleibt das Verhalten durch align-items:flex-end erhalten (Sheet klebt unten), auf Desktop erscheint Modal zentriert ohne am Rand zu kleben.
      v365: U3 Nomenklatur (17.07.2026): ko-strategies.js label + hint von 'KO-Trading' auf 'KO-Zertifikat' geaendert (Taxonomie v1.0). CDN-Hash ko-strategies.js aktualisiert: b7a9e52 → d61f574.
@@ -3255,7 +3256,7 @@ window.pinSubmit = function(){
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@03ef406/ko-markov.js"></script>
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@03ef406/ko-data.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c3fa765/ko-data.js"></script>
 <!-- ko-strategies.js v2.1.0 — Commit-Hash 02644b8 (15.07.2026, Dead-Code-Audit:
      getFocus/getLabelList entfernt; vorher 785e61e/01.07.2026 Short-Strategie
      fading_short + Regelwerk-Erweiterung). type="module" erforderlich. -->
