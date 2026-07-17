@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v364">
+<meta name="version" content="20260717-v365">
 <!-- CHANGELOG (neueste zuerst):
+     v365: U3 Nomenklatur (17.07.2026): ko-strategies.js label + hint von 'KO-Trading' auf 'KO-Zertifikat' geaendert (Taxonomie v1.0). CDN-Hash ko-strategies.js aktualisiert: b7a9e52 → d61f574.
      v364: BUGFIX Ampel-Diskrepanz — minimaler korrekter Fix (17.07.2026). Konsolenanalyse bewies: calcStrategyGates() lief korrekt (3 Downgrades) aber danach wurde kein ko:regimeChanged gefeuert — Ampel blieb auf altem Stand. Fix: window.dispatchEvent(ko:regimeChanged) direkt nach _lastMseResult-Update in runMorningBriefing() eingefuegt. renderAllGateWidgets() zeichnet dann alle Ampeln (Home, Scanner, MSE-Detail) synchron neu mit MCM-Gates. MCM-Startup-Gate aus renderHomeLanding entfernt (war zu frueh, Registry noch nicht bereit). Dieser Fix ist minimal und beweisbar: Ampeln aendern sich sichtbar kurz nach Seitenaufruf wenn MCM fertig ist.
      v363: BUGFIX Ampel finale Loesung (17.07.2026, nach Konsolen-Diagnose). Root Cause vollstaendig bewiesen: (1) KoMarketState.restoreLastRegime() stellt Regime + Basis-Gates wieder her aber nie _lastMseResult; (2) buildMarketContext()/calcStrategyGates() wurden nur in runMorningBriefing() aufgerufen — beim Seitenaufruf ohne frisches Briefing nie. Loesung: MCM-Startup-Gate am Ende von renderHomeLanding() — einmalig pro Session (Flag _mcmStartupDone), laedt _alphaData falls null, baut MCM-Kontext, ruft calcStrategyGates() auf, ueberschreibt _lastMseResult mit MCM-Gates inkl. _context, feuert ko:regimeChanged. updateMarketWeatherWidget() zurueck auf einfaches Basis-Gate (v362-Aenderung revertiert — hatte Widget-Aufruf verhindert weil _alphaData beim Start immer null). Konsolenbeweis: [MCM-Startup] Gates aktualisiert — N Downgrades muss erscheinen.
      v362: BUGFIX Ampel-Diskrepanz finale Loesung (17.07.2026). Root Cause jetzt vollstaendig: buildMarketContext()/calcStrategyGates() wurden NUR in runMorningBriefing() aufgerufen — bei Seitenaufruf mit gecachtem Briefing liefen sie zwar (ko-indicators-loader intern), aber das Ergebnis wurde nie in _lastMseResult geschrieben. Alle bisherigen Fixes (Schutz vor Ueberschreiben, Fallback-Entfernung) bekampften Symptome. Echte Loesung: updateMarketWeatherWidget() ruft jetzt SELBST buildMarketContext() + calcStrategyGates() auf wenn _alphaData verfuegbar — identisch zum Briefing-Flow. Damit sind MCM-Context-Downgrades immer aktiv, unabhaengig davon ob das Briefing in dieser Session neu erstellt wurde. Fallback auf Basis-Gates bleibt wenn _alphaData noch nicht geladen.
@@ -3233,7 +3234,7 @@ window.pinSubmit = function(){
 <!-- ko-strategies.js v2.1.0 — Commit-Hash 02644b8 (15.07.2026, Dead-Code-Audit:
      getFocus/getLabelList entfernt; vorher 785e61e/01.07.2026 Short-Strategie
      fading_short + Regelwerk-Erweiterung). type="module" erforderlich. -->
-<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b7a9e52/ko-strategies.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@d61f574/ko-strategies.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
