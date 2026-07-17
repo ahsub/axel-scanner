@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v368">
+<meta name="version" content="20260717-v369">
 <!-- CHANGELOG (neueste zuerst):
+     v369: VCP-Strategie aktiviert (17.07.2026): (1) ko-strategies.js: VCP-Strategie mit label/hint/color/intro/focus/task/maxWords ergaenzt. (2) ko-prompts.js: VCP-Prompt mit Minervini-Methodik, vcpContractions/vcpLastPct-Datenfeldern, 4-Punkte-Aufgabenstruktur. (3) index.html: vcp_setups → 'vcp' statt 'momentum' in _lbToStrat. vcp_setups aus allen No-Metrics-Listen entfernt (renderAlphaLB, switchAlphaLB, runAlphaLbKI) — VCP zeigt jetzt Kandidaten + KI-Button aktiv. CDN-Hashes aktualisiert: ko-strategies d61f574→a9aeec9, ko-prompts 1d89a9f→a9aeec9.
      v368: U10 Fear & Greed Fix (17.07.2026): CNN-Endpunkt (production.dataviz.cnn.io) blockierte CORS-Proxy mit HTTP 418 (Bot-Detection). Loesung: fetchCnnFearGreed() in ko-data.js auf alternative.me/fng/ umgestellt — direkte Fetch ohne Proxy, hat korrekte CORS-Header, liefert identischen F&G-Index. Rating-Mapping auf Deutsch (Extreme Angst/Angst/Neutral/Gier/Extreme Gier). CDN-Hash ko-data.js: 03ef406 → c3fa765.
      v367: S6 TradingView Layout-Link (17.07.2026): Einstellungs-Tab bekommt neues Feld "Mein Chart-Layout" — optionaler URL-Input, wird in localStorage (ko_tv_layout_url) gespeichert. Im TV-Modal erscheint jetzt ein zusaetzlicher Button "Mein Layout" (amber) wenn ein Layout-Link gesetzt ist. So oeffnet TV direkt das persoenliche gespeicherte Layout statt des Default-Charts. TV-Login-Status haengt vom Browser ab (nicht steuerbar).
      v366: B3 KI-Modal-Positionierung (17.07.2026): alle 5 Bottom-Sheet-Modals (runBestOpportunityKI, runAlphaLbKI, openKiBriefing, showMSEDetail, weitere) von reinem Bottom-Sheet auf zentriertes Modal umgestellt — border-radius:16px 16px 0 0 → 16px (vollständig gerundet), width:100% → width:min(100%,680px), margin:auto 0 0 fuer korrekte Zentrierung. Auf Mobile bleibt das Verhalten durch align-items:flex-end erhalten (Sheet klebt unten), auf Desktop erscheint Modal zentriert ohne am Rand zu kleben.
@@ -3260,7 +3261,7 @@ window.pinSubmit = function(){
 <!-- ko-strategies.js v2.1.0 — Commit-Hash 02644b8 (15.07.2026, Dead-Code-Audit:
      getFocus/getLabelList entfernt; vorher 785e61e/01.07.2026 Short-Strategie
      fading_short + Regelwerk-Erweiterung). type="module" erforderlich. -->
-<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@d61f574/ko-strategies.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@a9aeec9/ko-strategies.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -22583,7 +22584,6 @@ function renderAlphaLB(lb, key) {
   var _lbNoMetrics = {
     short_breakdown: 'Breakdown',
     short_fading_ko: 'KO-Short',
-    vcp_setups:      'VCP',
   };
   if (_lbNoMetrics[key]) {
     el.innerHTML = '<div style="padding:8px 0;font-size:11px;color:var(--amber)">'
@@ -22646,7 +22646,7 @@ var _lbToStrat = {
   // NEU (14.07.2026): VCP ist im Kern ein Momentum/Breakout-Setup — eigene
   // KI-Prompt-Strategie waere eigener Sprint (KoPrompts.STRATEGIES), erstmal
   // auf bestehende momentum-Strategie gemappt.
-  vcp_setups:      'momentum',
+  vcp_setups:      'vcp',
 };
 
 /**
@@ -22665,7 +22665,7 @@ function switchAlphaLB(btn, key) {
   // KI-Analyse nur auf expliziten Nutzer-Wunsch.
 
   // U5/U7 (16.07.2026): KI-Button visuell dimmen wenn keine Metriken definiert
-  var _noMetrics = ['short_breakdown','short_fading_ko','vcp_setups'];
+  var _noMetrics = ['short_breakdown','short_fading_ko'];
   var kiBtn = document.querySelector('#alpha-lb-section button[onclick="runAlphaLbKI()"]');
   var kiStatus = document.getElementById('alpha-lb-ki-status');
   if (kiBtn) {
@@ -22787,7 +22787,6 @@ async function runAlphaLbKI() {
   var _noMetricsLBs = {
     short_breakdown: 'Breakdown',
     short_fading_ko: 'KO-Short',
-    vcp_setups:      'VCP',
   };
   if (_noMetricsLBs[_alphaLB]) {
     if (statusEl) statusEl.innerHTML =
@@ -23829,7 +23828,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c72b7bf/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1d89a9f/ko-prompts.js">
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@a9aeec9/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1f40df0/ko-indicators-loader.js"></script>
