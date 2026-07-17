@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260716-v357">
+<meta name="version" content="20260717-v358">
 <!-- CHANGELOG (neueste zuerst):
+     v358: Nachbesserung Durchklick-Test (17.07.2026, 3 Punkte). (1) No-Metrics-Listen korrigiert: short_fading raus, short_fading_ko rein — CSP/Wheel und CSP Weekly waren faelschlicherweise gedimmt (short_fading traf die falsche ID), KO-Short war faelschlicherweise nicht gedimmt (short_fading_ko fehlte). Gilt fuer beide Listen: runAlphaLbKI() + switchAlphaLB(). (2) renderAlphaLB(): Leaderboards ohne Metriken (short_breakdown, short_fading_ko, vcp_setups) zeigen jetzt Hinweistext statt Ticker-Chips — "Bewertungsmetriken noch nicht definiert — Kandidatenliste nicht verfuegbar" (Option 2, Axel-Entscheidung: ehrlichste Loesung). (3) Tearsheet: Zeitstempel-Hinweis ueber KI-Analyse-Text eingefuegt — erklaert dass Ampel-Farben im Briefing-Text den Marktkontext zum Erstellungszeitpunkt reflektieren, nicht den aktuellen Live-Stand (Quelle der Verwirrung: MB zeigte z.B. KO-Short rot, UIQ-Live-Ampel zeigte anderes — kein Bug, zwei verschiedene Zeitpunkte).
      v357: Batch 4 (16.07.2026). (1) Scanner KI-Dropdown Nomenklatur: 'KO-Trading' → 'KO-Zertifikat', 'Options-Wheel' → 'CSP/Wheel' (laut Taxonomie-Dokument v1.0). (2) Leaderboard-KI-Button umbenannt: 'Markt-Einschätzung fuer diese Strategie' → 'KI-Strategieempfehlung fuer dieses Leaderboard' (konsistent mit Scanner-Button U2). (3) U5/U7: runAlphaLbKI() bricht fruehzeitig ab mit klarem Hinweis wenn Leaderboard keine Bewertungsmetriken hat (short_breakdown/short_fading/vcp_setups) — statt generischer KI-Analyse auf ungeeigneter Datengrundlage. (4) switchAlphaLB() dimmt KI-Button optisch auf 40% Opazitaet + zeigt Tooltip wenn keine Metriken vorhanden — visuelles Feedback schon vor dem Klick.
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
@@ -21465,6 +21466,9 @@ function showMorningTearsheet(results) {
         + '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px">KI-MARKTANALYSE</div>'
         + (results.kiBriefing ? '<button id="ts-simple-btn" onclick="generateSimpleTearsheet()" style="font-size:10px;padding:3px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer" title="Allgemeinverständliche Umformulierung"><i class=\"ti ti-text-size\"></i> Kurz und bündig</button>' : '')
       + '</div>'
+      + (results.time ? '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem;padding:4px 8px;background:var(--bg3);border-radius:6px;border-left:2px solid var(--amber)">'
+        + '⏱ Ampel-Stand: Briefing-Zeitpunkt ' + results.time + ' Uhr — Live-Ampel im Übersichts-Tab zeigt aktuellen Stand.'
+        + '</div>' : '')
       + '<div id="ts-ki-text" style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap;min-height:120px">'
         + (results.kiBriefing || '<span style="color:var(--text3)">KI-Token nicht gesetzt — Markt-Einschätzung nicht verfügbar.</span>')
       + '</div>'
@@ -22522,6 +22526,23 @@ function renderAlphaLB(lb, key) {
   var el = document.getElementById('alpha-lb-content');
   var cardsEl = document.getElementById('alpha-lb-cards');
   if (!el) return;
+
+  // Option 2 (17.07.2026): Leaderboards ohne definierte Bewertungsmetriken
+  // zeigen Hinweistext statt Ticker-Chips — ehrlicher als Daten ohne Qualitätsbasis.
+  var _lbNoMetrics = {
+    short_breakdown: 'Breakdown',
+    short_fading_ko: 'KO-Short',
+    vcp_setups:      'VCP',
+  };
+  if (_lbNoMetrics[key]) {
+    el.innerHTML = '<div style="padding:8px 0;font-size:11px;color:var(--amber)">'
+      + '⚠ <strong>' + _lbNoMetrics[key] + '</strong>: '
+      + 'Bewertungsmetriken noch nicht definiert — Kandidatenliste nicht verfügbar. '
+      + '<span style="color:var(--text3)">Geplant für einen späteren Sprint.</span></div>';
+    if (cardsEl) cardsEl.innerHTML = '';
+    return;
+  }
+
   var items = (lb || {})[key] || [];
   if (!items.length) { el.innerHTML = '<span style="color:var(--text3)">Keine Daten</span>'; if (cardsEl) cardsEl.innerHTML = ''; return; }
 
@@ -22593,7 +22614,7 @@ function switchAlphaLB(btn, key) {
   // KI-Analyse nur auf expliziten Nutzer-Wunsch.
 
   // U5/U7 (16.07.2026): KI-Button visuell dimmen wenn keine Metriken definiert
-  var _noMetrics = ['short_breakdown','short_fading','vcp_setups'];
+  var _noMetrics = ['short_breakdown','short_fading_ko','vcp_setups'];
   var kiBtn = document.querySelector('#alpha-lb-section button[onclick="runAlphaLbKI()"]');
   var kiStatus = document.getElementById('alpha-lb-ki-status');
   if (kiBtn) {
@@ -22714,7 +22735,7 @@ async function runAlphaLbKI() {
   // die auf ungeeigneter Datengrundlage basieren würde.
   var _noMetricsLBs = {
     short_breakdown: 'Breakdown',
-    short_fading:    'Fading',
+    short_fading_ko: 'KO-Short',
     vcp_setups:      'VCP',
   };
   if (_noMetricsLBs[_alphaLB]) {
