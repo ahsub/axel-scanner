@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v360">
+<meta name="version" content="20260717-v361">
 <!-- CHANGELOG (neueste zuerst):
+     v361: BUGFIX Ampel-Farbdiskrepanz 2. Runde (17.07.2026). Root Cause vollstaendig: updateMarketWeatherWidget() setzte _lastMseResult bei JEDEM Aufruf (Seitenaufruf, Panel-Wechsel, Polling) mit Regime-Basis-Gates — OHNE MCM-Kontext-Downgrades. Damit wurden die MCM-Gates die Morning Briefing korrekt via calcStrategyGates() gesetzt hatte sofort wieder ueberschrieben. Fix: _lastMseResult in updateMarketWeatherWidget() wird nur noch gesetzt wenn noch KEIN MCM-Ergebnis vorhanden ist (erkennbar an _context-Feld). MCM-Gates behalten dauerhaft Prioritaet. Zusaetzlich: no-op Reassignment-Zeile (result ? _lastMseResult : null) entfernt. Nach diesem Fix: Ampel-Farben in Uebersicht, Scanner, MSE-Detail und Leaderboard-KI-Hint sind identisch und basieren alle auf demselben MCM-Ergebnis.
      v360: BUGFIX Ampel-Farbdiskrepanz Home vs. Scanner (17.07.2026). Root Cause: renderHomeLanding() hatte einen eigenen Fallback-Pfad (KoMarketState.getStrategyGates(_lastRegime)) der Regime-Basis-Gates OHNE MCM-Kontext-Downgrades lieferte — Ergebnis: Home-Ampel nach Panel-Wechsel zeigte andere Farben als Scanner-Ampel (die korrekt via ko:regimeChanged + renderAllGateWidgets() aus _lastMseResult kommt). Fix: Fallback-Pfad entfernt, renderHomeLanding() nutzt jetzt ausschliesslich window._lastMseResult wie alle anderen Ampel-Renderer. Wenn _lastMseResult null: Ampel bleibt leer mit emptyText-Hinweis.
      v359: Tearsheet Zeitstempel-Hinweis praezisiert (17.07.2026, Axel-Feedback): statt kurzem "Ampel-Stand: X Uhr" jetzt erklaerende Formulierung: "Die Ampelfarben in diesem Text spiegeln den Marktkontext von HH:MM Uhr wider (Briefing-Erstellungszeit) — sie bleiben bis zum naechsten Briefing-Abruf eingefroren. Die Live-Ampel im Uebersichts-Tab zeigt den aktuellen Stand."
      v358: Nachbesserung Durchklick-Test (17.07.2026, 3 Punkte). (1) No-Metrics-Listen korrigiert: short_fading raus, short_fading_ko rein — CSP/Wheel und CSP Weekly waren faelschlicherweise gedimmt (short_fading traf die falsche ID), KO-Short war faelschlicherweise nicht gedimmt (short_fading_ko fehlte). Gilt fuer beide Listen: runAlphaLbKI() + switchAlphaLB(). (2) renderAlphaLB(): Leaderboards ohne Metriken (short_breakdown, short_fading_ko, vcp_setups) zeigen jetzt Hinweistext statt Ticker-Chips — "Bewertungsmetriken noch nicht definiert — Kandidatenliste nicht verfuegbar" (Option 2, Axel-Entscheidung: ehrlichste Loesung). (3) Tearsheet: Zeitstempel-Hinweis ueber KI-Analyse-Text eingefuegt — erklaert dass Ampel-Farben im Briefing-Text den Marktkontext zum Erstellungszeitpunkt reflektieren, nicht den aktuellen Live-Stand (Quelle der Verwirrung: MB zeigte z.B. KO-Short rot, UIQ-Live-Ampel zeigte anderes — kein Bug, zwei verschiedene Zeitpunkte).
@@ -19855,10 +19856,18 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
   // Strategy Gates anzeigen — vereinheitlicht (MCM v323): _lastMseResult setzen,
   // Event dispatchen, ALLE Widgets (mse-gates + home-strategy-gates) ziehen synchron mit.
   // Ersetzt den vorherigen mse-gates-only-Renderer (war Ursache des Widget-Lags).
-  window._lastMseResult = result ? {
-    regime: result.regime, color: result.color, label: result.label,
-    action: result.action, strategies: result.strategies,
-  } : window._lastMseResult; // kein Downgrade auf null bei fehlenden Rohdaten
+  // FIX (17.07.2026): _lastMseResult nur setzen wenn noch KEIN MCM-Ergebnis
+  // vorhanden ist (erkennbar an _context.downgrades-Feld das calcStrategyGates()
+  // setzt). Regime-Basis-Gates (updateMarketWeatherWidget) duerfen MCM-Context-
+  // Downgrades nicht ueberschreiben — das war die Ursache der Farbdiskrepanz
+  // zwischen Erstaufruf (Basis-Gates) und nach Morning Briefing (MCM-Gates).
+  var _hasMcmResult = window._lastMseResult && window._lastMseResult._context;
+  if (!_hasMcmResult && result) {
+    window._lastMseResult = {
+      regime: result.regime, color: result.color, label: result.label,
+      action: result.action, strategies: result.strategies,
+    };
+  }
   window.dispatchEvent(new Event('ko:regimeChanged'));
 
   // Action Text wird von renderAllGateWidgets() mitgesetzt (siehe oben) —
@@ -19876,7 +19885,7 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
   // Globale Variable für Scanner-Filter
   window._currentRegime  = result ? result.regime : null;
   window._lastQqqRegime  = result ? result.regime.toLowerCase() : null;
-  window._lastMseResult  = result ? window._lastMseResult : null; // für Strategie-Ampel Landing-Page
+  // _lastMseResult wird oben gesetzt (mit MCM-Schutz) — diese Zeile entfernt (17.07.2026, war no-op / destruktiv)
 }
 
 // MSE Detail Modal
