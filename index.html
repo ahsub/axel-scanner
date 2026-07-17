@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v359">
+<meta name="version" content="20260717-v360">
 <!-- CHANGELOG (neueste zuerst):
+     v360: BUGFIX Ampel-Farbdiskrepanz Home vs. Scanner (17.07.2026). Root Cause: renderHomeLanding() hatte einen eigenen Fallback-Pfad (KoMarketState.getStrategyGates(_lastRegime)) der Regime-Basis-Gates OHNE MCM-Kontext-Downgrades lieferte — Ergebnis: Home-Ampel nach Panel-Wechsel zeigte andere Farben als Scanner-Ampel (die korrekt via ko:regimeChanged + renderAllGateWidgets() aus _lastMseResult kommt). Fix: Fallback-Pfad entfernt, renderHomeLanding() nutzt jetzt ausschliesslich window._lastMseResult wie alle anderen Ampel-Renderer. Wenn _lastMseResult null: Ampel bleibt leer mit emptyText-Hinweis.
      v359: Tearsheet Zeitstempel-Hinweis praezisiert (17.07.2026, Axel-Feedback): statt kurzem "Ampel-Stand: X Uhr" jetzt erklaerende Formulierung: "Die Ampelfarben in diesem Text spiegeln den Marktkontext von HH:MM Uhr wider (Briefing-Erstellungszeit) — sie bleiben bis zum naechsten Briefing-Abruf eingefroren. Die Live-Ampel im Uebersichts-Tab zeigt den aktuellen Stand."
      v358: Nachbesserung Durchklick-Test (17.07.2026, 3 Punkte). (1) No-Metrics-Listen korrigiert: short_fading raus, short_fading_ko rein — CSP/Wheel und CSP Weekly waren faelschlicherweise gedimmt (short_fading traf die falsche ID), KO-Short war faelschlicherweise nicht gedimmt (short_fading_ko fehlte). Gilt fuer beide Listen: runAlphaLbKI() + switchAlphaLB(). (2) renderAlphaLB(): Leaderboards ohne Metriken (short_breakdown, short_fading_ko, vcp_setups) zeigen jetzt Hinweistext statt Ticker-Chips — "Bewertungsmetriken noch nicht definiert — Kandidatenliste nicht verfuegbar" (Option 2, Axel-Entscheidung: ehrlichste Loesung). (3) Tearsheet: Zeitstempel-Hinweis ueber KI-Analyse-Text eingefuegt — erklaert dass Ampel-Farben im Briefing-Text den Marktkontext zum Erstellungszeitpunkt reflektieren, nicht den aktuellen Live-Stand (Quelle der Verwirrung: MB zeigte z.B. KO-Short rot, UIQ-Live-Ampel zeigte anderes — kein Bug, zwei verschiedene Zeitpunkte).
      v357: Batch 4 (16.07.2026). (1) Scanner KI-Dropdown Nomenklatur: 'KO-Trading' → 'KO-Zertifikat', 'Options-Wheel' → 'CSP/Wheel' (laut Taxonomie-Dokument v1.0). (2) Leaderboard-KI-Button umbenannt: 'Markt-Einschätzung fuer diese Strategie' → 'KI-Strategieempfehlung fuer dieses Leaderboard' (konsistent mit Scanner-Button U2). (3) U5/U7: runAlphaLbKI() bricht fruehzeitig ab mit klarem Hinweis wenn Leaderboard keine Bewertungsmetriken hat (short_breakdown/short_fading/vcp_setups) — statt generischer KI-Analyse auf ungeeigneter Datengrundlage. (4) switchAlphaLB() dimmt KI-Button optisch auf 40% Opazitaet + zeigt Tooltip wenn keine Metriken vorhanden — visuelles Feedback schon vor dem Klick.
@@ -5791,12 +5792,15 @@ function renderHomeLanding() {
   // alle Gate-Widgets (siehe window.renderGateWidget / renderAllGateWidgets).
   // Ersetzt 2 duplizierte Label/Color-Maps (Haupt- + Fallback-Pfad).
   if (typeof window.renderGateWidget === 'function') {
-    var _mseResult = window._lastMseResult;
-    if (!_mseResult && typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) {
-      var _fbG = KoMarketState.getStrategyGates(KoMarketState._lastRegime);
-      _mseResult = _fbG ? { regime: KoMarketState._lastRegime, strategies: _fbG.strategies, action: _fbG.action, color: _fbG.color } : null;
-    }
-    window.renderGateWidget(document.getElementById('home-strategy-gates'), _mseResult,
+    // FIX (17.07.2026): renderHomeLanding() nutzt jetzt ausschliesslich
+    // window._lastMseResult als Single Source of Truth — identisch mit
+    // renderAllGateWidgets(). Der alte Fallback auf
+    // KoMarketState.getStrategyGates(_lastRegime) lieferte Regime-Basis-Gates
+    // OHNE MCM-Kontext-Downgrades, was zu Farbdiskrepanz zwischen
+    // Home-Ampel (Panel-Wechsel) und Scanner-Ampel (ko:regimeChanged) fuehrte.
+    // Kein Fallback mehr: wenn _lastMseResult null ist, bleibt die Ampel leer
+    // (emptyText sagt dem Nutzer was zu tun ist).
+    window.renderGateWidget(document.getElementById('home-strategy-gates'), window._lastMseResult,
       { fontSize: '11px', padding: '3px 9px', withValueClick: true, emptyText: 'Morning Briefing starten für Strategie-Ampel' });
   }
 
