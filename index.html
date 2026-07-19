@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260719-v374">
+<meta name="version" content="20260719-v375">
 <!-- CHANGELOG (neueste zuerst):
+     v375: Options-Deck Collar-Tab + scoreCollar-Chip (19.07.2026). Frontend-Ergaenzung zu Aggregator v5.12.0: (1) Options-Deck Board: neuer Filter-Tab "Collar/PP" (sortiert nach scoreCollar aus Aggregator-Output). (2) Ticker-Chip: scoreCollar wird neben scoreCsp/scoreCc/scoreSpread angezeigt wenn > 0. (3) setOptionsSort-keyMap um scoreCollar:collar erweitert (Tab-Highlighting funktioniert korrekt). Hinweis: scoreCollar wird erst nach naechstem Aggregator-Nachtlauf befuellt (Aggregator v5.12.0 deployed 19.07.2026).
      v374: Nomenklatur-Konsistenz und Strategie-Vervollständigung (19.07.2026, visuelle Verifikation). 4 Fixes: (1) _lbToStrat-Bug: short_fading war auf 'meanrev' gemappt statt 'fading_short' — Fading-Leaderboard öffnete Mean-Reversion-Analyse statt Fading-Short-Analyse. Fix: short_fading → 'fading_short'. (2) Fading-Tab-Label: 'Fading' → 'Fading Short' (konsistent mit Taxonomie-Dokument). (3) KI-Briefing-Modal Kandidaten-Auswahl: Dividend Growth + Value entfernt (waren seit v371 aus UIQ entfernt, Buttons blieben stehen); VCP-Setup + Collar/PP hinzugefügt — Modal zeigt jetzt nur noch aktive Strategien. (4) Options-Desk KI-Buttons: 'Options-Wheel' → 'CSP/Wheel', 'Options ATM/NA' → 'CSP ATM/NA', Collar/PP-Button neu hinzugefügt (ruft KoPrompts.get('collar') — bereits in ko-prompts.js vollständig implementiert); Modal-Label-Mapping um collar erweitert.
      v373: Gemini-Analyse BULL_FRAGILE umgesetzt (17.07.2026, Axel-Input). (1) BREADTH-FILTER VALIDIERT: ndx_breadth war bereits als CONTEXT_DOWNGRADE_RULE aktiv (caution ≤50%, risk ≤35% — praktisch identisch mit Gemini-Empfehlung "mind. 50-60% ueber 50-Tage-Schnitt"), kein neuer Bau noetig. VCP nachtraeglich in ALLE relevanten Downgrade-Regeln ergaenzt (treasury_stress/ndx_breadth/intermarket_score/vix/vvix/pcr/fear_greed/bull_indicator/calendar-windows) — war zuvor nicht abgesichert. Collar bewusst ausgenommen (Absicherung soll bei Stress NICHT gesperrt werden). (2) ATR-POSITIONSGRÖSSE MIT REGIME-KOPPLUNG: calcDdPosition() im DeepDive-Rechner reduziert jetzt automatisch das eingegebene Risiko-% bei BULL_FRAGILE (-35%) und STRESS_UNSTABLE (-50%) nach Gemini-Formel-Empfehlung ("systematisches De-Leveraging um 25-50% bei Regimewechsel") — Reduktion transparent sichtbar im Ergebnis-Text (Original-% und Effektiv-% beide angezeigt), kein stilles Overriding der Nutzereingabe. CDN-Hash ko-market-state: → 8838fb4.
      v372: Collar/Protective-Put Proxy-Strategie fuer BULL_FRAGILE (17.07.2026, Axel-Entscheidung nach Pareto-Abwaegung). Statt vollem Optionsketten-Feed + Positions-Import (Sprint-Aufwand) eine schlanke Proxy-Variante nach demselben Muster wie CSP/Wheel: ATR-basierte Strike-Naeherung (Put 1-1.5x ATR unter Kurs, Call 1-2x ATR ueber Kurs fuer vollen Collar), klare Einschraenkung dass echte Strikes/Praemien in IBKR/CapTrader verifiziert werden muessen. Regime-Gates: BULL_FRAGILE Prioritaet 1 (genau die identifizierte Luecke aus der Regime-Coverage-Analyse), BULL_QUIET/POST_PANIC nicht noetig, STRESS_UNSTABLE zu spaet fuer Neuabsicherung, NEUTRAL optional. Ergaenzt in ko-strategies.js, ko-prompts.js (Prompt), ko-market-state.js (STRATEGY_ORDER/LABELS + alle 5 Gates), Scanner-Dropdown. Vollstaendige Herleitung: UIQ-Suite/docs/REGIME-COVERAGE-ANALYSE.md.
@@ -2817,8 +2818,9 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:.5rem">
       <button onclick="setOptionsSort('optsScore')" id="osort-all" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-weight:700">Alle</button>
       <button onclick="setOptionsSort('scoreCsp')" id="osort-csp" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">CSP</button>
-      <button onclick="setOptionsSort('scoreCc')" id="osort-cc" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #06b6d4;background:rgba(6,182,212,0.08);color:#06b6d4;cursor:pointer">Covered Call</button>
+      <button onclick="setOptionsSort('scoreCc')" id="osort-cc" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #06b6d4;background:rgba(6,182,212,0.08);color:#06b6d4;cursor:pointer">Cov. Call</button>
       <button onclick="setOptionsSort('scoreSpread')" id="osort-spread" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.08);color:var(--green);cursor:pointer">Credit Spread</button>
+      <button onclick="setOptionsSort('scoreCollar')" id="osort-collar" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #64748b;background:rgba(100,116,139,0.08);color:#64748b;cursor:pointer">Collar/PP</button>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.6rem;align-items:center">
       <span style="font-size:10px;color:var(--text3)">HVP-Filter:</span>
@@ -21867,7 +21869,7 @@ var _optionsSortKey = 'optsScore';
 
 function setOptionsSort(key) {
   _optionsSortKey = key;
-  var keyMap = { optsScore:'all', scoreCsp:'csp', scoreCc:'cc', scoreSpread:'spread' };
+  var keyMap = { optsScore:'all', scoreCsp:'csp', scoreCc:'cc', scoreSpread:'spread', scoreCollar:'collar' };
   Object.keys(keyMap).forEach(function(k) {
     var btn = document.getElementById('osort-' + keyMap[k]);
     if (btn) { btn.style.fontWeight = (k===key) ? '700' : 'normal'; btn.style.opacity = (k===key) ? '1' : '0.6'; }
@@ -22140,6 +22142,7 @@ function renderOptionsDeskCards(data) {
       +   (t.scoreCsp    ? '<span style="color:var(--amber)">CSP <b>' + t.scoreCsp + '</b></span>' : '')
       +   (t.scoreCc     ? '<span style="color:#06b6d4">CC <b>' + t.scoreCc + '</b></span>' : '')
       +   (t.scoreSpread ? '<span style="color:var(--green)">Spread <b>' + t.scoreSpread + '</b></span>' : '')
+      +   (t.scoreCollar ? '<span style="color:#64748b">Collar <b>' + t.scoreCollar + '</b></span>' : '')
       + '</div>'
       + '<div style="font-size:10px;color:var(--text3)">ATM ~' + atmStrike + ' &middot; Stop ~' + stopHint + ' (2 ATR)</div>'
       + '</div>';
