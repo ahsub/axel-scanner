@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260717-v373">
+<meta name="version" content="20260719-v374">
 <!-- CHANGELOG (neueste zuerst):
+     v374: Nomenklatur-Konsistenz und Strategie-Vervollständigung (19.07.2026, visuelle Verifikation). 4 Fixes: (1) _lbToStrat-Bug: short_fading war auf 'meanrev' gemappt statt 'fading_short' — Fading-Leaderboard öffnete Mean-Reversion-Analyse statt Fading-Short-Analyse. Fix: short_fading → 'fading_short'. (2) Fading-Tab-Label: 'Fading' → 'Fading Short' (konsistent mit Taxonomie-Dokument). (3) KI-Briefing-Modal Kandidaten-Auswahl: Dividend Growth + Value entfernt (waren seit v371 aus UIQ entfernt, Buttons blieben stehen); VCP-Setup + Collar/PP hinzugefügt — Modal zeigt jetzt nur noch aktive Strategien. (4) Options-Desk KI-Buttons: 'Options-Wheel' → 'CSP/Wheel', 'Options ATM/NA' → 'CSP ATM/NA', Collar/PP-Button neu hinzugefügt (ruft KoPrompts.get('collar') — bereits in ko-prompts.js vollständig implementiert); Modal-Label-Mapping um collar erweitert.
      v373: Gemini-Analyse BULL_FRAGILE umgesetzt (17.07.2026, Axel-Input). (1) BREADTH-FILTER VALIDIERT: ndx_breadth war bereits als CONTEXT_DOWNGRADE_RULE aktiv (caution ≤50%, risk ≤35% — praktisch identisch mit Gemini-Empfehlung "mind. 50-60% ueber 50-Tage-Schnitt"), kein neuer Bau noetig. VCP nachtraeglich in ALLE relevanten Downgrade-Regeln ergaenzt (treasury_stress/ndx_breadth/intermarket_score/vix/vvix/pcr/fear_greed/bull_indicator/calendar-windows) — war zuvor nicht abgesichert. Collar bewusst ausgenommen (Absicherung soll bei Stress NICHT gesperrt werden). (2) ATR-POSITIONSGRÖSSE MIT REGIME-KOPPLUNG: calcDdPosition() im DeepDive-Rechner reduziert jetzt automatisch das eingegebene Risiko-% bei BULL_FRAGILE (-35%) und STRESS_UNSTABLE (-50%) nach Gemini-Formel-Empfehlung ("systematisches De-Leveraging um 25-50% bei Regimewechsel") — Reduktion transparent sichtbar im Ergebnis-Text (Original-% und Effektiv-% beide angezeigt), kein stilles Overriding der Nutzereingabe. CDN-Hash ko-market-state: → 8838fb4.
      v372: Collar/Protective-Put Proxy-Strategie fuer BULL_FRAGILE (17.07.2026, Axel-Entscheidung nach Pareto-Abwaegung). Statt vollem Optionsketten-Feed + Positions-Import (Sprint-Aufwand) eine schlanke Proxy-Variante nach demselben Muster wie CSP/Wheel: ATR-basierte Strike-Naeherung (Put 1-1.5x ATR unter Kurs, Call 1-2x ATR ueber Kurs fuer vollen Collar), klare Einschraenkung dass echte Strikes/Praemien in IBKR/CapTrader verifiziert werden muessen. Regime-Gates: BULL_FRAGILE Prioritaet 1 (genau die identifizierte Luecke aus der Regime-Coverage-Analyse), BULL_QUIET/POST_PANIC nicht noetig, STRESS_UNSTABLE zu spaet fuer Neuabsicherung, NEUTRAL optional. Ergaenzt in ko-strategies.js, ko-prompts.js (Prompt), ko-market-state.js (STRATEGY_ORDER/LABELS + alle 5 Gates), Scanner-Dropdown. Vollstaendige Herleitung: UIQ-Suite/docs/REGIME-COVERAGE-ANALYSE.md.
      v371: Strategie-Fundus-Bereinigung nach Regime-Coverage-Analyse (17.07.2026, Axel-Entscheidungen). (1) VALUE + DIVIDEND GROWTH ENTFERNT: beide hatten in KEINEM der 5 MSE-Regime Prioritaet-1-Status (objektiver Beleg: Buy-and-Hold-Konzepte, keine Timing-Strategien). Entfernt aus: ko-strategies.js (Strategie-Bloecke), ko-prompts.js (Prompt-Bloecke inkl. Carlin/Graham-Value-Analyse mit FIN-Archiv-Datenbindung), ko-market-state.js (STRATEGY_ORDER, STRATEGY_LABELS, alle 5 Regime-Gates), index.html (Scanner-Dropdown, DeepDive-Quick-Buttons, Alpha-Desk Value-Tab-Button — Panel-DOM + renderValueDeskCards() bleiben dormant fuer spaetere DepotIQ-Wiederverwendung). (2) VCP IN REGIME-GATES ERGAENZT: war zuvor nur im Frontend (Prompt/Leaderboard) aktiv, fehlte komplett in getStrategyGates() — Ampel zeigte fuer VCP nichts an. Jetzt in allen 5 Regimen bewertet: BULL_QUIET Prioritaet 1 (ideales Contraction-Umfeld), BULL_FRAGILE/STRESS_UNSTABLE/POST_PANIC gesperrt (keine Struktur moeglich), NEUTRAL abwartend. (3) FADING SHORT ALS EXPERIMENTELL MARKIERT: Label in STRATEGY_LABELS + Leaderboard-Tab + DeepDive-Button zeigen jetzt \ud83e\uddea-Kennzeichnung und Tooltip \"Edge-These noch nicht verifiziert\" — Metriken-Vervollstaendigung zurueckgestellt bis Axel Backtest/Evidenzgrundlage liefert. CDN-Hashes ko-strategies/ko-prompts/ko-market-state: → bf7c816. Vollstaendige Begruendung: UIQ-Suite/docs/REGIME-COVERAGE-ANALYSE.md.
@@ -2723,7 +2724,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <button class="alpha-lb-tab" data-lb="long_swing" onclick="switchAlphaLB(this,'long_swing')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #06b6d4;background:rgba(6,182,212,0.08);color:#06b6d4;cursor:pointer">🔄 Swing</button>
       <button class="alpha-lb-tab" data-lb="long_mr" onclick="switchAlphaLB(this,'long_mr')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">↩️ Mean Rev.</button>
       <button class="alpha-lb-tab" data-lb="short_breakdown" onclick="switchAlphaLB(this,'short_breakdown')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--red);background:rgba(239,68,68,0.08);color:var(--red);cursor:pointer">📉 Breakdown</button>
-      <button class="alpha-lb-tab" data-lb="short_fading" onclick="switchAlphaLB(this,'short_fading')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.08);color:#f97316;cursor:pointer">🔝 Fading</button>
+      <button class="alpha-lb-tab" data-lb="short_fading" onclick="switchAlphaLB(this,'short_fading')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.08);color:#f97316;cursor:pointer">🔝 Fading Short</button>
       <!-- NEU (01.07.2026): Fading Short via KO — separater Tab für Short-Strategie-Workflow -->
       <button class="alpha-lb-tab" data-lb="short_fading_ko" onclick="switchAlphaLB(this,'short_fading_ko')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.15);color:#f97316;cursor:pointer;font-weight:700" title="Experimentell — Edge-These noch nicht verifiziert">⚠️ KO-Short 🧪</button>
       <!-- NEU (13.07.2026): KO-Long, CSP, CC Leaderboards -->
@@ -2806,9 +2807,10 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         style="font-size:11px;padding:4px 12px;border-radius:8px;border:1px solid #818cf8;background:linear-gradient(135deg,rgba(129,140,248,0.15),rgba(168,85,247,0.15));color:#818cf8;cursor:pointer;font-weight:600;width:100%;margin-bottom:4px">
         🎯 Beste Underlying × Strategie-Kombination finden
       </button>
-      <button onclick="runOptionsKiBriefing('options')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer">Options-Wheel</button>
-      <button onclick="runOptionsKiBriefing('atmna')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #a371f7;background:rgba(163,113,247,0.1);color:#a371f7;cursor:pointer">Options ATM/NA</button>
-      <button onclick="runOptionsKiBriefing('weekly_income')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #34d399;background:rgba(52,211,153,0.1);color:#34d399;cursor:pointer">Options Weekly</button>
+      <button onclick="runOptionsKiBriefing('options')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer">🎯 CSP/Wheel</button>
+      <button onclick="runOptionsKiBriefing('atmna')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #a371f7;background:rgba(163,113,247,0.1);color:#a371f7;cursor:pointer">⚙️ CSP ATM/NA</button>
+      <button onclick="runOptionsKiBriefing('weekly_income')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #34d399;background:rgba(52,211,153,0.1);color:#34d399;cursor:pointer">📅 Options Weekly</button>
+      <button onclick="runOptionsKiBriefing('collar')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #64748b;background:rgba(100,116,139,0.1);color:#64748b;cursor:pointer">🛡️ Collar/PP</button>
       <span id="options-ki-status" style="font-size:10px;color:var(--text3);align-self:center"></span>
     </div>
     <!-- Strategie-Tabs -->
@@ -17664,16 +17666,17 @@ function csvSaveConfirm(tickers) {
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
           🔄 Swing-Trading
         </button>
-        <button class="ki-strat-btn" data-strat="dividend"
+        <button class="ki-strat-btn" data-strat="vcp"
           onclick="setKiStrat(this)"
-          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
-          💰 Dividend Growth
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #a855f7;background:transparent;color:#a855f7;cursor:pointer"
+          title="VCP-Setup: Volatility Contraction Pattern · Stage 2 · Ausbruch über Pivot">
+          📐 VCP-Setup
         </button>
-        <button class="ki-strat-btn" data-strat="value"
+        <button class="ki-strat-btn" data-strat="collar"
           onclick="setKiStrat(this)"
-          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;opacity:0.6"
-          title="Fundamentaldaten noch nicht verfügbar">
-          🔍 Value ⚠️
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #64748b;background:transparent;color:#64748b;cursor:pointer"
+          title="Collar/Protective Put: Absicherung Long-Position · BULL_FRAGILE · ATR-basierte Strike-Näherung">
+          🛡️ Collar/PP
         </button>
         <button class="ki-strat-btn" data-strat="meanrev"
           onclick="setKiStrat(this)"
@@ -22449,7 +22452,7 @@ async function runOptionsKiBriefing(strat) {
   // Open modal
   var existing = document.getElementById('ki-modal');
   if (existing) existing.remove();
-  var label = strat==='atmna' ? 'Options ATM/NA' : strat==='weekly_income' ? 'Options Weekly' : 'Options-Wheel';
+  var label = strat==='atmna' ? 'CSP ATM/NA' : strat==='weekly_income' ? 'Options Weekly' : strat==='collar' ? 'Collar/Protective Put' : 'CSP/Wheel';
   var modal = document.createElement('div');
   modal.id = 'ki-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
@@ -22661,7 +22664,7 @@ var _lbToStrat = {
   long_swing:      'swing',
   long_mr:         'meanrev',
   short_breakdown: 'breakdown',
-  short_fading:    'meanrev',
+  short_fading:    'fading_short',
   // NEU (01.07.2026): KO-Short Tab → fading_short Regelwerk
   short_fading_ko: 'fading_short',
   ko_long:         'ko',
