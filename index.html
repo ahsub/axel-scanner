@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260720-v376">
+<meta name="version" content="20260720-v377">
 <!-- CHANGELOG (neueste zuerst):
+     v377: BUGFIX KI-Prompts erhalten MCM-Context-Downgrades (20.07.2026). Neuer Helper _getMcmContextForPrompt() als Single Source of Truth fuer alle KI-Calls: gibt Regime + aktive MCM-Downgrades (z.B. momentum:red [Breadth-Weak]) + alle Gate-Farben als kompakten String. Ersetzt in 4 KI-Prompt-Kontexten veraltete Felder: (1) Options beste Kombi: war window._lastQqqRegime (Aggregator-Markov, Kleinschreibung, kein MCM). (2) Options CSP/CC/Collar: selbes Problem. (3) Best-Opportunity-KI: war mseRegime ohne Gate-Farben. (4) Leaderboard-KI: war mseRegime ohne Gate-Farben. Resultat: KI weiss jetzt explizit welche Strategien durch MCM gesperrt sind und kann Kandidaten korrekt bewerten ohne auf Training-Wissen zurueckzugreifen.
      v376: BUGFIX Ampel-Diskrepanz Morning Briefing Tearsheet (20.07.2026). Root Cause: showMorningTearsheet() rief KoMarketState.getStrategyGates(regime) direkt auf — liefert Regime-Basis-Gates OHNE MCM-Context-Downgrades (Breadth, VIX-Level, Calendar-Events). Betraf BEIDE Pfade: (1) frisches Briefing (Zeile showMorningTearsheet, var gates), (2) Cache-Pfad (Briefing aus localStorage, Zeile mit cached.regime). Fix: beide Stellen bevorzugen jetzt window._lastMseResult wenn vorhanden (enthaelt MCM-Context-Downgrades von calcStrategyGates()), getStrategyGates() bleibt als Fallback wenn _lastMseResult noch nicht gesetzt. Damit zeigt das MB-Tearsheet dieselben Ampelfarben wie Scanner und Home-Ampel. Konsol-Beweis: [Morning] Context-Downgrades aktiv muss sichtbar sein bevor Tearsheet oeffnet.
      v375: Options-Deck Collar-Tab + scoreCollar-Chip (19.07.2026). Frontend-Ergaenzung zu Aggregator v5.12.0: (1) Options-Deck Board: neuer Filter-Tab "Collar/PP" (sortiert nach scoreCollar aus Aggregator-Output). (2) Ticker-Chip: scoreCollar wird neben scoreCsp/scoreCc/scoreSpread angezeigt wenn > 0. (3) setOptionsSort-keyMap um scoreCollar:collar erweitert (Tab-Highlighting funktioniert korrekt). Hinweis: scoreCollar wird erst nach naechstem Aggregator-Nachtlauf befuellt (Aggregator v5.12.0 deployed 19.07.2026).
      v374: Nomenklatur-Konsistenz und Strategie-Vervollständigung (19.07.2026, visuelle Verifikation). 4 Fixes: (1) _lbToStrat-Bug: short_fading war auf 'meanrev' gemappt statt 'fading_short' — Fading-Leaderboard öffnete Mean-Reversion-Analyse statt Fading-Short-Analyse. Fix: short_fading → 'fading_short'. (2) Fading-Tab-Label: 'Fading' → 'Fading Short' (konsistent mit Taxonomie-Dokument). (3) KI-Briefing-Modal Kandidaten-Auswahl: Dividend Growth + Value entfernt (waren seit v371 aus UIQ entfernt, Buttons blieben stehen); VCP-Setup + Collar/PP hinzugefügt — Modal zeigt jetzt nur noch aktive Strategien. (4) Options-Desk KI-Buttons: 'Options-Wheel' → 'CSP/Wheel', 'Options ATM/NA' → 'CSP ATM/NA', Collar/PP-Button neu hinzugefügt (ruft KoPrompts.get('collar') — bereits in ko-prompts.js vollständig implementiert); Modal-Label-Mapping um collar erweitert.
@@ -15395,6 +15396,32 @@ function _getVixRobust() {
   return rawVix || null;
 }
 
+// ── MCM-GATE-HELPER FÜR KI-PROMPTS (v377) ───────────────────────────────────
+// Single Source of Truth für alle KI-Prompts:
+// Gibt MCM-Context-Downgrades als kompakten String zurück (inkl. Downgrade-Gründe).
+// Fallback auf Regime-Label wenn _lastMseResult noch nicht gesetzt.
+// Verhindert dass KI mit "BULL_QUIET" bewertet obwohl MCM momentum/vcp/swing rot gesetzt hat.
+function _getMcmContextForPrompt() {
+  var regime = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime)
+    ? KoMarketState._lastRegime : 'NEUTRAL';
+  if (!window._lastMseResult || !window._lastMseResult.strategies) {
+    return 'Regime (MSE): ' + regime + '\nStrategie-Gates: n/v (MCM noch nicht geladen)';
+  }
+  var strategies = window._lastMseResult.strategies;
+  var gateLines = Object.keys(strategies).map(function(k) {
+    var s = strategies[k];
+    var color = s.color || (s.active ? 'green' : 'red');
+    var note = s.note ? ' (' + s.note + ')' : '';
+    return k + ':' + color + note;
+  }).join(', ');
+  var downgrades = (window._lastMseResult._context && window._lastMseResult._context.downgrades)
+    ? window._lastMseResult._context.downgrades.map(function(d){ return d.strategy + ' ' + d.from + '→' + d.to + ' [' + (d.reason||'MCM') + ']'; }).join(', ')
+    : 'keine';
+  return 'Regime (MSE): ' + regime
+    + '\nMCM-Downgrades aktiv: ' + downgrades
+    + '\nStrategie-Gates: ' + gateLines;
+}
+
 
 function renderVixAmpel(vix) {
   const el = document.getElementById('vix-ampel');
@@ -22395,7 +22422,7 @@ async function runBestOptionsOpportunityKI() {
 
   if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere ' + best.sym + '…';
 
-  var mkCtx = 'MARKTKONTEXT:\nVIX: ' + (_getVixRobust() || '-') + '\nRegime: ' + (window._lastQqqRegime || 'neutral')
+  var mkCtx = 'MARKTKONTEXT:\\nVIX: ' + (_getVixRobust() || '-') + '\\n' + _getMcmContextForPrompt()
     + '\n\nBESTER UNDERLYING ÜBER ALLE OPTIONS-STRATEGIEN (Gesamt-Score-Sieger):\n'
     + best.sym + ' Kurs:$' + (best.price||'--')
     + ' IVR:' + (best.ivRank != null ? best.ivRank + '%' : (best.hvp ? 'HVP' + best.hvp + '%' : '--'))
@@ -22442,7 +22469,7 @@ async function runOptionsKiBriefing(strat) {
   var stratCfg = KI_STRAT_CONFIG[strat];
   if (!stratCfg) { if (statusEl) statusEl.textContent = 'Fehler: Strategie unbekannt'; return; }
   var mkCtx = 'MARKTKONTEXT:' + '\n' + 'VIX: ' + (_getVixRobust() || '-') + '\n'
-    + 'Regime: ' + (window._lastQqqRegime || 'neutral') + '\n\n'
+    + _getMcmContextForPrompt() + '\\n\\n'
     + 'OPTIONS-WATCHLIST (Top-' + tickers.length + ', HVP>=' + _optionsDeskFilter + '%):' + '\n'
     + tickers.map(function(t,i){
         return (i+1) + '. ' + t.sym
@@ -22769,7 +22796,7 @@ async function runBestOpportunityKI() {
       + (t.atr ? ' ATR:' + t.atr : '');
   }).join('\n');
 
-  var ctx = 'MARKTKONTEXT:\nVIX: ' + vix + '\nRegime (MSE): ' + mseRegime
+  var ctx = 'MARKTKONTEXT:\\nVIX: ' + vix + '\\n' + _getMcmContextForPrompt()
     + '\n\nTOP-5 KANDIDATEN ÜBER ALLE STRATEGIEN:\n' + candidateLines;
   var isExpert = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
   var prompt = getKiSystemPrompt('Beste Chancen über alle Strategien — Top-5') + '\n\nMESSWERTE:\n' + ctx
