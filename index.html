@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260720-v379">
+<meta name="version" content="20260720-v380">
 <!-- CHANGELOG (neueste zuerst):
+     v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
      v379: BUGFIX STRATEGIE_MATRIX Prioritätsregel (20.07.2026). KI ignorierte MCM-Context-Downgrades weil STRATEGIE_MATRIX-Regeln (z.B. Momentum grün wenn BULL_QUIET + IOS>65) expliziter waren als der Downgrade-Hinweis. Fix: Neue PRIORITÄTSREGEL vor der Drei-Stufen-Logik — MCM-Downgrades haben absolute Priorität, KI muss sie zwingend übernehmen und mit Downgrade-Grund begründen (z.B. NDX-Breadth 40%).
      v378: BUGFIX Tearsheet-Timing (20.07.2026). openCachedBriefing() oeffnete Tearsheet sofort aus localStorage-Cache — zu diesem Zeitpunkt hatte _lastMseResult noch keine MCM-Downgrades (MCM-Startup-Gate noch nicht gelaufen). Fix: Tearsheet wartet auf ko:regimeChanged-Event (MCM-Startup-Gate feuert es nach calcStrategyGates()) bevor es oeffnet. Fallback nach 3s (fail-open) falls MCM nicht kommt. Damit sind Ampel-Farben im Tearsheet immer MCM-korrekt.
      v377: BUGFIX KI-Prompts erhalten MCM-Context-Downgrades (20.07.2026). Neuer Helper _getMcmContextForPrompt() als Single Source of Truth fuer alle KI-Calls: gibt Regime + aktive MCM-Downgrades (z.B. momentum:red [Breadth-Weak]) + alle Gate-Farben als kompakten String. Ersetzt in 4 KI-Prompt-Kontexten veraltete Felder: (1) Options beste Kombi: war window._lastQqqRegime (Aggregator-Markov, Kleinschreibung, kein MCM). (2) Options CSP/CC/Collar: selbes Problem. (3) Best-Opportunity-KI: war mseRegime ohne Gate-Farben. (4) Leaderboard-KI: war mseRegime ohne Gate-Farben. Resultat: KI weiss jetzt explizit welche Strategien durch MCM gesperrt sind und kann Kandidaten korrekt bewerten ohne auf Training-Wissen zurueckzugreifen.
@@ -11775,8 +11776,11 @@ renderCard = function(t, state){
   if (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime && state && !state.error) {
     var cardEl = document.getElementById('card-' + t.sym);
     if (cardEl && !cardEl.querySelector('.regime-badge')) {
-      var regime = KoMarketState._lastRegime;
-      var gates  = KoMarketState.getStrategyGates(regime);
+      // v380-Fix: _lastMseResult bevorzugen (MCM-Context-Downgrades)
+      var _mcmGates = window._lastMseResult && window._lastMseResult.strategies;
+      var gates  = _mcmGates
+        ? { strategies: window._lastMseResult.strategies, label: window._lastMseResult.label }
+        : KoMarketState.getStrategyGates(KoMarketState._lastRegime);
       var score  = state.compositeScore || state.score || 0;
 
       // Strategie ableiten aus Score/Signalen
@@ -21604,7 +21608,7 @@ function showMorningTearsheet(results) {
         + (results.kiBriefing ? '<button id="ts-simple-btn" onclick="generateSimpleTearsheet()" style="font-size:10px;padding:3px 10px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer" title="Allgemeinverständliche Umformulierung"><i class=\"ti ti-text-size\"></i> Kurz und bündig</button>' : '')
       + '</div>'
       + (results.time ? '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem;padding:4px 8px;background:var(--bg3);border-radius:6px;border-left:2px solid var(--amber)">'
-        + '⏱ Die Ampelfarben in diesem Text spiegeln den Marktkontext von ' + results.time + ' Uhr wider (Briefing-Erstellungszeit) — sie bleiben bis zum nächsten Briefing-Abruf eingefroren. Die Live-Ampel im Übersichts-Tab zeigt den aktuellen Stand.'
+        + '⏱ Die Ampelfarben in diesem Text spiegeln den Marktkontext von ' + results.time + ' Uhr wider (Briefing-Erstellungszeit) — sie bleiben bis zum nächsten Briefing-Abruf eingefroren. Die Live-Ampel im Übersichts-Tab zeigt den aktuellen Stand. Abweichungen zwischen KI-Text und Live-Ampel sind möglich wenn MCM-Context-Downgrades nach Briefing-Erstellung aktiv wurden.'
         + '</div>' : '')
       + '<div id="ts-ki-text" style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap;min-height:120px">'
         + (results.kiBriefing || '<span style="color:var(--text3)">KI-Token nicht gesetzt — Markt-Einschätzung nicht verfügbar.</span>')
