@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260720-v377">
+<meta name="version" content="20260720-v378">
 <!-- CHANGELOG (neueste zuerst):
+     v378: BUGFIX Tearsheet-Timing (20.07.2026). openCachedBriefing() oeffnete Tearsheet sofort aus localStorage-Cache — zu diesem Zeitpunkt hatte _lastMseResult noch keine MCM-Downgrades (MCM-Startup-Gate noch nicht gelaufen). Fix: Tearsheet wartet auf ko:regimeChanged-Event (MCM-Startup-Gate feuert es nach calcStrategyGates()) bevor es oeffnet. Fallback nach 3s (fail-open) falls MCM nicht kommt. Damit sind Ampel-Farben im Tearsheet immer MCM-korrekt.
      v377: BUGFIX KI-Prompts erhalten MCM-Context-Downgrades (20.07.2026). Neuer Helper _getMcmContextForPrompt() als Single Source of Truth fuer alle KI-Calls: gibt Regime + aktive MCM-Downgrades (z.B. momentum:red [Breadth-Weak]) + alle Gate-Farben als kompakten String. Ersetzt in 4 KI-Prompt-Kontexten veraltete Felder: (1) Options beste Kombi: war window._lastQqqRegime (Aggregator-Markov, Kleinschreibung, kein MCM). (2) Options CSP/CC/Collar: selbes Problem. (3) Best-Opportunity-KI: war mseRegime ohne Gate-Farben. (4) Leaderboard-KI: war mseRegime ohne Gate-Farben. Resultat: KI weiss jetzt explizit welche Strategien durch MCM gesperrt sind und kann Kandidaten korrekt bewerten ohne auf Training-Wissen zurueckzugreifen.
      v376: BUGFIX Ampel-Diskrepanz Morning Briefing Tearsheet (20.07.2026). Root Cause: showMorningTearsheet() rief KoMarketState.getStrategyGates(regime) direkt auf — liefert Regime-Basis-Gates OHNE MCM-Context-Downgrades (Breadth, VIX-Level, Calendar-Events). Betraf BEIDE Pfade: (1) frisches Briefing (Zeile showMorningTearsheet, var gates), (2) Cache-Pfad (Briefing aus localStorage, Zeile mit cached.regime). Fix: beide Stellen bevorzugen jetzt window._lastMseResult wenn vorhanden (enthaelt MCM-Context-Downgrades von calcStrategyGates()), getStrategyGates() bleibt als Fallback wenn _lastMseResult noch nicht gesetzt. Damit zeigt das MB-Tearsheet dieselben Ampelfarben wie Scanner und Home-Ampel. Konsol-Beweis: [Morning] Context-Downgrades aktiv muss sichtbar sein bevor Tearsheet oeffnet.
      v375: Options-Deck Collar-Tab + scoreCollar-Chip (19.07.2026). Frontend-Ergaenzung zu Aggregator v5.12.0: (1) Options-Deck Board: neuer Filter-Tab "Collar/PP" (sortiert nach scoreCollar aus Aggregator-Output). (2) Ticker-Chip: scoreCollar wird neben scoreCsp/scoreCc/scoreSpread angezeigt wenn > 0. (3) setOptionsSort-keyMap um scoreCollar:collar erweitert (Tab-Highlighting funktioniert korrekt). Hinweis: scoreCollar wird erst nach naechstem Aggregator-Nachtlauf befuellt (Aggregator v5.12.0 deployed 19.07.2026).
@@ -5761,7 +5762,28 @@ function openCachedBriefing() {
   try {
     var cached = JSON.parse(localStorage.getItem(cacheKey));
     if (cached && cached.kiBriefing) {
-      if (typeof showMorningTearsheet === 'function') showMorningTearsheet(cached);
+      // v378-FIX: _lastMseResult muss MCM-Downgrades enthalten bevor Tearsheet öffnet.
+      // Falls MCM noch nicht gelaufen (_context fehlt), kurz warten und dann öffnen.
+      // Max. 3s Wartezeit, danach Öffnung mit verfügbarem Stand (fail-open).
+      var _openTs = function() {
+        if (typeof showMorningTearsheet === 'function') showMorningTearsheet(cached);
+      };
+      var _hasMcm = window._lastMseResult && window._lastMseResult._context;
+      if (_hasMcm) {
+        _openTs();
+      } else {
+        // Warte auf ko:regimeChanged (MCM-Startup-Gate feuert dieses Event)
+        var _waited = false;
+        var _handler = function() {
+          if (_waited) return;
+          _waited = true;
+          window.removeEventListener('ko:regimeChanged', _handler);
+          _openTs();
+        };
+        window.addEventListener('ko:regimeChanged', _handler);
+        // Fallback: nach 3s öffnen auch wenn MCM nicht kam
+        setTimeout(function() { if (!_waited) { _waited = true; window.removeEventListener('ko:regimeChanged', _handler); _openTs(); } }, 3000);
+      }
       return;
     }
   } catch(e) {}
