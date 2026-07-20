@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260719-v375">
+<meta name="version" content="20260720-v376">
 <!-- CHANGELOG (neueste zuerst):
+     v376: BUGFIX Ampel-Diskrepanz Morning Briefing Tearsheet (20.07.2026). Root Cause: showMorningTearsheet() rief KoMarketState.getStrategyGates(regime) direkt auf — liefert Regime-Basis-Gates OHNE MCM-Context-Downgrades (Breadth, VIX-Level, Calendar-Events). Betraf BEIDE Pfade: (1) frisches Briefing (Zeile showMorningTearsheet, var gates), (2) Cache-Pfad (Briefing aus localStorage, Zeile mit cached.regime). Fix: beide Stellen bevorzugen jetzt window._lastMseResult wenn vorhanden (enthaelt MCM-Context-Downgrades von calcStrategyGates()), getStrategyGates() bleibt als Fallback wenn _lastMseResult noch nicht gesetzt. Damit zeigt das MB-Tearsheet dieselben Ampelfarben wie Scanner und Home-Ampel. Konsol-Beweis: [Morning] Context-Downgrades aktiv muss sichtbar sein bevor Tearsheet oeffnet.
      v375: Options-Deck Collar-Tab + scoreCollar-Chip (19.07.2026). Frontend-Ergaenzung zu Aggregator v5.12.0: (1) Options-Deck Board: neuer Filter-Tab "Collar/PP" (sortiert nach scoreCollar aus Aggregator-Output). (2) Ticker-Chip: scoreCollar wird neben scoreCsp/scoreCc/scoreSpread angezeigt wenn > 0. (3) setOptionsSort-keyMap um scoreCollar:collar erweitert (Tab-Highlighting funktioniert korrekt). Hinweis: scoreCollar wird erst nach naechstem Aggregator-Nachtlauf befuellt (Aggregator v5.12.0 deployed 19.07.2026).
      v374: Nomenklatur-Konsistenz und Strategie-Vervollständigung (19.07.2026, visuelle Verifikation). 4 Fixes: (1) _lbToStrat-Bug: short_fading war auf 'meanrev' gemappt statt 'fading_short' — Fading-Leaderboard öffnete Mean-Reversion-Analyse statt Fading-Short-Analyse. Fix: short_fading → 'fading_short'. (2) Fading-Tab-Label: 'Fading' → 'Fading Short' (konsistent mit Taxonomie-Dokument). (3) KI-Briefing-Modal Kandidaten-Auswahl: Dividend Growth + Value entfernt (waren seit v371 aus UIQ entfernt, Buttons blieben stehen); VCP-Setup + Collar/PP hinzugefügt — Modal zeigt jetzt nur noch aktive Strategien. (4) Options-Desk KI-Buttons: 'Options-Wheel' → 'CSP/Wheel', 'Options ATM/NA' → 'CSP ATM/NA', Collar/PP-Button neu hinzugefügt (ruft KoPrompts.get('collar') — bereits in ko-prompts.js vollständig implementiert); Modal-Label-Mapping um collar erweitert.
      v373: Gemini-Analyse BULL_FRAGILE umgesetzt (17.07.2026, Axel-Input). (1) BREADTH-FILTER VALIDIERT: ndx_breadth war bereits als CONTEXT_DOWNGRADE_RULE aktiv (caution ≤50%, risk ≤35% — praktisch identisch mit Gemini-Empfehlung "mind. 50-60% ueber 50-Tage-Schnitt"), kein neuer Bau noetig. VCP nachtraeglich in ALLE relevanten Downgrade-Regeln ergaenzt (treasury_stress/ndx_breadth/intermarket_score/vix/vvix/pcr/fear_greed/bull_indicator/calendar-windows) — war zuvor nicht abgesichert. Collar bewusst ausgenommen (Absicherung soll bei Stress NICHT gesperrt werden). (2) ATR-POSITIONSGRÖSSE MIT REGIME-KOPPLUNG: calcDdPosition() im DeepDive-Rechner reduziert jetzt automatisch das eingegebene Risiko-% bei BULL_FRAGILE (-35%) und STRESS_UNSTABLE (-50%) nach Gemini-Formel-Empfehlung ("systematisches De-Leveraging um 25-50% bei Regimewechsel") — Reduktion transparent sichtbar im Ergebnis-Text (Original-% und Effektiv-% beide angezeigt), kein stilles Overriding der Nutzereingabe. CDN-Hash ko-market-state: → 8838fb4.
@@ -21374,7 +21375,11 @@ function showMorningTearsheet(results) {
 
   // Regime-Daten
   var regime  = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '—';
-  var gates   = (regime !== '—' && typeof KoMarketState !== 'undefined') ? KoMarketState.getStrategyGates(regime) : null;
+  // BUGFIX v376 (20.07.2026): _lastMseResult bevorzugen — enthält MCM-Context-Downgrades.
+  // getStrategyGates() liefert nur Basis-Gates ohne Breadth/VIX/Calendar-Korrekturen.
+  var gates = window._lastMseResult && window._lastMseResult.strategies
+    ? { strategies: window._lastMseResult.strategies, action: window._lastMseResult.action, color: window._lastMseResult.color, label: window._lastMseResult.label }
+    : (regime !== '—' && typeof KoMarketState !== 'undefined') ? KoMarketState.getStrategyGates(regime) : null;
   var metrics = (typeof KoMarketState !== 'undefined') ? KoMarketState._lastMetrics : null;
 
   // Dark Pool Daten
@@ -21651,7 +21656,10 @@ function updateScannerHint() {
     var today = new Date().toISOString().slice(0,10);
     var cached = JSON.parse(localStorage.getItem('morning_briefing_' + today) || 'null');
     if (cached && cached.regime) {
-      var gates = (typeof KoMarketState !== 'undefined') ? KoMarketState.getStrategyGates(cached.regime) : null;
+      // BUGFIX v376: _lastMseResult bevorzugen (MCM-Context-Downgrades aktiv)
+      var gates = (window._lastMseResult && window._lastMseResult.strategies)
+        ? { strategies: window._lastMseResult.strategies, action: window._lastMseResult.action, color: window._lastMseResult.color, label: window._lastMseResult.label }
+        : (typeof KoMarketState !== 'undefined') ? KoMarketState.getStrategyGates(cached.regime) : null;
       if (gates) {
         hintEl.textContent = gates.label + ' · ' + gates.action;
         hintEl.parentElement.style.color = gates.color;
