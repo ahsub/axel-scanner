@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260720-v382">
+<meta name="version" content="20260720-v383">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -20007,6 +20007,15 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
   window._currentRegime  = result ? result.regime : null;
   window._lastQqqRegime  = result ? result.regime.toLowerCase() : null;
   // _lastMseResult wird oben gesetzt (mit MCM-Schutz) — diese Zeile entfernt (17.07.2026, war no-op / destruktiv)
+
+  // v383: qqq_markov in market_context nachpatchen sobald _lastQqqRegime verfuegbar.
+  // buildMarketContext() laeuft vor fetchQqqRegime() — qqq_markov fehlte deshalb im Context.
+  if (window._lastMseResult && window._lastMseResult._marketCtx && window._lastQqqRegime) {
+    window._lastMseResult._marketCtx.factors.qqq_markov = {
+      value: window._lastQqqRegime, signal: null,
+      label: 'QQQ Markov: ' + window._lastQqqRegime
+    };
+  }
 }
 
 // MSE Detail Modal
@@ -20859,7 +20868,7 @@ async function runMorningBriefing(forceRefresh) {
       var _alphaCtx = window._alphaData || null;
       if (typeof buildPromptSection === 'function' && _indicatorRegistry) {
         // Generisch: alle Kategorien in definierter Reihenfolge
-        ['regime','volatility','sentiment','macro','commodity','fx'].forEach(function(cat) {
+        ['regime','volatility','sentiment','macro','commodity','fx','fred','calendar'].forEach(function(cat) {
           var lines = buildPromptSection(cat, _alphaCtx);
           lines.forEach(function(l){ messwerteLines.push(l); });
           messwerteLines.push('');
@@ -23914,7 +23923,7 @@ async function generateDpKI(data, scoreObj, signal) {
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bcfe18/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4f1574b/ko-indicators-loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@b0ec8e8/ko-indicators-loader.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
