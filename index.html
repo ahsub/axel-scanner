@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260720-v380">
+<meta name="version" content="20260720-v381">
 <!-- CHANGELOG (neueste zuerst):
+     v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
      v379: BUGFIX STRATEGIE_MATRIX Prioritätsregel (20.07.2026). KI ignorierte MCM-Context-Downgrades weil STRATEGIE_MATRIX-Regeln (z.B. Momentum grün wenn BULL_QUIET + IOS>65) expliziter waren als der Downgrade-Hinweis. Fix: Neue PRIORITÄTSREGEL vor der Drei-Stufen-Logik — MCM-Downgrades haben absolute Priorität, KI muss sie zwingend übernehmen und mit Downgrade-Grund begründen (z.B. NDX-Breadth 40%).
      v378: BUGFIX Tearsheet-Timing (20.07.2026). openCachedBriefing() oeffnete Tearsheet sofort aus localStorage-Cache — zu diesem Zeitpunkt hatte _lastMseResult noch keine MCM-Downgrades (MCM-Startup-Gate noch nicht gelaufen). Fix: Tearsheet wartet auf ko:regimeChanged-Event (MCM-Startup-Gate feuert es nach calcStrategyGates()) bevor es oeffnet. Fallback nach 3s (fail-open) falls MCM nicht kommt. Damit sind Ampel-Farben im Tearsheet immer MCM-korrekt.
@@ -20863,21 +20864,10 @@ async function runMorningBriefing(forceRefresh) {
           lines.forEach(function(l){ messwerteLines.push(l); });
           messwerteLines.push('');
         });
-        // Spezifische Werte die nicht in der Registry stehen
-        messwerteLines.push('--- ZUSATZ-KONTEXT ---');
-        messwerteLines.push('MSE Regime: ' + mseRegime + (mseRegime !== '—' ? ' (Market State Engine v2.0)' : ' (noch nicht berechnet)'));
-        messwerteLines.push('QQQ Markov: ' + regime);
-        messwerteLines.push('VIX: ' + (results.vix || '—') + ' · Zone ' + vixZone + ' von 6');
-        messwerteLines.push('VIX Term Structure: ' + termStruct);
-        if (sektorTxt !== '—') messwerteLines.push('Sektor RS vs. SPY: ' + sektorTxt);
-        if (results.fearGreed) {
-          var _fg = results.fearGreed;
-          messwerteLines.push('Fear & Greed: '+_fg.score+'/100 ('+(_fg.rating||'')+')'+(_fg.previous?' Vortag:'+_fg.previous:'')+(_fg.proxy?' [Proxy]':' [CNN]'));
-        }
-        if (results.iosMarket) {
-          var _im = results.iosMarket;
-          messwerteLines.push('IOS Market: '+_im.iosMarketScore+'/100 → '+(_im.iosMarketDecision||'')+' T:'+_im.iosMarketTrend+' B:'+_im.iosMarketBreadth+' R:'+_im.iosMarketRisk);
-        }
+        // v381: MSE Regime, QQQ Markov, VIX Zone, VIX Term, F&G, IOS Market
+        // sind jetzt in der Registry (ko-indicators.json v2.2.0) und werden
+        // via buildMarketContext() + contextToPromptLines() oben abgedeckt.
+        // Hier nur noch Werte die Registry nicht abdeckt (Sektor-Text-Detail).
 
         // ── AGGREGATOR-DATEN (Single Source of Truth, KV-Snapshot v4.9) ──────
         // Direkt aus _alphaData.market — NICHT aus DOM-Polling, keine Interpretation nötig.
@@ -23924,7 +23914,7 @@ async function generateDpKI(data, scoreObj, signal) {
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bcfe18/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1f40df0/ko-indicators-loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4f1574b/ko-indicators-loader.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
