@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260720-v384">
+<meta name="version" content="20260720-v385">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -21451,12 +21451,13 @@ function showMorningTearsheet(results) {
   var _baseGates = (regime !== '—' && typeof KoMarketState !== 'undefined')
     ? KoMarketState.getStrategyGates(regime) : null;
   var gates = _baseGates ? {
-    label:      _baseGates.label,
-    action:     _baseGates.action,
-    color:      _baseGates.color,
-    strategies: (window._lastMseResult && window._lastMseResult.strategies)
-                  ? window._lastMseResult.strategies
-                  : (_baseGates.strategies || null)
+    label:       _baseGates.label,
+    action:      _baseGates.action,
+    color:       _baseGates.color,
+    description: _baseGates.description,
+    strategies:  (window._lastMseResult && window._lastMseResult.strategies)
+                   ? window._lastMseResult.strategies
+                   : (_baseGates.strategies || null)
   } : null;
   var metrics = (typeof KoMarketState !== 'undefined') ? KoMarketState._lastMetrics : null;
 
@@ -21738,7 +21739,7 @@ function updateScannerHint() {
        var _cBase2 = (typeof KoMarketState !== 'undefined' && cached.regime) ? KoMarketState.getStrategyGates(cached.regime) : null;
        var gates = _cBase2 ? {
          label: _cBase2.label, action: _cBase2.action, color: _cBase2.color,
-         strategies: (window._lastMseResult && window._lastMseResult.strategies) ? window._lastMseResult.strategies : (_cBase2.strategies || null)
+          label: _cBase2.label, action: _cBase2.action, color: _cBase2.color, description: _cBase2.description,
        } : null;
        if (gates) {
          hintEl.textContent = gates.label + ' · ' + gates.action;
