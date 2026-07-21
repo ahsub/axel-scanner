@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260721-v387">
+<meta name="version" content="20260721-v388">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -2740,6 +2740,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <button class="alpha-lb-tab" data-lb="options_cc" onclick="switchAlphaLB(this,'options_cc')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.08);color:var(--green);cursor:pointer">📋 Cov. Call</button>
       <!-- NEU (14.07.2026): VCP Detection Leaderboard (Backlog #18, Sprint 1) -->
       <button class="alpha-lb-tab" data-lb="vcp_setups" onclick="switchAlphaLB(this,'vcp_setups')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #a855f7;background:rgba(168,85,247,0.1);color:#a855f7;cursor:pointer">📐 VCP</button>
+      <button class="alpha-lb-tab" data-lb="long_breakout" onclick="switchAlphaLB(this,'long_breakout')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.1);color:var(--green);cursor:pointer">🚀 Breakout</button>
     </div>
     <div id="alpha-lb-content" style="margin-top:.4rem;min-height:36px;font-size:11px;color:var(--text3)">–</div>
     <!-- KI-Analyse Button für aktives Leaderboard -->
@@ -22655,16 +22656,13 @@ var _lbToStrat = {
   long_minervini:  'momentum',
   long_swing:      'swing',
   long_mr:         'meanrev',
+  long_breakout:   'breakout',   // NEU (21.07.2026): Breakout-Leaderboard → breakout-Prompt
   short_breakdown: 'breakdown',
   short_fading:    'fading_short',
-  // NEU (01.07.2026): KO-Short Tab → fading_short Regelwerk
   short_fading_ko: 'fading_short',
   ko_long:         'ko',
-  options_csp:     'options',
-  options_cc:      'weekly_income',
-  // NEU (14.07.2026): VCP ist im Kern ein Momentum/Breakout-Setup — eigene
-  // KI-Prompt-Strategie waere eigener Sprint (KoPrompts.STRATEGIES), erstmal
-  // auf bestehende momentum-Strategie gemappt.
+  options_csp:     'csp_wheel',  // BUGFIX (21.07.2026): war 'options' (alter Key, gibt null)
+  options_cc:      'cc',         // BUGFIX (21.07.2026): war 'weekly_income' (falsches Mapping)
   vcp_setups:      'vcp',
 };
 
