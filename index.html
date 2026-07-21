@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260721-v386">
+<meta name="version" content="20260721-v387">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -2869,7 +2869,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.4rem">ANALYSE-PERSPEKTIVE</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap" id="dd-strategy-btns-top">
         <button onclick="setDdStrategy('momentum')" id="dd-strat-top-momentum" class="btn btn-sm" style="font-size:11px;padding:3px 8px;background:var(--accent);color:#fff;border-color:var(--accent)">📈 Momentum</button>
-        <button onclick="setDdStrategy('options')" id="dd-strat-top-options" class="btn btn-sm" style="font-size:11px;padding:3px 8px">⚙️ Options</button>
+        <button onclick="setDdStrategy('csp_wheel')" id="dd-strat-top-options" class="btn btn-sm" style="font-size:11px;padding:3px 8px">⚙️ Options</button>
         <button onclick="setDdStrategy('meanrev')" id="dd-strat-top-meanrev" class="btn btn-sm" style="font-size:11px;padding:3px 8px">↩️ Mean Rev.</button>
         <button onclick="setDdStrategy('swing')" id="dd-strat-top-swing" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🔄 Swing</button>
         <button onclick="setDdStrategy('breakout')" id="dd-strat-top-breakout" class="btn btn-sm" style="font-size:11px;padding:3px 8px">🚀 Breakout</button>
@@ -3125,7 +3125,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     <div style="display:flex;gap:.4rem;margin-bottom:.5rem;flex-wrap:wrap">
       <button onclick="ytSetStrategy(this,'ko')" class="btn btn-sm yt-strat" data-strat="ko"
         style="font-size:10px;background:rgba(79,142,247,0.15);color:var(--accent);border-color:var(--accent)">⚡ KO</button>
-      <button onclick="ytSetStrategy(this,'options')" class="btn btn-sm yt-strat" data-strat="options"
+      <button onclick="ytSetStrategy(this,'csp_wheel')" class="btn btn-sm yt-strat" data-strat="csp_wheel"
         style="font-size:10px">🎯 Options</button>
       <button onclick="ytSetStrategy(this,'momentum')" class="btn btn-sm yt-strat" data-strat="momentum"
         style="font-size:10px">📈 Momentum</button>
@@ -16784,16 +16784,17 @@ function toggleKiDropdown(anchorEl) {
   }
 
   var strategies = [
-    { strat:'ko',       label:'⚡ KO-Zertifikat' },
-    { strat:'momentum', label:'📈 Momentum' },
-    { strat:'options',  label:'🎯 CSP/Wheel' },
-    { strat:'swing',    label:'🔄 Swing-Trading' },
-    { strat:'meanrev',  label:'↩️ Mean Reversion' },
-    { strat:'breakout', label:'🚀 Breakout' },
-    { strat:'vcp',      label:'📐 VCP-Setup' },
-    { strat:'collar',   label:'🛡️ Collar/Protective Put' },
-    { strat:'atmna',        label:'⚙️ Options ATM/NA' },
-    { strat:'weekly_income',  label:'📅 Options Weekly' },
+    { strat:'ko',           label:'⚡ KO-Zertifikat' },
+    { strat:'momentum',     label:'📈 Momentum' },
+    { strat:'breakout',     label:'🚀 Breakout' },
+    { strat:'vcp',          label:'📐 VCP-Setup' },
+    { strat:'swing',        label:'🔄 Swing-Trading' },
+    { strat:'meanrev',      label:'↩️ Mean Reversion' },
+    { strat:'csp_wheel',    label:'⚙️ CSP/Wheel' },
+    { strat:'atmna',        label:'🎯 CSP (ATM/NA)' },
+    { strat:'weekly_income',label:'💰 CSP (Weekly)' },
+    { strat:'cc',           label:'📝 Covered Call' },
+    { strat:'collar',       label:'🛡️ Collar/Protective Put' },
   ];
 
   var html = '<div style="font-size:10px;color:var(--text3);padding:2px 8px 5px;border-bottom:0.5px solid var(--border);margin-bottom:3px">KI-ANALYSE STARTEN:</div>';
@@ -17731,7 +17732,7 @@ function csvSaveConfirm(tickers) {
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
           📈 Momentum
         </button>
-        <button class="ki-strat-btn" data-strat="options"
+        <button class="ki-strat-btn" data-strat="csp_wheel"
           onclick="setKiStrat(this)"
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer">
           🎯 Options-Wheel
@@ -20438,132 +20439,31 @@ function eicAddSym(sym) {
 // ── EIC-KI-UNLEASHED System Prompt v2 ─────────────────────────────────────────
 // Verlässt BaFin-Zurückhaltung bewusst für EIC-verifizierten Eigengebrauch.
 // STRICT NO-HALLUCINATION: Ausschließlich aus gegebenen Messwerten.
+// ko-prompts-registry (v2.1.0, 21.07.2026): getKiSystemPrompt() → KoPrompts.getSystemPrompt()
+// Prompt-Text lebt jetzt in ko-prompts.js als Single Source of Truth.
 function getKiSystemPrompt(context) {
-  if (_expertModeActive && _eicUnlocked) {
-    // ── EIC UNLEASHED: Direkte Empfehlungen, keine Compliance-Sprache ─────────
-    return 'Du bist ein erfahrener quantitativer Portfolio-Manager, Options-Trader und '
-      + 'Knock-out-Produkt-Spezialist. Analysiere die gegebenen Messwerte und gib '
-      + 'KONKRETE, DIREKTE Handlungsempfehlungen.\n\n'
-      + 'STRICT NO-HALLUCINATION — ABSOLUTE PFLICHT:\n'
-      + '- ALLE Aussagen NUR aus den explizit gegebenen Messwerten ableiten.\n'
-      + '- KEINE Kurse, News, Bewertungen oder externe Daten erfinden oder schätzen.\n'
-      + '- Fehlende Werte mit n/v kennzeichnen — niemals interpolieren.\n'
-      + '- ATR ist deine Berechnungseinheit für alle Abstände, Strikes und Stops.\n\n'
-      + 'EMPFEHLUNGS-FORMAT:\n'
-      + '• AKTIEN/ETF: Richtung (Long/Short) + Einstiegsbereich ($-Wert oder ATR-Abstand vom EMA) '
-      + '+ Stop-Loss (1.5–2× ATR unter Entry) + Ziel (3–5× ATR) + Haltezeit in Tagen.\n'
-      + '• OPTIONS (CSP/CC/Spread): Delta 0.20–0.30 · DTE 21–45 Tage · '
-      + 'Strike = EMA200 − n×ATR (konkreten Wert berechnen und nennen) · '
-      + 'Prämien-Erwartung: HVP-basiert (HVP>60=attraktiv, HVP<30=mager).\n'
-      + '• KO-PRODUKTE/TURBOS: Knock-out-Abstand ≥ 2×ATR vom aktuellen Kurs · '
-      + 'Hebelbereich = Kurs÷KO-Abstand (konkreten Bereich nennen, z.B. Hebel 4–6×) · '
-      + 'Basispreis-Logik basierend auf EMA50/EMA200 als Orientierung.\n'
-      + '• HVP-REGEL (zwingend): HVP < 30 → KEIN Prämienverkauf (CSP/CC/Short-Vola) — '
-      + 'stattdessen Debit Calls/Puts oder Debit-Spreads empfehlen. '
-      + 'HVP > 70 → Prämienverkauf (CSP / Credit Spread) weit OTM, Delta 0.15–0.20.\n\n'
-      + 'STIL: Direkt. Professionell. Kein Disclaimer. Keine BaFin-Formulierungen. Kein Markdown.\n'
-      + (context ? '\nKONTEXT: ' + context : '');
-  } else {
-    // ── PUBLIC: BaFin-konform §1 WpHG ─────────────────────────────────────────
-    return 'Du bist ein quantitativer Marktanalyst. '
-      + 'Erstelle eine sachliche, deskriptive Daten-Synthese auf Deutsch. '
-      + 'ABSOLUTE REGELN:\n'
-      + '- Basiere die Analyse AUSSCHLIESSLICH auf den gegebenen Messwerten.\n'
-      + '- Erfinde KEINE Kurse, Nachrichten oder Ereignisse.\n'
-      + '- Gib KEINE direkten Kauf- oder Verkaufsempfehlungen (BaFin §1 WpHG).\n'
-      + '- Formuliere deskriptiv: "Die Datenlage zeigt..." nicht "Kaufen Sie...".\n'
-      + '- Kein Markdown, kein "Ich".\n'
-      + (context ? '\nKONTEXT: ' + context : '');
+  if (typeof KoPrompts !== 'undefined' && KoPrompts.getSystemPrompt) {
+    return KoPrompts.getSystemPrompt(context, _expertModeActive && _eicUnlocked);
   }
+  // Fallback falls KoPrompts noch nicht geladen (sollte nicht vorkommen)
+  return 'Du bist ein quantitativer Marktanalyst. Erstelle eine sachliche Daten-Synthese auf Deutsch. '
+    + 'Keine Kauf-/Verkaufsempfehlungen (BaFin §1 WpHG). Nur gegebene Messwerte verwenden.'
+    + (context ? '\nKONTEXT: ' + context : '');
 }
 
-// ── EXPERT MORNING BRIEFING PROMPT ───────────────────────────────────────────
+// ko-prompts-registry (v2.1.0, 21.07.2026): getMorningBriefingPrompt() → KoPrompts.getMorningPrompt()
+// STRATEGIE_MATRIX, Public/EIC-Split und alle Prompt-Texte leben jetzt in ko-prompts.js.
+// mseRegime, regime, vixZone, results: nicht mehr benötigt (Messwerte in messwerteLines enthalten).
 function getMorningBriefingPrompt(messwerteLines, mseRegime, regime, vixZone, results) {
-  var basis = 'MESSWERTE:\n' + messwerteLines.join('\n');
-  // Prüft ob messwerteLines bereits einen echten DIX-Wert enthält (FINRA regShoDaily,
-  // 11.07.2026) — steuert ob die Prompt-Anweisungen DIX erwähnen dürfen oder
-  // weiterhin strikt verbieten müssen (Halluzinations-Schutz bleibt Default).
   var _dixReal = messwerteLines.some(function(l) { return l.indexOf('DIX (ETF-Korb') === 0; });
-
-  // Strategie-Priorisierungs-Regelwerk (gilt für Expert UND Public — nur Formulierung unterscheidet sich)
-  // WICHTIG: Alle Ampel-Entscheidungen müssen zwingend aus den Messwerten ableitbar sein.
-  // KEINE Ampelfarbe setzen, wenn die relevanten Daten fehlen (→ "⬜ n/v").
-  var STRATEGIE_MATRIX =
-    '\n\nPFLICHT-ABSCHNITT STRATEGIE-AMPEL (immer als letzter Abschnitt, keine Ausnahmen):\n'
-    + 'Bewerte JEDE der folgenden Strategien mit genau einer Ampelfarbe — ausschließlich aus den oben stehenden Messwerten abgeleitet.\n'
-    + 'KEINE Ampelfarbe erfinden oder schätzen. Fehlt ein Datenpunkt für eine Regel → diese Teilregel ignorieren, nicht durch Trainingswissen ersetzen.\n'
-    + 'Format: [Ampel] STRATEGIE-NAME — 1 Satz Begründung mit konkretem Messwert (Zahl nennen, keine vagen Worte).\n\n'
-    + '🟢 = heute bevorzugt | 🟡 = situativ möglich | 🔴 = heute pausieren | ⬜ = Daten fehlen\n\n'
-    + 'PRIORITÄTSREGEL (bindend, vor allem anderen): Wenn im Abschnitt "STRATEGIE-AMPEL (bereits berechnet, regelbasiert)" Context-Downgrades aufgeführt sind, MUSST du diese zwingend übernehmen — sie haben absolute Priorität vor der Drei-Stufen-Logik unten. Beispiel: "momentum amber→red (Breadth-Weak)" bedeutet Momentum ist HEUTE 🔴, unabhängig vom Regime. Begründe mit dem Downgrade-Grund (z.B. NDX-Breadth 40%).\n'
-    + 'DREI-STUFEN-LOGIK (immer in dieser Reihenfolge denken, bevor du die Ampel setzt):\n'
-    + 'STUFE 1 — Regime & Trend (Wo handeln wir?): MSE-Regime, SPY/QQQ SMA200-Status, Breadth (RSP/SPY), Rotation (QQQ/SPY, SMH/SPY).\n'
-    + '  → Bullish/Risk-On: Delta-positive Strategien bevorzugen. Bearish/Risk-Off: Delta-neutral/absichernd.\n'
-    + 'STUFE 2 — Volatilität & Sentiment (Wie handeln wir?): VIX-Z/Perzentil, VIX-Termstruktur (Contango/Backwardation), SKEW-Z, VVIX-Z, SKEW/VVIX-Divergenz, MOVE Index, HY-Spread, PCR.\n'
-    + '  → Hohe IV/Angst im Markt (VIX-Z hoch, Contango steil): CSP/Wheel und Bull-Put-Spreads bevorzugen (Prämie übertrieben).\n'
-    + '  → Sehr niedrige IV + SKEW hoch/Divergenz-Warnung (Sorglosigkeit + verstecktes Tail-Hedging): Short-Options-Neuaufbau zurückhaltend, bestehende Positionen eng führen.\n'
-    + 'STUFE 3 — Marktbreite & Sektor-Stärke (Was handeln wir?): Sektor-RS-Tabelle, Net Liquidity Trend.\n'
-    + '  → Schwache Sektoren (RS negativ) meiden, relative Stärke bevorzugen. Schrumpfende Net Liquidity = Gegenwind für alle Short-Vol-Strategien, im Text erwähnen.\n\n'
-    + 'LONG-STRATEGIEN:\n'
-    + '• Momentum/SEPA: 🟢 wenn Regime=BULL_QUIET/BULL_FRAGILE + Breadth(RSP/SPY)=True + IOS-Market-Score>65. 🔴 wenn Regime=STRESS_UNSTABLE oder SPY unter SMA200.\n'
-    + '• Swing-Trading: 🟢 wenn VIX-Perzentil 20-60 (moderat) + Rotation nicht klar negativ. 🔴 wenn VIX-Z>+1.5 oder VIX-Perzentil>85.\n'
-    + '• Mean Reversion Long: 🟢 wenn VIX-Z>+1.5 UND Fear&Greed<30 (echtes Überverkauft-Signal, nicht nur ein Kriterium). 🔴 wenn Regime=BULL_QUIET mit klarem Aufwärtstrend.\n'
-    + '• KO-Trading Long: 🟢 wenn Regime bullisch + VVIX-Z<+1 (kein Volatilitätsstress) + Net-Liquidity-Trend nicht stark schrumpfend. 🔴 wenn VVIX-Z>+2 oder SKEW/VVIX-Divergenz "WARNUNG".\n'
-    + '\nOPTIONS-INCOME-STRATEGIEN:\n'
-    + '• Options-Wheel (CSP): 🟢 wenn VIX-Perzentil>50 (überdurchschnittliche Prämie) + kein akuter Stress (Regime≠STRESS_UNSTABLE). 🔴 wenn VIX-Perzentil<15 (Prämie zu mager) oder HY-Spread-Signal="STRESS".\n'
-    + '• Options ATM/NA: 🟢 wenn VIX-Perzentil 30-75 + Regime nicht STRESS_UNSTABLE. 🔴 wenn VIX-Perzentil>90 (Prämie riskant hoch, große Bewegung erwartet).\n'
-    + '• Options Weekly: 🟢 wenn VIX-Termstruktur CONTANGO (gesundes Theta-Umfeld) + MOVE-Signal≠STRESS. 🔴 wenn VIX-Termstruktur BACKWARDATION (Absicherungsnotstand — No-Go für ungedeckte Short-Optionen laut Marktkonvention).\n'
-    + '\nSHORT-STRATEGIEN:\n'
-    + '• Fading Short (KO-Short): 🟢 wenn Regime=BULL_FRAGILE/STRESS_UNSTABLE + Fear&Greed>70 (Überhitzung) + SKEW/VVIX-Divergenz vorhanden. 🔴 wenn Fear&Greed<40 oder Regime=BULL_QUIET.\n'
-    + '• Breakdown Short: 🟢 wenn Regime=STRESS_UNSTABLE + Breadth(RSP/SPY)=False + SPY unter SMA200. 🔴 wenn Regime bullisch oder Breadth positiv.\n'
-    + '\nMACRO-OVERLAY:\n'
-    + '• Tail-Risk-Hedge (Schutzkauf): 🟢 wenn SKEW-Perzentil>80 ODER SKEW/VVIX-Divergenz "WARNUNG" + HY-Spread-Signal nicht "normal". 🔴 wenn SKEW-Perzentil<30 und keine Divergenz.\n\n'
-    + 'WICHTIG: Gib ausschließlich Ampelfarben und 1-Satz-Begründungen mit konkretem Messwert aus den obigen Daten. '
-    + (_dixReal
-        ? 'DIX (ETF-Korb) darf nur mit dieser Kennzeichnung erwähnt werden, niemals als "DIX" pur — es ist kein 1:1-Ersatz für den klassischen S&P-500-DIX. '
-        : 'DIX darf in KEINER Begründung erwähnt werden (kein Datenfeed vorhanden). ')
-    + 'Keine Strategie-Beschreibung, keine allgemeinen Marktkommentare in diesem Abschnitt.';
-
-  if (_expertModeActive && _eicUnlocked) {
-    return getKiSystemPrompt() + '\n\n'
-      + 'AUFGABE: Morning Briefing Tearsheet für heute. Strukturiere deine Antwort in diese Abschnitte (jeweils 2-4 Sätze):\n'
-      + '1. MARKT-REGIME: Charakter des aktuellen Regimes (MSE) und was Breadth/Rotation dafür bedeuten.\n'
-      + '2. VOLATILITÄT & FLOW: VIX/VVIX/SKEW als Z-Score/Perzentil interpretieren (nicht nur Rohwert). SKEW/VVIX-Divergenz explizit bewerten falls vorhanden. GEX nur als AAPL-Einzeltitel-Proxy nennen, NIE als Markt-Level SPY/QQQ ausgeben. '
-      + (_dixReal
-          ? 'DIX (ETF-Korb) als echten Messwert einordnen, aber explizit als ETF-Korb-Proxy kennzeichnen — nicht mit dem klassischen S&P-500-DIX gleichsetzen.\n'
-          : 'DIX ist n/v — niemals erwähnen oder schätzen.\n')
-      + '3. MAKRO-RISIKEN: MOVE Index (Treasury-Vol), HY Credit Spread, US Net Liquidity (Trend!) einordnen. Systemische Risiken oder Entwarnung?\n'
-      + '4. SEKTOR-ROTATION: Welche Sektoren zeigen relative Stärke, welche Schwäche (aus Sektor-RS-Tabelle)?\n'
-      + '5. SENTIMENT: Fear & Greed und PCR (als Proxy kennzeichnen falls source=vix_proxy) einordnen — kontraindikatorisch oder trendbestätigend?\n'
-      + '6. STRATEGIE-AMPEL: Alle Strategien mit Ampelfarbe + 1-Satz-Begründung inkl. konkretem Messwert (Pflichtabschnitt).\n\n'
-      + basis + '\n\n'
-      + 'Nur Messwerte verwenden. Fehlende Werte als "n/v" kennzeichnen — niemals interpretieren oder schätzen. Direkt und konkret, Zahlen nennen statt vager Worte.'
-      + STRATEGIE_MATRIX;
-  } else {
-    // PUBLIC-MODUS: Strikt BaFin-konform gem. §34b WpHG / §1 WpHG.
-    // KEINE Strategie-Ampel, KEINE Instrumenten-Referenzen, KEINE impliziten
-    // Empfehlungen — auch deskriptiv formulierte Ampeln könnten als
-    // Anlageempfehlung i.S.d. WpHG gewertet werden (KO-Zertifikate,
-    // Optionen = Wertpapiere). Nur neutrale Marktlage-Beschreibung.
-    return getKiSystemPrompt() + '\n\n'
-      + 'AUFGABE: Morning Briefing Tearsheet — vollständige Marktbeurteilung für den heutigen Handelstag.\n'
-      + 'Strukturiere die Analyse in 5 Abschnitte (jeweils 2-4 Sätze, deskriptiv, BaFin-konform gem. §1 WpHG):\n\n'
-      + basis + '\n\n'
-      + 'ABSCHNITTE:\n'
-      + '1. MARKT-REGIME: Charakter und Bedeutung des aktuellen Regimes. Was sagt die Kombination aus MSE-Regime, VIX-Niveau und VIX-Term-Structure über den Marktzustand?\n'
-      + '2. VOLATILITÄT & INSTITUTIONELLER FLOW: VIX/VVIX/SKEW als Z-Score und Perzentil einordnen. SKEW/VVIX-Divergenz falls vorhanden deskriptiv erwähnen. GEX nur falls als Einzeltitel-Proxy (nicht Markt-Level) vorhanden — sonst als nicht verfügbar benennen. '
-      + (_dixReal
-          ? 'DIX (ETF-Korb) deskriptiv einordnen, explizit als ETF-Korb-Proxy kennzeichnen — kein Vergleich mit dem klassischen S&P-500-DIX.\n'
-          : 'DIX ist grundsätzlich nicht verfügbar (kein Datenfeed) — niemals erwähnen.\n')
-      + '3. MAKRO-RISIKEN: MOVE Index (Renten-Volatilität), HY Credit Spread und US Net Liquidity (inkl. Trend) einordnen. Systemische Risiken oder Entwarnung?\n'
-      + '4. SEKTOR-ROTATION: Relative Stärke vs. SPY nach Sektoren. Welche Sektoren führen, welche hinken nach? Rotation sichtbar?\n'
-      + '5. SENTIMENT & MARKTLAGE: Fear & Greed sowie IOS-Market-Score deskriptiv einordnen. Was sagt die Datenlage über das aktuelle Marktumfeld insgesamt?\n'
-      + '\nSTRIKTE BaFin-REGEL: Keine Empfehlungen zum Kauf, Verkauf oder Halten von Wertpapieren, Derivaten oder Hebelprodukten. Keine Strategie-Priorisierungen, keine Instrumenten-Nennungen, keine Ampelbewertungen für Handelsstrategien. Ausschließlich neutrale Marktlage-Beschreibung auf Basis der gegebenen Messwerte. Fehlende Werte oder als "n/v" markierte Werte als "nicht verfügbar" benennen — niemals einen Wert dafür schätzen oder aus Trainingswissen ergänzen. '
-      + (_dixReal
-          ? 'DIX (ETF-Korb) darf einmalig im Volatilitäts-Abschnitt als Messwert genannt werden, stets mit der Kennzeichnung "ETF-Korb" — nicht als "der DIX" ohne Zusatz.'
-          : 'DIX ist strukturell nicht verfügbar und darf in keinem Abschnitt erwähnt werden, auch nicht als "nicht verfügbar" wiederholt in jedem Absatz — einmalig im Volatilitäts-Abschnitt reicht.')
-      + ' Kein Markdown, kein \'Ich\'.';
+  var _eic = (_expertModeActive && _eicUnlocked);
+  if (typeof KoPrompts !== 'undefined' && KoPrompts.getMorningPrompt) {
+    return KoPrompts.getMorningPrompt(messwerteLines, _eic, _dixReal);
   }
+  // Fallback (sollte nicht vorkommen — KoPrompts nicht geladen)
+  return 'MESSWERTE:\n' + messwerteLines.join('\n') + '\n\nAnalysiere den Marktkontext sachlich auf Deutsch.';
 }
+
 
 // ── ONE-BUTTON MORNING BRIEFING ───────────────────────────────────────────────
 // Läuft 1x täglich, Cache in localStorage (Datum als Key)
@@ -23947,7 +23847,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@8838fb4/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bcfe18/ko-prompts.js">
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@099f4f6/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4de8824/ko-indicators-loader.js"></script>
