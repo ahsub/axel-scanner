@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260722-v391">
+<meta name="version" content="20260722-v392">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -2815,9 +2815,10 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         style="font-size:11px;padding:4px 12px;border-radius:8px;border:1px solid #818cf8;background:linear-gradient(135deg,rgba(129,140,248,0.15),rgba(168,85,247,0.15));color:#818cf8;cursor:pointer;font-weight:600;width:100%;margin-bottom:4px">
         🎯 Beste Underlying × Strategie-Kombination finden
       </button>
-      <button onclick="runOptionsKiBriefing('options')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer">🎯 CSP/Wheel</button>
+      <button onclick="runOptionsKiBriefing('csp_wheel')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--amber);background:rgba(245,158,11,0.1);color:var(--amber);cursor:pointer">🎯 CSP/Wheel</button>
       <button onclick="runOptionsKiBriefing('atmna')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #a371f7;background:rgba(163,113,247,0.1);color:#a371f7;cursor:pointer">⚙️ CSP ATM/NA</button>
       <button onclick="runOptionsKiBriefing('weekly_income')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #34d399;background:rgba(52,211,153,0.1);color:#34d399;cursor:pointer">📅 Options Weekly</button>
+      <button onclick="runOptionsKiBriefing('cc')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #f59e0b;background:rgba(245,158,11,0.08);color:#f59e0b;cursor:pointer">📝 Covered Call</button>
       <button onclick="runOptionsKiBriefing('collar')" style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #64748b;background:rgba(100,116,139,0.1);color:#64748b;cursor:pointer">🛡️ Collar/PP</button>
       <span id="options-ki-status" style="font-size:10px;color:var(--text3);align-self:center"></span>
     </div>
@@ -22445,7 +22446,12 @@ async function runOptionsKiBriefing(strat) {
   // Open modal
   var existing = document.getElementById('ki-modal');
   if (existing) existing.remove();
-  var label = strat==='atmna' ? 'CSP ATM/NA' : strat==='weekly_income' ? 'Options Weekly' : strat==='collar' ? 'Collar/Protective Put' : 'CSP/Wheel';
+  var label = strat==='atmna' ? 'CSP ATM/NA'
+            : strat==='weekly_income' ? 'Options Weekly'
+            : strat==='collar' ? 'Collar/Protective Put'
+            : strat==='cc' ? 'Covered Call'
+            : strat==='csp_wheel' ? 'CSP/Wheel'
+            : (KI_STRAT_CONFIG[strat] ? KI_STRAT_CONFIG[strat].hint.split(':')[0] : strat);
   var modal = document.createElement('div');
   modal.id = 'ki-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
