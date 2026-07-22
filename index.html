@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260721-v390">
+<meta name="version" content="20260722-v391">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -22823,7 +22823,31 @@ async function runAlphaLbKI() {
   var vix = _getVixRobust ? _getVixRobust() : '-';
   var mseRegime = (typeof KoMarketState !== 'undefined' && KoMarketState._lastRegime) ? KoMarketState._lastRegime : '-';
   var tickerLines = tickers.map(function(t, i) {
-    return (i+1) + '. ' + (t.sym||t.ticker||'?') + ' Score:' + (t.score||t.compositeScore||'-') + ' Grade:' + (t.grade||'-') + ' RSI:' + (t.rsi ? Math.round(t.rsi) : '-') + ' Kurs:$' + (t.price||'-') + (t.hvp ? ' HVP:' + t.hvp + '%' : '') + (t.atr ? ' ATR:' + t.atr : '');
+    // v390+: top20() liefert jetzt alle Kern-Felder — vollständig an KI übergeben
+    var line = (i+1) + '. ' + (t.sym||t.ticker||'?');
+    line += ' Score:' + (t.score||'-');
+    line += ' Grade:' + (t.grade||'-');
+    line += ' Kurs:$' + (t.price||'-');
+    line += ' RSI:' + (t.rsi ? Math.round(t.rsi) : '-');
+    line += ' ATR:' + (t.atr ? t.atr.toFixed(2) : '-');
+    if (t.hvp   != null) line += ' HVP:' + t.hvp + '%';
+    if (t.macdHist != null) line += ' MACD-Hist:' + (t.macdHist > 0 ? '+' : '') + t.macdHist.toFixed(3);
+    if (t.obvTrend != null) line += ' OBV:' + (t.obvTrend > 0 ? '+' : '') + t.obvTrend.toFixed(2);
+    if (t.volRatio != null) line += ' VolRatio:' + t.volRatio.toFixed(2) + 'x';
+    if (t.avgVol20 != null) line += ' AvgVol:' + Math.round(t.avgVol20/1000) + 'k';
+    if (t.ema50  != null && t.price) line += ' EMA50:$' + t.ema50.toFixed(2);
+    if (t.ema200 != null && t.price) line += ' EMA200:$' + t.ema200.toFixed(2);
+    if (t.dist200 != null) line += ' Dist200:' + t.dist200.toFixed(1) + '%';
+    if (t.pctFromHigh52 != null) line += ' 52W-H:' + t.pctFromHigh52.toFixed(1) + '%';
+    if (t.bbPos  != null) line += ' BBPos:' + t.bbPos.toFixed(2);
+    if (t.rsRating != null) line += ' RS:' + t.rsRating;
+    if (t.overheat != null) line += ' Overheat:' + t.overheat;
+    // VCP-spezifische Felder
+    if (t.vcpContractions != null) line += ' VCP-C:' + t.vcpContractions;
+    if (t.vcpLastPct != null) line += ' VCP-Last:' + t.vcpLastPct + '%';
+    if (t.vcpVolContraction != null) line += ' VCP-VolContr:' + t.vcpVolContraction.toFixed(2);
+    if (t.vcpBreakoutVol != null) line += ' VCP-BrkVol:' + t.vcpBreakoutVol.toFixed(2) + 'x';
+    return line;
   }).join('\n');
   var ctx = 'MARKTKONTEXT:\nVIX: ' + vix + '\nRegime (MSE): ' + mseRegime + '\nMarkov: ' + regime + '\n\nKANDIDATEN ' + _alphaLB.toUpperCase() + ' (Top-' + tickers.length + '):\n' + tickerLines;
   var isExpert = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
