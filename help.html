@@ -888,9 +888,17 @@
       <tr><th>Key</th><th>Pflicht?</th><th>Wofür</th><th>Kosten</th></tr>
       <tr><td>UIQ KI-Token</td><td>✅ Ja</td><td>Morning Briefing, KI-Briefing, Deep Dive</td><td>Inkl. im Abo</td></tr>
       <tr><td>Cloud Sync Token</td><td>Optional</td><td>Geräteübergreifende Synchronisierung</td><td>Kostenlos</td></tr>
+      <tr><td>Finnhub API-Key</td><td>Optional</td><td>Live-Kurse (SPY/QQQ, US-Indizes, Mover-Liste)</td><td>Kostenlos (Basis)</td></tr>
+      <tr><td>Twelve Data API-Key</td><td>Optional</td><td>Intraday-Charts, IV-Daten</td><td>Kostenlos (Basis)</td></tr>
       <tr><td>OpenAI Key</td><td>Optional</td><td>Whisper Audio-Transkription</td><td>~$0.006/Min</td></tr>
     </table>
 
+    <div class="notice notice-blue">
+      💡 Auch ohne Finnhub/Twelve-Data-Key voll nutzbar: Scanner (680 Ticker), Morning Briefing,
+      Strategie-Ampel und KI-Analysen laufen komplett über den UIQ-Server (KV-Cache).
+      Live-Kurse und Intraday-Charts sind die einzigen Features, die eigene API-Keys benötigen.
+      Beim ersten Start ohne Keys erscheint ein kurzer Hinweis-Toast.
+    </div>
     <div class="notice">
       Datenschutz: Alle Keys werden ausschließlich im localStorage deines Browsers gespeichert.
       Sie verlassen deinen Browser nur als Header bei direkten API-Calls.
@@ -940,6 +948,12 @@
     <p>Seit 02.07.2026 wird der offizielle Track Record gemessen. Lead-Metrik:
     <span class="tag">hit30-fresh</span> — Anteil der Shortlist-Kandidaten, die
     innerhalb von 30 Tagen &gt;5% Kursgewinn erreichen. Läuft als Phase A (erste 6 Monate).</p>
+
+    <h3>Ich sehe bei SPY/QQQ das Kürzel „(KV)" — was bedeutet das?</h3>
+    <p>Das bedeutet, dass der angezeigte Preis aus dem nächtlichen KV-Cache stammt (Vortagesschluss),
+    weil kein Finnhub API-Key hinterlegt ist. Sobald ein Finnhub-Key in den Einstellungen eingetragen wird,
+    erscheinen Live-Kurse mit Tagesveränderung in grün/rot. Die Daten sind inhaltlich korrekt —
+    nur nicht tagesaktuell im Intraday-Sinne.</p>
   </section>
 
   <footer>
