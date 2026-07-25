@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260725-v400">
+<meta name="version" content="20260725-v401">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -34,6 +34,7 @@
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
      v400: Backlog #20 — dataQuality-Flag im Tearsheet (25.07.2026): ko-indicators-loader v1.4.0 berechnet ctx.dataQuality ('full'|'partial'|'minimal') aus Kern-Faktor-Befüllungsgrad (promptWeight hoch/sehr_hoch). Tearsheet-Header zeigt Badge wenn partial/minimal, mit Tooltip (fehlende Indikatoren). Bei 'full' kein Badge.
+     v401: Backlog #13c/f — Pattern/Entry-Engine im DeepDive (25.07.2026): patternEntry aus KV in kvToScannerState() gemappt. DeepDive zeigt Pattern-Score/Signal/Preis-Punkte (BuyStop, Suggested, LimPullback, MaxBuy) + Entry-Timing-Score als neuen Block. KI-Prompt erhaelt Pattern/Entry-Kontext fuer informierte Einschaetzung.
      v399: Backlog #13a — STRATEGY_TO_LB vervollstaendigt (25.07.2026): breakout→long_breakout und vcp→vcp_setups ergaenzt. Alle Ampel-Chips mit existierendem LB-Tab sind jetzt klickbar (Navigation zum Alpha-Desk). Chips ohne LB-Tab (atmna, weekly_income, collar) bleiben korrekt als Info-Pillen.
      v398: DE-Modus Pre-Market Scanner (Tradegate, 24.07.2026): Neues Preset "US auf Tradegate" nutzt bestehende TRADEGATE_MAP (~60 Titel), ruft Kurse via Yahoo Finance (.F-Suffix) ab, Zeitfenster-Guard 08:00–22:00 MEZ, manuell erweiterbar in TRADEGATE_MAP. Kein Finnhub-Key nötig.
      v397: Onboarding-Hinweis (24.07.2026): einmaliger Toast wenn weder Finnhub- noch Twelve-Data-Key gesetzt — erklärt welche Features ohne Keys laufen. Gespeichert in localStorage (ko_onboarding_keys_hint_shown).
@@ -2920,6 +2921,9 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.5rem">MARKTKONTEXT</div>
       <div id="dd-market-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
     </div>
+
+    <!-- Pattern & Entry Engine (Backlog #13c/f, 25.07.2026) -->
+    <div id="dd-pattern-entry" style="display:none;padding:.75rem 1.25rem;border-top:1px solid var(--border2)"></div>
 
     <!-- ATR Positionsgröße -->
     <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border2);background:var(--bg3);border-radius:0 0 16px 16px">
@@ -7610,6 +7614,8 @@ function kvToScannerState(r) {
     rsRating:     r.rsRating != null ? r.rsRating : null,
     perf3m:       r.perf3m  != null ? r.perf3m  : null,
     perf12m:      r.perf12m != null ? r.perf12m : null,
+    // Pattern/Entry-Engine (ios_pattern_entry_engine.py, Backlog #13c/f, 25.07.2026)
+    patternEntry: r.patternEntry || null,
     // IV-Archiv-Felder (Aggregator v5.1, SUITE.md #15)
     // ivRank/ivPercentile: erst nach >=30 Archiv-Tagen befüllt (ab ~12.08.2026)
     ivAtm:          r.ivAtm         != null ? r.ivAtm         : null,
@@ -19658,6 +19664,76 @@ function renderDeepDiveTech(sym, raw, state) {
   // ATR Positionsgröße vorbefüllen
   if (raw.price) document.getElementById('dd-barrier').placeholder = 'z.B. ' + Math.round(raw.price * 0.93);
   calcDdPosition();
+
+  // ── Pattern/Entry-Engine (Backlog #13c/f, 25.07.2026) ────────────────
+  var peEl = document.getElementById('dd-pattern-entry');
+  if (!peEl) return;
+  var pe = state.patternEntry;
+  if (!pe || (!pe.pattern && !pe.entry)) { peEl.style.display = 'none'; return; }
+  var pat = pe.pattern || {};
+  var ent = pe.entry   || {};
+  var entPrices = pat.entry || {};   // Preis-Punkte sitzen in pat.entry (score_pattern_setup)
+
+  var patOk  = pat.ok  === true;
+  var entOk  = ent.ok  === true;
+
+  // Pattern-Block
+  var patHtml = '';
+  if (patOk) {
+    var pDecCol = pat.patternDecision === 'STRONG_BUY' ? 'var(--green)' :
+                  pat.patternDecision === 'BUY'        ? '#86efac' :
+                  pat.patternDecision === 'WATCH'      ? 'var(--amber)' : 'var(--text3)';
+    patHtml = '<div style="margin-bottom:.6rem">'
+      + '<span style="font-size:10px;color:var(--text3);letter-spacing:1px">PATTERN</span> '
+      + '<b style="color:' + pDecCol + '">' + (pat.patternDecision||'—') + '</b>'
+      + ' <span style="font-size:11px;color:var(--text3)">· ' + (pat.bestPattern||'—') + ' · Score ' + (pat.patternScore||0) + '/100</span>'
+      + '</div>';
+  } else {
+    patHtml = '<div style="margin-bottom:.6rem;font-size:11px;color:var(--text3)">Pattern: ' + (pat.reason||'n/v') + '</div>';
+  }
+
+  // Entry-Score-Block
+  var entHtml = '';
+  if (entOk) {
+    var entCol = ent.grade==='A'||ent.grade==='A+'?'var(--green)':ent.grade==='B'||ent.grade==='B+'?'var(--amber)':'var(--text3)';
+    entHtml = '<div style="margin-bottom:.6rem">'
+      + '<span style="font-size:10px;color:var(--text3);letter-spacing:1px">ENTRY-TIMING</span> '
+      + '<b style="color:' + entCol + '">' + (ent.grade||'—') + ' · ' + (ent.action||'—') + '</b>'
+      + ' <span style="font-size:11px;color:var(--text3)">· Score ' + (ent.entryScore||0) + '/100 · ' + (ent.setup||'') + '</span>'
+      + '</div>';
+  }
+
+  // Preis-Punkte (nur wenn Pattern ok und Preis-Daten vorhanden)
+  var priceHtml = '';
+  if (patOk && entPrices.suggested) {
+    var price = raw.price || 0;
+    var rows = [
+      { label: 'Buy-Stop',     val: entPrices.buyStop,      hint: 'Ausbruch bestätigt' },
+      { label: 'Suggested',    val: entPrices.suggested,    hint: 'Empfohlener Einstieg' },
+      { label: 'Lim. Pullback',val: entPrices.limitPullback,hint: 'Konservativer Pullback' },
+      { label: 'Normal',       val: entPrices.normalEntry,  hint: 'Mittlerer Pullback' },
+      { label: 'Deep Pullback',val: entPrices.deepPullback, hint: 'Tiefer Pullback' },
+      { label: 'Max. Buy',     val: entPrices.maxBuy,       hint: 'Absolute Obergrenze' },
+    ].filter(function(r){ return r.val != null; });
+
+    priceHtml = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:.4rem">'
+      + rows.map(function(r) {
+          var pctDiff = price > 0 ? ((r.val - price) / price * 100) : 0;
+          var diffStr = pctDiff >= 0 ? '+' + pctDiff.toFixed(1) + '%' : pctDiff.toFixed(1) + '%';
+          var col = r.val <= price ? 'var(--green)' : 'var(--amber)';
+          return '<div style="background:var(--bg3);border-radius:6px;padding:4px 6px" title="' + r.hint + '">'
+            + '<div style="font-size:9px;color:var(--text3)">' + r.label + '</div>'
+            + '<div style="font-size:12px;font-weight:600;color:' + col + '">$' + r.val.toFixed(2) + '</div>'
+            + '<div style="font-size:9px;color:var(--text3)">' + diffStr + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
+  if (!patHtml && !entHtml) { peEl.style.display = 'none'; return; }
+  peEl.style.display = 'block';
+  peEl.innerHTML = '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.5rem">📐 PATTERN & ENTRY (IOS Engine)</div>'
+    + patHtml + entHtml + priceHtml;
 }
 
 function renderDeepDiveMarket() {
@@ -19704,6 +19780,21 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     'ATR (14): $' + (raw.atr||'n/a'),
     'Marktkontext — VIX: ' + (vix||'n/a') + ' | Institutional Flow Score: ' + (dpScore||'n/a'),
   ];
+
+  // Pattern/Entry-Engine Daten in KI-Prompt (Backlog #13c/f, 25.07.2026)
+  var pe = state.patternEntry;
+  if (pe && pe.pattern && pe.pattern.ok) {
+    var _pat = pe.pattern;
+    ctx.push('Pattern-Score: ' + (_pat.patternScore||0) + '/100 · Bestes Muster: ' + (_pat.bestPattern||'—') + ' · Signal: ' + (_pat.patternDecision||'—'));
+    if (_pat.entry && _pat.entry.suggested) {
+      var _e = _pat.entry;
+      ctx.push('Entry-Preise: BuyStop $' + _e.buyStop.toFixed(2) + ' | Suggested $' + _e.suggested.toFixed(2) + ' | LimPullback $' + _e.limitPullback.toFixed(2) + ' | MaxBuy $' + _e.maxBuy.toFixed(2));
+    }
+  }
+  if (pe && pe.entry && pe.entry.ok) {
+    var _ent = pe.entry;
+    ctx.push('Entry-Timing: Score ' + (_ent.entryScore||0) + '/100 · ' + (_ent.grade||'—') + ' · ' + (_ent.action||'—') + ' · Setup: ' + (_ent.setup||'—'));
+  }
 
   var strat = KI_STRAT_CONFIG[_ddCurrentStrategy] || KI_STRAT_CONFIG.momentum || { label: _ddCurrentStrategy, focus: [] };
   var prompt_context = strat.focus.join('\n');
