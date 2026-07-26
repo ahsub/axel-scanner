@@ -6953,6 +6953,110 @@ function kvDataToTickerData(kvTicker) {
   };
 }
 
+// ── MARKET SNAPSHOT BRIDGE (v1.0, 26.07.2026) ────────────────────────────────
+// Liest market:snapshot:latest aus KV — funktioniert an Wochenenden/Feiertagen,
+// da der Aggregator immer den letzten Handelstag als "latest" schreibt.
+// Fallback-Kette: KV latest → KV Datum-Key → GitHub Backup → null
+// ─────────────────────────────────────────────────────────────────────────────
+var _msBridgeCache    = null;
+var _msBridgeCacheTs  = 0;
+var _MS_CACHE_MS      = 60 * 60 * 1000;   // 1h Normal
+var _MS_CACHE_WEEKEND = 48 * 60 * 60 * 1000; // 48h Wochenende/Feiertag
+
+function _msEffectiveTTL() {
+  var d = new Date();
+  return (d.getDay() === 0 || d.getDay() === 6) ? _MS_CACHE_WEEKEND : _MS_CACHE_MS;
+}
+
+async function loadMarketSnapshot(force) {
+  var ttl = _msEffectiveTTL();
+  if (!force && _msBridgeCache && (Date.now() - _msBridgeCacheTs) < ttl) {
+    return _msBridgeCache;
+  }
+
+  var koSync = (typeof KoConfig !== 'undefined')
+    ? KoConfig.api.koSync
+    : 'https://ko-sync.ahildebrand.workers.dev';
+
+  var BACKUP_URL = 'https://raw.githubusercontent.com/ahsub/ko-aggregator/main/backups/tr_backup_latest.json';
+
+  // 1. KV: market:snapshot:latest (immer letzter erfolgreicher Aggregator-Lauf)
+  try {
+    var r1 = await fetch(koSync + '/public/market:snapshot:latest', { cache: 'no-store' });
+    if (r1.ok) {
+      var d1 = await r1.json();
+      var snap1 = d1.data || d1;
+      if (snap1 && Array.isArray(snap1.tickers) && snap1.tickers.length) {
+        console.log('[MS-Bridge] KV latest — ' + snap1.tickers.length + ' Ticker · tday=' + snap1.tday);
+        _msBridgeCache   = snap1;
+        _msBridgeCacheTs = Date.now();
+        return _msBridgeCache;
+      }
+    }
+  } catch(e1) { console.warn('[MS-Bridge] KV latest fehlgeschlagen:', e1.message); }
+
+  // 2. KV: market:snapshot:{last-trading-day} (Datum-Key als zweiter Versuch)
+  try {
+    var todayUTC = new Date().toISOString().slice(0, 10);
+    var r2 = await fetch(koSync + '/public/market:snapshot:' + todayUTC, { cache: 'no-store' });
+    if (r2.ok) {
+      var d2 = await r2.json();
+      var snap2 = d2.data || d2;
+      if (snap2 && Array.isArray(snap2.tickers) && snap2.tickers.length) {
+        console.log('[MS-Bridge] KV Datum-Key ' + todayUTC + ' — ' + snap2.tickers.length + ' Ticker');
+        _msBridgeCache   = snap2;
+        _msBridgeCacheTs = Date.now();
+        return _msBridgeCache;
+      }
+    }
+  } catch(e2) { console.warn('[MS-Bridge] KV Datum-Key fehlgeschlagen:', e2.message); }
+
+  // 3. GitHub Backup — sucht neuesten market:snapshot:* Key im tr_backup_latest.json
+  try {
+    var r3   = await fetch(BACKUP_URL, { cache: 'no-store' });
+    if (r3.ok) {
+      var backup = await r3.json();
+      var keys   = Object.keys(backup.keys || {});
+      // Neuesten Datum-Key finden (alphabetisch größter = aktuellster)
+      var msKey  = keys
+        .filter(function(k) { return k.startsWith('market:snapshot:') && k !== 'market:snapshot:latest'; })
+        .sort()
+        .pop();
+      if (msKey && backup.keys[msKey]) {
+        var snap3 = backup.keys[msKey];
+        if (Array.isArray(snap3.tickers) && snap3.tickers.length) {
+          console.log('[MS-Bridge] Backup ' + msKey + ' — ' + snap3.tickers.length + ' Ticker (tday=' + snap3.tday + ')');
+          _msBridgeCache   = snap3;
+          _msBridgeCacheTs = Date.now();
+          return _msBridgeCache;
+        }
+      }
+    }
+  } catch(e3) { console.warn('[MS-Bridge] GitHub Backup fehlgeschlagen:', e3.message); }
+
+  console.warn('[MS-Bridge] Alle Quellen fehlgeschlagen — kein Market-Snapshot verfügbar.');
+  return null;
+}
+
+// Hilfsfunktion: Ticker-Objekt aus dem Snapshot nach Symbol suchen (O(1) via Map)
+var _msTickerMap = null;
+function _msBuildTickerMap(snapshot) {
+  if (!snapshot) return;
+  _msTickerMap = {};
+  (snapshot.tickers || []).forEach(function(t) {
+    if (t.symbol) _msTickerMap[t.symbol] = t;
+  });
+}
+
+async function getMarketSnapshotTicker(sym) {
+  var snap = await loadMarketSnapshot();
+  if (!snap) return null;
+  if (!_msTickerMap) _msBuildTickerMap(snap);
+  return _msTickerMap[sym] || _msTickerMap[sym + '.DE'] || null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function runScan(){
   // Ticker ermitteln — mit Yahoo Search für Klarnamen
   var rawInput = document.getElementById('custom-input');
