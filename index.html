@@ -7741,6 +7741,54 @@ function kvToScannerState(r) {
     _er:          null,
     _fromTdCache: false,
     currency:     'USD',
+    // ── Erweitertes KV-Mapping (26.07.2026) ─────────────────────────────────
+    // Felder waren bereits in master_market_data.tickers vorhanden,
+    // wurden aber bisher nicht aus dem KV-Objekt in den State gemappt.
+    // VCP-Metriken (Leaderboard-Anzeige + DeepDive)
+    vcpDetected:      r.vcpDetected      || false,
+    vcpContractions:  r.vcpContractions  || 0,
+    vcpLastPct:       r.vcpLastPct       != null ? r.vcpLastPct       : null,
+    vcpAvgPrevPct:    r.vcpAvgPrevPct    != null ? r.vcpAvgPrevPct    : null,
+    vcpVolContraction:r.vcpVolContraction != null ? r.vcpVolContraction: null,
+    vcpBreakoutVol:   r.vcpBreakoutVol   != null ? r.vcpBreakoutVol   : null,
+    tightnessPct:     r.tightnessPct     != null ? r.tightnessPct     : null,
+    // EMA / SMA
+    sma150:           r.sma150           != null ? r.sma150           : null,
+    ema200SlopeUp:    r.ema200SlopeUp    != null ? r.ema200SlopeUp    : null,
+    // MACD komplett (Linie + Signal — macdHist bereits oben gemappt)
+    macdLine:         r.macdLine         != null ? r.macdLine         : null,
+    macdSignal:       r.macdSignal       != null ? r.macdSignal       : null,
+    // KSI (Kinetic Slippage Index)
+    ksi:              r.ksi              != null ? r.ksi              : null,
+    ksiSignal:        r.ksiSignal        != null ? r.ksiSignal        : null,
+    ksiSpike:         r.ksiSpike         != null ? r.ksiSpike         : null,
+    ksiRatio:         r.ksiRatio         != null ? r.ksiRatio         : null,
+    // ICS (Inter-Scale Consensus)
+    icsDirection:     r.icsDirection     != null ? r.icsDirection     : null,
+    icsAngle:         r.icsAngle         != null ? r.icsAngle         : null,
+    icsConsensus:     r.icsConsensus     != null ? r.icsConsensus     : null,
+    icsConsBull:      r.icsConsBull      != null ? r.icsConsBull      : null,
+    icsConsBear:      r.icsConsBear      != null ? r.icsConsBear      : null,
+    icsChUpper:       r.icsChUpper       != null ? r.icsChUpper       : null,
+    icsChLower:       r.icsChLower       != null ? r.icsChLower       : null,
+    icsBoState:       r.icsBoState       != null ? r.icsBoState       : null,
+    icsChannelPos:    r.icsChannelPos    != null ? r.icsChannelPos    : null,
+    // Distanz-Metriken
+    dist50:           r.dist50           != null ? r.dist50           : null,
+    dist200:          r.dist200          != null ? r.dist200          : null,
+    nearestSellStopPct: r.nearestSellStopPct != null ? r.nearestSellStopPct : null,
+    nearestBuyStopPct:  r.nearestBuyStopPct  != null ? r.nearestBuyStopPct  : null,
+    // Performance
+    perf6m:           r.perf6m          != null ? r.perf6m           : null,
+    perfRsRaw:        r.perfRsRaw       != null ? r.perfRsRaw        : null,
+    // Volumen / Markt-Breite
+    avgVol20:         r.avgVol20        != null ? r.avgVol20         : null,
+    bullPct:          r.bullPct         != null ? r.bullPct          : null,
+    warnLevel:        r.warnLevel       != null ? r.warnLevel        : null,
+    squeezeRisk:      r.squeezeRisk     != null ? r.squeezeRisk      : null,
+    // Sektor-Tags
+    sectors:          Array.isArray(r.sectors) ? r.sectors : [],
+    // ────────────────────────────────────────────────────────────────────────
     closes_full:  [],
   };
 }
@@ -18103,6 +18151,43 @@ function kvToScannerState(r) {
     _er:          null,
     _fromTdCache: false,
     currency:     'USD',
+    // ── Erweitertes KV-Mapping (26.07.2026) ─────────────────────────────────
+    vcpDetected:      r.vcpDetected      || false,
+    vcpContractions:  r.vcpContractions  || 0,
+    vcpLastPct:       r.vcpLastPct       != null ? r.vcpLastPct       : null,
+    vcpAvgPrevPct:    r.vcpAvgPrevPct    != null ? r.vcpAvgPrevPct    : null,
+    vcpVolContraction:r.vcpVolContraction != null ? r.vcpVolContraction: null,
+    vcpBreakoutVol:   r.vcpBreakoutVol   != null ? r.vcpBreakoutVol   : null,
+    tightnessPct:     r.tightnessPct     != null ? r.tightnessPct     : null,
+    sma150:           r.sma150           != null ? r.sma150           : null,
+    ema200SlopeUp:    r.ema200SlopeUp    != null ? r.ema200SlopeUp    : null,
+    macdLine:         r.macdLine         != null ? r.macdLine         : null,
+    macdSignal:       r.macdSignal       != null ? r.macdSignal       : null,
+    ksi:              r.ksi              != null ? r.ksi              : null,
+    ksiSignal:        r.ksiSignal        != null ? r.ksiSignal        : null,
+    ksiSpike:         r.ksiSpike         != null ? r.ksiSpike         : null,
+    ksiRatio:         r.ksiRatio         != null ? r.ksiRatio         : null,
+    icsDirection:     r.icsDirection     != null ? r.icsDirection     : null,
+    icsAngle:         r.icsAngle         != null ? r.icsAngle         : null,
+    icsConsensus:     r.icsConsensus     != null ? r.icsConsensus     : null,
+    icsConsBull:      r.icsConsBull      != null ? r.icsConsBull      : null,
+    icsConsBear:      r.icsConsBear      != null ? r.icsConsBear      : null,
+    icsChUpper:       r.icsChUpper       != null ? r.icsChUpper       : null,
+    icsChLower:       r.icsChLower       != null ? r.icsChLower       : null,
+    icsBoState:       r.icsBoState       != null ? r.icsBoState       : null,
+    icsChannelPos:    r.icsChannelPos    != null ? r.icsChannelPos    : null,
+    dist50:           r.dist50           != null ? r.dist50           : null,
+    dist200:          r.dist200          != null ? r.dist200          : null,
+    nearestSellStopPct: r.nearestSellStopPct != null ? r.nearestSellStopPct : null,
+    nearestBuyStopPct:  r.nearestBuyStopPct  != null ? r.nearestBuyStopPct  : null,
+    perf6m:           r.perf6m          != null ? r.perf6m           : null,
+    perfRsRaw:        r.perfRsRaw       != null ? r.perfRsRaw        : null,
+    avgVol20:         r.avgVol20        != null ? r.avgVol20         : null,
+    bullPct:          r.bullPct         != null ? r.bullPct          : null,
+    warnLevel:        r.warnLevel       != null ? r.warnLevel        : null,
+    squeezeRisk:      r.squeezeRisk     != null ? r.squeezeRisk      : null,
+    sectors:          Array.isArray(r.sectors) ? r.sectors : [],
+    // ────────────────────────────────────────────────────────────────────────
     closes_full:  [],
   };
 }
