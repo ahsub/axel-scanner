@@ -6954,7 +6954,7 @@ function kvDataToTickerData(kvTicker) {
 }
 
 // ── MARKET SNAPSHOT BRIDGE (v1.0, 26.07.2026) ────────────────────────────────
-// Liest market:snapshot:latest aus KV — funktioniert an Wochenenden/Feiertagen,
+// Liest market-snapshot-latest aus KV — funktioniert an Wochenenden/Feiertagen,
 // da der Aggregator immer den letzten Handelstag als "latest" schreibt.
 // Fallback-Kette: KV latest → KV Datum-Key → GitHub Backup → null
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6980,9 +6980,9 @@ async function loadMarketSnapshot(force) {
 
   var BACKUP_URL = 'https://raw.githubusercontent.com/ahsub/ko-aggregator/main/backups/tr_backup_latest.json';
 
-  // 1. KV: market:snapshot:latest (immer letzter erfolgreicher Aggregator-Lauf)
+  // 1. KV: market-snapshot-latest (immer letzter erfolgreicher Aggregator-Lauf)
   try {
-    var r1 = await fetch(koSync + '/public/market:snapshot:latest', { cache: 'no-store' });
+    var r1 = await fetch(koSync + '/public/market-snapshot-latest', { cache: 'no-store' });
     if (r1.ok) {
       var d1 = await r1.json();
       var snap1 = d1.data || d1;
@@ -6995,10 +6995,10 @@ async function loadMarketSnapshot(force) {
     }
   } catch(e1) { console.warn('[MS-Bridge] KV latest fehlgeschlagen:', e1.message); }
 
-  // 2. KV: market:snapshot:{last-trading-day} (Datum-Key als zweiter Versuch)
+  // 2. KV: market-snapshot-{last-trading-day} (Datum-Key als zweiter Versuch)
   try {
     var todayUTC = new Date().toISOString().slice(0, 10);
-    var r2 = await fetch(koSync + '/public/market:snapshot:' + todayUTC, { cache: 'no-store' });
+    var r2 = await fetch(koSync + '/public/market-snapshot-' + todayUTC, { cache: 'no-store' });
     if (r2.ok) {
       var d2 = await r2.json();
       var snap2 = d2.data || d2;
@@ -7011,7 +7011,7 @@ async function loadMarketSnapshot(force) {
     }
   } catch(e2) { console.warn('[MS-Bridge] KV Datum-Key fehlgeschlagen:', e2.message); }
 
-  // 3. GitHub Backup — sucht neuesten market:snapshot:* Key im tr_backup_latest.json
+  // 3. GitHub Backup — sucht neuesten market-snapshot-* Key im tr_backup_latest.json
   try {
     var r3   = await fetch(BACKUP_URL, { cache: 'no-store' });
     if (r3.ok) {
@@ -7019,7 +7019,7 @@ async function loadMarketSnapshot(force) {
       var keys   = Object.keys(backup.keys || {});
       // Neuesten Datum-Key finden (alphabetisch größter = aktuellster)
       var msKey  = keys
-        .filter(function(k) { return k.startsWith('market:snapshot:') && k !== 'market:snapshot:latest'; })
+        .filter(function(k) { return k.startsWith('market-snapshot-') && k !== 'market-snapshot-latest'; })
         .sort()
         .pop();
       if (msKey && backup.keys[msKey]) {
