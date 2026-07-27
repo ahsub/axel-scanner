@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260727-v406">
+<meta name="version" content="20260727-v407">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v407: regimeConfidence + Breadth datenbasiert verbessert (27.07.2026): calcRegimeConfidence() um Z-Score Signalklarheit erweitert (252T-Fenster, avgZ VIX/VIX-Ratio/VVIX: >1.5σ=+10%, <0.5σ=−5%); mit heutigen Daten (avgZ≈0.4) ergibt BULL_QUIET ~80% statt 85%. Aggregator: regimeUsed + regimeStreak im Breadth-Archiv, Regime-Mehrheitsvotum aus results[].
      v406: regimeConfidence (27.07.2026, SUITE.md Backlog #21): calcRegimeConfidence() berechnet Konfidenz aus Regime-Basis (BULL_QUIET=85/BULL_FRAGILE=68/POST_PANIC=60/STRESS=48) − 8% pro MCM-Downgrade × dataQuality-Faktor (full/partial/minimal). Anzeige als "(~XX%)" neben home-regime-val — ~ = unkalibriert bis Sept. 2026 nach 60 Track-Record-Tagen. updateRegimeConfidenceDisplay() via ko:regimeChanged-Event-Bus. window._lastMcmCtx speichert ctx für dataQuality-Zugriff.
      v405: UIQ Breadth-Oszillator Frontend (27.07.2026, SUITE.md Backlog #12): loadBreadthOsc() liest master.market.breadthOsc (McClellan EMA19-EMA39 aus ~700 Ticker-Scan). Panel im Makro-Tab zwischen Sektor-Überhitzung und Intermarket: Oszillatorwert + Signal-Badge + Advance/Decline-Balken + EMA19/EMA39/Archivtage. Auto-Befüllung via _alphaData-Load und autoMakro(). Aufbauphase-Hinweis wenn <39 Archivtage.
      v400: Backlog #20 — dataQuality-Flag im Tearsheet (25.07.2026): ko-indicators-loader v1.4.0 berechnet ctx.dataQuality ('full'|'partial'|'minimal') aus Kern-Faktor-Befüllungsgrad (promptWeight hoch/sehr_hoch). Tearsheet-Header zeigt Badge wenn partial/minimal, mit Tooltip (fehlende Indikatoren). Bei 'full' kein Badge.
@@ -10550,39 +10551,55 @@ function loadBreadthOsc() {
 
 // ── Regime-Konfidenz (27.07.2026, SUITE.md Backlog #21) ──────────────────────
 // Berechnet die Konfidenz des aktuellen Regime-Signals aus:
-//   - Regime-Basis (BULL_QUIET am klarsten, STRESS am widersprüchlichsten)
-//   - Anzahl aktiver MCM-Context-Downgrades (mehr Downgrades = weniger Konfidenz)
-//   - Datenverfügbarkeit (ctx._dataQualityDetail.pct aus ko-indicators-loader v1.4.0)
-// KALIBRIERUNG: Konstanten sind vorläufig (Präfix "~") — September 2026 nach
-// 60+ Track-Record-Tagen empirisch kalibrieren (hohe vs. niedrige Konfidenz).
+//   1. Regime-Basis (BULL_QUIET am klarsten, STRESS am widersprüchlichsten)
+//   2. Anzahl aktiver MCM-Context-Downgrades (mehr = weniger Konfidenz)
+//   3. Datenverfügbarkeit (ctx._dataQualityDetail.pct, ko-indicators-loader v1.4.0)
+//   4. Z-Score Signalklarheit (252T-Fenster aus _alphaData.market.zscores)
+//      — nahe Null = gemischte Signale, Extremwerte = klares Signal
+// KALIBRIERUNG: Konstanten vorläufig (Präfix "~") — Sept. 2026 nach
+// 60+ Track-Record-Tagen empirisch kalibrieren.
 function calcRegimeConfidence(mseResult, mcmCtx) {
   if (!mseResult || !mseResult.regime) return null;
 
-  // Regime-Basis: empirisch plausible Startwerte, noch nicht kalibriert
+  // 1. Regime-Basis
   var regimeBase = {
-    'BULL_QUIET':           85,   // klarste Konstellation
-    'BULL_FRAGILE':         68,   // bullisch aber Risse sichtbar
-    'POST_PANIC_REVERSION': 60,   // Erholung unsicher
-    'STRESS_UNSTABLE':      48,   // widersprüchlichste Lage
+    'BULL_QUIET':           85,
+    'BULL_FRAGILE':         68,
+    'POST_PANIC_REVERSION': 60,
+    'STRESS_UNSTABLE':      48,
   }[mseResult.regime] || 60;
 
-  // Abzug pro Context-Downgrade: je mehr Downgrades desto widersprüchlicher
-  // Kalibrierbar: Empirisch prüfen ob 8% pro Downgrade zu viel/wenig ist
+  // 2. Abzug pro Context-Downgrade
   var downgrades = 0;
   try { downgrades = (mseResult.gates._context.downgrades || []).length; } catch(e) {}
   var downgradeAbzug = downgrades * 8;
 
-  // Datenverfügbarkeit aus MCM-Kontext (falls vorhanden)
+  // 3. Datenverfügbarkeit
   var dqFactor = 1.0;
   if (mcmCtx && mcmCtx._dataQualityDetail && mcmCtx._dataQualityDetail.pct !== undefined) {
-    var pct = mcmCtx._dataQualityDetail.pct;  // 0-100
+    var pct = mcmCtx._dataQualityDetail.pct;
     dqFactor = pct >= 80 ? 1.0 : pct >= 50 ? 0.88 : 0.72;
   } else if (mcmCtx && mcmCtx.dataQuality) {
     dqFactor = mcmCtx.dataQuality === 'full' ? 1.0 : mcmCtx.dataQuality === 'partial' ? 0.88 : 0.72;
   }
 
-  var raw = (regimeBase - downgradeAbzug) * dqFactor;
-  // Clampen: 25-92% (nie 100% ohne echten Track-Record-Beweis)
+  // 4. Z-Score Signalklarheit (252T historische Basis — unabhängig von Archivstart)
+  // Extreme Z-Scores (|z| > 1.5) = Regime klar erkennbar → Konfidenz hoch
+  // Nahe null (|z| < 0.5) = gemischte Signale → Konfidenz reduzieren
+  var clarityBonus = 0;
+  try {
+    var zs = window._alphaData && window._alphaData.market && window._alphaData.market.zscores;
+    if (zs) {
+      var vixZ   = Math.abs((zs.vix      && zs.vix.zscore      != null) ? zs.vix.zscore      : 0);
+      var ratioZ = Math.abs((zs.vixRatio && zs.vixRatio.zscore != null) ? zs.vixRatio.zscore : 0);
+      var vvixZ  = Math.abs((zs.vvix     && zs.vvix.zscore     != null) ? zs.vvix.zscore     : 0);
+      var avgZ = (vixZ + ratioZ + vvixZ) / 3;
+      // > 1.5σ = klares Signal, < 0.5σ = Rauschen (wie heute: avgZ ≈ 0.4)
+      clarityBonus = avgZ > 1.5 ? +10 : avgZ > 1.0 ? +5 : avgZ > 0.5 ? 0 : -5;
+    }
+  } catch(e) {}
+
+  var raw = (regimeBase - downgradeAbzug) * dqFactor + clarityBonus;
   return Math.max(25, Math.min(92, Math.round(raw)));
 }
 
