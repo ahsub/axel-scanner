@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260728-v408">
+<meta name="version" content="20260728-v409">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v409: Dividend + Value Leaderboard-Tabs im Alpha Desk (28.07.2026, Backlog #13b): 2 neue Tab-Buttons (💰 Dividend / 📊 Value), Farb-Mapping (#f59e42 / #94a3b8), Chip-Tooltip mit Fundamental-Feldern (divYield, payoutRatio, fcfYield, roe / peForward, pb, analystUpside), scoreKey zeigt sDividend/sValue statt Composite-Score, _lbToStrat um long_dividend→dividend + long_value→value erweitert.
      v408: Score-Paar-Divergenz-Anzeige (28.07.2026, Backlog #11): updateScoreDivergenceDisplay() liest master.market.scoreDivergences[] aus _alphaData — 3 server-seitige Paare: (1) Regime vs. IOS-Score, (2) IOS-Trend vs. IOS-Breadth, (3) McClellan vs. Regime. Home-Panel: #home-divergence-card (amber-Border, initially hidden) erscheint nur bei aktiven Divergenzen. Severity-Farbkodierung (🔴 high / 🟡 medium / ⚪ low), 2-Zeilen-Erklärung + Tooltip. Eingebunden in ko:regimeChanged-Event-Bus + renderHomeLanding().
      v407: regimeConfidence + Breadth datenbasiert verbessert (27.07.2026): calcRegimeConfidence() um Z-Score Signalklarheit erweitert (252T-Fenster, avgZ VIX/VIX-Ratio/VVIX: >1.5σ=+10%, <0.5σ=−5%); mit heutigen Daten (avgZ≈0.4) ergibt BULL_QUIET ~80% statt 85%. Aggregator: regimeUsed + regimeStreak im Breadth-Archiv, Regime-Mehrheitsvotum aus results[].
      v406: regimeConfidence (27.07.2026, SUITE.md Backlog #21): calcRegimeConfidence() berechnet Konfidenz aus Regime-Basis (BULL_QUIET=85/BULL_FRAGILE=68/POST_PANIC=60/STRESS=48) − 8% pro MCM-Downgrade × dataQuality-Faktor (full/partial/minimal). Anzeige als "(~XX%)" neben home-regime-val — ~ = unkalibriert bis Sept. 2026 nach 60 Track-Record-Tagen. updateRegimeConfidenceDisplay() via ko:regimeChanged-Event-Bus. window._lastMcmCtx speichert ctx für dataQuality-Zugriff.
@@ -2813,6 +2814,8 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <!-- NEU (14.07.2026): VCP Detection Leaderboard (Backlog #18, Sprint 1) -->
       <button class="alpha-lb-tab" data-lb="vcp_setups" onclick="switchAlphaLB(this,'vcp_setups')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #a855f7;background:rgba(168,85,247,0.1);color:#a855f7;cursor:pointer">📐 VCP</button>
       <button class="alpha-lb-tab" data-lb="long_breakout" onclick="switchAlphaLB(this,'long_breakout')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.1);color:var(--green);cursor:pointer">🚀 Breakout</button>
+      <button class="alpha-lb-tab" data-lb="long_dividend" onclick="switchAlphaLB(this,'long_dividend')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f59e42;background:rgba(245,158,66,0.10);color:#f59e42;cursor:pointer" title="Dividendenstrategie: Qualitäts-Dividendentitel für Income + CSP-Unterlegung">💰 Dividend</button>
+      <button class="alpha-lb-tab" data-lb="long_value" onclick="switchAlphaLB(this,'long_value')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #64748b;background:rgba(100,116,139,0.10);color:#94a3b8;cursor:pointer" title="Value-Strategie: günstig bewertete Qualitätstitel (peForward, pb, fcfYield)">📊 Value</button>
     </div>
     <div id="alpha-lb-content" style="margin-top:.4rem;min-height:36px;font-size:11px;color:var(--text3)">–</div>
     <!-- KI-Analyse Button für aktives Leaderboard -->
@@ -23288,6 +23291,8 @@ function renderAlphaLB(lb, key) {
           : key === 'long_swing'     ? '#06b6d4'
           : key === 'long_mr'        ? 'var(--amber)'
           : key === 'short_breakdown'? 'var(--red)'
+          : key === 'long_dividend'  ? '#f59e42'
+          : key === 'long_value'     ? '#94a3b8'
           : key === 'vcp_setups'     ? '#a855f7' : '#f97316';
 
   // Chip-Reihe (bestehend, kompakter Überblick)
@@ -23299,9 +23304,34 @@ function renderAlphaLB(lb, key) {
     var macdStr = x.macd != null ? (x.macd > 0 ? ' ▲' : ' ▼') : '';
     var vcpInfo = (key === 'vcp_setups' && x.vcpContractions != null)
       ? ' · ' + x.vcpContractions + ' Contractions, letzte ' + (x.vcpLastPct != null ? x.vcpLastPct + '%' : '?') : '';
-    chip.title = 'Score: ' + x.score + (x.macd != null ? ' · MACD: ' + (x.macd > 0 ? 'bullish' : 'bearish') : '') + vcpInfo + ' · Klick: DeepDive';
+    // Dividend-spezifische Tooltip-Infos (28.07.2026)
+    var divInfo = '';
+    if (key === 'long_dividend') {
+      var dParts = [];
+      if (x.divYield    != null) dParts.push('Yield: ' + x.divYield + '%');
+      if (x.payoutRatio != null) dParts.push('Payout: ' + x.payoutRatio + '%');
+      if (x.fcfYield    != null) dParts.push('FCF: ' + x.fcfYield + '%');
+      if (x.roe         != null) dParts.push('ROE: ' + x.roe + '%');
+      divInfo = dParts.length ? ' · ' + dParts.join(' · ') : '';
+    }
+    // Value-spezifische Tooltip-Infos (28.07.2026)
+    var valInfo = '';
+    if (key === 'long_value') {
+      var vParts = [];
+      if (x.peForward     != null) vParts.push('PE: ' + x.peForward + 'x');
+      if (x.pb            != null) vParts.push('P/B: ' + x.pb);
+      if (x.fcfYield      != null) vParts.push('FCF: ' + x.fcfYield + '%');
+      if (x.analystUpside != null) vParts.push('Upside: +' + x.analystUpside + '%');
+      valInfo = vParts.length ? ' · ' + vParts.join(' · ') : '';
+    }
+    var scoreKey = key === 'long_dividend' ? (x.sDividend != null ? x.sDividend : x.score)
+                 : key === 'long_value'    ? (x.sValue    != null ? x.sValue    : x.score)
+                 : x.score;
+    chip.title = 'Score: ' + scoreKey
+      + (x.macd != null ? ' · MACD: ' + (x.macd > 0 ? 'bullish' : 'bearish') : '')
+      + vcpInfo + divInfo + valInfo + ' · Klick: DeepDive';
     chip.innerHTML = '<span style="font-family:var(--mono);font-weight:600;color:' + col + '">' + x.sym + '</span>'
-      + '<span style="color:var(--text3)"> ' + x.score + macdStr + '</span>'
+      + '<span style="color:var(--text3)"> ' + scoreKey + macdStr + '</span>'
       + '<span onclick="(function(e,s){e.stopPropagation();window.open(\'https://www.tradingview.com/chart/?symbol=\'+s,\'_blank\');})(event,\'" + x.sym + "\')" '
       + 'style="margin-left:4px;color:var(--text3);cursor:pointer;font-size:9px" title="Chart auf TradingView öffnen">📈TV</span>';
     chip.onclick = (function(s){ return function(){ openDeepDive(s,s); }; })(x.sym);
@@ -23330,7 +23360,8 @@ var _lbToStrat = {
   options_csp:     'csp_wheel',  // BUGFIX (21.07.2026): war 'options' (alter Key, gibt null)
   options_cc:      'cc',         // BUGFIX (21.07.2026): war 'weekly_income' (falsches Mapping)
   vcp_setups:      'vcp',
-};
+  long_dividend:   'dividend',   // Backlog #13b (28.07.2026)
+  long_value:      'value',      // Backlog #13b (28.07.2026)
 
 /**
  * REVERT (15.07.2026, Axel-Korrektur zu Arbeitspaket E Punkt 2): Die
