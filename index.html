@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260727-v407">
+<meta name="version" content="20260728-v408">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v408: Score-Paar-Divergenz-Anzeige (28.07.2026, Backlog #11): updateScoreDivergenceDisplay() liest master.market.scoreDivergences[] aus _alphaData — 3 server-seitige Paare: (1) Regime vs. IOS-Score, (2) IOS-Trend vs. IOS-Breadth, (3) McClellan vs. Regime. Home-Panel: #home-divergence-card (amber-Border, initially hidden) erscheint nur bei aktiven Divergenzen. Severity-Farbkodierung (🔴 high / 🟡 medium / ⚪ low), 2-Zeilen-Erklärung + Tooltip. Eingebunden in ko:regimeChanged-Event-Bus + renderHomeLanding().
      v407: regimeConfidence + Breadth datenbasiert verbessert (27.07.2026): calcRegimeConfidence() um Z-Score Signalklarheit erweitert (252T-Fenster, avgZ VIX/VIX-Ratio/VVIX: >1.5σ=+10%, <0.5σ=−5%); mit heutigen Daten (avgZ≈0.4) ergibt BULL_QUIET ~80% statt 85%. Aggregator: regimeUsed + regimeStreak im Breadth-Archiv, Regime-Mehrheitsvotum aus results[].
      v406: regimeConfidence (27.07.2026, SUITE.md Backlog #21): calcRegimeConfidence() berechnet Konfidenz aus Regime-Basis (BULL_QUIET=85/BULL_FRAGILE=68/POST_PANIC=60/STRESS=48) − 8% pro MCM-Downgrade × dataQuality-Faktor (full/partial/minimal). Anzeige als "(~XX%)" neben home-regime-val — ~ = unkalibriert bis Sept. 2026 nach 60 Track-Record-Tagen. updateRegimeConfidenceDisplay() via ko:regimeChanged-Event-Bus. window._lastMcmCtx speichert ctx für dataQuality-Zugriff.
      v405: UIQ Breadth-Oszillator Frontend (27.07.2026, SUITE.md Backlog #12): loadBreadthOsc() liest master.market.breadthOsc (McClellan EMA19-EMA39 aus ~700 Ticker-Scan). Panel im Makro-Tab zwischen Sektor-Überhitzung und Intermarket: Oszillatorwert + Signal-Badge + Advance/Decline-Balken + EMA19/EMA39/Archivtage. Auto-Befüllung via _alphaData-Load und autoMakro(). Aufbauphase-Hinweis wenn <39 Archivtage.
@@ -646,7 +647,17 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           </div>
         </div>
 
-        <!-- Sektor Top-3 / Flop-3 (v281, Makro-Kondensat Schritt 2) -->
+        <!-- Score-Paar-Divergenz-Card (Backlog #11, 28.07.2026)
+             Sichtbar nur wenn scoreDivergences[] mindestens einen Eintrag hat.
+             Daten kommen aus _alphaData.market.scoreDivergences (Aggregator-Berechnung).
+             Kein eigener API-Call — reine Darstellung der vorberechneten Daten. -->
+        <div id="home-divergence-card" style="display:none;background:var(--bg2);border:0.5px solid var(--amber);border-radius:10px;padding:.6rem 1rem;margin-bottom:.75rem">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+            <span style="font-size:10px;font-weight:700;color:var(--amber);letter-spacing:.04em">⚡ SCORE-DIVERGENZ</span>
+            <span id="home-divergence-count" style="font-size:10px;color:var(--text3)"></span>
+          </div>
+          <div id="home-divergence-list" style="display:flex;flex-direction:column;gap:.35rem"></div>
+        </div>
         <div id="home-sektor-card" style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;padding:.7rem 1rem;margin-bottom:.75rem;cursor:pointer" onclick="showPanel('makro')" title="Details im Makro-Tab">
           <div style="font-size:10px;color:var(--text3);letter-spacing:.8px;margin-bottom:.5rem">SEKTOREN · RELATIVE STÄRKE (5T)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
@@ -6016,6 +6027,7 @@ function renderHomeLanding() {
   // zuverlässigeren Cache ueberschreiben, WENN die DOM-Kopie leer war —
   // reiner localStorage-Read, KEIN Netzwerk-/KI-Call, respektiert Arbeitspaket B.
   try { _refreshHomeStatusTiles(); } catch(e) { console.warn('[HomeStatus]', e.message); }
+  try { updateScoreDivergenceDisplay(); } catch(e) { console.warn('[ScoreDivergence]', e.message); }
 
   // BUGFIX (15.07.2026, Axel-Anfrage): "Marktaktivität" (Aktivste/Volumen/
   // Winner/Loser) hatte bereits einen manuellen "laden"-Button, wurde aber
@@ -10628,6 +10640,68 @@ function updateRegimeConfidenceDisplay() {
 
 // Auto-Update bei jedem Regime-Wechsel (selber Event-Bus wie alle anderen Widgets)
 window.addEventListener('ko:regimeChanged', function() { updateRegimeConfidenceDisplay(); });
+
+// ── Score-Paar-Divergenz-Anzeige (Backlog #11, 28.07.2026) ───────────────────
+// Liest master.market.scoreDivergences[] aus _alphaData (Aggregator-Vorberechnung).
+// Kein eigener API-Call — hängt sich in ko:regimeChanged-Event-Bus ein.
+function updateScoreDivergenceDisplay() {
+  var card  = document.getElementById('home-divergence-card');
+  var list  = document.getElementById('home-divergence-list');
+  var count = document.getElementById('home-divergence-count');
+  if (!card || !list) return;
+
+  var divs = window._alphaData &&
+             window._alphaData.market &&
+             window._alphaData.market.scoreDivergences;
+
+  if (!divs || !divs.length) {
+    card.style.display = 'none';
+    return;
+  }
+
+  // Severity → Farbe + Icon
+  var sevStyle = {
+    'high':   { col: 'var(--red)',   icon: '🔴' },
+    'medium': { col: 'var(--amber)', icon: '🟡' },
+    'low':    { col: 'var(--text3)', icon: '⚪' },
+  };
+
+  list.innerHTML = '';
+  divs.forEach(function(d) {
+    var sev = sevStyle[d.severity] || sevStyle['medium'];
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-direction:column;gap:.15rem;' +
+      'border-left:2px solid ' + sev.col + ';padding-left:.5rem';
+
+    // Label-Zeile
+    var labelEl = document.createElement('div');
+    labelEl.style.cssText = 'font-size:11px;font-weight:600;color:' + sev.col;
+    labelEl.textContent = sev.icon + ' ' + d.label;
+
+    // Erklärung — gekürzt auf 2 Zeilen, Tooltip zeigt vollen Text
+    var expEl = document.createElement('div');
+    expEl.style.cssText = 'font-size:10px;color:var(--text3);line-height:1.4;' +
+      'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden';
+    expEl.textContent = d.explanation;
+    expEl.title = d.explanation;  // voller Text im Tooltip
+
+    row.appendChild(labelEl);
+    row.appendChild(expEl);
+    list.appendChild(row);
+  });
+
+  // Counter + Card sichtbar
+  var highCount = divs.filter(function(d) { return d.severity === 'high'; }).length;
+  count.textContent = divs.length + ' Signal' + (divs.length > 1 ? 'e' : '') +
+    (highCount ? ' · ' + highCount + '× HOCH' : '');
+  card.style.display = 'block';
+
+  console.log('[ScoreDivergence] ' + divs.length + ' Divergenz(en): ' +
+    divs.map(function(d) { return d.type + '(' + d.severity + ')'; }).join(', '));
+}
+
+// Beim Start + bei jedem Regime-Wechsel aktualisieren
+window.addEventListener('ko:regimeChanged', function() { updateScoreDivergenceDisplay(); });
 
 async function loadNasdaqBreadth() {
   var btn = document.getElementById('breadth-btn');
