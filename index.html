@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260729-v410">
+<meta name="version" content="20260729-v411">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,7 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
-     v410: Backlog #13b vollständig (29.07.2026): ko-strategies.js v2.4.0 + ko-prompts.js v2.3.0 mit dividend/value Strategien. kvToScannerState() ergänzt: long_dividend→sDividend, long_value→sValue in stratScores. tickerLines in runAlphaLbKI() um Fundamental-Felder (divYield/payoutRatio/fcfYield/ROE für Dividend; peForward/pb/fcfYield/analystUpside/ROE für Value) erweitert. CDN-Hashes: ko-strategies 4bcfe18→57c6f91, ko-prompts ab084ec→57c6f91.\n     v409: Dividend + Value Leaderboard-Tabs im Alpha Desk (28.07.2026, Backlog #13b): 2 neue Tab-Buttons (💰 Dividend / 📊 Value), Farb-Mapping (#f59e42 / #94a3b8), Chip-Tooltip mit Fundamental-Feldern (divYield, payoutRatio, fcfYield, roe / peForward, pb, analystUpside), scoreKey zeigt sDividend/sValue statt Composite-Score, _lbToStrat um long_dividend→dividend + long_value→value erweitert.
+     v411: Score-Divergenz client-seitige Paare (29.07.2026, Backlog #11b): updateScoreDivergenceDisplay() um 2 client-seitige Paare erweitert — (4) Bull-Indicator vs. IOS-Score: _lastMcmCtx.factors.bull_indicator + DOM-Fallback vs. iosMarketScore, Schwelle Delta≥30 (medium) / ≥45 (high); (5) TSI vs. Regime: #tsi-score DOM-Wert vs. Regime, nur bei BULL-Regime aktiv, Schwelle >40 (medium) / >60 (high). Beide Paare nur aktiv wenn Morning-Briefing bereits calcBullIndicator/calcTreasuryStress gelaufen hat.\n     v410: Backlog #13b vollständig (29.07.2026): ko-strategies.js v2.4.0 + ko-prompts.js v2.3.0 mit dividend/value Strategien. kvToScannerState() ergänzt: long_dividend→sDividend, long_value→sValue in stratScores. tickerLines in runAlphaLbKI() um Fundamental-Felder (divYield/payoutRatio/fcfYield/ROE für Dividend; peForward/pb/fcfYield/analystUpside/ROE für Value) erweitert. CDN-Hashes: ko-strategies 4bcfe18→57c6f91, ko-prompts ab084ec→57c6f91.\n     v409: Dividend + Value Leaderboard-Tabs im Alpha Desk (28.07.2026, Backlog #13b): 2 neue Tab-Buttons (💰 Dividend / 📊 Value), Farb-Mapping (#f59e42 / #94a3b8), Chip-Tooltip mit Fundamental-Feldern (divYield, payoutRatio, fcfYield, roe / peForward, pb, analystUpside), scoreKey zeigt sDividend/sValue statt Composite-Score, _lbToStrat um long_dividend→dividend + long_value→value erweitert.
      v408: Score-Paar-Divergenz-Anzeige (28.07.2026, Backlog #11): updateScoreDivergenceDisplay() liest master.market.scoreDivergences[] aus _alphaData — 3 server-seitige Paare: (1) Regime vs. IOS-Score, (2) IOS-Trend vs. IOS-Breadth, (3) McClellan vs. Regime. Home-Panel: #home-divergence-card (amber-Border, initially hidden) erscheint nur bei aktiven Divergenzen. Severity-Farbkodierung (🔴 high / 🟡 medium / ⚪ low), 2-Zeilen-Erklärung + Tooltip. Eingebunden in ko:regimeChanged-Event-Bus + renderHomeLanding().
      v407: regimeConfidence + Breadth datenbasiert verbessert (27.07.2026): calcRegimeConfidence() um Z-Score Signalklarheit erweitert (252T-Fenster, avgZ VIX/VIX-Ratio/VVIX: >1.5σ=+10%, <0.5σ=−5%); mit heutigen Daten (avgZ≈0.4) ergibt BULL_QUIET ~80% statt 85%. Aggregator: regimeUsed + regimeStreak im Breadth-Archiv, Regime-Mehrheitsvotum aus results[].
      v406: regimeConfidence (27.07.2026, SUITE.md Backlog #21): calcRegimeConfidence() berechnet Konfidenz aus Regime-Basis (BULL_QUIET=85/BULL_FRAGILE=68/POST_PANIC=60/STRESS=48) − 8% pro MCM-Downgrade × dataQuality-Faktor (full/partial/minimal). Anzeige als "(~XX%)" neben home-regime-val — ~ = unkalibriert bis Sept. 2026 nach 60 Track-Record-Tagen. updateRegimeConfidenceDisplay() via ko:regimeChanged-Event-Bus. window._lastMcmCtx speichert ctx für dataQuality-Zugriff.
@@ -10646,8 +10646,9 @@ function updateRegimeConfidenceDisplay() {
 // Auto-Update bei jedem Regime-Wechsel (selber Event-Bus wie alle anderen Widgets)
 window.addEventListener('ko:regimeChanged', function() { updateRegimeConfidenceDisplay(); });
 
-// ── Score-Paar-Divergenz-Anzeige (Backlog #11, 28.07.2026) ───────────────────
-// Liest master.market.scoreDivergences[] aus _alphaData (Aggregator-Vorberechnung).
+// ── Score-Paar-Divergenz-Anzeige (Backlog #11 + #11b, 28./29.07.2026) ─────────
+// Server-seitige Paare: aus _alphaData.market.scoreDivergences[]
+// Client-seitige Paare (29.07.2026): Bull-Indicator vs. IOS-Score, TSI vs. Regime
 // Kein eigener API-Call — hängt sich in ko:regimeChanged-Event-Bus ein.
 function updateScoreDivergenceDisplay() {
   var card  = document.getElementById('home-divergence-card');
@@ -10655,11 +10656,121 @@ function updateScoreDivergenceDisplay() {
   var count = document.getElementById('home-divergence-count');
   if (!card || !list) return;
 
-  var divs = window._alphaData &&
+  var divs = (window._alphaData &&
              window._alphaData.market &&
-             window._alphaData.market.scoreDivergences;
+             window._alphaData.market.scoreDivergences)
 
-  if (!divs || !divs.length) {
+  ? divs.slice() : [];  // Kopie für client-seitige Ergänzung
+
+  // ── Client-seitige Paare (29.07.2026, Backlog #11b) ─────────────────────
+  // Bull-Indicator vs. IOS-Score: beide laufen nach Morning-Briefing-Gate.
+  // TSI vs. Regime: Treasury-Stress-Index aus DOM nach calcTreasuryStress().
+  (function() {
+    var ios    = window._alphaData && window._alphaData.market && window._alphaData.market.iosMarket;
+    var iosSc  = ios ? (ios.iosMarketScore || null) : null;
+    var regime = window._alphaData && window._alphaData.market && window._alphaData.market.snapshot &&
+                 window._alphaData.market.snapshot.data && window._alphaData.market.snapshot.data[0] &&
+                 window._alphaData.market.snapshot.data[0].regime;
+    if (!regime && window._lastMseResult) regime = window._lastMseResult.regime;
+    var isBull = regime && (regime.indexOf('BULL') !== -1 || regime.indexOf('POST_PANIC') !== -1);
+
+    // Paar 4: Bull-Indicator vs. IOS-Score ───────────────────────────────────
+    var mcmCtx   = window._lastMcmCtx;
+    var bullFac  = mcmCtx && mcmCtx.factors && mcmCtx.factors.bull_indicator;
+    var bullVal  = bullFac ? (typeof bullFac.value === 'number' ? bullFac.value : null) : null;
+
+    // Fallback: DOM direkt lesen
+    if (bullVal === null) {
+      var bullEl = document.getElementById('bull-score');
+      if (bullEl && bullEl.textContent && bullEl.textContent !== '—') {
+        var _b = parseFloat(String(bullEl.textContent).split('/')[0]);
+        if (!isNaN(_b)) bullVal = _b;
+      }
+    }
+
+    if (bullVal !== null && iosSc !== null) {
+      var delta = iosSc - bullVal;  // positiv = IOS optimistischer als Bull-Indicator
+      if (delta >= 30 && isBull) {
+        // IOS hoch, Bull-Indicator niedrig → Schein-Aufwärtstrend?
+        var sev = delta >= 45 ? 'high' : 'medium';
+        divs.push({
+          type: 'bull_vs_ios',
+          severity: sev,
+          scoreA: bullVal,
+          scoreB: iosSc,
+          delta: delta,
+          label: 'Bull-Indicator ' + bullVal + '/100 ↔ IOS ' + iosSc + '/100',
+          explanation:
+            'Der Bull-Indicator (' + bullVal + '/100) zeigt schwächere Markt-' +
+            'dynamik als der IOS-Market-Score (' + iosSc + '/100). ' +
+            'Der IOS-Score gewichtet Trend/Breadth/Risk/Rotation — der Bull-Indicator ' +
+            'integriert zusätzlich Markov-Regime, Intermarket-Signale und Treasury-Stress. ' +
+            'Die Lücke von ' + delta + ' Punkten deutet auf einen Markt hin, ' +
+            'der fundamental breiter läuft als die Makro-Qualität rechtfertigt. ' +
+            'Momentum-Setups mit erhöhtem Stop-Bewusstsein handeln.',
+        });
+      } else if (delta <= -30) {
+        // Bull-Indicator hoch, IOS niedrig — ungewöhnlich (Bull-Indicator ist konservativer)
+        var sev = delta <= -45 ? 'medium' : 'low';
+        divs.push({
+          type: 'bull_vs_ios',
+          severity: sev,
+          scoreA: bullVal,
+          scoreB: iosSc,
+          delta: Math.abs(delta),
+          label: 'Bull-Indicator ' + bullVal + '/100 ↔ IOS ' + iosSc + '/100',
+          explanation:
+            'Ungewöhnliche Konstellation: Bull-Indicator (' + bullVal + '/100) übertrifft ' +
+            'deutlich den IOS-Score (' + iosSc + '/100). ' +
+            'Makro-Faktoren (Regime, Intermarket, Treasury) signalisieren Stärke, ' +
+            'während Breadth/Rotation im IOS noch nachziehen. ' +
+            'Mögliches Frühzeichen einer Marktbeschleunigung — auf Bestätigung warten.',
+        });
+      }
+    }
+
+    // Paar 5: TSI (Treasury Stress) vs. Regime ──────────────────────────────
+    var tsiEl  = document.getElementById('tsi-score');
+    var tsiVal = tsiEl && tsiEl.textContent !== '—' ? parseInt(tsiEl.textContent) : null;
+
+    if (tsiVal !== null && !isNaN(tsiVal) && isBull) {
+      if (tsiVal > 60) {
+        divs.push({
+          type: 'tsi_vs_regime',
+          severity: 'high',
+          scoreA: regime,
+          scoreB: tsiVal,
+          delta: tsiVal,
+          label: 'TSI ' + tsiVal + '/100 ↔ Regime ' + (regime || '?'),
+          explanation:
+            'Der Treasury Stress Index (TSI: ' + tsiVal + '/100) zeigt erhöhten ' +
+            'Zinskurven-/Währungs-Stress, während das Makro-Regime (' + (regime || '?') + ') ' +
+            'noch bullisch klassifiziert. ' +
+            'VIX-Termstruktur und Treasury-Auktionsdruck divergieren: ' +
+            'Anleihen-Markt preist Risiken ein, die der Aktienmarkt noch ignoriert. ' +
+            'Historisch erhöhtes Regime-Downgrade-Risiko — Hebel reduzieren, ' +
+            'Breakout-Setups pausieren bis TSI < 40.',
+        });
+      } else if (tsiVal > 40) {
+        divs.push({
+          type: 'tsi_vs_regime',
+          severity: 'medium',
+          scoreA: regime,
+          scoreB: tsiVal,
+          delta: tsiVal,
+          label: 'TSI ' + tsiVal + '/100 ↔ Regime ' + (regime || '?'),
+          explanation:
+            'Der Treasury Stress Index (TSI: ' + tsiVal + '/100) liegt im erhöhten ' +
+            'Bereich, obwohl das Regime (' + (regime || '?') + ') bullisch ist. ' +
+            'Zinskurven-Inversion, starker Dollar oder schwache Auktionen ' +
+            'können Markt-Stress anzeigen der in VIX-Daten noch nicht sichtbar ist. ' +
+            'Selektiv vorgehen: Breakout-Setups bevorzugen, Overnight-Risiko beachten.',
+        });
+      }
+    }
+  })();
+
+  if (!divs.length) {
     card.style.display = 'none';
     return;
   }
