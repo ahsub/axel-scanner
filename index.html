@@ -33,7 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
-     v409: Dividend + Value Leaderboard-Tabs im Alpha Desk (28.07.2026, Backlog #13b): 2 neue Tab-Buttons (💰 Dividend / 📊 Value), Farb-Mapping (#f59e42 / #94a3b8), Chip-Tooltip mit Fundamental-Feldern (divYield, payoutRatio, fcfYield, roe / peForward, pb, analystUpside), scoreKey zeigt sDividend/sValue statt Composite-Score, _lbToStrat um long_dividend→dividend + long_value→value erweitert.
+     v410: Backlog #13b vollständig (29.07.2026): ko-strategies.js v2.4.0 + ko-prompts.js v2.3.0 mit dividend/value Strategien. kvToScannerState() ergänzt: long_dividend→sDividend, long_value→sValue in stratScores. tickerLines in runAlphaLbKI() um Fundamental-Felder (divYield/payoutRatio/fcfYield/ROE für Dividend; peForward/pb/fcfYield/analystUpside/ROE für Value) erweitert. CDN-Hashes: ko-strategies 4bcfe18→57c6f91, ko-prompts ab084ec→57c6f91.\n     v409: Dividend + Value Leaderboard-Tabs im Alpha Desk (28.07.2026, Backlog #13b): 2 neue Tab-Buttons (💰 Dividend / 📊 Value), Farb-Mapping (#f59e42 / #94a3b8), Chip-Tooltip mit Fundamental-Feldern (divYield, payoutRatio, fcfYield, roe / peForward, pb, analystUpside), scoreKey zeigt sDividend/sValue statt Composite-Score, _lbToStrat um long_dividend→dividend + long_value→value erweitert.
      v408: Score-Paar-Divergenz-Anzeige (28.07.2026, Backlog #11): updateScoreDivergenceDisplay() liest master.market.scoreDivergences[] aus _alphaData — 3 server-seitige Paare: (1) Regime vs. IOS-Score, (2) IOS-Trend vs. IOS-Breadth, (3) McClellan vs. Regime. Home-Panel: #home-divergence-card (amber-Border, initially hidden) erscheint nur bei aktiven Divergenzen. Severity-Farbkodierung (🔴 high / 🟡 medium / ⚪ low), 2-Zeilen-Erklärung + Tooltip. Eingebunden in ko:regimeChanged-Event-Bus + renderHomeLanding().
      v407: regimeConfidence + Breadth datenbasiert verbessert (27.07.2026): calcRegimeConfidence() um Z-Score Signalklarheit erweitert (252T-Fenster, avgZ VIX/VIX-Ratio/VVIX: >1.5σ=+10%, <0.5σ=−5%); mit heutigen Daten (avgZ≈0.4) ergibt BULL_QUIET ~80% statt 85%. Aggregator: regimeUsed + regimeStreak im Breadth-Archiv, Regime-Mehrheitsvotum aus results[].
      v406: regimeConfidence (27.07.2026, SUITE.md Backlog #21): calcRegimeConfidence() berechnet Konfidenz aus Regime-Basis (BULL_QUIET=85/BULL_FRAGILE=68/POST_PANIC=60/STRESS=48) − 8% pro MCM-Downgrade × dataQuality-Faktor (full/partial/minimal). Anzeige als "(~XX%)" neben home-regime-val — ~ = unkalibriert bis Sept. 2026 nach 60 Track-Record-Tagen. updateRegimeConfidenceDisplay() via ko:regimeChanged-Event-Bus. window._lastMcmCtx speichert ctx für dataQuality-Zugriff.
@@ -3355,7 +3355,7 @@ window.pinSubmit = function(){
 <!-- ko-strategies.js v2.1.0 — Commit-Hash 02644b8 (15.07.2026, Dead-Code-Audit:
      getFocus/getLabelList entfernt; vorher 785e61e/01.07.2026 Short-Strategie
      fading_short + Regelwerk-Erweiterung). type="module" erforderlich. -->
-<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4bcfe18/ko-strategies.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@57c6f91/ko-strategies.js"></script>
 
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
@@ -7699,6 +7699,8 @@ function kvToScannerState(r) {
     long_mr:        { score: r.sMrLong    || 0, label: 'Mean Rev. Long' },
     short_breakdown:{ score: r.sBreakdown || 0, label: 'Short Breakdown' },
     short_fading:   { score: r.sFading    || 0, label: 'Short Fading'   },
+    long_dividend:  { score: r.sDividend  || 0, label: 'Dividend Growth' },  // Backlog #13b (29.07.2026)
+    long_value:     { score: r.sValue     || 0, label: 'Value Investing'  },  // Backlog #13b (29.07.2026)
   };
 
   // SEPA-Proxy aus Minervini-Score (renderCard erwartet 0-8)
@@ -18358,6 +18360,8 @@ function kvToScannerState(r) {
     long_mr:        { score: r.sMrLong    || 0, label: 'Mean Rev. Long' },
     short_breakdown:{ score: r.sBreakdown || 0, label: 'Short Breakdown' },
     short_fading:   { score: r.sFading    || 0, label: 'Short Fading'   },
+    long_dividend:  { score: r.sDividend  || 0, label: 'Dividend Growth' },  // Backlog #13b (29.07.2026)
+    long_value:     { score: r.sValue     || 0, label: 'Value Investing'  },  // Backlog #13b (29.07.2026)
   };
 
   // SEPA-Proxy aus Minervini-Score (renderCard erwartet 0-8)
@@ -23545,6 +23549,23 @@ async function runAlphaLbKI() {
     if (t.vcpLastPct != null) line += ' VCP-Last:' + t.vcpLastPct + '%';
     if (t.vcpVolContraction != null) line += ' VCP-VolContr:' + t.vcpVolContraction.toFixed(2);
     if (t.vcpBreakoutVol != null) line += ' VCP-BrkVol:' + t.vcpBreakoutVol.toFixed(2) + 'x';
+    // Dividend-spezifische Felder (Backlog #13b, 29.07.2026)
+    if (_alphaLB === 'long_dividend') {
+      if (t.divYield    != null) line += ' DivYield:' + t.divYield + '%';
+      if (t.payoutRatio != null) line += ' Payout:' + t.payoutRatio + '%';
+      if (t.fcfYield    != null) line += ' FCF:' + t.fcfYield + '%';
+      if (t.roe         != null) line += ' ROE:' + t.roe + '%';
+      if (t.sDividend   != null) line += ' sDividend:' + t.sDividend;
+    }
+    // Value-spezifische Felder (Backlog #13b, 29.07.2026)
+    if (_alphaLB === 'long_value') {
+      if (t.peForward     != null) line += ' PE:' + t.peForward + 'x';
+      if (t.pb            != null) line += ' PB:' + t.pb;
+      if (t.fcfYield      != null) line += ' FCF:' + t.fcfYield + '%';
+      if (t.analystUpside != null) line += ' Upside:+' + t.analystUpside + '%';
+      if (t.roe           != null) line += ' ROE:' + t.roe + '%';
+      if (t.sValue        != null) line += ' sValue:' + t.sValue;
+    }
     return line;
   }).join('\n');
   var ctx = 'MARKTKONTEXT:\nVIX: ' + vix + '\nRegime (MSE): ' + mseRegime + '\nMarkov: ' + regime + '\n\nKANDIDATEN ' + _alphaLB.toUpperCase() + ' (Top-' + tickers.length + '):\n' + tickerLines;
@@ -24567,7 +24588,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@8838fb4/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@ab084ec/ko-prompts.js">
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@57c6f91/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@aa858e0/ko-indicators-loader.js"></script>
