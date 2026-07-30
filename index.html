@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260729-v413">
+<meta name="version" content="20260730-v414">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v414: ko-prompts-registry Sprint 2 (30.07.2026) — 3 verbliebene Inline-Prompts externalisiert: (1) autoMakro Intermarket-Analyse → KoPrompts.getIntermarketPrompt() (ko-prompts.js v2.4.0). (2) runOversoldScan → KoPrompts.getOversoldPrompt(). (3) runMetaAnalysis → KoPrompts.getMetaAnalysisPrompt(). Alle KI-Call-Prompts in index.html vollständig über KoPrompts-Modul — kein Inline-Prompt-String mehr. CDN-Hash ko-prompts: 57c6f91→690aa97f.
      v413: Score-Divergenzen im Morning-Briefing-Prompt (#11b, 29.07.2026): messwerteLines um --- SCORE-DIVERGENZEN ---Block ergänzt — server-seitige Paare (_alphaData.market.scoreDivergences) + client-seitige Paare (Bull vs. IOS, TSI vs. Regime, analog updateScoreDivergenceDisplay) werden zusammengeführt und mit Severity-Label + Formulierungshinweis an den Prompt übergeben. KI muss Divergenzen explizit thematisieren, nicht stillschweigend übergehen.
      v412: Backlog #19 Kosmetik-Rest (29.07.2026): list-select→eic-list-select (Namensdrift updateExistingWatchlist), preset-select→ticker-preset (2x Namensdrift), calcPortfolioRec() + Aufruf entfernt (r-portfolio-rec/r-port-details nie im HTML definiert, stille Dead-Function). ki-dropdown-wrap + overheat-text belassen (if-Guard-geschützt).
      v411: Score-Divergenz client-seitige Paare (29.07.2026, Backlog #11b): updateScoreDivergenceDisplay() um 2 client-seitige Paare erweitert — (4) Bull-Indicator vs. IOS-Score: _lastMcmCtx.factors.bull_indicator + DOM-Fallback vs. iosMarketScore, Schwelle Delta≥30 (medium) / ≥45 (high); (5) TSI vs. Regime: #tsi-score DOM-Wert vs. Regime, nur bei BULL-Regime aktiv, Schwelle >40 (medium) / >60 (high). Beide Paare nur aktiv wenn Morning-Briefing bereits calcBullIndicator/calcTreasuryStress gelaufen hat.\n     v410: Backlog #13b vollständig (29.07.2026): ko-strategies.js v2.4.0 + ko-prompts.js v2.3.0 mit dividend/value Strategien. kvToScannerState() ergänzt: long_dividend→sDividend, long_value→sValue in stratScores. tickerLines in runAlphaLbKI() um Fundamental-Felder (divYield/payoutRatio/fcfYield/ROE für Dividend; peForward/pb/fcfYield/analystUpside/ROE für Value) erweitert. CDN-Hashes: ko-strategies 4bcfe18→57c6f91, ko-prompts ab084ec→57c6f91.\n     v409: Dividend + Value Leaderboard-Tabs im Alpha Desk (28.07.2026, Backlog #13b): 2 neue Tab-Buttons (💰 Dividend / 📊 Value), Farb-Mapping (#f59e42 / #94a3b8), Chip-Tooltip mit Fundamental-Feldern (divYield, payoutRatio, fcfYield, roe / peForward, pb, analystUpside), scoreKey zeigt sDividend/sValue statt Composite-Score, _lbToStrat um long_dividend→dividend + long_value→value erweitert.
@@ -11308,60 +11309,14 @@ async function autoMakro(){
   const imSpread = document.getElementById('im-irx')?.querySelector('[style*="font-size:13px"]')?.textContent || '—';
   const imScore  = document.getElementById('im-score-label')?.textContent || '—';
 
-  const prompt =
-    'Du bist ein professioneller Finanzmarktanalyst der täglich eine Marktlageeinschätzung für einen aktiven Retail-Investor erstellt, der in deutschen und US-amerikanischen Märkten in KO-Turbo-Zertifikate und Aktienoptionen (Wheel-Strategie) investiert.\n\n' +
-    '== MARKTDATEN vom ' + today + ' ==\n' +
-    '\nINDIZES:\n' +
-    '- S&P 500: ' + sp + '\n' +
-    '- Nasdaq 100: ' + nq + '\n' +
-    '- VIX (Angstbarometer): ' + vix + '\n' +
-    '\nINTERMARKET-SIGNALE:\n' +
-    '- VVIX (Vola der Vola, Frühwarnindikator): ' + imVvix + '\n' +
-    '- AUD/USD (Risk-On Währung): ' + imAud + '\n' +
-    '- JPY/USD (Safe-Haven Währung): ' + imJpy + '\n' +
-    '- Intermarket Risk Score: ' + imScore + '\n' +
-    '\nROHSTOFFE & SAFE HAVEN:\n' +
-    '- Gold: ' + gold + '  |  Silber: ' + silver + '  |  Kupfer: ' + copper + '\n' +
-    '- WTI Öl: ' + oil2 + '\n' +
-    '\nMAKRO: INFLATION & ZINSEN:\n' +
-    '- TIPS ETF (Inflationserwartungen): ' + imTip + '\n' +
-    '- 10J-3M Spread (Yield Curve): ' + imSpread + '\n' +
-    '\nMAKRO: HOUSING & IMMOBILIEN:\n' +
-    '- Hausbauer ETF ITB: ' + imItb + '\n' +
-    '- REIT ETF VNQ: ' + imVnq + '\n' +
-    '\nKRYPTO (Risikosentiment):\n' +
-    '- Bitcoin: ' + btc + '  |  Ethereum: ' + eth + '  |  Solana: ' + sol + '\n' +
-    sektorContext + newsContext + consistencyHint + '\n\n' +
-
-    '== AUFGABE ==\n' +
-    'Erstelle eine ausführliche, rein faktenbasierte Marktlageeinschätzung. Verwende AUSSCHLIESSLICH die oben angegebenen Daten. Erfinde KEINE Kurse, Prozentzahlen oder Ereignisse.\n\n' +
-
-    'Analysiere dabei folgende Themenbereiche soweit die Daten es erlauben:\n' +
-    '1. MARKTREGIME: Ist der Markt Risk-On oder Risk-Off? Begründe mit konkreten Intermarket-Signalen.\n' +
-    '2. SEKTORROTATION: Welche Sektoren führen, welche hinken nach? Konkrete Implikationen für Positionierung.\n' +
-    '3. TECHNOLOGIE & WACHSTUM: Lage der Hyperscaler (MSFT, AMZN, GOOGL, META), Halbleiter/Chip-Hersteller (NVDA, AMD, AVGO, AMAT), KI-Infrastruktur, Robotik. Nur wenn Sektor-Daten vorhanden.\n' +
-    '4. ZINSEN & INFLATION: Interpretation der Yield Curve, Inflationserwartungen, Implikationen für zinssensitive Sektoren (Versorger, REITs, Immobilien).\n' +
-    '5. ENERGIE & ROHSTOFFE: Öl, Kupfer, Gold — was signalisieren sie über globales Wachstum?\n' +
-    '6. HOUSING USA: Lage des Immobilienmarkts, Bauaktivität, Implikationen für Zinserwartungen.\n' +
-    '7. CONSUMER & DEFENSIVE: Stärke der Consumer-Aktien als Konjunkturindikator.\n' +
-    '8. KONKRETE HANDLUNGSEMPFEHLUNG: Für KO-Trader und Options-Wheel-Strategie — welche Sektoren bevorzugen, welche meiden, Positionsgröße, KO-Abstand.\n\n' +
-
-    'Erstelle das Ergebnis als JSON mit dieser Struktur:\n' +
-    '{\n' +
-    '  "verdict": "bull" oder "neu" oder "bear",\n' +
-    '  "verdictText": "3-4 Sätze Gesamteinschätzung mit konkreter Handlungsempfehlung auf Deutsch",\n' +
-    '  "factors": [\n' +
-    '    {"icon":"bull","title":"Thema","desc":"Faktenbasierte Analyse 2-3 Sätze mit Implikation für Investor"},\n' +
-    '    ... (5-8 Faktoren, jeder Themenbereich der abgedeckt ist bekommt einen Eintrag)\n' +
-    '  ]\n' +
-    '}\n\n' +
-    'Regeln:\n' +
-    '- icon: nur "bull", "neu" oder "bear"\n' +
-    '- Jeder factor.desc: 2-3 Sätze, faktenbasiert, mit konkreter Implikation\n' +
-    '- Wenn Daten für ein Thema fehlen: diesen Faktor weglassen\n' +
-    '- Kein Faktor ohne Datenbasis aus dem Prompt\n' +
-    '- Antworte NUR mit dem JSON, kein weiterer Text\n' +
-    '- Sprache: Deutsch, professionell aber verständlich';
+  // Prompt via KoPrompts-Modul (ko-prompts.js v2.4.0) — kein Inline-Prompt mehr
+  const prompt = (typeof KoPrompts !== 'undefined' && KoPrompts.getIntermarketPrompt)
+    ? KoPrompts.getIntermarketPrompt({
+        today, sp, nq, vix, gold, silver, copper, oil2, btc, eth, sol,
+        imVvix, imAud, imJpy, imTip, imItb, imVnq, imSpread, imScore,
+        sektorContext, newsContext, consistencyHint
+      })
+    : '[Fehler: KoPrompts nicht geladen — Intermarket-Analyse nicht möglich]';
 
   try {
     // KI-Call via ko-ai Worker (System-Prompt + API-Key serverside)
@@ -19345,14 +19300,13 @@ async function runOversoldScan() {
     return c.sym + ': RSI=' + c.rsi + ' | 52W-H: ' + c.dist52wHigh + '% | MA50: ' + c.distMa50 + '% | Vol: ' + c.volRatio + '% Ø | MACD: ' + (c.macdBull ? 'bull' : c.macdBull === false ? 'bear' : 'n/a') + ' | OBV: ' + (c.obvBull ? 'bull' : c.obvBull === false ? 'bear' : 'n/a') + ' | Score: ' + c.score;
   }).join('\n');
 
-  const prompt = 'Du bist ein erfahrener technischer Analyst spezialisiert auf Oversold-Rebounds.\n\n'
-    + 'VIX zum Scanzeitpunkt: ' + (_vixLevel ? _vixLevel.toFixed(1) : 'unbekannt') + '\n\n'
-    + 'Folgende Titel zeigen potenzielle Oversold-Signale (RSI niedrig, unter MA50 oder 52W-Hoch stark gefallen):\n\n'
-    + candidateStr + '\n\n'
-    + 'AUFGABE: Bewerte jeden Titel auf Oversold-Rebound-Potenzial. Antworte NUR mit JSON, kein anderer Text:\n'
-    + '{"candidates":[{"sym":"AAPL","oversold_score":75,"rebound_days":"3-7","rationale":"RSI 28, Volume-Spike, MACD dreht","risk":"BEAR-Markt, kein Boden bestätigt"}]}\n'
-    + 'oversold_score: 0-100 (100 = maximale Oversold-Wahrscheinlichkeit). HVP aus Scandaten berücksichtigen: >50% = erhöhte Vola = Rebound-Chance höher aber auch Risiko. Wenn kein HVP: NICHT erfinden.\n'
-    + 'Sortiere absteigend nach oversold_score. Nur Titel mit oversold_score >= 40 zurückgeben.';
+  // Prompt via KoPrompts-Modul (ko-prompts.js v2.4.0) — kein Inline-Prompt mehr
+  const prompt = (typeof KoPrompts !== 'undefined' && KoPrompts.getOversoldPrompt)
+    ? KoPrompts.getOversoldPrompt({
+        vix: _vixLevel ? _vixLevel.toFixed(1) : 'unbekannt',
+        candidateStr
+      })
+    : '[Fehler: KoPrompts nicht geladen]';
 
   try {
     const text = await koAiCall('oversold', prompt, false);
@@ -19950,15 +19904,10 @@ async function runMetaAnalysis() {
     });
   }
 
-  const prompt = 'Du bist ein quantitativer Analyst der Trading-Scanner-Systeme optimiert.\n\n'
-    + ctx + '\n\n'
-    + 'AUFGABE: Meta-Analyse dieser Backtesting-Daten.\n'
-    + '1. STÄRKEN: Welche Gewichtungsvariante zeigt die robusteste Performance? Warum?\n'
-    + '2. SCHWÄCHEN: Was funktioniert nicht? Welche Signale sind wenig prädiktiv?\n'
-    + '3. KONFIDENZ: Wie belastbar sind die Aussagen bei ' + dp + ' Datenpunkten?\n'
-    + '4. EMPFEHLUNG: Konkrete Gewichtungsanpassung (Tech/SEPA/BP/Sticky/Vol, Summe=100) und Begründung.\n'
-    + '5. NÄCHSTE SCHRITTE: Was sollte gesammelt werden um die Datenbasis zu verbessern?\n\n'
-    + 'Antworte auf Deutsch, strukturiert 1-5. Max. 350 Wörter. Vollständig abschließen.';
+  // Prompt via KoPrompts-Modul (ko-prompts.js v2.4.0) — kein Inline-Prompt mehr
+  const prompt = (typeof KoPrompts !== 'undefined' && KoPrompts.getMetaAnalysisPrompt)
+    ? KoPrompts.getMetaAnalysisPrompt({ backtestCtx: ctx, dp })
+    : '[Fehler: KoPrompts nicht geladen]';
 
   try {
     const text = await koAiCall('meta_analysis', prompt, false);
@@ -24720,7 +24669,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@8838fb4/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@57c6f91/ko-prompts.js">
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@690aa97f/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@aa858e0/ko-indicators-loader.js"></script>
