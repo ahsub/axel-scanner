@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260730-v414">
+<meta name="version" content="20260730-v415">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v415: ko-indicators-registry Sprint (30.07.2026) — STRATEGY_TO_LB + _lbToStrat als Single Source of Truth in ko-prompts.js v2.5.0 verankert. Neue API: KoPrompts.getLbKey(stratId), KoPrompts.stratFromLb(lbKey), KoPrompts.getStratToLbMap(). Beide Tabellen aus index.html entfernt (5 aktive Call-Sites umgestellt). CDN-Hash ko-prompts: 422f28ce→84611613.
      v414: ko-prompts-registry Sprint 2 (30.07.2026) — 3 verbliebene Inline-Prompts externalisiert: (1) autoMakro Intermarket-Analyse → KoPrompts.getIntermarketPrompt() (ko-prompts.js v2.4.0). (2) runOversoldScan → KoPrompts.getOversoldPrompt(). (3) runMetaAnalysis → KoPrompts.getMetaAnalysisPrompt(). Alle KI-Call-Prompts in index.html vollständig über KoPrompts-Modul — kein Inline-Prompt-String mehr. CDN-Hash ko-prompts: 57c6f91→422f28ce.
      v413: Score-Divergenzen im Morning-Briefing-Prompt (#11b, 29.07.2026): messwerteLines um --- SCORE-DIVERGENZEN ---Block ergänzt — server-seitige Paare (_alphaData.market.scoreDivergences) + client-seitige Paare (Bull vs. IOS, TSI vs. Regime, analog updateScoreDivergenceDisplay) werden zusammengeführt und mit Severity-Label + Formulierungshinweis an den Prompt übergeben. KI muss Divergenzen explizit thematisieren, nicht stillschweigend übergehen.
      v412: Backlog #19 Kosmetik-Rest (29.07.2026): list-select→eic-list-select (Namensdrift updateExistingWatchlist), preset-select→ticker-preset (2x Namensdrift), calcPortfolioRec() + Aufruf entfernt (r-portfolio-rec/r-port-details nie im HTML definiert, stille Dead-Function). ki-dropdown-wrap + overheat-text belassen (if-Guard-geschützt).
@@ -5568,18 +5569,9 @@ function unlockApp(){
    * bewusst NICHT geraten, sondern die Button-Optik entfernt (flache
    * Info-Pille statt Pill-Button).
    */
-  var STRATEGY_TO_LB = {
-    ko:           'ko_long',
-    momentum:     'long_minervini',
-    breakout:     'long_breakout',   // NEU (25.07.2026, Backlog #13a)
-    vcp:          'vcp_setups',      // NEU (25.07.2026, Backlog #13a)
-    swing:        'long_swing',
-    meanrev:      'long_mr',
-    fading_short: 'short_fading_ko',
-    csp_wheel:    'options_csp',
-    cc:           'options_cc',
-    // atmna / weekly_income / collar: kein eigener LB-Tab → bleiben Info-Pillen
-  };
+  // STRATEGY_TO_LB entfernt (30.07.2026, ko-indicators-registry Sprint) —
+  // Single Source of Truth: KoPrompts.getLbKey(stratId) aus ko-prompts.js v2.5.0
+  // Verwendung: KoPrompts.getLbKey('ko') → 'ko_long'; null = kein LB-Tab
   /**
    * Rendert eine Strategie-Ampel in ein Ziel-Element.
    * @param {HTMLElement} el - Ziel-Container
@@ -5603,7 +5595,7 @@ function unlockApp(){
       var s = result.strategies[k];
       var c = cMap[s.color || (s.active ? 'green' : 'red')] || cMap.red;
       var isValue = opts.withValueClick && k === 'value';
-      var lbKey   = STRATEGY_TO_LB[k];
+      var lbKey   = (typeof KoPrompts !== 'undefined' && KoPrompts.getLbKey) ? KoPrompts.getLbKey(k) : null;
       var clickable = isValue || !!lbKey;
 
       var clickFn = '';
@@ -23433,21 +23425,9 @@ function renderAlphaLB(lb, key) {
 }
 
 // Mapping Leaderboard-Key → passende KI-Strategie
-var _lbToStrat = {
-  long_minervini:  'momentum',
-  long_swing:      'swing',
-  long_mr:         'meanrev',
-  long_breakout:   'breakout',   // NEU (21.07.2026): Breakout-Leaderboard → breakout-Prompt
-  short_breakdown: 'breakdown',
-  short_fading:    'fading_short',
-  short_fading_ko: 'fading_short',
-  ko_long:         'ko',
-  options_csp:     'csp_wheel',  // BUGFIX (21.07.2026): war 'options' (alter Key, gibt null)
-  options_cc:      'cc',         // BUGFIX (21.07.2026): war 'weekly_income' (falsches Mapping)
-  vcp_setups:      'vcp',
-  long_dividend:   'dividend',   // Backlog #13b (28.07.2026)
-  long_value:      'value',      // Backlog #13b (28.07.2026)
-};
+// _lbToStrat entfernt (30.07.2026, ko-indicators-registry Sprint) —
+// Single Source of Truth: KoPrompts.stratFromLb(lbKey) aus ko-prompts.js v2.5.0
+// Verwendung: KoPrompts.stratFromLb('ko_long') → 'ko'
 
 /**
  * REVERT (15.07.2026, Axel-Korrektur zu Arbeitspaket E Punkt 2): Die
@@ -23508,7 +23488,7 @@ async function runBestOpportunityKI() {
 
   var best = top5[0].ticker;
   var bestLbKey = top5[0].lbKey;
-  var strat = _lbToStrat[bestLbKey] || 'momentum';
+  var strat = (typeof KoPrompts !== 'undefined' && KoPrompts.stratFromLb) ? (KoPrompts.stratFromLb(bestLbKey) || 'momentum') : 'momentum';
   var stratCfg = (typeof KI_STRAT_CONFIG !== 'undefined') ? KI_STRAT_CONFIG[strat] : null;
   if (!stratCfg) { if (statusEl) statusEl.textContent = 'Strategie-Config fehlt'; return; }
 
@@ -23519,7 +23499,7 @@ async function runBestOpportunityKI() {
 
   var candidateLines = top5.map(function(c, i) {
     var t = c.ticker;
-    var lbStrat = _lbToStrat[c.lbKey] || c.lbKey;
+    var lbStrat = (typeof KoPrompts !== 'undefined' && KoPrompts.stratFromLb) ? (KoPrompts.stratFromLb(c.lbKey) || c.lbKey) : c.lbKey;
     var stratLabel = (typeof KI_STRAT_CONFIG !== 'undefined' && KI_STRAT_CONFIG[lbStrat]) ? KI_STRAT_CONFIG[lbStrat].label : c.lbKey;
     return (i+1) + '. ' + (t.sym||t.ticker||'?')
       + ' [' + stratLabel + ']'
@@ -23554,7 +23534,7 @@ async function runBestOpportunityKI() {
       + '<div style="margin-bottom:.75rem;display:flex;flex-direction:column;gap:4px">'
       + top5.map(function(c, i) {
           var t = c.ticker;
-          var lbStrat = _lbToStrat[c.lbKey] || c.lbKey;
+          var lbStrat = (typeof KoPrompts !== 'undefined' && KoPrompts.stratFromLb) ? (KoPrompts.stratFromLb(c.lbKey) || c.lbKey) : c.lbKey;
           var stratLabel = (typeof KI_STRAT_CONFIG !== 'undefined' && KI_STRAT_CONFIG[lbStrat]) ? KI_STRAT_CONFIG[lbStrat].label : c.lbKey;
           var scoreColor = (t.score||t.compositeScore||0) >= 70 ? 'var(--green)' : (t.score||t.compositeScore||0) >= 50 ? 'var(--amber)' : 'var(--red)';
           return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg2);border-radius:8px;' + (i===0?'border:0.5px solid var(--accent)':'border:0.5px solid var(--border)') + '">'
@@ -23595,7 +23575,7 @@ async function runAlphaLbKI() {
     return;
   }
 
-  var strat = _lbToStrat[_alphaLB] || 'momentum';
+  var strat = (typeof KoPrompts !== 'undefined' && KoPrompts.stratFromLb) ? (KoPrompts.stratFromLb(_alphaLB) || 'momentum') : 'momentum';
   var stratCfg = (typeof KI_STRAT_CONFIG !== 'undefined') ? KI_STRAT_CONFIG[strat] : null;
   if (!stratCfg) { if (statusEl) statusEl.textContent = 'Strategie-Config fehlt'; return; }
   if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere…';
@@ -24669,7 +24649,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@8838fb4/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@422f28ce/ko-prompts.js">
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@84611613/ko-prompts.js">
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@aa858e0/ko-indicators-loader.js"></script>
