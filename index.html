@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v416: Track-Record Phase C (31.07.2026): ko-trackrecord.js v1.0.0 eingebunden — CDN @a3d667c9. Neuer Tab "📊 Track-Record" im Alpha Desk, nur im EIC-Modus sichtbar (Spec §9.3, BaFin). loadTrackRecord() lädt tr:stats via ko-sync, rendert Strategie×Regime-Matrix (h30, hitFresh, avg, alpha, Mindest-n=20). Tab erscheint/verschwindet mit toggleExpertMode(). Erste h30-Daten ab 01.08.2026 (Track-Record Tag 30).
      v415: ko-indicators-registry Sprint (30.07.2026) — STRATEGY_TO_LB + _lbToStrat als Single Source of Truth in ko-prompts.js v2.5.0 verankert. Neue API: KoPrompts.getLbKey(stratId), KoPrompts.stratFromLb(lbKey), KoPrompts.getStratToLbMap(). Beide Tabellen aus index.html entfernt (5 aktive Call-Sites umgestellt). CDN-Hash ko-prompts: 422f28ce→84611613.
      v414: ko-prompts-registry Sprint 2 (30.07.2026) — 3 verbliebene Inline-Prompts externalisiert: (1) autoMakro Intermarket-Analyse → KoPrompts.getIntermarketPrompt() (ko-prompts.js v2.4.0). (2) runOversoldScan → KoPrompts.getOversoldPrompt(). (3) runMetaAnalysis → KoPrompts.getMetaAnalysisPrompt(). Alle KI-Call-Prompts in index.html vollständig über KoPrompts-Modul — kein Inline-Prompt-String mehr. CDN-Hash ko-prompts: 57c6f91→422f28ce.
      v413: Score-Divergenzen im Morning-Briefing-Prompt (#11b, 29.07.2026): messwerteLines um --- SCORE-DIVERGENZEN ---Block ergänzt — server-seitige Paare (_alphaData.market.scoreDivergences) + client-seitige Paare (Bull vs. IOS, TSI vs. Regime, analog updateScoreDivergenceDisplay) werden zusammengeführt und mit Severity-Label + Formulierungshinweis an den Prompt übergeben. KI muss Divergenzen explizit thematisieren, nicht stillschweigend übergehen.
@@ -2773,6 +2774,12 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
             style="font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer">
             &#x1F3AF; Options-Desk
           </button>
+          <!-- Track-Record Tab: nur EIC-Modus (Spec §9.3) -->
+          <button id="alpha-tab-trackrecord" onclick="switchAlphaTab('trackrecord')"
+            style="font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;display:none"
+            title="Track-Record — historische Signal-Statistik (EIC)">
+            &#x1F4CA; Track-Record
+          </button>
           <!-- Value-Tab entfernt (17.07.2026, Regime-Coverage-Analyse): Value-Strategie
                hat in KEINEM der 5 MSE-Regime Prioritaet-1-Status — konzeptionell keine
                Timing-Strategie, sondern Buy-and-Hold. Vorgesehen fuer spaeteres DepotIQ.
@@ -2925,6 +2932,21 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     </div>
     <div id="options-desk-cards" style="display:flex;flex-direction:column;gap:.5rem">
       <div style="color:var(--text3);font-size:12px;text-align:center;padding:1.5rem">Tab w&auml;hlen um zu laden.</div>
+    </div>
+  </div>
+
+  <!-- ── TRACK-RECORD (EIC-only, Spec §9.3) ──────────────────────────── -->
+  <div id="alpha-panel-trackrecord" style="display:none;padding:.75rem 1rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+      <div style="font-size:10px;color:var(--text3);letter-spacing:1px">TRACK-RECORD &mdash; HISTORISCHE SIGNAL-STATISTIK</div>
+      <button onclick="loadTrackRecord(true)" id="tr-refresh-btn"
+        style="font-size:10px;padding:2px 8px;border-radius:6px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text3);cursor:pointer"
+        title="Track-Record neu laden">&#8635; Aktualisieren</button>
+    </div>
+    <div id="tr-matrix-container">
+      <div style="color:var(--text3);font-size:12px;text-align:center;padding:2rem">
+        Track-Record wird geladen&hellip;
+      </div>
     </div>
   </div>
 </div>
@@ -20819,6 +20841,9 @@ function toggleExpertMode(checked) {
     showToast('🔬 Expert-Modus aktiviert — explizite Empfehlungen freigeschaltet');
     var sw = document.getElementById('eic-suggest-wrap');
     if (sw) sw.style.display = 'block';
+    // Track-Record Tab im EIC-Modus einblenden (Spec §9.3)
+    var trBtn = document.getElementById('alpha-tab-trackrecord');
+    if (trBtn) trBtn.style.display = '';
   } else {
     if (slider) slider.style.background = 'var(--bg2)';
     if (slider) slider.style.borderColor = 'var(--border2)';
@@ -20831,7 +20856,57 @@ function toggleExpertMode(checked) {
     showToast('Public-Modus aktiv — BaFin-konforme Ausgaben');
     var sw2 = document.getElementById('eic-suggest-wrap');
     if (sw2) sw2.style.display = 'none';
+    // Track-Record Tab ausblenden + Panel zurücksetzen
+    var trBtn2 = document.getElementById('alpha-tab-trackrecord');
+    if (trBtn2) trBtn2.style.display = 'none';
+    var trPanel = document.getElementById('alpha-panel-trackrecord');
+    if (trPanel) trPanel.style.display = 'none';
+    // Zurück zur Shortlist wenn TR-Tab aktiv war
+    if (document.getElementById('alpha-panel-trackrecord') &&
+        document.getElementById('alpha-panel-trackrecord').style.display !== 'none') {
+      switchAlphaTab('shortlist');
+    }
   }
+}
+
+// ── Track-Record Lade-Funktion (Phase C, 31.07.2026) ─────────────────────────
+// Lädt tr:stats aus KV via TrackRecord-Modul und rendert die Matrix.
+// EIC-only (Spec §9.3) — Aufruf nur aus switchAlphaTab('trackrecord').
+var _trLoaded = false;
+function loadTrackRecord(force) {
+  var container = document.getElementById('tr-matrix-container');
+  if (!container) return;
+  if (_trLoaded && !force) return; // bereits geladen, kein Refresh nötig
+
+  if (typeof window.TrackRecord === 'undefined') {
+    container.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:2rem">' +
+      '⚠ TrackRecord-Modul nicht geladen — Seite neu laden.</div>';
+    return;
+  }
+
+  container.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:2rem">' +
+    '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Lade Track-Record…</div>';
+
+  var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
+
+  // Styles einmalig injizieren
+  if (typeof window.TrackRecord.injectStyles === 'function') window.TrackRecord.injectStyles();
+
+  window.TrackRecord.load(koSync).then(function(ok) {
+    if (!ok) {
+      container.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:2rem">' +
+        '⚠ Track-Record nicht verfügbar: ' + (window.TrackRecord.error || 'Unbekannter Fehler') +
+        '<br><span style="font-size:11px">Daten reifen ab Tag 30 (02.08.2026)</span></div>';
+      return;
+    }
+    window.TrackRecord.renderMatrix(container);
+    _trLoaded = true;
+    console.log('[TrackRecord] Matrix gerendert — tr:stats geladen');
+  }).catch(function(e) {
+    container.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:2rem">' +
+      '⚠ Fehler: ' + e.message + '</div>';
+    console.error('[TrackRecord] loadTrackRecord Fehler:', e);
+  });
 }
 
 function initExpertMode() {
@@ -22597,7 +22672,7 @@ function setOptionsSort(key) {
 }
 
 function switchAlphaTab(tab) {
-  ['shortlist','options','value'].forEach(function(t) {
+  ['shortlist','options','value','trackrecord'].forEach(function(t) {
     var panel = document.getElementById('alpha-panel-' + t);
     var btn   = document.getElementById('alpha-tab-' + t);
     if (!panel || !btn) return;
@@ -22608,6 +22683,10 @@ function switchAlphaTab(tab) {
     btn.style.borderColor = isActive ? 'var(--accent)' : 'var(--border2)';
     btn.style.fontWeight  = isActive ? '600'           : 'normal';
   });
+  // Track-Record beim ersten Öffnen laden
+  if (tab === 'trackrecord') {
+    loadTrackRecord(false);
+  }
   // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket F): "Options-Desk als
   // vollwertiger Modus ... verdrängt (statt versteckt darunter) die Master-
   // Shortlist" — die reine Equity-Long/Short-Leaderboard-Leiste (Minervini/
@@ -24653,6 +24732,8 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@aa858e0/ko-indicators-loader.js"></script>
+<!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@a3d667c9/ko-trackrecord.js"></script>
 
   </div><!-- /content -->
   </div><!-- /main-content -->
