@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260730-v415">
+<meta name="version" content="20260801-v417">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v417: DE-Modus Erweiterung (01.08.2026): TRADEGATE_MAP +18 verifizierte Einträge (BRKB→BRY, KO→CCC3, PG→PGG, PM→PM1, C→CIT, CSCO→CSC0, T→RHAT, TMUS→T1MU, CMCSA→CBC3, SPGI→SPG1, BX→BXD, ABNB→AB9, LULU→LUL, BIIB→BII, MO→PHM1, WM→WM2, CI→CI1, GD→GD1). TG-Premarket Preset auf IWV Top-100 (nach Gewichtung) erweitert — vorher nur TRADEGATE_MAP-Keys (~110), jetzt feste IWV-Top-100-Liste; Stocks ohne Map-Eintrag nutzen US-Ticker+.F-Fallback (funktioniert für UNH.F, PFE.F, LIN.F etc.).
      v416: Track-Record Phase C (31.07.2026): ko-trackrecord.js v1.0.0 eingebunden — CDN @a3d667c9. Neuer Tab "📊 Track-Record" im Alpha Desk, nur im EIC-Modus sichtbar (Spec §9.3, BaFin). loadTrackRecord() lädt tr:stats via ko-sync, rendert Strategie×Regime-Matrix (h30, hitFresh, avg, alpha, Mindest-n=20). Tab erscheint/verschwindet mit toggleExpertMode(). Erste h30-Daten ab 01.08.2026 (Track-Record Tag 30).
      v415: ko-indicators-registry Sprint (30.07.2026) — STRATEGY_TO_LB + _lbToStrat als Single Source of Truth in ko-prompts.js v2.5.0 verankert. Neue API: KoPrompts.getLbKey(stratId), KoPrompts.stratFromLb(lbKey), KoPrompts.getStratToLbMap(). Beide Tabellen aus index.html entfernt (5 aktive Call-Sites umgestellt). CDN-Hash ko-prompts: 422f28ce→84611613.
      v414: ko-prompts-registry Sprint 2 (30.07.2026) — 3 verbliebene Inline-Prompts externalisiert: (1) autoMakro Intermarket-Analyse → KoPrompts.getIntermarketPrompt() (ko-prompts.js v2.4.0). (2) runOversoldScan → KoPrompts.getOversoldPrompt(). (3) runMetaAnalysis → KoPrompts.getMetaAnalysisPrompt(). Alle KI-Call-Prompts in index.html vollständig über KoPrompts-Modul — kein Inline-Prompt-String mehr. CDN-Hash ko-prompts: 57c6f91→422f28ce.
@@ -6656,9 +6657,23 @@ function getTickers(){
     return ibdData.filter(function(r){ return r.ticker; }).map(function(r){ return {sym:r.ticker, name:r.name}; });
   }
   if(preset==='tg-premarket'){
-    // US-Aktien auf Tradegate: TRADEGATE_MAP-Einträge als Scan-Basis
-    // Ticker bleiben US-Symbole — Scanner nutzt getTradegateSym() intern für Kurse
-    var tgList = Object.keys(TRADEGATE_MAP).map(function(us){
+    // IWV Top-100 (nach Gewichtung, Stand 24.07.2026) als Scan-Basis für Tradegate Pre-Market.
+    // Tickers mit explizitem Eintrag in TRADEGATE_MAP → korrektes DE-Symbol via getTradegateSym().
+    // Tickers OHNE Eintrag → Fallback auf US-Ticker + .F-Suffix (Yahoo Finance), funktioniert für
+    // die meisten Large-Caps (UNH.F, PFE.F, LIN.F etc.).
+    var TG_PRESET_IWV100 = [
+      "NVDA","AAPL","MSFT","AMZN","GOOGL","AVGO","GOOG","META","MU","LLY",
+      "JPM","BRKB","TSLA","AMD","XOM","JNJ","V","WMT","ABBV","CSCO",
+      "MA","AMAT","COST","BAC","INTC","CAT","LRCX","UNH","GE","CVX",
+      "PG","HD","MRK","KO","GS","PM","NFLX","RTX","KLAC","PLTR",
+      "WFC","PANW","TXN","MS","LIN","C","TMO","AMGN","NOW","BLK",
+      "CRM","AXP","HON","ORCL","ISRG","LOW","T","IBM","MDT","ETN",
+      "BSX","ADP","BKNG","SYK","MMC","CB","SCHW","PGR","VRTX","REGN",
+      "ADI","NEE","ABNB","GILD","CMCSA","COF","USB","AMT","LULU","SNPS",
+      "CDNS","TJX","MO","PLD","APH","CI","QCOM","CTAS","MSI","GD",
+      "NXPI","DHR","AON","ICE","CME","ADBE","ZTS","MRVL","WDAY","SPGI",
+    ];
+    var tgList = TG_PRESET_IWV100.map(function(us){
       return {sym: us, name: us, _tgMode: true};
     });
     return tgList;
@@ -13446,23 +13461,32 @@ var TRADEGATE_MAP = {
   // Consumer Tech
   "NFLX":"NFL","UBER":"UT8","SHOP":"SHOP","PYPL":"PYP","SQ":"SQ2",
   "HOOD":"HDD","SOFI":"SF3","AFRM":"AFR",
+  "ABNB":"AB9","LULU":"LUL",
   // Healthcare & Pharma
   "JNJ":"JNJ","LLY":"LLY","ABT":"ABT","MRK":"MRK","ABBV":"4AB","TMO":"TMO",
   "ISRG":"IS8","REGN":"REG","VRTX":"VRX","GILD":"GIS","AMGN":"AGN",
   "MRNA":"MO4","BNTX":"22UA","NVO":"NOVO","AZN":"AZN",
+  "BIIB":"BII",
   // Financials
   "JPM":"JPM","BAC":"BAC","WFC":"WFC","GS":"GOS","MS":"DWD","BLK":"BL3",
-  "V":"VIS","MA":"MAC","AXP":"AXP","SCHW":"SCH","PYPL":"PYP",
+  "V":"VIS","MA":"MAC","AXP":"AXP","SCHW":"SCH",
+  "C":"CIT","BX":"BXD","SPGI":"SPG1","CI":"CI1",
   // Consumer & Retail
-  "AMZN":"AMZ","COST":"CTO","WMT":"WMT","HD":"HDI","MCD":"MDO","SBUX":"SRB",
+  "COST":"CTO","WMT":"WMT","HD":"HDI","MCD":"MDO","SBUX":"SRB",
   "NKE":"NKE","BKNG":"BCO",
+  "PG":"PGG","KO":"CCC3","PM":"PM1","MO":"PHM1",
   // Energy
   "XOM":"XONA","CVX":"CVX","COP":"COP","SLB":"SLB","BP":"BP2","SHEL":"R6C",
   // Industrial
   "CAT":"CAT","HON":"HON","DE":"DE","GE":"GEC","BA":"BCO","LMT":"LOM",
   "RTX":"RTX","NOC":"NOC","UPS":"UPS","UNP":"UNP",
+  "GD":"GD1","WM":"WM2",
+  // Telecom & Conglomerates
+  "CSCO":"CSC0","IBM":"IBM","T":"RHAT","TMUS":"T1MU","CMCSA":"CBC3",
+  // Berkshire
+  "BRKB":"BRY",
   // EV / Auto
-  "TSLA":"TL0","F":"FMC","GM":"GM","RIVN":"RVN","LCID":"LCD",
+  "F":"FMC","GM":"GM","RIVN":"RVN","LCID":"LCD",
   // China ADRs
   "BABA":"AHLA","JD":"JD3","PDD":"PDD","BIDU":"B1C","NIO":"NIO",
 };
