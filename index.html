@@ -8710,7 +8710,22 @@ function renderCard(t,state){
       var nhTip = nh ? ' · RS New High \u2605' : '';
       return '<span title="RS-Rank Score (SPY+IWM)' + nhTip + ' · Grade: ' + gr + '" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:.03em;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">' + (nh ? '\u2605 ' : '') + gr + ' ' + sc + '</span>';
     })(state.rsScore, state.rsGrade||'?', state.rsNewHigh) : '')+
-     '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"'+
+    /* AVWAP Badge (August 2026) — zeigt Distanz zum Anchored VWAP */
+    (state.distToAvwapPct != null ? (function(dist, above, slope){
+      var col = above
+        ? (Math.abs(dist) <= 3 ? 'var(--amber)' : dist > 8 ? 'var(--red)' : 'var(--green)')
+        : 'var(--red)';
+      var bg  = above
+        ? (Math.abs(dist) <= 3 ? 'rgba(245,158,11,0.12)' : dist > 8 ? 'rgba(240,86,86,0.10)' : 'rgba(52,194,110,0.10)')
+        : 'rgba(240,86,86,0.10)';
+      var ico = above ? (Math.abs(dist) <= 3 ? '⚡' : dist > 8 ? '🔥' : '⚓') : '⚠';
+      var tip = 'AVWAP (52W-Tief): ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%'
+              + (slope != null ? ' · Slope ' + (slope > 0 ? '↑' : '↓') + Math.abs(slope).toFixed(2) + '%/5B' : '');
+      return '<span title="' + tip + '" style="font-size:10px;font-weight:700;padding:2px 6px;'
+        + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
+        + ico + ' ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%</span>';
+    })(state.distToAvwapPct, state.avwapAbove, state.avwapSlope) : '')+
+     '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"+
        ' onchange="setCardTF(this)"'+
        ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-weight:600">'+
        '<option value="1d">1T ✓</option>'+
