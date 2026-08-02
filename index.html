@@ -3029,6 +3029,9 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     <!-- RS-Rank Score (IOS Konzept-Integration, August 2026) -->
     <div id="dd-rs-rank" style="display:none;padding:.75rem 1.25rem;border-top:1px solid var(--border2)"></div>
 
+    <!-- Anchored VWAP (Zeiierman-Konzept, August 2026) -->
+    <div id="dd-avwap" style="display:none;padding:.75rem 1.25rem;border-top:1px solid var(--border2)"></div>
+
     <!-- ATR Positionsgröße -->
     <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border2);background:var(--bg3);border-radius:0 0 16px 16px">
       <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.5rem">ATR-POSITIONSGRÖSSE</div>
@@ -7911,6 +7914,13 @@ function kvToScannerState(r) {
     rsScoreIwm:       r.rsScoreIwm   != null ? r.rsScoreIwm   : null,
     rsNewHigh:        r.rsNewHigh    != null ? r.rsNewHigh    : null,
     rsGrade:          r.rsGrade      != null ? r.rsGrade      : null,
+    // Anchored VWAP (Zeiierman-Konzept, August 2026)
+    avwap:            r.avwap           != null ? r.avwap           : null,
+    avwapAnchorDate:  r.avwapAnchorDate != null ? r.avwapAnchorDate : null,
+    avwapAnchorPrice: r.avwapAnchorPrice!= null ? r.avwapAnchorPrice: null,
+    distToAvwapPct:   r.distToAvwapPct  != null ? r.distToAvwapPct  : null,
+    avwapAbove:       r.avwapAbove      != null ? r.avwapAbove      : null,
+    avwapSlope:       r.avwapSlope      != null ? r.avwapSlope      : null,
     // Sektor-Tags
     sectors:          Array.isArray(r.sectors) ? r.sectors : [],
     // ────────────────────────────────────────────────────────────────────────
@@ -18578,6 +18588,13 @@ function kvToScannerState(r) {
     bullPct:          r.bullPct         != null ? r.bullPct          : null,
     warnLevel:        r.warnLevel       != null ? r.warnLevel        : null,
     squeezeRisk:      r.squeezeRisk     != null ? r.squeezeRisk      : null,
+    // Anchored VWAP (Zeiierman-Konzept, August 2026)
+    avwap:            r.avwap           != null ? r.avwap           : null,
+    avwapAnchorDate:  r.avwapAnchorDate != null ? r.avwapAnchorDate : null,
+    avwapAnchorPrice: r.avwapAnchorPrice!= null ? r.avwapAnchorPrice: null,
+    distToAvwapPct:   r.distToAvwapPct  != null ? r.distToAvwapPct  : null,
+    avwapAbove:       r.avwapAbove      != null ? r.avwapAbove      : null,
+    avwapSlope:       r.avwapSlope      != null ? r.avwapSlope      : null,
     sectors:          Array.isArray(r.sectors) ? r.sectors : [],
     // ────────────────────────────────────────────────────────────────────────
     closes_full:  [],
@@ -20380,6 +20397,78 @@ function renderDeepDiveTech(sym, raw, state) {
     }
   }
 // ── Ende RS-Rank Score Block ─────────────────────────────────────────────────
+
+// ── Anchored VWAP Block (Zeiierman-Konzept, August 2026) ─────────────────────
+  var avwapEl = document.getElementById('dd-avwap');
+  if (avwapEl) {
+    var avwap     = state.avwap;
+    var avwapDate = state.avwapAnchorDate;
+    var avwapPx   = state.avwapAnchorPrice;
+    var distPct   = state.distToAvwapPct;
+    var above     = state.avwapAbove;
+    var slope     = state.avwapSlope;
+    var price     = raw.price || 0;
+
+    if (avwap == null) {
+      avwapEl.style.display = 'none';
+    } else {
+      avwapEl.style.display = 'block';
+
+      // Farblogik: grün wenn über AVWAP, rot wenn darunter
+      var avwapCol = above ? 'var(--green)' : 'var(--red)';
+      var avwapBg  = above ? 'rgba(52,194,110,0.08)' : 'rgba(240,86,86,0.08)';
+      var avwapBrd = above ? 'var(--green)' : 'var(--red)';
+
+      // Distanz-Farbkodierung: 0–3% = Zone (amber), >8% = überhitzt (rot), sonst grün
+      var distCol = distPct == null ? 'var(--text3)'
+                  : Math.abs(distPct) <= 3  ? 'var(--amber)'
+                  : distPct > 8             ? 'var(--red)'
+                  : distPct < -5            ? 'var(--red)'
+                  : 'var(--green)';
+
+      var distLabel = distPct == null ? '—'
+                    : (distPct >= 0 ? '+' : '') + distPct.toFixed(1) + '%';
+
+      // Slope-Indikator
+      var slopeStr = slope == null ? '—'
+                   : (slope > 0 ? '↑ ' : '↓ ') + Math.abs(slope).toFixed(2) + '%/5B';
+      var slopeCol = slope == null ? 'var(--text3)' : slope > 0 ? 'var(--green)' : 'var(--red)';
+
+      // CSP-Zone Hinweis
+      var cspHint = '';
+      if (distPct != null && distPct >= 0 && distPct <= 3) {
+        cspHint = '<div style="font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(245,158,11,0.12);'
+          + 'border:0.5px solid var(--amber);color:var(--amber);margin-top:5px;display:inline-block">'
+          + '⚡ CSP-Zone — institutioneller Anker (' + distLabel + ' über AVWAP)</div>';
+      } else if (distPct != null && distPct < 0) {
+        cspHint = '<div style="font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(240,86,86,0.1);'
+          + 'border:0.5px solid var(--red);color:var(--red);margin-top:5px;display:inline-block">'
+          + '⚠️ Unter AVWAP — kein Long-Entry</div>';
+      } else if (distPct != null && distPct > 8) {
+        cspHint = '<div style="font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(240,86,86,0.1);'
+          + 'border:0.5px solid var(--red);color:var(--red);margin-top:5px;display:inline-block">'
+          + '🔥 ' + distLabel + ' über AVWAP — überhitzt</div>';
+      }
+
+      avwapEl.innerHTML =
+        '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.4rem">'
+        + '⚓ ANCHORED VWAP (52W-TIEF · EWMA apt=20)</div>'
+        + '<div style="padding:7px 10px;border-radius:8px;border-left:3px solid ' + avwapBrd + ';background:' + avwapBg + '">'
+        +   '<div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:12px;margin-bottom:3px">'
+        +     '<span>AVWAP <b style="color:' + avwapCol + '">$' + avwap.toFixed(2) + '</b></span>'
+        +     '<span>Kurs <b>' + (above ? '▲' : '▼') + ' ' + (above ? 'über' : 'unter') + '</b></span>'
+        +     '<span>Dist <b style="color:' + distCol + '">' + distLabel + '</b></span>'
+        +     '<span>Slope <b style="color:' + slopeCol + '">' + slopeStr + '</b></span>'
+        +   '</div>'
+        +   '<div style="font-size:10px;color:var(--text3)">'
+        +     'Anker: ' + (avwapDate || '—') + ' @ $' + (avwapPx ? avwapPx.toFixed(2) : '—')
+        +     ' (52W-Tief)'
+        +   '</div>'
+        + '</div>'
+        + cspHint;
+    }
+  }
+// ── Ende Anchored VWAP Block ──────────────────────────────────────────────────
 }
 
 function renderDeepDiveMarket() {
@@ -20451,6 +20540,22 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     if (state.perf3m != null)      _rsLine += ' · 3M-Perf: ' + (state.perf3m > 0 ? '+' : '') + state.perf3m.toFixed(1) + '%';
     if (state.perf6m != null)      _rsLine += ' · 6M-Perf: ' + (state.perf6m > 0 ? '+' : '') + state.perf6m.toFixed(1) + '%';
     ctx.push(_rsLine);
+  }
+
+  // Anchored VWAP (Zeiierman-Konzept, August 2026)
+  if (state.avwap != null) {
+    var _avLine = 'Anchored VWAP (52W-Tief): $' + state.avwap.toFixed(2);
+    _avLine += ' · Kurs ' + (state.avwapAbove ? 'ÜBER' : 'UNTER') + ' AVWAP';
+    if (state.distToAvwapPct != null) {
+      var _dp = state.distToAvwapPct;
+      _avLine += ' · Dist: ' + (_dp >= 0 ? '+' : '') + _dp.toFixed(1) + '%';
+      if (_dp >= 0 && _dp <= 3)  _avLine += ' → CSP-Zone (institutioneller Anker)';
+      else if (_dp < 0)          _avLine += ' → unter AVWAP (kein Long-Entry)';
+      else if (_dp > 8)          _avLine += ' → überhitzt';
+    }
+    if (state.avwapSlope != null) _avLine += ' · Slope: ' + (state.avwapSlope > 0 ? '+' : '') + state.avwapSlope.toFixed(2) + '%/5B';
+    if (state.avwapAnchorDate)    _avLine += ' · Anker: ' + state.avwapAnchorDate + ' @ $' + (state.avwapAnchorPrice||0).toFixed(2);
+    ctx.push(_avLine);
   }
 
   var strat = KI_STRAT_CONFIG[_ddCurrentStrategy] || KI_STRAT_CONFIG.momentum || { label: _ddCurrentStrategy, focus: [] };
