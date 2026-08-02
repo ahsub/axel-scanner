@@ -8743,6 +8743,17 @@ function renderCard(t,state){
         + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
         + ico + ' ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%</span>';
     })(state.distToAvwapPct, state.avwapAbove, state.avwapSlope) : '')+
+    /* OB-Badge (August 2026) */
+    (state.obBullDistPct != null ? (function(dist, mit, bh, bl, px){
+      var inZone = bh != null && px <= bh && px >= bl;
+      var col = inZone ? 'var(--green)' : Math.abs(dist) <= 5 ? 'var(--amber)' : 'var(--text3)';
+      var bg  = inZone ? 'rgba(52,194,110,0.13)' : Math.abs(dist) <= 5 ? 'rgba(245,158,11,0.10)' : 'rgba(255,255,255,0.04)';
+      var tip = 'Bull OB: ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%'
+              + (inZone ? ' ← PREIS IM OB' : '') + (mit != null ? ' · Mit ' + mit.toFixed(0) + '%' : '');
+      return '<span title="' + tip + '" style="font-size:10px;font-weight:700;padding:2px 6px;'
+        + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
+        + '📦 ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%</span>';
+    })(state.obBullDistPct, state.obBullMitPct, state.obBullHigh, state.obBullLow, state.price || 0) : '')+
      '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"+
        ' onchange="setCardTF(this)"'+
        ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-weight:600">'+
