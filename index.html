@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260802-v424">
+<meta name="version" content="20260802-v425">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,7 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
-     v424: TVA Trending-Filter im Scanner (02.08.2026): Filter-Bar unter Kursfilter mit 4 Buttons: Alle / Trending (tvaRegime Trend Up+Strong) / Strong (nur Strong Trend Up) / Kein Chop (chopIndex<55). Zählungen dynamisch aus KV-Daten. applyTvaFilter() + setTvaFilter() + updateTvaFilterCounts(). Aktuell: Trending=34, Strong=9 im DD-DANGER-Umfeld.
+     v425: Earnings Calendar (02.08.2026): Echter yfinance-Kalender v5.26.0. earningsDate/DTE/EPS-Felder. Badge in Cards: 📅>14T ⚠️7-14T 🚨<7T. KI-Prompt CSP-Warnung DTE<21. ETF-gefiltert.
      v423: TVA Sprint A — ADX + f_marketRegime + f_chopIndex (02.08.2026): Aggregator v5.25.0: neue Funktion compute_tva_indicators() — ADX/DI (Wilder), Efficiency Ratio (Kaufman), TVA f_chopIndex (8 Felder), TVA f_marketRegime (8 Regime). Frontend v410: DeepDive TVA-Block (2×2 Grid: ADX, Regime, Chop, ER+DI), KV-Adapter +8 Felder, KI-Prompt TVA-Kontext + Handlungshinweise. GHA Run #178 — 711 Ticker mit ADX/Regime/Chop live.
      v422: Bugfix TrackRecord CORS (01.08.2026): Cache-Control-Header in fetch() → CORS-Preflight-Fehler (ko-sync erlaubt nur X-UIQ-Token+Content-Type). Fix: Cache-Control aus headers{} entfernt, cache:"no-store" als fetch-Option behalten. CDN-Hash: 5491c2b3→e4f93297.
      v421: Bugfix TrackRecord 401 (01.08.2026): ko-trackrecord.js v1.0.1 — TrackRecord.load() nutzte /public/tr:stats (kein Auth) → 401. Fix: /sync/tr:stats + X-UIQ-Token-Header. CDN-Hash: ac331b8f→5491c2b3.
@@ -7989,6 +7989,11 @@ function kvToScannerState(r) {
     tvaRegimeConf:    r.tvaRegimeConf != null ? r.tvaRegimeConf : null,
     chopIndex:        r.chopIndex     != null ? r.chopIndex     : null,
     chopLabel:        r.chopLabel     != null ? r.chopLabel     : null,
+    // Earnings Calendar (August 2026)
+    earningsDate:     r.earningsDate  != null ? r.earningsDate  : null,
+    earningsDTE:      r.earningsDTE   != null ? r.earningsDTE   : null,
+    earningsEPS:      r.earningsEPS   != null ? r.earningsEPS   : null,
+    earningsRevEst:   r.earningsRevEst!= null ? r.earningsRevEst: null,
     // Sektor-Tags
     sectors:          Array.isArray(r.sectors) ? r.sectors : [],
     // ────────────────────────────────────────────────────────────────────────
@@ -8873,7 +8878,19 @@ function renderCard(t,state){
         + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
         + '📦 ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%</span>';
     })(state.obBullDistPct, state.obBullMitPct, state.obBullHigh, state.obBullLow, state.price || 0) : '')+
-     '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"'+
+    /* Earnings Badge (August 2026) */
+    (state.earningsDTE != null && state.earningsDTE >= -2 && state.earningsDTE <= 30 ? (function(dte, eps){
+      var urgent  = dte <= 7;
+      var soon    = dte <= 14;
+      var col = urgent ? '#ef4444' : soon ? '#f97316' : 'var(--text3)';
+      var bg  = urgent ? 'rgba(239,68,68,0.12)' : soon ? 'rgba(249,115,22,0.10)' : 'rgba(255,255,255,0.06)';
+      var ico = urgent ? '🚨' : soon ? '⚠️' : '📅';
+      var tip = 'Earnings in ' + dte + ' Tagen' + (eps != null ? ' · EPS Est: $' + eps : '');
+      return '<span title="' + tip + '" style="font-size:10px;font-weight:700;padding:2px 6px;'
+        + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
+        + ico + ' ' + dte + 'T</span>';
+    })(state.earningsDTE, state.earningsEPS) : '')+
+     '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"+
        ' onchange="setCardTF(this)"'+
        ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-weight:600">'+
        '<option value="1d">1T ✓</option>'+
@@ -18789,6 +18806,11 @@ function kvToScannerState(r) {
     tvaRegimeConf:    r.tvaRegimeConf != null ? r.tvaRegimeConf : null,
     chopIndex:        r.chopIndex     != null ? r.chopIndex     : null,
     chopLabel:        r.chopLabel     != null ? r.chopLabel     : null,
+    // Earnings Calendar (August 2026)
+    earningsDate:     r.earningsDate  != null ? r.earningsDate  : null,
+    earningsDTE:      r.earningsDTE   != null ? r.earningsDTE   : null,
+    earningsEPS:      r.earningsEPS   != null ? r.earningsEPS   : null,
+    earningsRevEst:   r.earningsRevEst!= null ? r.earningsRevEst: null,
     // Anchored VWAP (Zeiierman-Konzept, August 2026)
     avwap:            r.avwap           != null ? r.avwap           : null,
     avwapAnchorDate:  r.avwapAnchorDate != null ? r.avwapAnchorDate : null,
@@ -20957,6 +20979,17 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     if (state.chopIndex >= 55) _tvaLine += ' → Choppiges Umfeld: Entry-Timing prüfen, keine aggressiven CSPs';
     else if (state.adx >= 35 && state.diPlus > state.diMinus) _tvaLine += ' → Starker Aufwärtstrend: Momentum-Strategien bevorzugen';
     ctx.push(_tvaLine);
+  }
+
+  // Earnings Calendar (August 2026)
+  if (state.earningsDTE != null && state.earningsDTE >= -2 && state.earningsDTE <= 45) {
+    var _eLine = 'Earnings: in ' + state.earningsDTE + ' Tagen (' + (state.earningsDate||'?') + ')';
+    if (state.earningsEPS  != null) _eLine += ' · EPS-Est: $' + state.earningsEPS;
+    if (state.earningsDTE <= 21)
+      _eLine += ' → WARNUNG: Position überspannt Earnings — CSP-Strike eng wählen oder warten';
+    else if (state.earningsDTE <= 7)
+      _eLine += ' → KRITISCH: Earnings in <7 Tagen — kein neuer CSP empfohlen';
+    ctx.push(_eLine);
   }
 
   // Order Blocks (Hybrid Detector, August 2026)
