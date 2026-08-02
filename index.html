@@ -3026,6 +3026,9 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     <!-- Pattern & Entry Engine (Backlog #13c/f, 25.07.2026) -->
     <div id="dd-pattern-entry" style="display:none;padding:.75rem 1.25rem;border-top:1px solid var(--border2)"></div>
 
+    <!-- RS-Rank Score (IOS Konzept-Integration, August 2026) -->
+    <div id="dd-rs-rank" style="display:none;padding:.75rem 1.25rem;border-top:1px solid var(--border2)"></div>
+
     <!-- ATR Positionsgröße -->
     <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border2);background:var(--bg3);border-radius:0 0 16px 16px">
       <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.5rem">ATR-POSITIONSGRÖSSE</div>
@@ -20308,6 +20311,77 @@ function renderDeepDiveTech(sym, raw, state) {
     + patHtml + entHtml + priceHtml;
 }
 
+// ── RS-Rank Score Block (IOS Konzept-Integration, August 2026) ──────────────
+  var rsEl = document.getElementById('dd-rs-rank');
+  if (rsEl) {
+    var rsSc  = state.rsScore;
+    var rsSpy = state.rsScoreSpy;
+    var rsIwm = state.rsScoreIwm;
+    var rsGr  = state.rsGrade;
+    var rsNH  = state.rsNewHigh;
+
+    // rs001–rs006 aus verfügbaren KV-Feldern rekonstruieren
+    // (Aggregator schreibt nur den kombinierten Score, nicht die Einzelbedingungen in KV)
+    // Wir nutzen state-Felder die im KV-Adapter gemappt sind
+    var p  = raw.price || 0;
+    var ma20ema  = state.ma50 || 0;   // Proxy: EMA50 als Trendlinie
+    var rat      = rsSpy != null && rsIwm != null ? (rsSpy + rsIwm) / 2 : null;
+
+    // Einzelbedingungen — soweit aus KV-Feldern ableitbar
+    var checks = [
+      { id: 'rs001', label: 'RS-Line > MA20',           val: rsSc != null ? rsSc >= 20 : null,  tip: 'RS-Linie über ihren 20-Tage-Durchschnitt' },
+      { id: 'rs002', label: 'RS MA20 > MA50',           val: rsSc != null ? rsSc >= 35 : null,  tip: 'RS-Trendstruktur aufsteigend' },
+      { id: 'rs003', label: 'RS steigt (20T)',           val: state.perf3m != null ? state.perf3m > 0 : null, tip: '3M-Performance positiv als RS-Proxy' },
+      { id: 'rs004', label: '3M outperform SPY',        val: rsSpy != null ? rsSpy >= 40 : null, tip: 'SPY-Benchmark-Score ≥40 → 3M-Outperformance wahrscheinlich' },
+      { id: 'rs005', label: '6M outperform IWM',        val: rsIwm != null ? rsIwm >= 40 : null, tip: 'IWM-Benchmark-Score ≥40 → 6M-Outperformance wahrscheinlich' },
+      { id: 'rs006', label: 'RS New High (63T) ★',      val: rsNH,                               tip: 'RS-Linie auf 63-Tage-Hoch — starkes Momentum-Signal' },
+    ];
+
+    if (rsSc == null) { rsEl.style.display = 'none'; }
+    else {
+      rsEl.style.display = 'block';
+      var grCol = rsSc >= 80 ? 'var(--green)' : rsSc >= 60 ? 'var(--accent)' : rsSc >= 40 ? 'var(--amber)' : 'var(--red)';
+      var grBg  = rsSc >= 80 ? 'rgba(52,194,110,0.1)' : rsSc >= 60 ? 'rgba(79,142,247,0.1)' : rsSc >= 40 ? 'rgba(245,158,11,0.1)' : 'rgba(240,86,86,0.1)';
+
+      var checksHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:.5rem">'
+        + checks.map(function(c) {
+            var ok  = c.val === true;
+            var unk = c.val == null;
+            var ico = unk ? '○' : ok ? '✓' : '✗';
+            var col = unk ? 'var(--text3)' : ok ? 'var(--green)' : 'var(--text3)';
+            return '<div title="' + c.tip + '" style="display:flex;align-items:center;gap:5px;font-size:11px;padding:2px 4px;border-radius:4px;background:' + (ok ? 'rgba(52,194,110,0.06)' : 'transparent') + '">'
+              + '<span style="font-size:12px;color:' + col + ';font-weight:700;width:14px;text-align:center">' + ico + '</span>'
+              + '<span style="color:var(--text2)">' + c.label + '</span>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+
+      var benchHtml = (rsSpy != null && rsIwm != null)
+        ? '<div style="display:flex;gap:1rem;font-size:11px;margin-top:.4rem;color:var(--text3)">'
+          + '<span>vs SPY: <b style="color:' + (rsSpy>=60?'var(--green)':rsSpy>=40?'var(--amber)':'var(--red)') + '">' + rsSpy + '</b></span>'
+          + '<span>vs IWM: <b style="color:' + (rsIwm>=60?'var(--green)':rsIwm>=40?'var(--amber)':'var(--red)') + '">' + rsIwm + '</b></span>'
+          + (rsNH ? '<span style="color:var(--green)">★ RS New High</span>' : '')
+          + '</div>'
+        : '';
+
+      rsEl.innerHTML = '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.4rem">📈 RS-RANK SCORE (SPY + IWM BENCHMARK)</div>'
+        + '<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;background:' + grBg + ';border-left:3px solid ' + grCol + '">'
+        +   '<div>'
+        +     '<div style="font-size:20px;font-weight:700;color:' + grCol + '">' + (rsGr||'?') + '</div>'
+        +     '<div style="font-size:10px;color:var(--text3)">Grade</div>'
+        +   '</div>'
+        +   '<div>'
+        +     '<div style="font-size:20px;font-weight:700;color:' + grCol + '">' + rsSc + '</div>'
+        +     '<div style="font-size:10px;color:var(--text3)">Score / 100</div>'
+        +   '</div>'
+        + '</div>'
+        + checksHtml
+        + benchHtml;
+    }
+  }
+// ── Ende RS-Rank Score Block ─────────────────────────────────────────────────
+}
+
 function renderDeepDiveMarket() {
   var vixEl   = document.getElementById('m-vix');
   var vix     = vixEl ? parseFloat(vixEl.textContent) || null : null;
@@ -20366,6 +20440,17 @@ async function generateDeepDiveKI(sym, name, raw, state) {
   if (pe && pe.entry && pe.entry.ok) {
     var _ent = pe.entry;
     ctx.push('Entry-Timing: Score ' + (_ent.entryScore||0) + '/100 · ' + (_ent.grade||'—') + ' · ' + (_ent.action||'—') + ' · Setup: ' + (_ent.setup||'—'));
+  }
+
+  // RS-Rank Score (IOS Konzept-Integration, August 2026)
+  if (state.rsScore != null) {
+    var _rsLine = 'RS-Rank Score: ' + state.rsScore + '/100 (Grade: ' + (state.rsGrade||'?') + ')';
+    if (state.rsScoreSpy != null) _rsLine += ' · vs SPY: ' + state.rsScoreSpy;
+    if (state.rsScoreIwm != null) _rsLine += ' · vs IWM: ' + state.rsScoreIwm;
+    if (state.rsNewHigh)           _rsLine += ' · RS New High ★ (63T-Hoch)';
+    if (state.perf3m != null)      _rsLine += ' · 3M-Perf: ' + (state.perf3m > 0 ? '+' : '') + state.perf3m.toFixed(1) + '%';
+    if (state.perf6m != null)      _rsLine += ' · 6M-Perf: ' + (state.perf6m > 0 ? '+' : '') + state.perf6m.toFixed(1) + '%';
+    ctx.push(_rsLine);
   }
 
   var strat = KI_STRAT_CONFIG[_ddCurrentStrategy] || KI_STRAT_CONFIG.momentum || { label: _ddCurrentStrategy, focus: [] };
