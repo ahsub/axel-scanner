@@ -8890,7 +8890,7 @@ function renderCard(t,state){
         + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
         + ico + ' ' + dte + 'T</span>';
     })(state.earningsDTE, state.earningsEPS) : '')+
-     '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"+
+     '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"'+
        ' onchange="setCardTF(this)"'+
        ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-weight:600">'+
        '<option value="1d">1T ✓</option>'+
