@@ -3035,6 +3035,9 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     <!-- Order Block Zones (Hybrid Detector, August 2026) -->
     <div id="dd-ob" style="display:none;padding:.75rem 1.25rem;border-top:1px solid var(--border2)"></div>
 
+    <!-- TVA Indicators: ADX + Regime + Chop (August 2026) -->
+    <div id="dd-tva" style="display:none;padding:.75rem 1.25rem;border-top:1px solid var(--border2)"></div>
+
     <!-- ATR Positionsgröße -->
     <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border2);background:var(--bg3);border-radius:0 0 16px 16px">
       <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.5rem">ATR-POSITIONSGRÖSSE</div>
@@ -7957,6 +7960,15 @@ function kvToScannerState(r) {
     obBearVolPct:     r.obBearVolPct  != null ? r.obBearVolPct  : null,
     obBullCount:      r.obBullCount   != null ? r.obBullCount   : null,
     obBearCount:      r.obBearCount   != null ? r.obBearCount   : null,
+    // TVA Indicators (August 2026)
+    adx:              r.adx           != null ? r.adx           : null,
+    diPlus:           r.diPlus        != null ? r.diPlus        : null,
+    diMinus:          r.diMinus       != null ? r.diMinus       : null,
+    efficiencyRatio:  r.efficiencyRatio!=null ? r.efficiencyRatio:null,
+    tvaRegime:        r.tvaRegime     != null ? r.tvaRegime     : null,
+    tvaRegimeConf:    r.tvaRegimeConf != null ? r.tvaRegimeConf : null,
+    chopIndex:        r.chopIndex     != null ? r.chopIndex     : null,
+    chopLabel:        r.chopLabel     != null ? r.chopLabel     : null,
     // Sektor-Tags
     sectors:          Array.isArray(r.sectors) ? r.sectors : [],
     // ────────────────────────────────────────────────────────────────────────
@@ -18683,6 +18695,15 @@ function kvToScannerState(r) {
     obBearVolPct:     r.obBearVolPct  != null ? r.obBearVolPct  : null,
     obBullCount:      r.obBullCount   != null ? r.obBullCount   : null,
     obBearCount:      r.obBearCount   != null ? r.obBearCount   : null,
+    // TVA Indicators (August 2026)
+    adx:              r.adx           != null ? r.adx           : null,
+    diPlus:           r.diPlus        != null ? r.diPlus        : null,
+    diMinus:          r.diMinus       != null ? r.diMinus       : null,
+    efficiencyRatio:  r.efficiencyRatio!=null ? r.efficiencyRatio:null,
+    tvaRegime:        r.tvaRegime     != null ? r.tvaRegime     : null,
+    tvaRegimeConf:    r.tvaRegimeConf != null ? r.tvaRegimeConf : null,
+    chopIndex:        r.chopIndex     != null ? r.chopIndex     : null,
+    chopLabel:        r.chopLabel     != null ? r.chopLabel     : null,
     // Anchored VWAP (Zeiierman-Konzept, August 2026)
     avwap:            r.avwap           != null ? r.avwap           : null,
     avwapAnchorDate:  r.avwapAnchorDate != null ? r.avwapAnchorDate : null,
@@ -20653,6 +20674,88 @@ function renderDeepDiveTech(sym, raw, state) {
     }
   }
 // ── Ende Order Block Block ────────────────────────────────────────────────────
+
+// ── TVA Indicators Block (August 2026) ───────────────────────────────────────
+  var tvaEl = document.getElementById('dd-tva');
+  if (tvaEl) {
+    var adx  = state.adx;
+    var dip  = state.diPlus;
+    var dim  = state.diMinus;
+    var er   = state.efficiencyRatio;
+    var reg  = state.tvaRegime;
+    var conf = state.tvaRegimeConf;
+    var chop = state.chopIndex;
+    var clbl = state.chopLabel;
+
+    if (adx == null) {
+      tvaEl.style.display = 'none';
+    } else {
+      tvaEl.style.display = 'block';
+
+      // ADX Farbkodierung
+      var adxCol = adx >= 35 ? 'var(--green)' : adx >= 20 ? 'var(--amber)' : 'var(--text3)';
+      var adxLbl = adx >= 35 ? 'Starker Trend' : adx >= 20 ? 'Trend' : 'Kein Trend';
+
+      // Regime Farbe
+      var regCol = (reg||'').includes('Strong') ? 'var(--green)'
+                 : (reg||'').includes('Up') || (reg||'') === 'Range' ? 'var(--accent)'
+                 : (reg||'').includes('Down') ? 'var(--red)'
+                 : 'var(--amber)';
+
+      // Chop Farbe
+      var chopCol = (chop||0) >= 70 ? 'var(--red)' : (chop||0) >= 55 ? 'var(--amber)'
+                  : (chop||0) >= 40 ? 'var(--amber)' : 'var(--green)';
+
+      // ER Bar (0-100%)
+      var erPct  = er != null ? Math.round(er * 100) : 0;
+      var erCol  = erPct >= 60 ? 'var(--green)' : erPct >= 30 ? 'var(--amber)' : 'var(--red)';
+      var erBar  = '';
+      for (var _i = 0; _i < 10; _i++) erBar += (_i < Math.round(erPct/10) ? '█' : '░');
+
+      // DI Verhältnis
+      var diTotal = (dip||0) + (dim||0);
+      var diTrend = diTotal > 0 ? (dip > dim ? '↑ Bullisch' : '↓ Bärisch') : '→ Neutral';
+      var diCol   = dip > dim ? 'var(--green)' : dip < dim ? 'var(--red)' : 'var(--text3)';
+
+      tvaEl.innerHTML =
+        '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.4rem">'
+        + '📊 TVA MARKTSTRUKTUR (ADX · REGIME · CHOP)</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
+
+        // ADX
+        + '<div style="padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.04)">'
+        +   '<div style="font-size:9px;color:var(--text3);margin-bottom:2px">ADX-14</div>'
+        +   '<div style="font-size:16px;font-weight:700;color:' + adxCol + '">' + adx.toFixed(1) + '</div>'
+        +   '<div style="font-size:10px;color:' + adxCol + '">' + adxLbl + '</div>'
+        + '</div>'
+
+        // Regime
+        + '<div style="padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.04)">'
+        +   '<div style="font-size:9px;color:var(--text3);margin-bottom:2px">TVA REGIME</div>'
+        +   '<div style="font-size:11px;font-weight:700;color:' + regCol + '">' + (reg||'—') + '</div>'
+        +   '<div style="font-size:10px;color:var(--text3)">Konf: ' + (conf||0).toFixed(0) + '%</div>'
+        + '</div>'
+
+        // Chop
+        + '<div style="padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.04)">'
+        +   '<div style="font-size:9px;color:var(--text3);margin-bottom:2px">CHOP INDEX</div>'
+        +   '<div style="font-size:16px;font-weight:700;color:' + chopCol + '">' + (chop||0).toFixed(0) + '</div>'
+        +   '<div style="font-size:10px;color:' + chopCol + '">' + (clbl||'—') + '</div>'
+        + '</div>'
+
+        // ER + DI
+        + '<div style="padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.04)">'
+        +   '<div style="font-size:9px;color:var(--text3);margin-bottom:2px">EFFICIENCY RATIO</div>'
+        +   '<div style="font-size:10px;font-family:monospace;color:' + erCol + '">' + erBar + ' ' + erPct + '%</div>'
+        +   '<div style="font-size:10px;color:' + diCol + '">' + diTrend
+        +     (dip != null ? ' · DI+ ' + dip.toFixed(1) + ' / DI- ' + (dim||0).toFixed(1) : '')
+        +   '</div>'
+        + '</div>'
+
+        + '</div>';
+    }
+  }
+// ── Ende TVA Block ────────────────────────────────────────────────────────────
 }
 
 function renderDeepDiveMarket() {
@@ -20740,6 +20843,24 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     if (state.avwapSlope != null) _avLine += ' · Slope: ' + (state.avwapSlope > 0 ? '+' : '') + state.avwapSlope.toFixed(2) + '%/5B';
     if (state.avwapAnchorDate)    _avLine += ' · Anker: ' + state.avwapAnchorDate + ' @ $' + (state.avwapAnchorPrice||0).toFixed(2);
     ctx.push(_avLine);
+  }
+
+  // TVA Indicators (August 2026)
+  if (state.adx != null) {
+    var _tvaLine = 'TVA Marktstruktur:';
+    _tvaLine += ' ADX ' + state.adx.toFixed(1)
+      + (state.adx >= 35 ? ' (starker Trend)' : state.adx >= 20 ? ' (Trend)' : ' (kein Trend)');
+    if (state.tvaRegime) _tvaLine += ' · Regime: ' + state.tvaRegime
+      + (state.tvaRegimeConf != null ? ' (' + state.tvaRegimeConf.toFixed(0) + '% Konf)' : '');
+    if (state.chopIndex != null) _tvaLine += ' · Chop: ' + state.chopIndex.toFixed(0)
+      + '% (' + (state.chopLabel||'—') + ')';
+    if (state.efficiencyRatio != null) _tvaLine += ' · ER: ' + (state.efficiencyRatio * 100).toFixed(0) + '%'
+      + (state.efficiencyRatio >= 0.6 ? ' (trendend)' : state.efficiencyRatio < 0.3 ? ' (choppy)' : '');
+    if (state.diPlus != null) _tvaLine += ' · DI+/DI-: ' + state.diPlus.toFixed(1) + '/' + (state.diMinus||0).toFixed(1);
+    // Handlungshinweis
+    if (state.chopIndex >= 55) _tvaLine += ' → Choppiges Umfeld: Entry-Timing prüfen, keine aggressiven CSPs';
+    else if (state.adx >= 35 && state.diPlus > state.diMinus) _tvaLine += ' → Starker Aufwärtstrend: Momentum-Strategien bevorzugen';
+    ctx.push(_tvaLine);
   }
 
   // Order Blocks (Hybrid Detector, August 2026)
