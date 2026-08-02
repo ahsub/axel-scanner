@@ -3032,6 +3032,9 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
     <!-- Anchored VWAP (Zeiierman-Konzept, August 2026) -->
     <div id="dd-avwap" style="display:none;padding:.75rem 1.25rem;border-top:1px solid var(--border2)"></div>
 
+    <!-- Order Block Zones (Hybrid Detector, August 2026) -->
+    <div id="dd-ob" style="display:none;padding:.75rem 1.25rem;border-top:1px solid var(--border2)"></div>
+
     <!-- ATR Positionsgröße -->
     <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border2);background:var(--bg3);border-radius:0 0 16px 16px">
       <div style="font-size:10px;color:var(--text3);font-weight:600;letter-spacing:1px;margin-bottom:.5rem">ATR-POSITIONSGRÖSSE</div>
@@ -7921,6 +7924,21 @@ function kvToScannerState(r) {
     distToAvwapPct:   r.distToAvwapPct  != null ? r.distToAvwapPct  : null,
     avwapAbove:       r.avwapAbove      != null ? r.avwapAbove      : null,
     avwapSlope:       r.avwapSlope      != null ? r.avwapSlope      : null,
+    // Order Blocks (Hybrid Detector, August 2026)
+    obBullHigh:       r.obBullHigh    != null ? r.obBullHigh    : null,
+    obBullLow:        r.obBullLow     != null ? r.obBullLow     : null,
+    obBullDate:       r.obBullDate    != null ? r.obBullDate    : null,
+    obBullScore:      r.obBullScore   != null ? r.obBullScore   : null,
+    obBullDistPct:    r.obBullDistPct != null ? r.obBullDistPct : null,
+    obBullMitPct:     r.obBullMitPct  != null ? r.obBullMitPct  : null,
+    obBullVolPct:     r.obBullVolPct  != null ? r.obBullVolPct  : null,
+    obBearHigh:       r.obBearHigh    != null ? r.obBearHigh    : null,
+    obBearLow:        r.obBearLow     != null ? r.obBearLow     : null,
+    obBearDistPct:    r.obBearDistPct != null ? r.obBearDistPct : null,
+    obBearMitPct:     r.obBearMitPct  != null ? r.obBearMitPct  : null,
+    obBearVolPct:     r.obBearVolPct  != null ? r.obBearVolPct  : null,
+    obBullCount:      r.obBullCount   != null ? r.obBullCount   : null,
+    obBearCount:      r.obBearCount   != null ? r.obBearCount   : null,
     // Sektor-Tags
     sectors:          Array.isArray(r.sectors) ? r.sectors : [],
     // ────────────────────────────────────────────────────────────────────────
@@ -18603,6 +18621,21 @@ function kvToScannerState(r) {
     bullPct:          r.bullPct         != null ? r.bullPct          : null,
     warnLevel:        r.warnLevel       != null ? r.warnLevel        : null,
     squeezeRisk:      r.squeezeRisk     != null ? r.squeezeRisk      : null,
+    // Order Blocks (Hybrid Detector, August 2026)
+    obBullHigh:       r.obBullHigh    != null ? r.obBullHigh    : null,
+    obBullLow:        r.obBullLow     != null ? r.obBullLow     : null,
+    obBullDate:       r.obBullDate    != null ? r.obBullDate    : null,
+    obBullScore:      r.obBullScore   != null ? r.obBullScore   : null,
+    obBullDistPct:    r.obBullDistPct != null ? r.obBullDistPct : null,
+    obBullMitPct:     r.obBullMitPct  != null ? r.obBullMitPct  : null,
+    obBullVolPct:     r.obBullVolPct  != null ? r.obBullVolPct  : null,
+    obBearHigh:       r.obBearHigh    != null ? r.obBearHigh    : null,
+    obBearLow:        r.obBearLow     != null ? r.obBearLow     : null,
+    obBearDistPct:    r.obBearDistPct != null ? r.obBearDistPct : null,
+    obBearMitPct:     r.obBearMitPct  != null ? r.obBearMitPct  : null,
+    obBearVolPct:     r.obBearVolPct  != null ? r.obBearVolPct  : null,
+    obBullCount:      r.obBullCount   != null ? r.obBullCount   : null,
+    obBearCount:      r.obBearCount   != null ? r.obBearCount   : null,
     // Anchored VWAP (Zeiierman-Konzept, August 2026)
     avwap:            r.avwap           != null ? r.avwap           : null,
     avwapAnchorDate:  r.avwapAnchorDate != null ? r.avwapAnchorDate : null,
@@ -20484,6 +20517,96 @@ function renderDeepDiveTech(sym, raw, state) {
     }
   }
 // ── Ende Anchored VWAP Block ──────────────────────────────────────────────────
+
+// ── Order Block Block (Hybrid Detector, August 2026) ─────────────────────────
+  var obEl = document.getElementById('dd-ob');
+  if (obEl) {
+    var obBH   = state.obBullHigh;
+    var obBL   = state.obBullLow;
+    var obBD   = state.obBullDate;
+    var obBS   = state.obBullScore;
+    var obBDist= state.obBullDistPct;
+    var obBMit = state.obBullMitPct;
+    var obBVol = state.obBullVolPct;
+    var obBeH  = state.obBearHigh;
+    var obBeL  = state.obBearLow;
+    var obBeDist= state.obBearDistPct;
+    var obBeMit = state.obBearMitPct;
+    var obBeVol = state.obBearVolPct;
+    var price   = raw.price || 0;
+
+    if (obBH == null && obBeH == null) {
+      obEl.style.display = 'none';
+    } else {
+      obEl.style.display = 'block';
+
+      var bullHtml = '', bearHtml = '', matrixHtml = '';
+
+      // ── Bullish OB ────────────────────────────────────────────────────
+      if (obBH != null) {
+        var inZone  = price <= obBH && price >= obBL;
+        var bCol    = inZone ? 'var(--green)' : (obBDist != null && Math.abs(obBDist) <= 5 ? 'var(--amber)' : 'var(--text2)');
+        var bBg     = inZone ? 'rgba(52,194,110,0.10)' : 'rgba(52,194,110,0.05)';
+        var mitCol  = (obBMit||0) > 75 ? 'var(--red)' : (obBMit||0) > 40 ? 'var(--amber)' : 'var(--green)';
+        var distStr = obBDist != null ? (obBDist >= 0 ? '+' : '') + obBDist.toFixed(1) + '%' : '—';
+        var volBarW = Math.round((obBVol||50));
+        bullHtml = '<div style="padding:5px 8px;border-radius:6px;border-left:3px solid var(--green);background:' + bBg + ';margin-bottom:5px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">'
+          +   '<span style="font-size:10px;font-weight:700;color:var(--green)">▲ BULLISH OB' + (inZone ? ' ← PREIS DRIN' : '') + '</span>'
+          +   '<span style="font-size:10px;color:' + bCol + '">' + distStr + '</span>'
+          + '</div>'
+          + '<div style="font-size:11px;color:var(--text2)">$' + obBL.toFixed(2) + ' – $' + obBH.toFixed(2) + ' · ' + (obBD||'—') + '</div>'
+          + '<div style="display:flex;gap:.8rem;font-size:10px;margin-top:3px;flex-wrap:wrap">'
+          +   '<span>Q-Score: <b>' + (obBS||0).toFixed(0) + '</b></span>'
+          +   '<span>Mitig: <b style="color:' + mitCol + '">' + (obBMit||0).toFixed(0) + '%</b></span>'
+          +   (obBVol != null ? '<span>Bull-Vol: <b style="color:var(--green)">' + obBVol.toFixed(0) + '%</b></span>' : '')
+          + '</div>'
+          + '</div>';
+      }
+
+      // ── Bearish OB ────────────────────────────────────────────────────
+      if (obBeH != null) {
+        var inBearZone = price <= obBeH && price >= obBeL;
+        var beCol   = inBearZone ? 'var(--red)' : (obBeDist != null && Math.abs(obBeDist) <= 5 ? 'var(--amber)' : 'var(--text2)');
+        var mitBCol = (obBeMit||0) > 75 ? 'var(--red)' : (obBeMit||0) > 40 ? 'var(--amber)' : 'var(--green)';
+        var beDist  = obBeDist != null ? (obBeDist >= 0 ? '+' : '') + obBeDist.toFixed(1) + '%' : '—';
+        bearHtml = '<div style="padding:5px 8px;border-radius:6px;border-left:3px solid var(--red);background:rgba(240,86,86,0.05);margin-bottom:5px">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">'
+          +   '<span style="font-size:10px;font-weight:700;color:var(--red)">▼ BEARISH OB' + (inBearZone ? ' ← PREIS DRIN' : '') + '</span>'
+          +   '<span style="font-size:10px;color:' + beCol + '">' + beDist + '</span>'
+          + '</div>'
+          + '<div style="font-size:11px;color:var(--text2)">$' + obBeL.toFixed(2) + ' – $' + obBeH.toFixed(2) + '</div>'
+          + '<div style="display:flex;gap:.8rem;font-size:10px;margin-top:3px;flex-wrap:wrap">'
+          +   '<span>Mitig: <b style="color:' + mitBCol + '">' + (obBeMit||0).toFixed(0) + '%</b></span>'
+          +   (obBeVol != null ? '<span>Bear-Vol: <b style="color:var(--red)">' + obBeVol.toFixed(0) + '%</b></span>' : '')
+          + '</div>'
+          + '</div>';
+      }
+
+      // ── AVWAP + OB Confluence Matrix ──────────────────────────────────
+      var avwap   = state.avwap;
+      var avwabove= state.avwapAbove;
+      var avwdist = state.distToAvwapPct;
+      if (avwap != null && obBH != null) {
+        var cspZone  = avwdist != null && avwdist >= 0 && avwdist <= 3;
+        var obZone   = obBDist != null && Math.abs(obBDist) <= 5;
+        var confCol  = (cspZone && obZone) ? 'var(--green)' : (cspZone || obZone) ? 'var(--amber)' : 'var(--text3)';
+        var confLbl  = (cspZone && obZone) ? '🟢 MAXIMAL — AVWAP-Zone + OB-Zone'
+                     : cspZone ? '🟡 AVWAP-Zone (kein OB in Reichweite)'
+                     : obZone  ? '🟡 OB-Zone (AVWAP nicht in Reichweite)'
+                     : '⚪ Keine institutionelle Zone';
+        matrixHtml = '<div style="margin-top:4px;padding:4px 8px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:10px;color:' + confCol + '">'
+          + confLbl
+          + '</div>';
+      }
+
+      obEl.innerHTML =
+        '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.4rem">'
+        + '📦 ORDER BLOCKS (ZEIIERMAN + BIGBELUGA + FLUX)</div>'
+        + bullHtml + bearHtml + matrixHtml;
+    }
+  }
+// ── Ende Order Block Block ────────────────────────────────────────────────────
 }
 
 function renderDeepDiveMarket() {
@@ -20571,6 +20694,30 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     if (state.avwapSlope != null) _avLine += ' · Slope: ' + (state.avwapSlope > 0 ? '+' : '') + state.avwapSlope.toFixed(2) + '%/5B';
     if (state.avwapAnchorDate)    _avLine += ' · Anker: ' + state.avwapAnchorDate + ' @ $' + (state.avwapAnchorPrice||0).toFixed(2);
     ctx.push(_avLine);
+  }
+
+  // Order Blocks (Hybrid Detector, August 2026)
+  if (state.obBullHigh != null || state.obBearHigh != null) {
+    var _obLine = 'Order Blocks (Hybrid):';
+    if (state.obBullHigh != null) {
+      _obLine += ' Bull OB $' + state.obBullLow.toFixed(2) + '-$' + state.obBullHigh.toFixed(2);
+      if (state.obBullDistPct != null) _obLine += ' (Dist ' + (state.obBullDistPct >= 0 ? '+' : '') + state.obBullDistPct.toFixed(1) + '%)';
+      if (state.obBullMitPct != null)  _obLine += ' Mit ' + state.obBullMitPct.toFixed(0) + '%';
+      if (state.obBullVolPct != null)  _obLine += ' BullVol ' + state.obBullVolPct.toFixed(0) + '%';
+      var price = raw.price || 0;
+      if (price <= state.obBullHigh && price >= state.obBullLow)
+        _obLine += ' → PREIS IM BULL OB (institutionelle Unterstützung aktiv)';
+    }
+    if (state.obBearHigh != null) {
+      _obLine += ' | Bear OB $' + state.obBearLow.toFixed(2) + '-$' + state.obBearHigh.toFixed(2);
+      if (state.obBearDistPct != null) _obLine += ' (Dist ' + (state.obBearDistPct >= 0 ? '+' : '') + state.obBearDistPct.toFixed(1) + '%)';
+    }
+    // Confluence
+    var avwdist = state.distToAvwapPct;
+    var obdist  = state.obBullDistPct;
+    if (avwdist != null && obdist != null && Math.abs(avwdist) <= 3 && Math.abs(obdist) <= 5)
+      _obLine += ' | CONFLUENCE: AVWAP-Zone + OB-Zone = maximale institutionelle Zone → CSP-Strike bevorzugen';
+    ctx.push(_obLine);
   }
 
   var strat = KI_STRAT_CONFIG[_ddCurrentStrategy] || KI_STRAT_CONFIG.momentum || { label: _ddCurrentStrategy, focus: [] };
