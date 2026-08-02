@@ -7552,6 +7552,24 @@ async function runScan(){
       raw._yfSym = (typeof _trySym !== 'undefined') ? _trySym : t.sym;
       raw._currency = (typeof _yfCurrency !== 'undefined') ? _yfCurrency : (isDeMarket ? 'EUR' : 'USD');
       raw.sessionNote=sessionNote;
+      // ── TG-Premarket Delta (August 2026) ─────────────────────────────────
+      // Im TG-Modus: Delta vs. gestrigem TG-Schlusskurs berechnen.
+      // closes[-1] = aktueller TG-Kurs (EUR), closes[-2] = gestriger TG-Schluss (EUR)
+      // Kein FX-Problem da beides in EUR. KV-Schlusskurs als Referenz nur als Fallback.
+      if (window._tgPremarketMode && closes.length >= 2) {
+        var _tgNow  = closes[closes.length - 1];
+        var _tgPrev = closes[closes.length - 2];
+        if (_tgPrev > 0) {
+          var _tgDelta = (_tgNow / _tgPrev - 1) * 100;
+          var _tgSign  = _tgDelta >= 0 ? '+' : '';
+          var _tgCol   = _tgDelta >= 0 ? '#22c55e' : '#ef4444';
+          // sessionNote mit Delta überschreiben
+          raw.sessionNote = '🇩🇪 TG ' + _tgSign + _tgDelta.toFixed(2) + '%';
+          raw._tgDelta    = _tgDelta;
+          raw._tgDeltaStr = _tgSign + _tgDelta.toFixed(2) + '%';
+          raw._tgDeltaCol = _tgCol;
+        }
+      }
       raw.effectiveTF=effectiveTF;
       // Calculate backtesting signal quality
       if(closes.length>=100){
@@ -8704,7 +8722,11 @@ function renderCard(t,state){
     '<span style="font-size:13px;font-weight:700;padding:2px 8px;border-radius:6px;background:'+(state.scoreColor||'var(--text3)')+';color:#fff;margin-left:6px">'+
       (state.scoreLabel||'?')+' '+(state.compositeScore||0)+
     '</span>'+
-    (state.sessionNote?'<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,0.08);color:var(--text3);margin-left:4px">'+state.sessionNote+'</span>':'')+
+    (state.sessionNote?(function(note, tgCol){
+      var bg  = tgCol ? (tgCol === '#22c55e' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)') : 'rgba(255,255,255,0.08)';
+      var col = tgCol || 'var(--text3)';
+      return '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:' + bg + ';color:' + col + ';margin-left:4px;font-weight:' + (tgCol ? '700' : 'normal') + '">' + note + '</span>';
+    })(state.sessionNote, state._tgDeltaCol || null):'')+
     earningsBadgeHtml(state._er||null)+
     (state.iosRating&&state.iosRating!=='NO'?(function(){
       var iD=state.iosDecision||'',iC=iD==='BUY FIRST TRANCHE'?'#22c55e':iD==='LEADER WAIT PULLBACK'?'#f0a93a':iD==='SELECTIVE ENTRY'?'#4f8ef7':'#9ca3af';
@@ -13571,6 +13593,20 @@ var TRADEGATE_MAP = {
   "F":"FMC","GM":"GM","RIVN":"RVN","LCID":"LCD",
   // China ADRs
   "BABA":"AHLA","JD":"JD3","PDD":"PDD","BIDU":"B1C","NIO":"NIO",
+  // IWV Top-100 Ergänzungen (August 2026) — fehlende Einträge
+  // Gesundheit & MedTech
+  "UNH":"UNH","MDT":"MDT","BSX":"BSX","SYK":"SYK","ZTS":"ZTS","DHR":"DHR",
+  // Industrie & Tech
+  "ETN":"ETN","MMC":"MMC","MSI":"MSI","CTAS":"CTS","ADP":"ADP","APH":"APH",
+  // Versicherung & Finanz
+  "CB":"CBE","PGR":"PGR","AON":"AON","ICE":"ICE","CME":"CME",
+  "COF":"COF","USB":"USB",
+  // Energie & Versorger
+  "NEE":"NEE","LIN":"LIN",
+  // REIT & Real Estate
+  "AMT":"AMT","PLD":"PLD",
+  // Retail
+  "LOW":"LOW","TJX":"TJX",
 };
 
 function getTradegateSym(sym) {
