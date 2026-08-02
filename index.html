@@ -943,6 +943,24 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
           title="Filter aufheben">✕ Reset</button>
         <span id="price-filter-hint" style="font-size:10px;color:var(--text3);margin-left:2px;flex:1;text-align:right"></span>
       </div>
+      <!-- TVA Trending-Filter (August 2026) -->
+      <div id="tva-filter-bar" style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem;padding:5px 10px;background:var(--bg2);border-radius:8px;border:0.5px solid var(--border);flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text3);white-space:nowrap"><i class="ti ti-trending-up"></i> TVA:</span>
+        <button id="tva-btn-all" onclick="setTvaFilter('all')"
+          style="font-size:10px;padding:2px 8px;border-radius:5px;border:0.5px solid var(--border2);background:var(--accent);color:#fff;cursor:pointer;font-weight:600"
+          title="Alle Ticker anzeigen">Alle</button>
+        <button id="tva-btn-trend" onclick="setTvaFilter('trend')"
+          style="font-size:10px;padding:2px 8px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer"
+          title="Trend Up + Strong Trend Up (DI+ > DI-, ADX≥20)">📈 Trending (34)</button>
+        <button id="tva-btn-strong" onclick="setTvaFilter('strong')"
+          style="font-size:10px;padding:2px 8px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer"
+          title="Nur Strong Trend Up (ADX≥35, DI+ > DI-)">🚀 Strong (9)</button>
+        <button id="tva-btn-nochop" onclick="setTvaFilter('nochop')"
+          style="font-size:10px;padding:2px 8px;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer"
+          title="Kein extremer Chop (chopIndex < 55)">✅ Kein Chop</button>
+        <span id="tva-filter-count" style="font-size:10px;color:var(--text3);margin-left:auto"></span>
+      </div>
+
       <!-- qqq-regime-banner + vix-ampel aus Scanner entfernt (08.07.2026) -->
       <!-- Regime-Info ist bereits im Market-Weather-Widget oben sichtbar -->
       <div id="qqq-regime-banner" style="display:none"></div>
@@ -8017,6 +8035,17 @@ async function loadScannerFromKV() {
     ms = (window._alphaData && _alphaData.masterShortlist) ? _alphaData.masterShortlist : [];
   }
 
+  // ── TVA Trending-Filter (August 2026) ──────────────────────────────────
+  ms = applyTvaFilter(ms);
+  var countEl = document.getElementById('tva-filter-count');
+  if (countEl && window._tvaFilter !== 'all') {
+    countEl.textContent = ms.length + ' Titel nach TVA-Filter';
+    countEl.style.color = 'var(--amber)';
+  } else if (countEl) {
+    countEl.textContent = '';
+  }
+  updateTvaFilterCounts();
+
   if (!ms.length) {
     cont.innerHTML = '<div style="color:var(--text3);padding:1rem;font-size:12px">'
       + '<i class="ti ti-database-off"></i> Keine KV-Daten verfügbar — bitte Live-Scan verwenden.</div>';
@@ -8076,6 +8105,60 @@ async function loadScannerFromKV() {
 }
 
 window.kvToScannerState = kvToScannerState; // Global-Bindung für renderAlphaCards
+
+// ── TVA Trending-Filter (August 2026) ─────────────────────────────────────────
+window._tvaFilter = 'all';  // 'all' | 'trend' | 'strong' | 'nochop'
+
+function setTvaFilter(mode) {
+  window._tvaFilter = mode;
+  // Button-Styles aktualisieren
+  var btns = { all:'tva-btn-all', trend:'tva-btn-trend', strong:'tva-btn-strong', nochop:'tva-btn-nochop' };
+  Object.keys(btns).forEach(function(k) {
+    var el = document.getElementById(btns[k]);
+    if (!el) return;
+    var active = k === mode;
+    el.style.background = active ? 'var(--accent)' : 'var(--bg3)';
+    el.style.color = active ? '#fff' : 'var(--text2)';
+    el.style.fontWeight = active ? '600' : 'normal';
+  });
+  // Scanner neu rendern wenn KV-Daten vorhanden
+  if (window._scannerKvMode && window._alphaData) {
+    renderAlphaCards();
+  }
+}
+
+function applyTvaFilter(tickers) {
+  var mode = window._tvaFilter || 'all';
+  if (mode === 'all') return tickers;
+  return tickers.filter(function(r) {
+    var regime = r.tvaRegime || '';
+    var adx    = r.adx || 0;
+    var dip    = r.diPlus || 0;
+    var dim    = r.diMinus || 0;
+    var chop   = r.chopIndex || 0;
+    if (mode === 'trend')  return (regime === 'Trend Up' || regime === 'Strong Trend Up');
+    if (mode === 'strong') return regime === 'Strong Trend Up';
+    if (mode === 'nochop') return chop < 55;
+    return true;
+  });
+}
+
+function updateTvaFilterCounts() {
+  if (!window._alphaData) return;
+  var all = (_alphaData.tickers || []);
+  var trend  = all.filter(function(r){ return r.tvaRegime === 'Trend Up' || r.tvaRegime === 'Strong Trend Up'; });
+  var strong = all.filter(function(r){ return r.tvaRegime === 'Strong Trend Up'; });
+  var nochop = all.filter(function(r){ return (r.chopIndex || 0) < 55; });
+  var tb = document.getElementById('tva-btn-trend');
+  var sb = document.getElementById('tva-btn-strong');
+  var nb = document.getElementById('tva-btn-nochop');
+  if (tb) tb.title = 'Trend Up + Strong Trend Up: ' + trend.length + ' Titel';
+  if (tb) tb.textContent = '📈 Trending (' + trend.length + ')';
+  if (sb) sb.title = 'Strong Trend Up: ' + strong.length + ' Titel';
+  if (sb) sb.textContent = '🚀 Strong (' + strong.length + ')';
+  if (nb) nb.title = 'Kein extremer Chop (chopIndex<55): ' + nochop.length + ' Titel';
+  if (nb) nb.textContent = '✅ Kein Chop (' + nochop.length + ')';
+}
 
 function runScanAuto() {
   // Smart Scan: KV-Modus wenn Aggregator-Daten vorhanden, sonst Live-Scan
@@ -18757,6 +18840,17 @@ async function loadScannerFromKV() {
   } else {
     ms = (window._alphaData && _alphaData.masterShortlist) ? _alphaData.masterShortlist : [];
   }
+
+  // ── TVA Trending-Filter (August 2026) ──────────────────────────────────
+  ms = applyTvaFilter(ms);
+  var countEl = document.getElementById('tva-filter-count');
+  if (countEl && window._tvaFilter !== 'all') {
+    countEl.textContent = ms.length + ' Titel nach TVA-Filter';
+    countEl.style.color = 'var(--amber)';
+  } else if (countEl) {
+    countEl.textContent = '';
+  }
+  updateTvaFilterCounts();
 
   if (!ms.length) {
     cont.innerHTML = '<div style="color:var(--text3);padding:1rem;font-size:12px">'
