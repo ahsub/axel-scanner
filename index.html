@@ -8776,7 +8776,7 @@ function renderCard(t,state){
         + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
         + '📦 ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%</span>';
     })(state.obBullDistPct, state.obBullMitPct, state.obBullHigh, state.obBullLow, state.price || 0) : '')+
-     '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"+
+     '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"'+
        ' onchange="setCardTF(this)"'+
        ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-weight:600">'+
        '<option value="1d">1T ✓</option>'+
@@ -20421,7 +20421,6 @@ function renderDeepDiveTech(sym, raw, state) {
   peEl.style.display = 'block';
   peEl.innerHTML = '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.5rem">📐 PATTERN & ENTRY (IOS Engine)</div>'
     + patHtml + entHtml + priceHtml;
-}
 
 // ── RS-Rank Score Block (IOS Konzept-Integration, August 2026) ──────────────
   var rsEl = document.getElementById('dd-rs-rank');
