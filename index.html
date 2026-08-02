@@ -7896,6 +7896,18 @@ function kvToScannerState(r) {
     bullPct:          r.bullPct         != null ? r.bullPct          : null,
     warnLevel:        r.warnLevel       != null ? r.warnLevel        : null,
     squeezeRisk:      r.squeezeRisk     != null ? r.squeezeRisk      : null,
+    // RS-Rank Score (IOS Konzept-Integration, August 2026)
+    rsScore:          r.rsScore      != null ? r.rsScore      : null,   // 0-100 kombiniert SPY+IWM
+    rsScoreSpy:       r.rsScoreSpy   != null ? r.rsScoreSpy   : null,
+    rsScoreIwm:       r.rsScoreIwm   != null ? r.rsScoreIwm   : null,
+    rsNewHigh:        r.rsNewHigh    != null ? r.rsNewHigh    : null,   // bool: RS-Line 63T-Hoch
+    rsGrade:          r.rsGrade      != null ? r.rsGrade      : null,   // A+/A/B.../F
+    // RS-Rank Score (IOS Konzept-Integration, August 2026)
+    rsScore:          r.rsScore      != null ? r.rsScore      : null,
+    rsScoreSpy:       r.rsScoreSpy   != null ? r.rsScoreSpy   : null,
+    rsScoreIwm:       r.rsScoreIwm   != null ? r.rsScoreIwm   : null,
+    rsNewHigh:        r.rsNewHigh    != null ? r.rsNewHigh    : null,
+    rsGrade:          r.rsGrade      != null ? r.rsGrade      : null,
     // Sektor-Tags
     sectors:          Array.isArray(r.sectors) ? r.sectors : [],
     // ────────────────────────────────────────────────────────────────────────
@@ -8678,6 +8690,13 @@ function renderCard(t,state){
     (state._fromTdCache ? '<span style="font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(120,120,128,0.15);color:var(--text3);margin-left:4px" title="Daten aus lokalem Cache"><i class="ti ti-database" style="font-size:9px"></i> Cache</span>' : '')+
     '<span style="margin-left:auto;display:flex;align-items:center;gap:5px">'+
     (state.rs ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:.03em;background:'+(state.rs>=80?'rgba(52,194,110,0.18)':state.rs>=60?'rgba(79,142,247,0.18)':state.rs<40?'rgba(240,86,86,0.18)':'rgba(255,255,255,0.08)')+';color:'+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--text3)')+';border:0.5px solid '+(state.rs>=80?'var(--green)':state.rs>=60?'var(--accent)':state.rs<40?'var(--red)':'var(--border2)')+'">RS '+state.rs+'</span>' : '')+
+    /* RS-Rank Score (IOS Konzept-Integration, August 2026) — Aggregator-berechnete RS vs SPY+IWM */
+    (state.rsScore != null ? (function(sc,gr,nh){
+      var bg  = sc>=80?'rgba(52,194,110,0.15)':sc>=60?'rgba(79,142,247,0.12)':sc>=40?'rgba(245,158,11,0.12)':'rgba(240,86,86,0.12)';
+      var col = sc>=80?'var(--green)':sc>=60?'var(--accent)':sc>=40?'var(--amber)':'var(--red)';
+      var nhTip = nh ? ' · RS New High \u2605' : '';
+      return '<span title="RS-Rank Score (SPY+IWM)' + nhTip + ' · Grade: ' + gr + '" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;letter-spacing:.03em;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">' + (nh ? '\u2605 ' : '') + gr + ' ' + sc + '</span>';
+    })(state.rsScore, state.rsGrade||'?', state.rsNewHigh) : '')+
      '<select id="tf-sel-'+state.sym+'" data-sym="'+state.sym+'" onclick="event.stopPropagation()"'+
        ' onchange="setCardTF(this)"'+
        ' style="font-size:10px;padding:2px 5px;background:var(--bg2);border:0.5px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-weight:600">'+
@@ -22353,6 +22372,35 @@ function showMorningTearsheet(results) {
       '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.4rem">INTRADAY-VERGLEICH · MORGEN VS. NYSE</div>' +
       '<div id="ts-intraday-content" style="font-size:11px;color:var(--text2)"><i class="ti ti-loader"></i> Lädt Vergleichsdaten…</div>' +
     '</div>' +
+
+    // Distribution Days Warnblock (IOS Konzept-Integration, August 2026)
+    (function(){
+      var dd = window._kvMasterData && window._kvMasterData.market && window._kvMasterData.market.distributionDays
+               ? window._kvMasterData.market.distributionDays : null;
+      if (!dd || dd.dd_spy == null || !dd.dd_alert) return '';
+      var sev = dd.dd_severity || 'None';
+      var col = sev === 'Danger' ? '#ef4444' : '#f97316';
+      var bg  = sev === 'Danger' ? 'rgba(239,68,68,0.10)' : 'rgba(249,115,22,0.10)';
+      var ico = sev === 'Danger' ? '\uD83D\uDD34' : '\uD83D\DFE1';
+      var lbl = sev === 'Danger' ? 'DANGER — Markt unter Distribution' : 'WATCH — Distribution nimmt zu';
+      var tip = sev === 'Danger'
+        ? '≥6 DD: Neue Long-Positionen vermeiden. Stops eng ziehen. Auf Markt-Bestätigung warten.'
+        : '4–5 DD: Selektiv bleiben. Breakouts nur bei starkem Volumen.';
+      return '<div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border)">'
+        + '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.5rem">DISTRIBUTION DAYS (O\'NEIL/IBD · 25T)</div>'
+        + '<div style="padding:8px 12px;border-radius:8px;border-left:3px solid ' + col + ';background:' + bg + '">'
+        +   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+        +     '<b style="font-size:12px;color:' + col + '">' + ico + ' ' + lbl + '</b>'
+        +   '</div>'
+        +   '<div style="font-size:11px;color:var(--text2);display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:4px">'
+        +     '<span>SPY: <b style="color:' + col + '">' + dd.dd_spy + ' DD</b></span>'
+        +     '<span>QQQ: <b style="color:' + col + '">' + dd.dd_qqq + ' DD</b></span>'
+        +     '<span>Score: <b>' + dd.dd_score + '/100</b></span>'
+        +   '</div>'
+        +   '<div style="font-size:10px;color:var(--text3)">' + tip + '</div>'
+        + '</div>'
+        + '</div>';
+    })() +
 
     // Sektor RS
     '<div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border)">' +
