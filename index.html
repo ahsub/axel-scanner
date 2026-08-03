@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260803-v431">
+<meta name="version" content="20260803-v428">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -8899,6 +8899,7 @@ function renderCard(t,state){
         + '📦 ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%</span>';
     })(state.obBullDistPct, state.obBullMitPct, state.obBullHigh, state.obBullLow, state.price || 0) : '')+
     /* trendScore Badge (TVA Sprint A, August 2026) */
+    (function(){ if(state.sym==='AMZN') console.log('[Badge-Debug] AMZN trendScore='+state.trendScore+' confluenceScore='+state.confluenceScore); })() ||
     (state.trendScore != null ? (function(ts){
       var col = ts >= 30 ? 'var(--green)' : ts <= -30 ? 'var(--red)' : ts >= 10 ? 'var(--green)' : ts <= -10 ? 'var(--red)' : 'var(--text3)';
       var bg  = ts >= 30 ? 'rgba(52,194,110,0.12)' : ts <= -30 ? 'rgba(240,86,86,0.12)' : ts >= 10 ? 'rgba(52,194,110,0.08)' : ts <= -10 ? 'rgba(240,86,86,0.08)' : 'rgba(255,255,255,0.04)';
