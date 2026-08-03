@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v429: TVA Sprint A Frontend (03.08.2026): trendScore-Badge (▲↗→↘▼) + confluenceScore-Badge (◈, nur ≥60) in Ticker-Cards. DeepDive TVA-Block +2 Zeilen: Trend Score (−100..+100, farbig) + Confluence Score (0–100). KI-Prompt: trendScore + confluenceScore im TVA-Kontext. KV-Adapter +2 Felder.
      v428: BUGFIX showKiError retryFn.toString() (03.08.2026): Retry-Button nutzte retryFn.toString() im onclick-Attribut — dadurch waren sym/name/raw/state als Closure-Variablen im Inline-Handler nicht verfügbar → ReferenceError: sym is not defined. Fix: onclick entfernt, stattdessen addEventListener nach innerHTML-Setzung.
      v427: BUGFIX TVA-Filter TypeError (02.08.2026): setTvaFilter() rief renderAlphaCards() ohne ms-Parameter auf → Cannot read properties of undefined. Fix: _alphaData.masterShortlist als Parameter + Length-Guard.
      v426: BUGFIX Earnings-Badge onclick Syntax (02.08.2026): onclick="event.stopPropagation()"+ → '"+ (identisch F2 aus CODING-RULES.md). Dritte Wiederholung dieses Badge-Patch-Fehlers — ab jetzt expliziter onclick-Check nach jedem Badge-Patch Pflicht.
@@ -8002,6 +8003,9 @@ function kvToScannerState(r) {
     tvaRegimeConf:    r.tvaRegimeConf != null ? r.tvaRegimeConf : null,
     chopIndex:        r.chopIndex     != null ? r.chopIndex     : null,
     chopLabel:        r.chopLabel     != null ? r.chopLabel     : null,
+    // TVA Sprint A (August 2026)
+    trendScore:       r.trendScore    != null ? r.trendScore    : null,
+    confluenceScore:  r.confluenceScore != null ? r.confluenceScore : null,
     // Earnings Calendar (August 2026)
     earningsDate:     r.earningsDate  != null ? r.earningsDate  : null,
     earningsDTE:      r.earningsDTE   != null ? r.earningsDTE   : null,
@@ -8892,6 +8896,25 @@ function renderCard(t,state){
         + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
         + '📦 ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%</span>';
     })(state.obBullDistPct, state.obBullMitPct, state.obBullHigh, state.obBullLow, state.price || 0) : '')+
+    /* trendScore Badge (TVA Sprint A, August 2026) */
+    (state.trendScore != null ? (function(ts){
+      var col = ts >= 30 ? 'var(--green)' : ts <= -30 ? 'var(--red)' : ts >= 10 ? 'var(--green)' : ts <= -10 ? 'var(--red)' : 'var(--text3)';
+      var bg  = ts >= 30 ? 'rgba(52,194,110,0.12)' : ts <= -30 ? 'rgba(240,86,86,0.12)' : ts >= 10 ? 'rgba(52,194,110,0.08)' : ts <= -10 ? 'rgba(240,86,86,0.08)' : 'rgba(255,255,255,0.04)';
+      var ico = ts >= 30 ? '▲' : ts <= -30 ? '▼' : ts >= 10 ? '↗' : ts <= -10 ? '↘' : '→';
+      var tip = 'Trend Score (TVA): ' + (ts >= 0 ? '+' : '') + ts.toFixed(1) + ' | EMA-Stack + RSI × ADX-Konviktion';
+      return '<span title="' + tip + '" style="font-size:10px;font-weight:700;padding:2px 6px;'
+        + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
+        + ico + ' ' + (ts >= 0 ? '+' : '') + ts.toFixed(0) + '</span>';
+    })(state.trendScore) : '')+
+    /* confluenceScore Badge (TVA Sprint A, August 2026) */
+    (state.confluenceScore != null && state.confluenceScore >= 60 ? (function(cs){
+      var col = cs >= 80 ? 'var(--green)' : cs >= 60 ? 'var(--amber)' : 'var(--text3)';
+      var bg  = cs >= 80 ? 'rgba(52,194,110,0.13)' : 'rgba(245,158,11,0.10)';
+      var tip = 'Confluence Score: ' + cs + '/100 | Trend+Momentum+Volumen+AVWAP+OB';
+      return '<span title="' + tip + '" style="font-size:10px;font-weight:700;padding:2px 6px;'
+        + 'border-radius:8px;background:' + bg + ';color:' + col + ';border:0.5px solid ' + col + '">'
+        + '◈ ' + cs + '</span>';
+    })(state.confluenceScore) : '')+
     /* Earnings Badge (August 2026) */
     (state.earningsDTE != null && state.earningsDTE >= -2 && state.earningsDTE <= 30 ? (function(dte, eps){
       var urgent  = dte <= 7;
@@ -18820,6 +18843,9 @@ function kvToScannerState(r) {
     tvaRegimeConf:    r.tvaRegimeConf != null ? r.tvaRegimeConf : null,
     chopIndex:        r.chopIndex     != null ? r.chopIndex     : null,
     chopLabel:        r.chopLabel     != null ? r.chopLabel     : null,
+    // TVA Sprint A (August 2026)
+    trendScore:       r.trendScore    != null ? r.trendScore    : null,
+    confluenceScore:  r.confluenceScore != null ? r.confluenceScore : null,
     // Earnings Calendar (August 2026)
     earningsDate:     r.earningsDate  != null ? r.earningsDate  : null,
     earningsDTE:      r.earningsDTE   != null ? r.earningsDTE   : null,
@@ -20884,6 +20910,28 @@ function renderDeepDiveTech(sym, raw, state) {
         +   '</div>'
         + '</div>'
 
+        + '</div>'
+
+        // Trend Score + Confluence Score (TVA Sprint A, August 2026)
+        + (state.trendScore != null ? (function(ts, cs){
+          var tsCol = ts >= 30 ? 'var(--green)' : ts <= -30 ? 'var(--red)' : ts >= 10 ? 'var(--green)' : ts <= -10 ? 'var(--red)' : 'var(--text3)';
+          var tsLbl = ts >= 30 ? 'Starker Trend ↑' : ts <= -30 ? 'Starker Trend ↓' : ts >= 10 ? 'Aufwärts ↗' : ts <= -10 ? 'Abwärts ↘' : 'Neutral →';
+          var csCol = cs >= 80 ? 'var(--green)' : cs >= 60 ? 'var(--amber)' : cs >= 40 ? 'var(--text2)' : 'var(--text3)';
+          var csLbl = cs >= 80 ? 'Hohe Confluence' : cs >= 60 ? 'Confluence OK' : cs >= 40 ? 'Schwach' : 'Keine Confluence';
+          return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px">'
+            + '<div style="padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.04)">'
+            +   '<div style="font-size:9px;color:var(--text3);margin-bottom:2px">TREND SCORE (TVA)</div>'
+            +   '<div style="font-size:16px;font-weight:700;color:' + tsCol + '">' + (ts >= 0 ? '+' : '') + ts.toFixed(1) + '</div>'
+            +   '<div style="font-size:10px;color:' + tsCol + '">' + tsLbl + '</div>'
+            + '</div>'
+            + '<div style="padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.04)">'
+            +   '<div style="font-size:9px;color:var(--text3);margin-bottom:2px">CONFLUENCE SCORE</div>'
+            +   '<div style="font-size:16px;font-weight:700;color:' + csCol + '">' + (cs != null ? cs : '—') + '</div>'
+            +   '<div style="font-size:10px;color:' + csCol + '">' + (cs != null ? csLbl : '—') + '</div>'
+            + '</div>'
+            + '</div>';
+        })(state.trendScore, state.confluenceScore) : '')
+
         + '</div>';
     }
   }
@@ -20988,6 +21036,10 @@ async function generateDeepDiveKI(sym, name, raw, state) {
       + '% (' + (state.chopLabel||'—') + ')';
     if (state.efficiencyRatio != null) _tvaLine += ' · ER: ' + (state.efficiencyRatio * 100).toFixed(0) + '%'
       + (state.efficiencyRatio >= 0.6 ? ' (trendend)' : state.efficiencyRatio < 0.3 ? ' (choppy)' : '');
+    if (state.trendScore != null) _tvaLine += ' · TrendScore: ' + (state.trendScore >= 0 ? '+' : '') + state.trendScore.toFixed(1)
+      + (state.trendScore >= 30 ? ' (starker Aufwärtstrend)' : state.trendScore <= -30 ? ' (starker Abwärtstrend)' : state.trendScore >= 10 ? ' (aufwärts)' : state.trendScore <= -10 ? ' (abwärts)' : ' (neutral)');
+    if (state.confluenceScore != null) _tvaLine += ' · Confluence: ' + state.confluenceScore + '/100'
+      + (state.confluenceScore >= 80 ? ' (hohe Signaldichte)' : state.confluenceScore >= 60 ? ' (OK)' : state.confluenceScore >= 40 ? ' (schwach)' : ' (keine Confluence)');
     if (state.diPlus != null) _tvaLine += ' · DI+/DI-: ' + state.diPlus.toFixed(1) + '/' + (state.diMinus||0).toFixed(1);
     // Handlungshinweis
     if (state.chopIndex >= 55) _tvaLine += ' → Choppiges Umfeld: Entry-Timing prüfen, keine aggressiven CSPs';
