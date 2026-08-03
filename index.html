@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260803-v429">
+<meta name="version" content="20260803-v428">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v430: Alpha Desk Card: trendScore (TS) + confluenceScore (CS ≥60) in Kandidaten-Zeile. eicCandidates-Push ergänzt.
      v429: TVA Sprint A Frontend (03.08.2026): trendScore-Badge (▲↗→↘▼) + confluenceScore-Badge (◈, nur ≥60) in Ticker-Cards. DeepDive TVA-Block +2 Zeilen: Trend Score (−100..+100, farbig) + Confluence Score (0–100). KI-Prompt: trendScore + confluenceScore im TVA-Kontext. KV-Adapter +2 Felder.
      v428: BUGFIX showKiError retryFn.toString() (03.08.2026): Retry-Button nutzte retryFn.toString() im onclick-Attribut — dadurch waren sym/name/raw/state als Closure-Variablen im Inline-Handler nicht verfügbar → ReferenceError: sym is not defined. Fix: onclick entfernt, stattdessen addEventListener nach innerHTML-Setzung.
      v427: BUGFIX TVA-Filter TypeError (02.08.2026): setTvaFilter() rief renderAlphaCards() ohne ms-Parameter auf → Cannot read properties of undefined. Fix: _alphaData.masterShortlist als Parameter + Length-Guard.
@@ -21786,6 +21787,8 @@ async function loadEicSuggestions() {
     var rsiTxt    = c.rsi  ? 'RSI ' + Math.round(c.rsi) : '';
     var hvpTxt    = c.hvp  != null ? ' · HVP ' + c.hvp : '';
     var atrTxt    = c.atr  ? ' · ATR $' + c.atr.toFixed(2) : '';
+    var tsTxt     = c.trendScore != null ? ' · TS ' + (c.trendScore >= 0 ? '+' : '') + c.trendScore.toFixed(0) : '';
+    var csTxt     = c.confluenceScore != null && c.confluenceScore >= 60 ? ' · CS ' + c.confluenceScore : '';
     var priceTxt  = c.price ? '$' + c.price.toFixed(2) : '';
 
     // Kandidaten im globalen Array cachen — Button gibt nur Index weiter (kein JSON im HTML-Attribut)
@@ -21797,7 +21800,8 @@ async function loadEicSuggestions() {
       volRatio: c.volRatio, high52: c.high52, low52: c.low52, dist200: c.dist200,
       strategy: c.strategy, score: c.score, grade: c.grade, regime: c.regime,
       sMinervini: c.sMinervini, sSwing: c.sSwing, sMrLong: c.sMrLong,
-      sBreakdown: c.sBreakdown, sFading: c.sFading
+      sBreakdown: c.sBreakdown, sFading: c.sFading,
+      trendScore: c.trendScore, confluenceScore: c.confluenceScore
     });
 
     return '<div style="padding:5px 0;border-bottom:0.5px solid var(--border)">'
@@ -21811,7 +21815,7 @@ async function loadEicSuggestions() {
           + '<button data-eicidx="' + eicIdx + '" onclick="runEicQuickAnalysis(this)" style="font-size:9px;padding:1px 5px;background:rgba(34,197,94,0.12);border:0.5px solid var(--green);color:var(--green);border-radius:4px;cursor:pointer" title="EIC Unleashed Analyse">🔬 Analyse</button>'
         + '</div>'
       + '</div>'
-      + '<div style="font-size:10px;color:var(--text3)">' + rsiTxt + hvpTxt + atrTxt + '</div>'
+      + '<div style="font-size:10px;color:var(--text3)">' + rsiTxt + hvpTxt + atrTxt + tsTxt + csTxt + '</div>'
       + '<div id="eic-qa-result-' + eicIdx + '" style="display:none;font-size:11px;line-height:1.6;color:var(--text);margin-top:4px;padding:5px 7px;background:var(--bg3);border-radius:5px;border-left:2px solid var(--green)"></div>'
     + '</div>';
   }).join('');
