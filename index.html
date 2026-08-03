@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260802-v427">
+<meta name="version" content="20260803-v428">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v428: BUGFIX showKiError retryFn.toString() (03.08.2026): Retry-Button nutzte retryFn.toString() im onclick-Attribut — dadurch waren sym/name/raw/state als Closure-Variablen im Inline-Handler nicht verfügbar → ReferenceError: sym is not defined. Fix: onclick entfernt, stattdessen addEventListener nach innerHTML-Setzung.
      v427: BUGFIX TVA-Filter TypeError (02.08.2026): setTvaFilter() rief renderAlphaCards() ohne ms-Parameter auf → Cannot read properties of undefined. Fix: _alphaData.masterShortlist als Parameter + Length-Guard.
      v426: BUGFIX Earnings-Badge onclick Syntax (02.08.2026): onclick="event.stopPropagation()"+ → '"+ (identisch F2 aus CODING-RULES.md). Dritte Wiederholung dieses Badge-Patch-Fehlers — ab jetzt expliziter onclick-Check nach jedem Badge-Patch Pflicht.
      v425: Earnings Calendar (02.08.2026): Echter yfinance-Kalender v5.26.0. earningsDate/DTE/EPS-Felder. Badge in Cards: 📅>14T ⚠️7-14T 🚨<7T. KI-Prompt CSP-Warnung DTE<21. ETF-gefiltert.
@@ -4309,7 +4310,7 @@ function showKiError(el, err, retryFn, cachedFallback) {
     + '<div style="font-weight:600;margin-bottom:.25rem">' + msg + '</div>'
     + '<p style="margin:0;color:var(--text2)">' + sub + '</p>'
     + (showRetry
-        ? '<button id="' + retryBtnId + '" onclick="(' + retryFn.toString() + ')()" '
+        ? '<button id="' + retryBtnId + '" '  /* onclick via addEventListener — kein toString() */
           + (countdownSec > 0 ? 'disabled ' : '')
           + 'style="margin-top:.5rem;padding:3px 10px;font-size:11px;border-radius:6px;'
           + 'border:0.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;opacity:' + (countdownSec > 0 ? '0.5' : '1') + '">'
@@ -4318,6 +4319,16 @@ function showKiError(el, err, retryFn, cachedFallback) {
         : '')
     + '</div>'
     + cacheHtml;
+
+  // addEventListener-Fix: retryFn.toString() verursachte 'sym is not defined'
+  if (showRetry && retryFn) {
+    (function(btnId, fn) {
+      setTimeout(function() {
+        var btn = document.getElementById(btnId);
+        if (btn) btn.addEventListener('click', function() { fn(); });
+      }, 0);
+    })(retryBtnId, retryFn);
+  }
 
   if (showRetry && countdownSec > 0) {
     var remaining = countdownSec;
