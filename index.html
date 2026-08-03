@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260803-v432">
+<meta name="version" content="20260803-v433">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v433: Cleanup Debug-Logs (v432 temp). Meta-Tag-Versionierung ab jetzt automatisch bei jedem Commit.
      v431: Bugfix Alpha-Desk _kvToState: trendScore + confluenceScore fehlten im lokalen Mapper → Badges jetzt auch in Master Shortlist Cards.
      v430: Alpha Desk Card: trendScore (TS) + confluenceScore (CS ≥60) in Kandidaten-Zeile. eicCandidates-Push ergänzt.
      v429: TVA Sprint A Frontend (03.08.2026): trendScore-Badge (▲↗→↘▼) + confluenceScore-Badge (◈, nur ≥60) in Ticker-Cards. DeepDive TVA-Block +2 Zeilen: Trend Score (−100..+100, farbig) + Confluence Score (0–100). KI-Prompt: trendScore + confluenceScore im TVA-Kontext. KV-Adapter +2 Felder.
@@ -8899,7 +8900,6 @@ function renderCard(t,state){
         + '📦 ' + (dist >= 0 ? '+' : '') + dist.toFixed(1) + '%</span>';
     })(state.obBullDistPct, state.obBullMitPct, state.obBullHigh, state.obBullLow, state.price || 0) : '')+
     /* trendScore Badge (TVA Sprint A, August 2026) */
-    (function(){ if(state.sym==='AMZN') console.log('[Badge-Debug] AMZN trendScore='+state.trendScore+' confluenceScore='+state.confluenceScore); })() ||
     (state.trendScore != null ? (function(ts){
       var col = ts >= 30 ? 'var(--green)' : ts <= -30 ? 'var(--red)' : ts >= 10 ? 'var(--green)' : ts <= -10 ? 'var(--red)' : 'var(--text3)';
       var bg  = ts >= 30 ? 'rgba(52,194,110,0.12)' : ts <= -30 ? 'rgba(240,86,86,0.12)' : ts >= 10 ? 'rgba(52,194,110,0.08)' : ts <= -10 ? 'rgba(240,86,86,0.08)' : 'rgba(255,255,255,0.04)';
@@ -24603,7 +24603,6 @@ function renderAlphaCards(ms) {
   ms.forEach(function(r, idx) {
     var ticker = { sym: r.sym, name: r.name || r.sym };
     var state  = _kvToState(r);
-    if (r.sym === 'AMZN') console.log('[Alpha-Debug] AMZN r.trendScore='+r.trendScore+' state.trendScore='+state.trendScore+' _kvToState='+typeof _kvToState);
 
     // Standard-Karte rendern (gleich wie Scanner-Tab) — mit Fehlerbehandlung
     try { renderCard(ticker, state); } catch(e) { console.error('[Alpha]', r.sym, e.message); return; }
