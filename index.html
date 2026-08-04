@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260804-v439">
+<meta name="version" content="20260804-v440">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,7 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v440: (1) DCE-Badge Emoji-Fix — bgMap statt replace-Chain, Emoji 🟢🟡🔴 jetzt korrekt. (2) DeepDive TVA-Block live — KV-Felder nach processData() injiziert (trendScore, confluenceScore, adx, tvaRegime, avwap, OB-Felder).
      v439: BUGFIX Konsolidierungs-Sprint — window-Referenz war zirkulär → undefined in renderAlphaCards (.toFixed Fehler). Zweite kvToScannerState wieder vollständige Kopie der ersten (257 Zeilen).
      v438: DCE-Ampel Frontend — 🟢🟡🔴 Badge + Confidence in Alpha-Desk weatherEl, Warning-Banner, Morning-Briefing DCE-Sektion im KI-Prompt.
      v437: Konsolidierungs-Sprint — kvToScannerState Duplikat (212-Zeilen-Kopie) durch window-Referenz ersetzt. Scope-Isolation erhalten, Single Source of Truth.
@@ -20470,6 +20471,16 @@ function openDeepDive(sym, name) {
     _ddCurrentState = processData(raw);
     _ddCurrentRaw  = raw;
     _ddCurrentName = name;
+    // KV-Felder injizieren die processData() nicht kennt (analog runScan KV-Pfad)
+    var _kvT = (typeof getKVTicker === 'function') ? getKVTicker(sym) : null;
+    if (_kvT) {
+      var _kvFields = ['trendScore','confluenceScore','adx','tvaRegime','tvaRegimeConf',
+                       'chopIndex','chopLabel','efficiencyRatio','diPlus','diMinus',
+                       'distToAvwapPct','avwapAbove','avwap','avwapSlope','avwapAnchorDate',
+                       'obBullDistPct','obBullMit','obBullHigh','obBullLow',
+                       'rsScore','rsGrade','rsNewHigh'];
+      _kvFields.forEach(function(f){ if (_kvT[f] != null) _ddCurrentState[f] = _kvT[f]; });
+    }
     renderDeepDiveTech(sym, raw, _ddCurrentState);
     renderDeepDiveMarket();
     generateDeepDiveKI(sym, name, raw, _ddCurrentState);
@@ -24304,10 +24315,11 @@ function renderAlphaDashboard(data) {
 
     weatherEl.innerHTML =
       // DCE-Ampel als erste, prominente Pill
-      (dceConf != null ? '<span title="' + dceTip + '" style="font-size:10px;font-weight:700;'
-        + 'padding:3px 8px;border-radius:8px;background:' + dceModeCol.replace(')', ',0.12)').replace('var(','rgba(').replace('--green','52,194,110').replace('--red','240,86,86').replace('--amber','245,158,11')
-        + ';color:' + dceModeCol + ';border:0.5px solid ' + dceModeCol + ';margin-right:4px">'
-        + dceLabel + '</span>' : '') +
+      (dceConf != null ? (function(){
+        var bgMap = {'GREEN':'rgba(52,194,110,0.12)','RED':'rgba(240,86,86,0.12)','YELLOW':'rgba(245,158,11,0.12)'};
+        var bg = bgMap[dceMode] || 'rgba(255,255,255,0.06)';
+        return '<span title="' + dceTip + '" style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:' + bg + ';color:' + dceModeCol + ';border:0.5px solid ' + dceModeCol + ';margin-right:4px">' + dceLabel + '</span>';
+      })() : '') +
       pill('VIX', vt.vix || '—', vt.vix && vt.vix < 20 ? 'var(--green)' : 'var(--red)') +
       pill('Term', vt.signal || '—', vt.signal === 'CONTANGO' ? 'var(--green)' : 'var(--red)') +
       pill('Ratio', vt.ratio || '—') +
