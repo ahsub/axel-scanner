@@ -168,7 +168,7 @@
 <nav>
   <div class="nav-brand">
     <h1>📡 UNDERLYINGIQ</h1>
-    <p>Bedienungsanleitung v328</p>
+    <p>Bedienungsanleitung v451</p>
   </div>
 
   <div class="nav-group">
@@ -202,7 +202,9 @@
 
   <div class="nav-group">
     <div class="nav-group-label">Indikatoren</div>
-    <a href="#indikatoren">Neue Indikatoren v5.8</a>
+    <a href="#indikatoren">Indikatoren v5.7–v5.8</a>
+    <a href="#mcm-vcp">MCM &amp; VCP</a>
+    <a href="#neue-indikatoren">Aktuell v5.9–v5.28</a>
   </div>
 
   <div class="nav-group">
@@ -727,6 +729,151 @@
     <p>Neues Leaderboard-Tab „📐 VCP" im Alpha Desk. Felder:
     <span class="tag">vcpDetected</span> · <span class="tag">vcpContractions</span> ·
     <span class="tag">vcpLastPct</span> · <span class="tag">vcpAvgPrevPct</span></p>
+  </section>
+
+
+  <!-- ── AKTUELLE INDIKATOREN v5.9–v5.28 (05.08.2026) ── -->
+  <section id="neue-indikatoren">
+    <h2>🚀 Aktuelle Indikatoren &amp; Features (Aggregator v5.9–v5.28)</h2>
+    <p>Zwischen Aggregator v5.9 (Juli 2026) und v5.28 (August 2026) wurden folgende
+    Indikatoren, Leaderboards und Features hinzugefügt. Frontend-Stand: v451.</p>
+
+    <div class="card">
+      <h3>RS-Rank Score <span class="badge badge-blue">v5.21</span></h3>
+      <p>Institutionelle Momentum-Bewertung nach IOS-Methodik — 6 Bedingungen:
+      RS-Rating ≥85, Dual-Benchmark (SPY + IWM), Sektor-RS, Stage-2-Trend,
+      EMA-Stack intakt, 52W-Nähe. Läuft für alle 711 Ticker; Ergebnis als Score
+      0–100 + Einzel-Flags <span class="tag">rs001</span>–<span class="tag">rs006</span>
+      im DeepDive sichtbar.</p>
+    </div>
+
+    <div class="card">
+      <h3>Distribution Days <span class="badge badge-blue">v5.21</span></h3>
+      <p>O'Neil/IBD-Methodik: Zählt Tage mit erhöhtem Volumen und negativem Schluss
+      für SPY und QQQ im 25-Tage-Lookback. Grenzwert: SPY ≥7 oder QQQ ≥9 = DANGER.
+      Erscheint als Warnblock im Morning-Briefing-Tearsheet wenn Grenzwert erreicht.</p>
+      <p>Felder: <span class="tag">spy_dd</span> · <span class="tag">qqq_dd</span> ·
+      <span class="tag">dd_status</span></p>
+    </div>
+
+    <div class="card">
+      <h3>Anchored VWAP (AVWAP) <span class="badge badge-purple">v5.22</span></h3>
+      <p>EWMA-gewichteter VWAP (Zeiierman-Methodik), Anker am 52W-Tief,
+      Halbwertszeit 20 Tage (α = 1 − e^(−ln2/20)). Zeigt ob ein Titel über oder
+      unter dem Anker-VWAP handelt — entscheidend für institutionelle
+      Support/Resistance-Zonen und CSP-Confluence.</p>
+      <p>Felder: <span class="tag">avwap</span> · <span class="tag">avwapDev</span> ·
+      <span class="tag">distToAvwapPct</span> · <span class="tag">avwapBadge</span></p>
+      <p>Badges: ⚡ stark über AVWAP · ⚓ auf AVWAP-Support · ⚠️ unter AVWAP</p>
+      <p>Gate in Minervini-Score: AVWAP-Zone (+15 Punkte) als Support-Distanz-Faktor.</p>
+    </div>
+
+    <div class="card">
+      <h3>Order Block Detector <span class="badge badge-purple">v5.24</span></h3>
+      <p>Hybrid-Implementierung (Zeiierman + BigBeluga + Flux): Erkennt institutionelle
+      Kauf- und Verkaufsblöcke aus Impulskerzen mit erhöhtem Volumen. Besonders
+      wertvoll für CSP-Strike-Auswahl (AVWAP + Order Block = Confluence-Zone).</p>
+      <p>17 Felder inkl. <span class="tag">obBullPrice</span> ·
+      <span class="tag">obBearPrice</span> · <span class="tag">obStrength</span> ·
+      <span class="tag">obConfluence</span></p>
+    </div>
+
+    <div class="card">
+      <h3>TVA-Indikatoren (MathLibrary-Port) <span class="badge badge-blue">v5.23–v5.25</span></h3>
+      <p>Port der TVA MathLibrary (Pine Script v6) in Python — vier Indikatoren:</p>
+      <table>
+        <tr><th>Indikator</th><th>Beschreibung</th><th>Wertebereich</th></tr>
+        <tr>
+          <td><span class="tag">trendScore</span></td>
+          <td>Trend Score aus EMA-Stack × ADX-Konviktion</td>
+          <td>−100 … +100</td>
+        </tr>
+        <tr>
+          <td><span class="tag">confluenceScore</span></td>
+          <td>5-Faktor-Confluence (Trend / Momentum / Volumen / AVWAP / OB)</td>
+          <td>0 … 100</td>
+        </tr>
+        <tr>
+          <td><span class="tag">tvaRegime</span></td>
+          <td>8 Regime + 3-Bar-Hold-Filter (reduziert Regime-Flipping)</td>
+          <td>Text-Label</td>
+        </tr>
+        <tr>
+          <td><span class="tag">chopIndex</span></td>
+          <td>Chop Index aus ADX + DI + ER + BB — misst Trendstärke vs. Seitwärtsdrift</td>
+          <td>0 … 100</td>
+        </tr>
+        <tr>
+          <td><span class="tag">sellProbability</span></td>
+          <td>Sigmoid-Wahrscheinlichkeit für Breakdown-Setups (Short-Leaderboard)</td>
+          <td>0 … 100 %</td>
+        </tr>
+        <tr>
+          <td><span class="tag">adx</span> · <span class="tag">diPlus</span> · <span class="tag">diMinus</span></td>
+          <td>ADX + Directional Indicators (Wilder), 14 Perioden</td>
+          <td>0 … 100</td>
+        </tr>
+      </table>
+      <p>Alle TVA-Felder im DeepDive als eigener Block sichtbar: Trend Score farbig
+      (grün/rot/grau), Confluence-Badge ◈ nur wenn ≥60.</p>
+    </div>
+
+    <div class="card">
+      <h3>IV-Rank / IV-Percentile — Archiv-Aufbau <span class="badge badge-amber">v5.1, läuft seit 12.07.2026</span></h3>
+      <p>Täglich wird die ATM-IV aus yfinance-Optionsketten (Front-Month, 7–60 DTE,
+      Call+Put gemittelt) archiviert. Sobald ≥30 Archiv-Tage vorliegen (~12.08.2026),
+      erscheint automatisch der IV-Rank (tastytrade-Formel: Min/Max-Fenster).
+      Ab ≥63 Tagen (~13.09.2026) ist IV-Percentile (TOS-Methodik) vollwertig
+      verfügbar. Bis dahin: HVP (Historical Volatility Percentile) als Fallback
+      mit Countdown-Tooltip.</p>
+      <p>Felder: <span class="tag">ivAtm</span> · <span class="tag">ivRank</span> ·
+      <span class="tag">ivPercentile</span> · <span class="tag">ivArchiveDays</span></p>
+    </div>
+
+    <div class="card">
+      <h3>Earnings Calendar <span class="badge badge-blue">v5.26</span></h3>
+      <p>Echter yfinance-Earnings-Kalender: Datum, DTE bis Earnings, EPS-Schätzung.
+      Badge in Ticker-Cards: 📅 &gt;14 Tage · ⚠️ 7–14 Tage · 🚨 &lt;7 Tage.
+      Im CSP-KI-Prompt: automatische Warnung wenn DTE &lt;21 Tage (Frühassignment-Risiko).</p>
+      <p>Felder: <span class="tag">earningsDate</span> · <span class="tag">earningsDTE</span> ·
+      <span class="tag">epsEstimate</span></p>
+    </div>
+
+    <div class="card">
+      <h3>DCE — Distribution Day Confluence Engine <span class="badge badge-purple">v5.27–v5.28</span></h3>
+      <p>Kombiniert mehrere unabhängige Distribution-Day-Signale zu einem
+      Konfidenz-Score. Zeigt im Alpha Desk als 🟢 / 🟡 / 🔴 Badge wie stark
+      die Belastung durch Distributionsdruck heute ist. Kalibrierung (Brier Score)
+      ab ~01.09.2026, wenn genügend Datenpunkte vorliegen.</p>
+    </div>
+
+    <div class="card">
+      <h3>DE-Modus — Tradegate-Preise <span class="badge badge-blue">v408+</span></h3>
+      <p>Für deutsche Nutzer: Vorbörsliche Tradegate-Preise (08:00–22:00 MEZ) für
+      US-Titel via <span class="tag">TRADEGATE_MAP</span>. Badge in Ticker-Cards:
+      🇩🇪 TG +1.23% (grün/rot). Abdeckung: ~96% der IWV-Top-100.
+      Premarket-Preset scannt automatisch gegen die Tradegate-Symbole.</p>
+    </div>
+
+    <div class="card">
+      <h3>Coaching-KI — Investment-Coach-Grundhaltung <span class="badge badge-amber">v450–v451 / ko-prompts v2.6</span></h3>
+      <p>Alle 18+ KI-Prompt-Aufrufe (Morning Briefing, DeepDive, alle 12 Strategie-
+      Leaderboards, Scanner, Intermarket) nutzen eine gemeinsame Coaching-Grundhaltung:
+      handlungsorientiert, jede Metrik mit Bedeutung erklärt
+      (<em>„ADX 15 — kein etablierter Trend"</em>), direkte Haltungsempfehlung
+      (handeln / abwarten / absichern) statt rein deskriptiver Ausgabe.
+      Das Morning Briefing (EIC-Modus) betont zusätzlich die Handelsbereitschaft
+      als erste Frage jedes Abschnitts.</p>
+    </div>
+
+    <div class="card">
+      <h3>Modularisierung — ko-prompts + ko-kv-state <span class="badge badge-blue">v414–v451</span></h3>
+      <p>Alle KI-Prompts sind aus index.html in <span class="tag">ko-prompts.js</span>
+      (ko-modules CDN) ausgelagert — kein Inline-Prompt-String mehr in der App.
+      Der KV-State-Konverter <span class="tag">kvToScannerState()</span> ist als
+      eigenständiges Modul <span class="tag">ko-kv-state.js</span> versioniert;
+      Inline-Fallback greift automatisch wenn CDN nicht erreichbar.</p>
+    </div>
   </section>
 
   <!-- ── ARCHITEKTUR ── -->
