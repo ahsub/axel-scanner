@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260806-v453">
+<meta name="version" content="20260807-v454">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,10 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v454: W5 IP-Schutz (07.08.2026): compositeScore + _kvState aus KV (Python-berechnet).
+           processData() Shortcut greift bei KV-Modus → JS-Scoring-Gewichte nie im Client ausgeführt.
+           Betrifft beide KV-State-Blöcke (Z.8071 + Z.18968). Kein funktionaler Unterschied —
+           KV-Score war bereits korrekt, jetzt auch der Shortcut-Pfad aktiv.
      v453: Kosmetik-Cleanup (#19 finaler Abschluss, 06.08.2026): 2 redundante fix-#19-Kommentare entfernt (Z.17315 OR-Fallback-Tautologie, Z.24931 war-preset-select-Hinweis). Kein Funktionsänderung.
      v452: Prio-4-Restfunde entfernt (#19 Abschluss) — ki-dropdown-wrap (3 tote getElementById-Aufrufe), overheat-text/sektor-overheat-content OR-Fallback (beide IDs nie im HTML, sohTxt immer '—').
      v451: Morning Briefing Coaching-Ton (ko-prompts v2.6.0 @610192d) — EIC: Mentor-Stil mit Metrik-Erklaerungen + Handlungshaltung je Abschnitt; Public: Erklaer-Pflicht fuer jeden Messwert, TOP-KANDIDATEN-Begruendung.
@@ -7813,7 +7817,7 @@ function kvToScannerState(r) {
   // Primär: delegiert an window._kvToScannerStateFn aus ko-kv-state.js
   if (typeof window._kvToScannerStateFn === 'function') return window._kvToScannerStateFn(r);
   // Fallback: vollständige Inline-Implementierung falls CDN-Modul noch nicht geladen
-  return (function(r) {
+  var _s = (function(r) {
     
   // Adapter: KV masterShortlist-Item → processData()-kompatibles State-Objekt
   // Ermöglicht renderCard() mit KV-Daten ohne Änderung am Render-Layer.
@@ -8069,8 +8073,14 @@ function kvToScannerState(r) {
     sectors:          Array.isArray(r.sectors) ? r.sectors : [],
     // ────────────────────────────────────────────────────────────────────────
     closes_full:  [],
+    // W5-IP-Schutz (v454, 07.08.2026): compositeScore aus KV (Python-berechnet),
+    // nicht im Client neu berechnet. processData() Shortcut (Z.8697) greift wenn
+    // _kvState gesetzt → JS-Scoring-Funktion mit sichtbaren Gewichten wird nie ausgeführt.
+    compositeScore: cscore,
   };
-
+  // W5: _kvState self-reference → processData() Shortcut greift, kein JS-Neuberechnen
+  _s._kvState = _s;
+  return _s;
   })(r);
 }
 
@@ -18710,7 +18720,7 @@ function kvToScannerState(r) {
   // Primär: delegiert an window._kvToScannerStateFn aus ko-kv-state.js
   if (typeof window._kvToScannerStateFn === 'function') return window._kvToScannerStateFn(r);
   // Fallback: vollständige Inline-Implementierung falls CDN-Modul noch nicht geladen
-  return (function(r) {
+  var _s = (function(r) {
     
   // Adapter: KV masterShortlist-Item → processData()-kompatibles State-Objekt
   // Ermöglicht renderCard() mit KV-Daten ohne Änderung am Render-Layer.
@@ -18966,8 +18976,14 @@ function kvToScannerState(r) {
     sectors:          Array.isArray(r.sectors) ? r.sectors : [],
     // ────────────────────────────────────────────────────────────────────────
     closes_full:  [],
+    // W5-IP-Schutz (v454, 07.08.2026): compositeScore aus KV (Python-berechnet),
+    // nicht im Client neu berechnet. processData() Shortcut (Z.8697) greift wenn
+    // _kvState gesetzt → JS-Scoring-Funktion mit sichtbaren Gewichten wird nie ausgeführt.
+    compositeScore: cscore,
   };
-
+  // W5: _kvState self-reference → processData() Shortcut greift, kein JS-Neuberechnen
+  _s._kvState = _s;
+  return _s;
   })(r);
 }
 
