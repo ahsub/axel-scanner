@@ -619,6 +619,9 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
   </div>
 
+  <div id="data-staleness-banner" style="display:none;background:var(--amber-bg);border:0.5px solid rgba(240,169,58,0.25);color:var(--amber);font-size:12px;padding:.6rem 1.25rem;text-align:center"></div>
+
+       
   <div class="content">
     <!-- HOME / LANDING PANEL (AP-A) -->
     <div id="panel-home" class="panel active">
@@ -7091,6 +7094,7 @@ async function loadKVMasterData(force) {
     });
 
     _kvLoadTime = Date.now();
+    checkDataFreshness(data.meta);
     var total   = data.tickers.length;
     var lastTD  = data.meta?.last_trading_day || '?';
     console.log('[KV-Scanner] ' + total + ' Ticker geladen · Handelstag: ' + lastTD);
@@ -19329,7 +19333,30 @@ function isTradingDay(date) {
   var iso = date.toISOString().slice(0, 10);
   return US_HOLIDAYS.indexOf(iso) === -1;
 }
+function checkDataFreshness(meta) {
+  var banner = document.getElementById('data-staleness-banner');
+  if (!banner || !meta || !meta.last_trading_day) return;
 
+  // Erwarteter letzter Handelstag: rückwärts vom heutigen Tag zum letzten Trading Day
+  var d = new Date();
+  var cutoffHour = 15; // Aggregator-Lauf ~13:30 UTC, etwas Puffer
+  if (d.getUTCHours() < cutoffHour) d.setUTCDate(d.getUTCDate() - 1);
+  while (!isTradingDay(d)) d.setUTCDate(d.getUTCDate() - 1);
+  var expected = d.toISOString().slice(0, 10);
+
+  if (meta.last_trading_day < expected) {
+    banner.style.display = 'block';
+    banner.innerHTML = '⚠️ Daten veraltet — letzter Handelstag im System: ' +
+      meta.last_trading_day + ' (erwartet: ' + expected + '). ' +
+      'Aggregator-Run vermutlich fehlgeschlagen — bitte GitHub Actions prüfen.';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function schedulerStart() {
+
+     
 function schedulerStart() {
   if (_schedulerInterval) clearInterval(_schedulerInterval);
   _schedulerInterval = setInterval(function() {
