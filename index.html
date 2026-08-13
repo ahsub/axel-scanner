@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260813-v459">
+<meta name="version" content="20260813-v460">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,27 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v460: DTE-Bugfix Teil 3 — strategieabhaengige Ziel-DTE (13.08.2026).
+           v459 hatte dte:30→21 pauschal auf ALLE Options-Strategien
+           angewendet — falsch fuer ATM/NA: Live-Test zeigte 21.08.2026
+           (8 DTE) statt der beabsichtigten ~30 Tage, weil ATM/NA einen
+           eigenstaendigen, nicht user-konfigurierbaren Zielwert hat
+           (dokumentiert im statischen ATMNA-Prompt-Text, verifiziert
+           bereits in v350 mit calc3rdFridayExpiration(30)) — waehrend
+           CSP/Wheel und Covered Call den user-einstellbaren Wert aus
+           den Options-Settings nutzen sollen (21-45 DTE lt. EIC-System-
+           Prompt). Root Cause: optsCfg.dte wurde als EIN geteilter Wert
+           fuer zwei Strategien mit unterschiedlicher Zielsemantik
+           behandelt. Fix: neue Helper-Funktion getTargetDteForStrategy
+           (nach getOptionsCfg() definiert) liefert je nach stratId 30
+           (atmna, fest) oder optsCfg.dte (csp_wheel/cc, einstellbar) —
+           an beiden Aufrufstellen genutzt: generischer Watchlist-Pfad
+           (Z.~18223) und Options-Desk-Pfad (Z.~24283). weekly_income
+           nutzt eigene fest codierte DTE-Werte (7/120) direkt im
+           eigenen Prompt-Text, unveraendert. Noch nicht live verifiziert
+           — naechster Schritt: ATM/NA-Button erneut testen, sollte
+           wieder ~30 DTE statt 8 DTE liefern, CSP_WHEEL/CC-Buttons
+           weiterhin ~21 DTE.
      v459: DTE-Bugfix Teil 2 — eigentliche Ursache in index.html (13.08.2026).
            v458 (ko-strategies.js/ko-prompts.js Fallback-Defaults) zeigte keine
            Live-Wirkung: ctx.optsCfg ist in der Praxis nie null/undefined
@@ -18237,7 +18258,7 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
   var _todayForPrompt = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', weekday:'long' });
   _kiCtx.marktkontext = 'HEUTIGES DATUM: ' + _todayForPrompt + '\n\n' + _kiCtx.marktkontext;
   if (['atmna', 'csp_wheel', 'weekly_income', 'cc'].indexOf(_kiStrat) !== -1) {
-    var _expInfo = calc3rdFridayExpiration(optsCfg.dte);
+    var _expInfo = calc3rdFridayExpiration(getTargetDteForStrategy(_kiStrat, optsCfg));
     _kiCtx.marktkontext += '\n\nZIEL-VERFALLSDATUM (bereits berechnet, NICHT selbst berechnen): '
       + _expInfo.dateStr + ' (Freitag, ' + _expInfo.actualDte + ' Tage ab heute) — dieses Datum in der Analyse verwenden.';
   }
@@ -19611,6 +19632,20 @@ function getOptionsCfg() {
   }
 }
 
+// NEU (13.08.2026, DTE-Fix Teil 3): Ziel-DTE ist NICHT fuer alle Options-
+// Strategien identisch. ATM/NA hat einen strategie-eigenen, nicht user-
+// konfigurierbaren Zielwert (~30 Tage, s. statischer ATMNA-Prompt-Text,
+// verifiziert in v350), waehrend CSP/Wheel und Covered Call den user-
+// einstellbaren Wert aus den Options-Settings nutzen (Default 21, Range
+// 21-45 lt. EIC-System-Prompt). weekly_income nutzt eigene fest codierte
+// Werte (7/120 DTE) direkt im eigenen Prompt-Text und braucht diesen Wert
+// eigentlich nicht — Rueckgabe hier ist fuer diesen Fall irrelevant, aber
+// unschaedlich.
+function getTargetDteForStrategy(stratId, optsCfg) {
+  if (stratId === 'atmna') return 30;
+  return optsCfg.dte;
+}
+     
 function saveOptionsCfg() {
   var cfg = {
     minPrice: parseFloat(document.getElementById('options-min-price').value) || 15,
@@ -24298,11 +24333,12 @@ async function runOptionsKiBriefing(strat) {
           + ' Grade:' + (t.grade||'--');
       }).join('\n');
   var _todayForPrompt2 = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', weekday:'long' });
-  var _expInfo2 = calc3rdFridayExpiration(21);
+  var _targetDte2 = getTargetDteForStrategy(strat, getOptionsCfg());
+  var _expInfo2 = calc3rdFridayExpiration(_targetDte2);
   mkCtx = 'HEUTIGES DATUM: ' + _todayForPrompt2 + '\n\n' + mkCtx
     + '\n\nZIEL-VERFALLSDATUM (bereits berechnet, NICHT selbst berechnen): '
     + _expInfo2.dateStr + ' (Freitag, ' + _expInfo2.actualDte + ' Tage ab heute) — dieses Datum in der Analyse verwenden.';
-  var ctx = { marktkontext: mkCtx, optsCfg: { minPrice:15, maxPrice:(_optionsMaxPrice != null ? _optionsMaxPrice : 150), minHvp:_optionsDeskFilter, goodHvp:50, idealHvp:65, erDays:30, dte:21 }, vixStr: String(_getVixRobust()||'--') };
+  var ctx = { marktkontext: mkCtx, optsCfg: { minPrice:15, maxPrice:(_optionsMaxPrice != null ? _optionsMaxPrice : 150), minHvp:_optionsDeskFilter, goodHvp:50, idealHvp:65, erDays:30, dte:_targetDte2 }, vixStr: String(_getVixRobust()||'--') };
   var prompt = KoPrompts.get(strat, ctx);
   // Open modal
   var existing = document.getElementById('ki-modal');
