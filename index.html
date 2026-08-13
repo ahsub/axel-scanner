@@ -3485,9 +3485,11 @@ window.pinSubmit = function(){
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c3fa765/ko-data.js"></script>
-<!-- ko-strategies.js v2.4.0 — Commit-Hash ccad16b (12.08.2026, Namenskollision
-     window.KoPrompts-Alias entfernt — überschrieb den echten KoPrompts aus
-     ko-prompts.js seit v415/30.07.2026 lautlos). type="module" erforderlich. -->
+<!-- ko-strategies.js v2.4.0 — Commit-Hash bf4bb71 (13.08.2026, DTE-Bugfix:
+     DEFAULT_OPTS_CFG.dte 30→21 — Template "${dte}-45 DTE" rendert jetzt
+     korrekt "21-45 DTE" statt "30-45 DTE", konsistent zum EIC-System-Prompt.
+     Begleit-Commit ko-prompts.js@3361e99, gleicher Fix an 3 Prompt-Stellen).
+     type="module" erforderlich. -->
 <script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@bf4bb71/ko-strategies.js"></script>
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
