@@ -22645,7 +22645,9 @@ async function runMorningBriefing(forceRefresh) {
 
         // 4) DIX/GEX — explizit als Proxy/fehlend markieren (Halluzinations-Schutz)
         var _dg = _mkt.dixGex || {};
-        if (_dg.source === 'flashalpha_free' && _dg.gex != null) {
+        if (_dg.source === 'squeezemetrics' && _dg.gex != null) {
+          messwerteLines.push('GEX (SPY-Markt-Level, SqueezeMetrics — ECHTE Daten): ' + _dg.gex + ' Mrd');
+        } else if (_dg.source === 'flashalpha_free' && _dg.gex != null) {
           messwerteLines.push('GEX (' + (_dg.ticker||'AAPL') + ', Free-Tier-Proxy — NICHT Markt-Level SPY/QQQ): ' + _dg.gex + ' Mrd, Gamma-Flip ' + (_dg.gamma_flip||'n/v'));
         } else {
           messwerteLines.push('GEX (SPY/QQQ Markt-Level): n/v — keine Interpretation zulässig');
