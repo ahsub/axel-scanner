@@ -22311,7 +22311,9 @@ function getKiSystemPrompt(context) {
 // STRATEGIE_MATRIX, Public/EIC-Split und alle Prompt-Texte leben jetzt in ko-prompts.js.
 // mseRegime, regime, vixZone, results: nicht mehr benötigt (Messwerte in messwerteLines enthalten).
 function getMorningBriefingPrompt(messwerteLines, mseRegime, regime, vixZone, results) {
-  var _dixReal = messwerteLines.some(function(l) { return l.indexOf('DIX (ETF-Korb') === 0; });
+  var _dixReal = messwerteLines.some(function(l) {
+    return l.indexOf('DIX (ETF-Korb') === 0 || l.indexOf('DIX (S&P-500-Basis') === 0;
+  });
   var _eic = (_expertModeActive && _eicUnlocked);
   if (typeof KoPrompts !== 'undefined' && KoPrompts.getMorningPrompt) {
     return KoPrompts.getMorningPrompt(messwerteLines, _eic, _dixReal);
