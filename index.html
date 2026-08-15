@@ -3,9 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260815-v464">
+<meta name="version" content="20260815-v465">
 <!-- CHANGELOG (neueste zuerst): 
-           v464: csp_wheel-Rollregel literaturgestuetzt neu strukturiert
+     v465: Drei Nachbesserungen am selben Tag (15.08.2026):
+           1. CDN-Hash-Pin fuer ko-prompts.js war seit dem 13.08. auf @3361e99
+              eingefroren — heutige ko-prompts.js-Aenderungen (csp_wheel/cc
+              getEffectiveRules(), Morning-Briefing-DIX/GEX-Fix) liefen dadurch
+              im Repo korrekt, wurden aber von der Live-App nie geladen. Auf
+              @5446c8f aktualisiert, per direktem CDN-Fetch verifiziert.
+           2. Kritischer Syntax-Bug behoben: Beim gemeinsamen Editieren des
+              Dark-Pool-KI-Prompts (generateDpKI()) ist eine Markdown-Ueber-
+              schrift ("2. Fragenlisten + Abschluss-Anweisung im Prompt") aus
+              Claudes Chat-Antwort versehentlich mit in den echten Code kopiert
+              worden — "2." wurde als Zahl geparst, "Fragenlisten" als unerwar-
+              tetes Token, SyntaxError liess den gesamten umgebenden <script>-
+              Block scheitern. Folge: toggleExpertMode und _optionsMaxPrice
+              waren komplett undefiniert, EIC-Modus-Toggle tot (PIN wurde zwar
+              akzeptiert, Toggle blieb aber inaktiv). Fehlerhafte Zeile entfernt,
+              per echtem Node.js-Parser verifiziert (nicht nur Sichtpruefung).
+           3. Aus Fund 2: eicPinSubmit() ruft nach korrekter PIN-Eingabe nur
+              unlockEicEditor() auf (Editor-in-Chief-Content-Bereich), nie
+              toggleExpertMode() erneut — dieser strukturelle Zusammenhang war
+              urspruenglich Ausgangsvermutung fuer den Toggle-Bug, hat sich aber
+              nach Fund des echten Syntax-Fehlers als nicht die tatsaechliche
+              Ursache herausgestellt (nicht separat gefixt, da Symptom bereits
+              durch Fund 2 behoben war).      
+     v464: csp_wheel-Rollregel literaturgestuetzt neu strukturiert
            (15.08.2026, kein index.html-Code betroffen — reine ko-modules/
            ko-strategy-registry.js-Aenderung, hier nur zur Nachvollziehbarkeit
            mitversioniert) — Nach 5 unabhaengigen Fachquellen (Jabbour/Budwick
