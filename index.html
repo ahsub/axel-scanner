@@ -2289,7 +2289,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
           </div>
           <div>
             <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Ziel-DTE (Laufzeit)</div>
-            <input type="number" id="options-dte" value="21" min="7" max="60"
+            <input type="number" id="options-dte" value="30" min="7" max="60"
               style="width:100%;font-size:13px;padding:4px 8px;background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);border-radius:6px"
               onchange="saveOptionsCfg()">
           </div>
@@ -19669,11 +19669,11 @@ function getOptionsCfg() {
       goodHvp:  d.goodHvp  != null ? d.goodHvp  : 50,
       idealHvp: d.idealHvp != null ? d.idealHvp : 70,
       erDays:   d.erDays   != null ? d.erDays   : 30,
-      dte:      d.dte      != null ? d.dte      : 21
+      dte:      d.dte      != null ? d.dte      : 30
          
     };
   } catch(e) {
-    return { minPrice:15, maxPrice:150, minHvp:30, goodHvp:50, idealHvp:70, erDays:30, dte:21 };
+    return { minPrice:15, maxPrice:150, minHvp:30, goodHvp:50, idealHvp:70, erDays:30, dte:30 };
   }
 }
 
@@ -19699,7 +19699,7 @@ function saveOptionsCfg() {
     goodHvp:  parseInt(document.getElementById('options-good-hvp').value)  || 50,
     idealHvp: parseInt(document.getElementById('options-ideal-hvp').value) || 70,
     erDays:   parseInt(document.getElementById('options-er-days').value)   || 30,
-    dte:      parseInt(document.getElementById('options-dte').value)       || 21
+    dte:      parseInt(document.getElementById('options-dte').value)       || 30
   };
   localStorage.setItem(OPTIONS_CFG_KEY, JSON.stringify(cfg));
   var st = document.getElementById('options-cfg-status');
