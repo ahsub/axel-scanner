@@ -3560,6 +3560,14 @@ window.pinSubmit = function(){
 
 <!-- ko-data.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@c3fa765/ko-data.js"></script>
+<!-- ko-strategy-registry.js v1.0 — Commit-Hash 25a3294 (15.08.2026, Schritt 1
+     der Migration: Registry erstmals eingebunden, MUSS vor ko-prompts.js und
+     ko-strategies.js laden. Bewusst normales <script>, kein type="module" —
+     verhindert die v456-Fehlerklasse (Ladereihenfolge-Konflikt zwischen
+     synchronem Script und deferred Modul). Enthält Single-Source-of-Truth
+     fuer csp_wheel/cc/atmna-Regeln (Delta/DTE), von getEffectiveRules() in
+     ko-prompts.js konsumiert. -->
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@25a3294/ko-strategy-registry.js"></script>
 <!-- ko-strategies.js v2.4.0 — Commit-Hash bf4bb71 (13.08.2026, DTE-Bugfix:
      DEFAULT_OPTS_CFG.dte 30→21 — Template "${dte}-45 DTE" rendert jetzt
      korrekt "21-45 DTE" statt "30-45 DTE", konsistent zum EIC-System-Prompt.
