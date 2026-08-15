@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260814-v461">
+<meta name="version" content="20260814-v462">
 <!-- CHANGELOG (neueste zuerst):
      v381: ko-indicators-loader v1.3.0 + ko-indicators.json v2.2.0 (20.07.2026). Registry-Konsolidierung Schritt 1-2: 5 neue Indikatoren in Registry aufgenommen (hy_spread, net_liquidity, move_index, skew_vvix_div, qqq_markov) — bisher im ZUSATZ-KONTEXT des MB-Prompts hardcodiert. Loader v1.3.0: _evalSignalRules um zgte/zlte (Z-Score-Regeln) und signal_eq (String-Vergleich) erweitert; buildMarketContext neu: FRED/Derived-Block wertet HY-Spread, Net Liquidity, MOVE-Index, SKEW/VVIX-Divergenz und QQQ-Markov direkt aus Aggregator-Daten aus statt DOM-Polling. CDN-Hash ko-indicators-loader: 1f40df0→4f1574b.
      v380: Zwei kleinere Fixes (20.07.2026). (1) Scanner-Karten-Badge nutzt jetzt _lastMseResult statt getStrategyGates() — Badge zeigt korrekte MCM-Gate-Farbe auch bei Context-Downgrades. (2) Tearsheet-Disclaimer erweitert: erklärt explizit dass Abweichungen zwischen eingefrorenem KI-Text und Live-Ampel durch nachträgliche MCM-Context-Downgrades entstehen können.
@@ -33,6 +33,32 @@
      v356: Batch 3 (16.07.2026). (1) Nomenklatur-Taxonomie v1.0 als Referenzdokument in UIQ-Suite/docs/ abgelegt — kanonische Strategie-Namen, alle Inkonsistenzen dokumentiert, Metriken-Status pro Strategie. (2) S4 Fibonacci: bereits korrekt als nav-mobile-secondary im Mehr-Menü, kein weiterer Eingriff noetig. (3) S7: Rechner-Button aus Ticker-Karten entfernt (renderCard() + Alpha Desk Options-Setup) — KO-Rechner-Tab ist weg, Rechner-Button waere toter Link. (4) B4: WL-Button in Ticker-Karten beschriftet: war nur Icon (ti-star), jetzt \"+ WL\" als sichtbare Beschriftung.
      v355: Button 'Marktlage analysieren' ganz nach oben (U9b, Axel-Feedback zu v354) — aus der Briefing-Card komplett herausgeloest und als erster sichtbarer CTA direkt nach dem Header positioniert, noch vor dem Regime-Banner. Kein Scrollen mehr noetig, um den Tagesstart auszuloesen. Leicht vergroessert (13px, padding 10px) fuer bessere Sichtbarkeit.
      v354: Durchklick-Test Batch 1 (16.07.2026, 7 Punkte). B1: fetchSingleForDeepDive() — fehlende Zeile 'var j = await r.json()' ergaenzt (ReferenceError 'j is not defined' beim DeepDive-KI-Aufruf). U2: Scanner-Button 'Markt-Einschätzung' → 'KI-Strategieempfehlung' umbenannt. U4: runBestOpportunityKI() auf Top-5 erweitert — zeigt jetzt alle 5 besten Kandidaten ueber alle Strategien im Modal, statt nur den Spitzenreiter; jeder Eintrag nennt Strategie + Score, KI-Text analysiert alle 5 + hebt besten hervor. U8: Versionstag in Sidebar von inline (neben UnderlyingIQ-Titel) nach linksbündig unter Datum/Uhrzeit verschoben. U9: 'Marktlage analysieren'-Button von ganz unten in der Card nach oben (vor Makro-Schnellansicht und Briefing-Text) — Button ist jetzt der erste sichtbare CTA beim Oeffnen des Home-Tabs. S1+S2: Sidebar-Reihenfolge korrigiert (Desktop + Mobile): Uebersicht → [Markt-Kontext] Makro → [Trading] Alpha Desk → Scanner → Fibonacci. Alpha Desk jetzt korrekt im Trading-Block positioniert, nicht mehr im Tagesstart-Bereich. S3: KO-Rechner-Tab aus Sidebar + Mobile-Navigation entfernt (nav-rechner-Button entfernt); Panel-Code + JS-Logik bleiben unberuehrt fuer spaetere Weiterverwendung.
+     v462: DIX-Feld-Nachzug fuer Backend-Umstrukturierung (dixEtfBasket)
+           (15.08.2026) — Nach der ko-aggregator-Aenderung vom 14.08. (v5.36.2,
+           dix_gex["dix"] nicht mehr vom FINRA-ETF-Korb-Wert ueberschrieben,
+           stattdessen getrennt unter dixEtfBasket* gefuehrt) mussten 6
+           Frontend-Stellen nachgezogen werden, die noch auf die alte
+           dixSource==='finra_regshodaily'-Pruefung setzten: (1) Z.~21781
+           UI-Metrik-Widget "DIX (ETF-Korb)", (2) Z.~22666 Morning-Briefing-
+           KI-Prompt-Kontext — hier lag der schwerwiegendste Fehler: der Text
+           behauptete "DIX (ETF-Korb)", nutzte aber _dg.dix, was seit dem
+           Backend-Fix bereits der SqueezeMetrics-S&P-500-Wert war (inhaltlich
+           falsche Zuordnung, nicht nur fehlende Anzeige), (3) Z.~23361
+           UI-Widget (Sidebar-Metriken), (4) Z.~25597 Dark-Pool-Tab FINRA-DIX-
+           Box, (5)+(6) Z.~25789/25797 Dark-Pool-KI-Prompt-Kontext + _dpDixReal-
+           Flag. An allen Stellen zusaetzlich NEU ergaenzt (vorher gar nicht
+           vorhanden): der SqueezeMetrics-DIX (S&P-500-Basis) UND — nach
+           Axel-Entscheidung — auch SqueezeMetrics-GEX im Dark-Pool-Tab, der
+           zuvor bewusst ausgeschlossen war (Option-B-Entscheidung 10.07.2026,
+           galt nur der lokalen Volumen-Heuristik, nicht echten externen
+           Datenquellen — Kommentar im Code entsprechend praezisiert).
+           Zusaetzlicher Fund beim Gesamt-Review: die abschliessende Prompt-
+           Anweisung im Dark-Pool-Tab widersprach nach der ersten Teil-
+           Aenderung kurzzeitig sich selbst ("GEX ist n/v — niemals erwaehnen"
+           obwohl ctx zu dem Zeitpunkt schon einen echten GEX-Wert enthielt) —
+           behoben durch 3 getrennte Flags (_dpDixReal/_dpDixSpReal/_dpGexReal)
+           statt einer ueberladenen Flag, je eigene Fragen + eigene
+           Abschluss-Anweisung pro Datenpunkt.
      v461: GEX-Anzeige im KI-Prompt reagierte nur auf FlashAlpha-Quelle
            (14.08.2026) — nach der Backend-Prioritaetsumkehr (ko-aggregator,
            s.u.) lieferte dixGex.source jetzt haeufig "squeezemetrics" statt
@@ -21778,7 +21804,8 @@ function showMSEDetail() {
   var _dgDetail = (window._alphaData && _alphaData.market && _alphaData.market.dixGex) ? _alphaData.market.dixGex : null;
   var metricsHtml = [
     ['VVIX Z-Score', metrics.vvix_z20 != null ? metrics.vvix_z20.toFixed(2) : '—'],
-    ['DIX (ETF-Korb)', (_dgDetail && _dgDetail.dix != null && _dgDetail.dixSource === 'finra_regshodaily') ? _dgDetail.dix + '% [FINRA]' : 'n/v'],
+    ['DIX (ETF-Korb)', (_dgDetail && _dgDetail.dixEtfBasket != null) ? _dgDetail.dixEtfBasket + '% [FINRA]' : 'n/v'],
+    ['DIX (S&P500)', (_dgDetail && _dgDetail.dix != null && _dgDetail.source === 'squeezemetrics') ? _dgDetail.dix + '% [SqueezeMetrics]' : 'n/v'],    
     ['DIX Z-Score', metrics.dix_z20 != null ? metrics.dix_z20.toFixed(2) : 'n/v — keine Historie'],
     ['GEX (AAPL-Proxy) Z',  metrics.gex_z20  != null ? metrics.gex_z20.toFixed(2)  : 'n/v'],
     ['SKEW Pct20',   metrics.skew_pct20 != null ? metrics.skew_pct20 + '%'  : '—'],
@@ -22663,10 +22690,15 @@ async function runMorningBriefing(forceRefresh) {
         } else {
           messwerteLines.push('GEX (SPY/QQQ Markt-Level): n/v — keine Interpretation zulässig');
         }
-        if (_dg.dix != null && _dg.dixSource === 'finra_regshodaily') {
-          messwerteLines.push('DIX (ETF-Korb SPY/QQQ/IWM/DIA, FINRA regShoDaily — ECHTE Daten): ' + _dg.dix + '% — WICHTIG: strukturell höher als SqueezeMetrics-DIX (S&P-500-Basis), da diese 4 ETFs überdurchschnittlichen Dark-Pool-Anteil haben. Nicht 1:1 mit "dem klassischen DIX" gleichsetzen, im Text als "DIX (ETF-Korb)" bezeichnen.');
+        if (_dg.dix != null && _dg.source === 'squeezemetrics') {
+          messwerteLines.push('DIX (S&P-500-Basis, SqueezeMetrics — ECHTE Daten, klassische Methodik): ' + _dg.dix + '%');
         } else {
-          messwerteLines.push('DIX (Dark Pool Index): n/v — kein freier Datenfeed verfügbar. NIEMALS einen Wert nennen oder schätzen.');
+          messwerteLines.push('DIX (S&P-500-Basis): n/v — keine Interpretation zulässig');
+        }
+        if (_dg.dixEtfBasket != null && _dg.dixEtfBasketSource === 'finra_regshodaily') {
+          messwerteLines.push('DIX (ETF-Korb SPY/QQQ/IWM/DIA, FINRA regShoDaily — ECHTE Daten): ' + _dg.dixEtfBasket + '% — WICHTIG: strukturell höher als der SqueezeMetrics-DIX (S&P-500-Basis) oben, da diese 4 ETFs überdurchschnittlichen Dark-Pool-Anteil haben. Nicht 1:1 mit dem S&P-500-DIX gleichsetzen, im Text als "DIX (ETF-Korb)" bezeichnen.');
+        } else {
+          messwerteLines.push('DIX (ETF-Korb): n/v — kein freier Datenfeed verfügbar. NIEMALS einen Wert nennen oder schätzen.');
         }
 
       } else {
@@ -23358,8 +23390,13 @@ function showMorningTearsheet(results) {
           })() +
           (function(){
             var _dg = (window._alphaData && _alphaData.market && _alphaData.market.dixGex) ? _alphaData.market.dixGex : null;
-            if (!_dg || _dg.dix == null || _dg.dixSource !== 'finra_regshodaily') return metricRow('DIX (ETF-Korb)', 'n/v — kein Datenfeed');
-            return metricRow('DIX (ETF-Korb)', _dg.dix + '% [FINRA]');
+            if (!_dg || _dg.dixEtfBasket == null) return metricRow('DIX (ETF-Korb)', 'n/v — kein Datenfeed');
+            return metricRow('DIX (ETF-Korb)', _dg.dixEtfBasket + '% [FINRA]');
+          })() +
+          (function(){
+            var _dg = (window._alphaData && _alphaData.market && _alphaData.market.dixGex) ? _alphaData.market.dixGex : null;
+            if (!_dg || _dg.dix == null || _dg.source !== 'squeezemetrics') return metricRow('DIX (S&P500)', 'n/v — kein Datenfeed');
+            return metricRow('DIX (S&P500)', _dg.dix + '% [SqueezeMetrics]');
           })() +
           metricRow('DIX Z-Score', metrics && metrics.dix_z20 != null ? val(metrics.dix_z20) : 'n/v — keine Historie') +
           metricRow('GEX (AAPL-Proxy) Z', metrics && metrics.gex_z20 != null ? val(metrics.gex_z20) : 'n/v — keine Historie') +
@@ -25594,10 +25631,10 @@ async function loadDarkPool(forceReload) {
   var _finraBox = document.getElementById('dp-finra-dix-box');
   if (_finraBox) {
     var _fd = (window._alphaData && _alphaData.market && _alphaData.market.dixGex) ? _alphaData.market.dixGex : null;
-    if (_fd && _fd.dix != null && _fd.dixSource === 'finra_regshodaily') {
+    if (_fd && _fd.dixEtfBasket != null) {
       _finraBox.style.display = 'block';
       var _fdValEl = document.getElementById('dp-finra-dix-val');
-      if (_fdValEl) _fdValEl.textContent = _fd.dix + '%';
+      if (_fdValEl) _fdValEl.textContent = _fd.dixEtfBasket + '%';
     } else {
       _finraBox.style.display = 'none';
     }
@@ -25771,11 +25808,15 @@ async function generateDpKI(data, scoreObj, signal) {
     + ' KI analysiert Marktdaten…</div>';
 
   // Prompt zusammenbauen
-  // v10.07.2026 (Option B, Axel-Entscheidung): DIX/GEX-Volumen-Heuristik NICHT
-  // an die KI senden — keine echte Datenbasis, Verwechslungsgefahr mit echtem
-  // institutionellem Flow. Bis dahin nur PCR (VVIX/SKEW-basiert, methodisch legitim) + VIX-Term (100% real).
-  // v11.07.2026: echter FINRA-DIX (ETF-Korb) kommt separat aus _alphaData.market.dixGex,
-  // NICHT aus dem lokalen KoDarkPool-Heuristik-Cache (data.dix) — unterschiedliche Quellen!
+  // v10.07.2026 (Option B, Axel-Entscheidung): lokale DIX/GEX-Volumen-Heuristik
+  // (data.dix/data.gex, KoDarkPool-Cache) NICHT an die KI senden — keine echte
+  // Datenbasis, Verwechslungsgefahr mit echtem institutionellem Flow. PCR
+  // (VVIX/SKEW-basiert) + VIX-Term bleiben aus demselben Grund die Basis.
+  // v11.07.2026: echter FINRA-DIX (ETF-Korb) kommt separat aus _alphaData.market.dixGex.
+  // v15.08.2026: echtes squeezemetrics-DIX+GEX (S&P-500-Basis) ebenfalls aus
+  // _alphaData.market.dixGex ergaenzt — beides ECHTE Datenquellen, keine
+  // Heuristik, daher konsistent mit der urspruenglichen Option-B-Begruendung
+  // (nur die *Heuristik* war ausgeschlossen, nicht echte externe Datenquellen).
   var ctx = [];
   ctx.push('INSTITUTIONAL FLOW SCORE (nur PCR + VIX-Term, DIX/GEX-Heuristik ausgeschlossen): '
     + (scoreObj && scoreObj.kiTotal != null ? scoreObj.kiTotal : '?') + '/100');
@@ -25786,15 +25827,25 @@ async function generateDpKI(data, scoreObj, signal) {
     ctx.push('VIX Spot: ' + data.vixTerm.vix + ' | VIX 3M: ' + data.vixTerm.vix3m + ' | Spread: ' + data.vixTerm.spread + ' | Struktur: ' + data.vixTerm.structure);
   }
   var _realDix = (window._alphaData && _alphaData.market && _alphaData.market.dixGex) ? _alphaData.market.dixGex : {};
-  if (_realDix.dix != null && _realDix.dixSource === 'finra_regshodaily') {
-    ctx.push('DIX (ETF-Korb SPY/QQQ/IWM/DIA, FINRA regShoDaily — ECHTE Daten): ' + _realDix.dix + '% — strukturell höher als klassischer S&P-500-DIX, nicht 1:1 vergleichbar, stets als "ETF-Korb" kennzeichnen.');
+  if (_realDix.dixEtfBasket != null) {
+    ctx.push('DIX (ETF-Korb SPY/QQQ/IWM/DIA, FINRA regShoDaily — ECHTE Daten): ' + _realDix.dixEtfBasket + '% — strukturell höher als klassischer S&P-500-DIX, nicht 1:1 vergleichbar, stets als "ETF-Korb" kennzeichnen.');
   } else {
     ctx.push('DIX (Dark Pool Index): n/v — kein freier Datenfeed verfügbar. NIEMALS einen Wert nennen oder schätzen.');
   }
-  ctx.push('GEX (Markt-Level SPY/QQQ): n/v — kein freier Datenfeed verfügbar. NIEMALS einen Wert nennen oder schätzen.');
-
+  if (_realDix.dix != null && _realDix.source === 'squeezemetrics') {
+     ctx.push('DIX (S&P-500-Basis, SqueezeMetrics — ECHTE Daten): ' + _realDix.dix + '%');
+  }  
+  if (_realDix.gex != null && _realDix.source === 'squeezemetrics') {
+     ctx.push('GEX (SPY-Markt-Level, SqueezeMetrics — ECHTE Daten): ' + _realDix.gex + ' Mrd');
+  } else {
+     ctx.push('GEX (SPY/QQQ Markt-Level): n/v — kein freier Datenfeed verfügbar. NIEMALS einen Wert nennen oder schätzen.');
+  }
   var isExpert2 = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
-  var _dpDixReal = _realDix.dix != null && _realDix.dixSource === 'finra_regshodaily';
+  var _dpDixReal = _realDix.dixEtfBasket != null;
+  var _dpDixSpReal = _realDix.dix != null && _realDix.source === 'squeezemetrics';
+  var _dpGexReal = _realDix.gex != null && _realDix.source === 'squeezemetrics';
+     
+2. Fragenlisten + Abschluss-Anweisung im Prompt
 
   var prompt = getKiSystemPrompt('Dark Pool & Institutional Flow Analyse')
     + '\n\nAKTUELLE MESSWERTE:\n' + ctx.join('\n') + '\n\n'
@@ -25806,17 +25857,21 @@ async function generateDpKI(data, scoreObj, signal) {
         + '4. Welche konkrete Strategie ist im aktuellen Sentiment-Umfeld bevorzugt (CSP/Long/Hedge)?\n'
         + '5. Gibt es einen Regime-Wechsel-Hinweis? Was wäre das Trigger-Event?\n'
         + (_dpDixReal ? '6. Was signalisiert der DIX (ETF-Korb) für institutionelles Dark-Pool-Verhalten in diesen vier ETFs?\n' : '')
+        + (_dpDixSpReal ? '7. Was signalisiert der DIX (S&P-500-Basis) für den breiten Markt?\n' : '')
+        + (_dpGexReal ? '8. Was bedeutet der aktuelle GEX-Wert für erwartete Volatilität (positiv=dämpfend, negativ=verstärkend)?\n' : '')
       : 'Formuliere 4-5 objektive deskriptive Sätze (BaFin-konform):\n'
         + '1. Was zeigen PCR-Proxy und VIX-Struktur über Options-Marktsentiment?\n'
         + '2. Was sagt die VIX-Kurvenstruktur?\n'
         + '3. Was signalisiert SKEW über Tail-Risk-Absicherungen?\n'
         + '4. Welche Parameter sollte der Anwender prüfen?\n'
         + (_dpDixReal ? '5. Was zeigt der DIX (ETF-Korb) deskriptiv über den Dark-Pool-Anteil in diesen vier ETFs?\n' : '')
+        + (_dpDixSpReal ? '6. Was zeigt der DIX (S&P-500-Basis) deskriptiv?\n' : '')
+        + (_dpGexReal ? '7. Was zeigt der GEX-Wert deskriptiv?\n' : '')
     )
     + '\nNur Messwerte. Keine Erfindungen. '
-    + (_dpDixReal
-        ? 'DIX nur als "ETF-Korb" kennzeichnen, nicht mit dem klassischen S&P-500-DIX gleichsetzen. GEX ist n/v — niemals erwähnen oder interpretieren.'
-        : 'DIX/GEX sind n/v — niemals erwähnen oder interpretieren.')
+    + (_dpDixReal ? 'DIX (ETF-Korb) nur so kennzeichnen, nicht mit dem S&P-500-DIX gleichsetzen. ' : 'DIX (ETF-Korb) ist n/v — niemals erwähnen oder schätzen. ')
+    + (_dpDixSpReal ? '' : 'DIX (S&P-500-Basis) ist n/v — niemals erwähnen oder schätzen. ')
+    + (_dpGexReal ? '' : 'GEX ist n/v — niemals erwähnen oder schätzen. ')
     + ' Kein Markdown.';
 
   try {
