@@ -3,8 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260815-v463">
+<meta name="version" content="20260815-v464">
 <!-- CHANGELOG (neueste zuerst): 
+           v464: csp_wheel-Rollregel literaturgestuetzt neu strukturiert
+           (15.08.2026, kein index.html-Code betroffen — reine ko-modules/
+           ko-strategy-registry.js-Aenderung, hier nur zur Nachvollziehbarkeit
+           mitversioniert) — Nach 5 unabhaengigen Fachquellen (Jabbour/Budwick
+           "The Option Trader Handbook" S.311-315, Spina "Erfolgreich Optionen
+           Handeln" S.98/179-196, Thomsett "Conservative Options Trading",
+           Friedenheim "Optionen handeln mit Koepfchen" S.37, Saliba "Option
+           Spread Strategies" S.29-33) ersetzt die pauschale "roll down and
+           out"-Regel ein zweistufiges, praemienneutrales System (maxRollDte:
+           90, analog zu ATMNA), das nach urspruenglicher Handelsabsicht
+           verzweigt (reine Praemieneinnahme vs. Erwerbsabsicht). Kernbefund:
+           Jabbour/Budwick kritisieren reaktives "roll down and out" bei
+           bereits bedraengten CSPs explizit als Netto-Verlustgeschaeft
+           (eliminiert Credit, verlaengert Risiko); Saliba zeigt aber, dass
+           PROAKTIVES, praemienneutrales Rollen (wie es ATMNA schon lebt)
+           legitim ist — daher premiumNeutral als harte Bedingung statt
+           Verbot. Neu: stopLoss -200% (zwei unabhaengige Quellen: Spina
+           S.194, Friedenheim S.37, exakt uebereinstimmender Wert).
+           ko-strategy-registry.js v1.1→v1.2.
      v463: Strategie-Registry-Korrektur — DTE 30-45 + Delta-Aufsplittung
            CSP/CC, saubere Architektur-Loesung (15.08.2026) — Marktstandard-
            Recherche (Theta-Decay-Begruendung) zeigte: der ueber drei Runden
