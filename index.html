@@ -25895,8 +25895,6 @@ async function generateDpKI(data, scoreObj, signal) {
   var _dpDixReal = _realDix.dixEtfBasket != null;
   var _dpDixSpReal = _realDix.dix != null && _realDix.source === 'squeezemetrics';
   var _dpGexReal = _realDix.gex != null && _realDix.source === 'squeezemetrics';
-     
-2. Fragenlisten + Abschluss-Anweisung im Prompt
 
   var prompt = getKiSystemPrompt('Dark Pool & Institutional Flow Analyse')
     + '\n\nAKTUELLE MESSWERTE:\n' + ctx.join('\n') + '\n\n'
