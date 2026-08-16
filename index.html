@@ -3,8 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260815-v465">
+<meta name="version" content="20260816-v466">
 <!-- CHANGELOG (neueste zuerst): 
+     v466: DIX/GEX-Proxy-Feldpfad-Bug behoben (16.08.2026, Axel-Deep-Debug-
+           Anfrage) — updateMarketWeatherWidget() las dpData?.gex?.value /
+           dpData?.dix?.value fuer die lokale MSE-Z-Score-Historie; beide
+           Pfade griffen strukturell ins Leere (ko-darkpool.js liefert
+           {dix:{dix,gex,...}}, kein Top-Level .gex, kein .value-Feld) —
+           seit Einfuehrung des Widgets IMMER null, wodurch KoMarketState.
+           _history.gex/.dix nie befuellt wurde (Symptom: "DIX Z-Score /
+           GEX (AAPL-Proxy) Z: n/v — keine Historie", dauerhaft, unabhaengig
+           von echter Marktlage). Fix: korrekte verschachtelte Pfade
+           dpData.dix.gex / dpData.dix.dix. Betrifft NUR die lokale Volumen-
+           Heuristik-Historie (Regime-Erkennung determineRegime()), NICHT
+           die echte DIX/GEX-Anzeige (SqueezeMetrics/FINRA, s. v462/v465 —
+           bereits korrekt). Begleitend: ko-indicators.json v2.4.0
+           (fear_greed source computed->aggregator, Root Cause: seit v368
+           schrieb fetchCnnFearGreed() nie mehr ins DOM, siehe dortiger
+           Changelog-Eintrag fuer Details) und ko-aggregator v5.36.4
+           (Distribution-Days-Score-Skala erweitert, kein index.html-Code
+           betroffen, hier nur zur Nachvollziehbarkeit mitversioniert).
      v465: Drei Nachbesserungen am selben Tag (15.08.2026):
            1. CDN-Hash-Pin fuer ko-prompts.js war seit dem 13.08. auf @3361e99
               eingefroren — heutige ko-prompts.js-Aenderungen (csp_wheel/cc
@@ -21762,8 +21780,16 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
               ? Math.round((vix3mData.price / vixData.price) * 1000) / 1000
               : null,
     // GEX + DIX aus Dark Pool Cache (keine freie API verfügbar)
-    gex:      dpData?.gex?.value || null,
-    dix:      dpData?.dix?.value || null,
+    // BUGFIX (16.08.2026, Axel-Deep-Debug-Anfrage): dpData?.gex?.value / dpData?.dix?.value
+    // griffen strukturell ins Leere — ko-darkpool.js fetchAll() liefert
+    // {dix:{dix,gex,dixAvg20,gexAvg20,...}, pcr:{...}, vixTerm:{...}} — es gibt
+    // KEIN Top-Level dpData.gex und KEIN .value-Feld. Beide Werte waren dadurch
+    // strukturell IMMER null, seit Einfuehrung des Widgets — die lokale
+    // Z-Score-Historie (KoMarketState._history.gex/.dix) blieb deshalb dauerhaft
+    // leer (Zeigt sich als "n/v — keine Historie" im MSE-Detail). Fix: korrekte
+    // verschachtelte Pfade dpData.dix.gex / dpData.dix.dix.
+    gex:      dpData?.dix?.gex ?? null,
+    dix:      dpData?.dix?.dix ?? null,
   };
 
   // VIX-Anzeige im Cockpit aktualisieren
