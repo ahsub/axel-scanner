@@ -3,8 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260816-v466">
+<meta name="version" content="20260816-v467">
 <!-- CHANGELOG (neueste zuerst): 
+     v467: CDN-Hash-Pin ko-indicators-loader.js aktualisiert (4879dc7→96d395a,
+           traegt ko-indicators.json v2.4.1 + ko-indicators-loader.js v1.3.3 —
+           MCM-Paritaets-Nachzug, Axel-Anschlussfrage 16.08.2026 "kann das
+           auch bei anderen Metriken passiert sein?"). Kein eigener index.html-
+           Code betroffen, nur CDN-Pin — mitversioniert fuer Nachvollziehbarkeit
+           (Pflicht-Header-Punkt 6). Server-seitige Ergaenzung parallel in
+           ko-aggregator v5.36.5 (move_index/skew_vvix_div/breadth_osc/
+           distribution_days als neue MCM-Faktoren im Server-Briefing).
      v466: DIX/GEX-Proxy-Feldpfad-Bug behoben (16.08.2026, Axel-Deep-Debug-
            Anfrage) — updateMarketWeatherWidget() las dpData?.gex?.value /
            dpData?.dix?.value fuer die lokale MSE-Z-Score-Historie; beide
@@ -26027,7 +26035,7 @@ async function generateDpKI(data, scoreObj, signal) {
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@5446c8f/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4879dc7/ko-indicators-loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@96d395a/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@e4f93297/ko-trackrecord.js"></script>
 
