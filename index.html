@@ -23,6 +23,9 @@
            Changelog-Eintrag fuer Details) und ko-aggregator v5.36.4
            (Distribution-Days-Score-Skala erweitert, kein index.html-Code
            betroffen, hier nur zur Nachvollziehbarkeit mitversioniert).
+           CDN-Hash-Pin ko-indicators-loader.js (traegt auch ko-indicators.json,
+           gleicher KO_MODULES_HASH) aa858e0→4879dc7 — sonst haette die
+           Live-App den fear_greed-Fix nie geladen (Pflicht-Header-Punkt 6).
      v465: Drei Nachbesserungen am selben Tag (15.08.2026):
            1. CDN-Hash-Pin fuer ko-prompts.js war seit dem 13.08. auf @3361e99
               eingefroren — heutige ko-prompts.js-Aenderungen (csp_wheel/cc
@@ -26024,7 +26027,7 @@ async function generateDpKI(data, scoreObj, signal) {
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@5446c8f/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@aa858e0/ko-indicators-loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4879dc7/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@e4f93297/ko-trackrecord.js"></script>
 
