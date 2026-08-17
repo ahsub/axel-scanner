@@ -3,8 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260816-v468">
-<!-- CHANGELOG (neueste zuerst): 
+<meta name="version" content="20260817-v469"><!
+     -- CHANGELOG (neueste zuerst):      
+     v469: CDN-Hash-Pin ko-prompts.js aktualisiert (5446c8f→4ab209d, traegt
+           ko-prompts.js v2.5.3 — PFLICHTREGEL-Nachzug (Axel-Anfrage 17.08.2026,           
+           Folgepunkt aus UEBERGABE-2026-08-16.md §4/§6). Der server-seitige           
+           Fix (market_aggregator.py v5.36.11, 16.08.) — jeder [CAUTION]/[RISK]-           
+           Faktor aus MARKET CONTEXT MUSS explizit genannt werden, unabhaengig           
+           von der STRUKTUR-Liste — fehlte im Client-Fallback-Prompt           
+           (_getMorningPrompt, nur bei KV-Cache-Miss oder EIC-Force-Refresh           
+           aktiv). Beide Branches (EIC + Public) nachgezogen, Wortlaut analog           
+           zum Server-Prompt. Kein eigener index.html-Code betroffen, nur           
+           CDN-Pin — mitversioniert fuer Nachvollziehbarkeit (Pflicht-Header-           
+           Punkt 6). Noch NICHT live verifiziert (Pfad selten getriggert).
      v468: CDN-Hash-Pin ko-indicators-loader.js aktualisiert (96d395a→3201ba7,           
            traegt ko-indicators.json v2.4.1 + ko-indicators-loader.js v1.4.1 —           
            vix/vix_term/mse_regime BUGFIX (Axel-Deep-Debug-Anfrage 17.08.2026           
@@ -26049,7 +26060,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@8838fb4/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@5446c8f/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4ab209d/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@3201ba7/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
