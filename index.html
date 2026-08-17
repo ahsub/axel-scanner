@@ -3,8 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260817-v471">          
+<meta name="version" content="20260817-v472">          
      <!-- CHANGELOG (neueste zuerst):                
+     v472: updateMarketWeatherWidget() BUGFIX — Live-Push fuer GEX/DIX auf                
+           echten Server-Wert (market.dixGex, squeezemetrics) umgestellt, alter                
+           Dark-Pool-Client-Heuristik-Proxy (dpData.dix.gex/.dix, "kein echter                
+           DIX/GEX — SqueezeMetrics-Ersatz geplant") nur noch Fallback (Axel-                
+           Deep-Debug-Anfrage: Regime zeigte NEUTRAL statt BULL_QUIET direkt                
+           nach dem DIX/GEX-Bulk-Historie-Backfill vom selben Tag). Root Cause:                
+           die frisch gebackfillte Historie (ko-market-state.js v2.3) enthaelt                
+           echte squeezemetrics-Werte (Milliarden-Skala), der taegliche Live-                
+           Push kam aber weiterhin aus der kleinskaligen Client-Heuristik —                
+           Skalen-Mismatch erzeugte einen technisch korrekten, aber inhaltlich                
+           bedeutungslosen GEX-Z-Score (-1.98 statt eines plausiblen Werts nahe                
+           0), der die Regime-Klassifikation ohne echten Marktgrund verschob.                
+           Live per Browser-Konsole bei Axel diagnostiziert (gex_raw:-0.005 vs.                
+           Historie ~7-15 Mrd). Noch NICHT live verifiziert.                
      v471: CDN-Hash-Pin ko-market-state.js aktualisiert (8838fb4→06c0e4e,                      
            traegt ko-market-state.js v2.3 — DIX/GEX-Bulk-Historie-Backfill                      
            (Axel-Anfrage 17.08.2026). loadHistoryFromAggregator() befuellt                      
@@ -21845,17 +21859,25 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
     vixRatio: (vix3mData && vixData && vixData.price > 0)
               ? Math.round((vix3mData.price / vixData.price) * 1000) / 1000
               : null,
-    // GEX + DIX aus Dark Pool Cache (keine freie API verfügbar)
-    // BUGFIX (16.08.2026, Axel-Deep-Debug-Anfrage): dpData?.gex?.value / dpData?.dix?.value
-    // griffen strukturell ins Leere — ko-darkpool.js fetchAll() liefert
-    // {dix:{dix,gex,dixAvg20,gexAvg20,...}, pcr:{...}, vixTerm:{...}} — es gibt
-    // KEIN Top-Level dpData.gex und KEIN .value-Feld. Beide Werte waren dadurch
-    // strukturell IMMER null, seit Einfuehrung des Widgets — die lokale
-    // Z-Score-Historie (KoMarketState._history.gex/.dix) blieb deshalb dauerhaft
-    // leer (Zeigt sich als "n/v — keine Historie" im MSE-Detail). Fix: korrekte
-    // verschachtelte Pfade dpData.dix.gex / dpData.dix.dix.
-    gex:      dpData?.dix?.gex ?? null,
-    dix:      dpData?.dix?.dix ?? null,
+    // GEX + DIX — PRIORITAET: echter Server-Wert (squeezemetrics, market.dixGex),
+    // Fallback: Dark-Pool-Client-Heuristik-Proxy.
+    // BUGFIX (17.08.2026, Axel-Deep-Debug-Anfrage — Regime zeigte NEUTRAL statt
+    // BULL_QUIET nach dem DIX/GEX-Bulk-Historie-Backfill vom selben Tag):
+    // dpData.dix.gex/.dix kommen aus KoDarkPool.fetchDIX(), einer CLIENT-
+    // SEITIGEN VOLUMEN-HEURISTIK ("kein echter DIX/GEX — SqueezeMetrics-Ersatz
+    // geplant", s. ko-darkpool.js) — kleine Werte nahe 0 (z.B. gex≈-0.005).
+    // Die frisch gebackfillte Historie (KoMarketState._history.gex/.dix, s.
+    // ko-market-state.js v2.3) enthaelt dagegen ECHTE squeezemetrics-Werte
+    // (Milliarden-Skala, z.B. gex≈9-15). Ein taeglicher Live-Push aus der
+    // Heuristik in eine Historie aus echten Werten erzeugt einen technisch
+    // korrekten, aber inhaltlich bedeutungslosen Z-Score (Skalen-Mismatch,
+    // GEX-Z faelschlich bei -1.98 statt eines plausiblen Werts nahe 0) — zog
+    // die Regime-Klassifikation ohne echten Marktgrund Richtung NEUTRAL.
+    // window._alphaData.market.dixGex liegt bereits vor (server-seitig
+    // taeglich befuellt, market_aggregator.py fetch_dix_gex()) und ist exakt
+    // dieselbe Quelle wie die Historie — konsistente Skala, echter Wert.
+    gex:      (window._alphaData?.market?.dixGex?.gex ?? dpData?.dix?.gex) ?? null,
+    dix:      (window._alphaData?.market?.dixGex?.dix ?? dpData?.dix?.dix) ?? null,
   };
 
   // VIX-Anzeige im Cockpit aktualisieren
