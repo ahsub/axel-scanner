@@ -3,8 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260817-v470">     
-     <!-- CHANGELOG (neueste zuerst):           
+<meta name="version" content="20260817-v471">          
+     <!-- CHANGELOG (neueste zuerst):                
+     v471: CDN-Hash-Pin ko-market-state.js aktualisiert (8838fb4→06c0e4e,                      
+           traegt ko-market-state.js v2.3 — DIX/GEX-Bulk-Historie-Backfill                      
+           (Axel-Anfrage 17.08.2026). loadHistoryFromAggregator() befuellt                      
+           jetzt auch _history.gex/.dix aus market.dixGex.history (squeeze-                      
+           metrics-Bulk-Historie seit 2011, server-seitig ab market_                      
+           aggregator.py v5.36.13 mitgeliefert) — nur wenn lokale Historie                      
+           noch leer ist, echte Live-Punkte werden nie ueberschrieben. Kein                      
+           eigener index.html-Code betroffen, nur CDN-Pin — mitversioniert                      
+           fuer Nachvollziehbarkeit (Pflicht-Header-Punkt 6). Noch NICHT                      
+           live verifiziert.                    
      v470: CDN-Hash-Pin ko-prompts.js aktualisiert (4ab209d→caa701f, traegt           
            ko-prompts.js v2.5.4 — csp_wheel.rollRules-Anbindungspruefung           
            (Folgepunkt aus UEBERGABE-2026-08-15.md §4/§7, Axel-Anfrage           
@@ -26075,7 +26085,7 @@ async function generateDpKI(data, scoreObj, signal) {
 </script>
 
 <!-- ko-darkpool.js — extern geladen aus ahsub/ko-modules (commit-hash gepinnt) -->
-<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@8838fb4/ko-market-state.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@06c0e4e/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@caa701f/ko-prompts.js"></script>
