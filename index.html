@@ -3,8 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260817-v469">
-     <!-- CHANGELOG (neueste zuerst):      
+<meta name="version" content="20260817-v470">     
+     <!-- CHANGELOG (neueste zuerst):           
+     v470: CDN-Hash-Pin ko-prompts.js aktualisiert (4ab209d→caa701f, traegt           
+           ko-prompts.js v2.5.4 — csp_wheel.rollRules-Anbindungspruefung           
+           (Folgepunkt aus UEBERGABE-2026-08-15.md §4/§7, Axel-Anfrage           
+           17.08.2026). Befund: rollRules wurde von keiner Funktion           
+           konsumiert (getEffectiveRules() reichte nur deltaRange/dteRange           
+           durch; der zweite in der Registry genannte Konsument,           
+           evaluateOptionsTradeAgainstUIQRules()/Options-Doktor, existiert           
+           als Code nirgends). Gemeinsam mit Axel entschieden: rollRules           
+           bleibt bewusst unverdrahtet — die Intent-basierte Verzweigung           
+           setzt eine BESTEHENDE Position mit bekannter Handelsabsicht           
+           voraus, passt strukturell nicht in den Kandidaten-Scanner,           
+           sondern in den geplanten Options-Doktor. stopLoss/profitTaking           
+           dagegen SIND jetzt eingebunden (getEffectiveRules() erweitert,           
+           neuer Punkt "g) EXIT-KRITERIEN" im csp_wheel-Prompt) — Exit-           
+           Kriterien fuer eine NEU zu eroeffnende Position passen           
+           strukturell in den Scanner-Kontext. Kein eigener index.html-Code           
+           betroffen, nur CDN-Pin — mitversioniert fuer Nachvollziehbarkeit           
+           (Pflicht-Header-Punkt 6). Noch NICHT live verifiziert.      
      v469: CDN-Hash-Pin ko-prompts.js aktualisiert (5446c8f→4ab209d, traegt
            ko-prompts.js v2.5.3 — PFLICHTREGEL-Nachzug (Axel-Anfrage 17.08.2026,           
            Folgepunkt aus UEBERGABE-2026-08-16.md §4/§6). Der server-seitige           
@@ -26060,7 +26078,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@8838fb4/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4ab209d/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@caa701f/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@3201ba7/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
