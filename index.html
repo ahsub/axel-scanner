@@ -3,8 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260816-v467">
+<meta name="version" content="20260816-v468">
 <!-- CHANGELOG (neueste zuerst): 
+     v468: CDN-Hash-Pin ko-indicators-loader.js aktualisiert (96d395a→3201ba7,           
+           traegt ko-indicators.json v2.4.1 + ko-indicators-loader.js v1.4.1 —           
+           vix/vix_term/mse_regime BUGFIX (Axel-Deep-Debug-Anfrage 17.08.2026           
+           nach "⚠️ Teildaten"-Badge im Morning-Briefing-Kopf). Alle drei           
+           Kern-Faktoren (promptWeight hoch/sehr_hoch) waren strukturell nie           
+           befuellbar: vix hatte source=aggregator ohne aggregatorKey UND der           
+           vorhandene domId=m-vix wurde nie gelesen (DOM-Pfad nur bei           
+           source=dom aktiv) — jetzt source=dom (Axel-Entscheidung: Live-Wert           
+           statt bis zu 24h altem Aggregator-Snapshot, konsistent mit v324           
+           VIX-Cache-Fix). vix_term/mse_regime hatten computeFrom/computeFn           
+           deklariert, aber getIndicatorValue() kennt beide Mechanismen nicht           
+           — reine Doku ohne Wirkung, gleiche Fehlerklasse wie dead code.           
+           Jetzt per Spezial-Block wie hy_spread/move_index gelesen. Folge:           
+           dataQuality zeigte permanent "partial" unabhaengig vom echten           
+           Datenstand. Kein eigener index.html-Code betroffen, nur CDN-Pin —           
+           mitversioniert fuer Nachvollziehbarkeit (Pflicht-Header-Punkt 6).
      v467: CDN-Hash-Pin ko-indicators-loader.js aktualisiert (4879dc7→96d395a,
            traegt ko-indicators.json v2.4.1 + ko-indicators-loader.js v1.3.3 —
            MCM-Paritaets-Nachzug, Axel-Anschlussfrage 16.08.2026 "kann das
@@ -26035,7 +26051,7 @@ async function generateDpKI(data, scoreObj, signal) {
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@5446c8f/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@96d395a/ko-indicators-loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@3201ba7/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@e4f93297/ko-trackrecord.js"></script>
 
