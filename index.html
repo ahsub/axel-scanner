@@ -57,6 +57,21 @@
            strukturell in den Scanner-Kontext. Kein eigener index.html-Code           
            betroffen, nur CDN-Pin — mitversioniert fuer Nachvollziehbarkeit           
            (Pflicht-Header-Punkt 6). Noch NICHT live verifiziert.      
+     v470: ko-strategies.js entfernt — Dead-Code-Audit (18.08.2026,
+           Strategy-Registry-Migration-Fortsetzung). Modul wurde geladen,
+           aber nirgends mehr konsumiert (window.KoStrategies seit dem
+           v456-Namespace-Fix vom 12.08. von nichts mehr aufgerufen,
+           verifiziert per repo-weiter grep). Enthielt die veraltete,
+           nicht aufgesplittete Strategies.options-Kombieintrag — Ursprung
+           des DTE-Drift-Bugs vom 13.08.2026 (UEBERGABE-2026-08-13.md §1) —
+           als ladbares totes Modul ein latentes Wiederholungsrisiko.
+           Script-Tag (type="module", Commit bf4bb71) + zugehoeriger
+           Kommentar entfernt.
+           Kein Funktionsverlust: KI_STRAT_CONFIG (DeepDive) bezog seine
+           Daten bereits ausschliesslich aus KoPrompts.STRATEGIES
+           (ko-prompts.js), nie aus KoStrategies. ko-strategy-registry.js
+           bleibt unveraendert eingebunden (aktiv genutzt via
+           getEffectiveRules()).
      v469: CDN-Hash-Pin ko-prompts.js aktualisiert (5446c8f→4ab209d, traegt
            ko-prompts.js v2.5.3 — PFLICHTREGEL-Nachzug (Axel-Anfrage 17.08.2026,           
            Folgepunkt aus UEBERGABE-2026-08-16.md §4/§6). Der server-seitige           
@@ -3742,12 +3757,18 @@ window.pinSubmit = function(){
      fuer csp_wheel/cc/atmna-Regeln (Delta/DTE), von getEffectiveRules() in
      ko-prompts.js konsumiert. -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@25a3294/ko-strategy-registry.js"></script>
-<!-- ko-strategies.js v2.4.0 — Commit-Hash bf4bb71 (13.08.2026, DTE-Bugfix:
-     DEFAULT_OPTS_CFG.dte 30→21 — Template "${dte}-45 DTE" rendert jetzt
-     korrekt "21-45 DTE" statt "30-45 DTE", konsistent zum EIC-System-Prompt.
-     Begleit-Commit ko-prompts.js@3361e99, gleicher Fix an 3 Prompt-Stellen).
-     type="module" erforderlich. -->
-<script type="module" src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@bf4bb71/ko-strategies.js"></script>
+<!-- ko-strategies.js ENTFERNT (18.08.2026) — Dead-Code-Audit im Rahmen der
+     Strategy-Registry-Migration ergab: window.KoStrategies (der einzige
+     Export dieser Datei, seit dem v456-Namespace-Fix vom 12.08.2026 nicht
+     mehr window.KoPrompts) wurde an KEINER Stelle in dieser Datei mehr
+     konsumiert — KI_STRAT_CONFIG bezieht seine Daten ausschliesslich aus
+     KoPrompts.STRATEGIES (ko-prompts.js). Enthielt zudem die veraltete,
+     nicht aufgesplittete Strategies.options-Kombieintrag (Ursprung des
+     DTE-Drift-Bugs vom 13.08.2026, s. UEBERGABE-2026-08-13.md §1) — als
+     totes, aber ladbares Modul ein latentes Risiko, falls je wieder verse-
+     hentlich KoStrategies.xxx() statt KoPrompts.xxx() aufgerufen würde.
+     Verifiziert vor Entfernung: `grep -ni "kostrategies"` in dieser Datei
+     ergab ausser diesem Kommentar keine Treffer. -->
 <script>
 // ── KO-WL MODULE v1.0 (embedded) ──
 /**
