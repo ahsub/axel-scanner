@@ -19855,11 +19855,12 @@ function getOptionsCfg() {
 // Strategien identisch. ATM/NA hat einen strategie-eigenen, nicht user-
 // konfigurierbaren Zielwert (~30 Tage, s. statischer ATMNA-Prompt-Text,
 // verifiziert in v350), waehrend CSP/Wheel und Covered Call den user-
-// einstellbaren Wert aus den Options-Settings nutzen (Default 21, Range
-// 21-45 lt. EIC-System-Prompt). weekly_income nutzt eigene fest codierte
-// Werte (7/120 DTE) direkt im eigenen Prompt-Text und braucht diesen Wert
-// eigentlich nicht — Rueckgabe hier ist fuer diesen Fall irrelevant, aber
-// unschaedlich.
+// einstellbaren Wert aus den Options-Settings nutzen (Default 30, Range
+// 30-45 lt. Marktstandard-Korrektur, s. UEBERGABE-2026-08-13.md §4 — Kommentar
+// war hier veraltet, Code selbst nutzte bereits korrekt 30, s. Fix 18.08.2026).
+// weekly_income nutzt eigene fest codierte Werte (7/120 DTE) direkt im
+// eigenen Prompt-Text und braucht diesen Wert eigentlich nicht — Rueckgabe
+// hier ist fuer diesen Fall irrelevant, aber unschaedlich.
 function getTargetDteForStrategy(stratId, optsCfg) {
   if (stratId === 'atmna') return 30;
   return optsCfg.dte;
