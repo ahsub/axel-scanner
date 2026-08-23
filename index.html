@@ -3,8 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260817-v473">          
+<meta name="version" content="20260823-v474">          
      <!-- CHANGELOG (neueste zuerst):                
+     v474: regime_v2 UIQ-weit uebernommen (23.08.2026, s. Nachtrag
+           UIQ-Suite/docs/REGIME-BACKTEST-VALIDIERUNG.md). hasData-Pruefung
+           vor KoMarketState.analyze() auf rawData.vixRatio != null reduziert
+           (vorher rawData.vvix || rawData.vixRatio || rawData.skew) — regime_v2
+           braucht kein VVIX/SKEW mehr, die alte Bedingung haette die Analyse
+           unnoetig blockiert, wenn nur diese beiden fehlen. rawData.vix/rawData.gex
+           wurden bereits vorher korrekt befuellt (kein Aenderungsbedarf dort).
+           CDN-Hash-Pin ko-market-state.js: NOCH OFFEN — Datei wurde inhaltlich
+           geaendert (THRESHOLDS + determineRegime() auf regime_v2 umgestellt,
+           s. dortiges Changelog), der Pin unten (Zeile mit @06c0e4e) muss nach
+           dem Commit auf den neuen Hash aktualisiert werden. Kein eigener
+           weiterer index.html-Code betroffen. Noch NICHT live verifiziert.
      v473: CDN-Hash-Pin ko-indicators-loader.js aktualisiert (3201ba7→313c739,                
            traegt ko-indicators.json v2.5.0 + ko-indicators-loader.js v1.4.2 —                
            sieben neue Konjunktur-Indikatoren (Axel-Anfrage, "auf diesem Auge                
@@ -21927,7 +21939,7 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
   console.log('[MSE] Frische Daten geladen — VVIX:', rawData.vvix, '| SKEW:', rawData.skew, '| VIX-Ratio:', rawData.vixRatio);
 
   // Nur analysieren wenn genug Daten vorhanden
-  var hasData = rawData.vvix || rawData.vixRatio || rawData.skew;
+  var hasData = rawData.vixRatio != null;  // regime_v2 braucht nur noch vixRatio (+vix/gex)
   var result  = hasData ? KoMarketState.analyze(rawData) : null;
   KoMarketState.saveHistory();
 
