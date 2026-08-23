@@ -3,8 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260823-v475">          
+<meta name="version" content="20260823-v476">          
      <!-- CHANGELOG (neueste zuerst):                
+     v476: Deep-Dive-Crash behoben (Public-Modus-Teil): generateDeepDiveKI()
+           enthielt eine tote, nie verwendete Zeile
+           ("var prompt_context = strat.focus.join('\n');"), die
+           unconditional crashte, sobald KI_STRAT_CONFIG[strategy].focus
+           nicht existierte -- was seit der Umstellung von ko-prompts.js auf
+           .prompt()-Funktionen fuer ALLE 14 Strategien der Fall war. Damit
+           war der komplette Deep-Dive (Public- UND Expert-Modus) tot,
+           unabhaengig von regime_v2. Live in dieser Session gefunden
+           (Diagnose: Konsole zeigte TypeError in generateDeepDiveKI, Zeile
+           21600), Zeile ersatzlos entfernt -- ihr Ergebnis wurde nirgends
+           gebraucht (Public-Prompt ist vollstaendig statisch, Expert-Prompt
+           nutzt nur strat.focus[0..3] direkt). Live gegen echten TGT-Deep-
+           Dive verifiziert (Perspektive Momentum, Public-Modus) -- laeuft
+           jetzt vollstaendig durch. Expert-/EIC-Modus-Teil (strat.focus[0..3]
+           brauchen echte Werte) separat in ko-modules/ko-prompts.js v2.5.6
+           gefixt (14 focus-Arrays ergaenzt).
      v475: CDN-Hash-Pin ko-market-state.js aktualisiert (06c0e4e→10f89b3,
            traegt ko-market-state.js v2.4 — regime_v2-Umstellung aus v474,
            s. dortiger Eintrag). Loest den in v474 offen gelassenen Pin
@@ -21597,7 +21613,6 @@ async function generateDeepDiveKI(sym, name, raw, state) {
   }
 
   var strat = KI_STRAT_CONFIG[_ddCurrentStrategy] || KI_STRAT_CONFIG.momentum || { label: _ddCurrentStrategy, focus: [] };
-  var prompt_context = strat.focus.join('\n');
   var isExpert = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
 
   var prompt = getKiSystemPrompt('Einzeltitel: ' + (name||sym) + ' · Perspektive: ' + strat.label)
