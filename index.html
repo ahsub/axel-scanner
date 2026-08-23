@@ -3,8 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260823-v476">          
+<meta name="version" content="20260823-v477">          
      <!-- CHANGELOG (neueste zuerst):                
+     v477: CDN-Hash-Pin ko-prompts.js aktualisiert (caa701f→9dcf33b, traegt
+           ko-prompts.js v2.5.6 — 14 focus-Arrays fuer den EIC-/Expert-Modus-
+           Teil des Deep-Dive-Fixes aus v476). Der Pin war seit dessen Commit
+           nicht mitgezogen worden (klassische CDN-Hash-Pin-Falle, s.
+           Pflicht-Header-Punkt 6) — Live-Check zeigte KoPrompts.VERSION
+           weiterhin '2.5.0' trotz deployter v476, obwohl main im ko-modules-
+           Repo bereits 2.5.6 war. Verifiziert: Inhalt von
+           https://raw.githubusercontent.com/ahsub/ko-modules/
+           9dcf33b9d7ec0ab02eae4174af0c097d019069ec/ko-prompts.js
+           byte-identisch mit der freigegebenen v2.5.6-Fassung geprueft.
      v476: Deep-Dive-Crash behoben (Public-Modus-Teil): generateDeepDiveKI()
            enthielt eine tote, nie verwendete Zeile
            ("var prompt_context = strat.focus.join('\n');"), die
@@ -26179,7 +26189,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@10f89b3/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@caa701f/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@9dcf33b/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@313c739/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
