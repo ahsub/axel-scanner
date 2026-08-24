@@ -17308,6 +17308,42 @@ const SEKTOREN = [
   { sym:'XLB',  name:'Materialien',     icon:'ti-flask' },
   { sym:'XLRE', name:'Immobilien',      icon:'ti-home' },
   { sym:'XBI',  name:'Biotech',         icon:'ti-dna' },
+  // NACHGERUESTET (24.08.2026, Axel-Anfrage zu kryptischen Tickern) — Labels
+  // fuer alle uebrigen RS_SECTOR_ETFS-Ticker (market_aggregator.py), die
+  // bisher ohne Eintrag hier auf ihren rohen Ticker zurueckfielen
+  // (renderSektorRS()-Fallback: match ? match.name : s.sym). XLU war dabei
+  // ein reiner Bug -- ist serverseitig laengst Teil von RS_SECTOR_ETFS,
+  // fehlte hier aber schlicht in der Liste.
+  { sym:'XLU',  name:'Versorger',                    icon:'ti-plug' },
+  { sym:'SOXX', name:'Halbleiter',                   icon:'ti-cpu' },
+  { sym:'IBB',  name:'Biotech',                      icon:'ti-dna' },
+  { sym:'ARKK', name:'Innovation (ARK)',              icon:'ti-rocket' },
+  { sym:'BOTZ', name:'Robotik & KI',                  icon:'ti-robot' },
+  { sym:'ITA',  name:'Luft-/Raumfahrt & Verteidigung',icon:'ti-plane' },
+  { sym:'ICLN', name:'Erneuerbare Energien',          icon:'ti-leaf' },
+  { sym:'VNQ',  name:'Immobilien (REIT, breit)',      icon:'ti-home' },
+  { sym:'XAR',  name:'Luft-/Raumfahrt & Verteidigung',icon:'ti-plane' },
+  { sym:'PPA',  name:'Luft-/Raumfahrt & Verteidigung',icon:'ti-plane' },
+  // DFEN (3x gehebelt) am 24.08.2026 bewusst NICHT aufgenommen -- Axel-
+  // Entscheidung: Hebel-ETFs verzerren den RS-Vergleich, gehoert nicht ins
+  // Sektor-RS-Bild. Server-seitig (market_aggregator.py RS_SECTOR_ETFS)
+  // ebenfalls entfernt, kommt also gar nicht mehr aus der KV-Quelle an.
+  { sym:'IRBO', name:'Robotik & KI',                  icon:'ti-robot' },
+  { sym:'ROBO', name:'Robotik & Automatisierung',     icon:'ti-robot' },
+  { sym:'HACK', name:'Cybersicherheit',               icon:'ti-shield-lock' },
+  { sym:'CIBR', name:'Cybersicherheit',               icon:'ti-shield-lock' },
+  { sym:'NLR',  name:'Kernenergie & Uran',            icon:'ti-atom' },
+  { sym:'URA',  name:'Uran',                          icon:'ti-atom' },
+  { sym:'ARKX', name:'Raumfahrt (ARK)',               icon:'ti-rocket' },
+  { sym:'ARKG', name:'Genomik/Biotech-Innovation (ARK)',icon:'ti-dna' },
+  { sym:'EZU',  name:'Eurozone',                      icon:'ti-currency-euro' },
+  { sym:'EWJ',  name:'Japan',                         icon:'ti-flag' },
+  { sym:'EWG',  name:'Deutschland',                   icon:'ti-flag' },
+  { sym:'FXI',  name:'China (Large Cap)',             icon:'ti-flag' },
+  { sym:'INDA', name:'Indien',                        icon:'ti-flag' },
+  { sym:'EWZ',  name:'Brasilien',                     icon:'ti-flag' },
+  { sym:'EWY',  name:'Südkorea',                      icon:'ti-flag' },
+  { sym:'EWT',  name:'Taiwan',                        icon:'ti-flag' },
 ];
 
 let _sektorData = [];
