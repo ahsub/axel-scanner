@@ -19694,6 +19694,47 @@ function checkDataFreshness(meta) {
   var banner = document.getElementById('data-staleness-banner');
   if (!banner || !meta || !meta.last_trading_day) return;
 
+  // NEU (24.08.2026, Backlog №35-Vervollstaendigung): erst pruefen, ob ein
+  // erklärter Degraded-Status vorliegt (yfinance-Ausfall, Vortages-KV bewusst
+  // beibehalten, s. market_aggregator.py). Falls ja: praezise Meldung statt
+  // der generischen "Aggregator-Run vermutlich fehlgeschlagen"-Warnung, die
+  // hier faelschlich einen echten Fehler suggerieren wuerde, obwohl der
+  // Sicherheits-Skip genau wie vorgesehen funktioniert hat.
+  fetchDegradedStatus().then(function(degraded) {
+    if (degraded && degraded.degraded === true) {
+      banner.style.display = 'block';
+      var pct = (degraded.validPct != null) ? Math.round(degraded.validPct * 100) : '?';
+      banner.innerHTML = '⚠️ Datenqualitäts-Hinweis — der letzte Aggregator-Lauf hat nur ' +
+        pct + '% der Ticker erfolgreich geladen (' +
+        (degraded.validCount != null ? degraded.validCount : '?') + '/' +
+        (degraded.totalCount != null ? degraded.totalCount : '?') +
+        ', vermutlich yfinance-Problem). Gestrige Daten werden weiter angezeigt, kein Datenverlust. ' +
+        (degraded.detectedAt ? 'Erkannt: ' + degraded.detectedAt + '. ' : '') +
+        'Behebt sich in der Regel automatisch beim nächsten erfolgreichen Lauf.';
+      return;
+    }
+    _checkDataFreshnessDateHeuristic(meta, banner);
+  }).catch(function() {
+    // Degraded-Status nicht abrufbar (z.B. Key existiert noch nie) — Datums-
+    // Heuristik bleibt der verlaessliche Fallback, unveraendertes Verhalten.
+    _checkDataFreshnessDateHeuristic(meta, banner);
+  });
+}
+
+async function fetchDegradedStatus() {
+  try {
+    var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
+    var r = await fetch(koSync + '/public/degraded_status', { cache: 'no-store' });
+    if (!r.ok) return null;
+    var resp = await r.json();
+    return resp.data || resp;
+  } catch(e) {
+    console.warn('[Degraded-Status] Nicht verfügbar:', e.message);
+    return null;
+  }
+}
+
+function _checkDataFreshnessDateHeuristic(meta, banner) {
   // Erwarteter letzter Handelstag: rückwärts vom heutigen Tag zum letzten Trading Day
   var d = new Date();
   var cutoffHour = 15; // Aggregator-Lauf ~13:30 UTC, etwas Puffer
