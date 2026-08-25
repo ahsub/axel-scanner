@@ -3,8 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260825-v478">          
+<meta name="version" content="20260825-v479">          
      <!-- CHANGELOG (neueste zuerst):                
+     v479: VIX-Diskrepanz Morning Briefing — eigentlicher Root Cause gefunden
+           (25.08.2026, nach v478). Der v478-Fix (Vereinheitlichung factors.vix/
+           factors.vix_term + Zeitstempel) war korrekt, loeste aber nicht das
+           gesamte Problem: renderMakro() (Makro-Panel, manueller/KI-Cache
+           localStorage 'ko_makro') schrieb ebenfalls in #m-vix — DASSELBE
+           Element wie fetchVix(). runMorningBriefing() ruft loadMakro() als
+           Schritt "0/9" auf (Zweck: DOM-Kontext fuer Intermarket/Bull-
+           Indikator, NICHT um VIX zu setzen), direkt VOR Schritt "1/9", wo
+           _getVixRobust() #m-vix als ersten Kaskaden-Schritt liest. Jede
+           Briefing-Generierung ueberschrieb den frisch geholten Live-VIX-Wert
+           dadurch deterministisch mit dem ggf. tagealten manuellen Cache-
+           Eintrag, bevor er gelesen wurde — unabhaengig von v478. Fix:
+           renderMakro() schreibt #m-vix nicht mehr (alleinige Zustaendigkeit
+           von fetchVix(), v283-Prinzip). d.vix bleibt Teil von ko_makro fuer
+           die KI-Fliesstext-Analyse (verdictText), nur die DOM-Kollision
+           entfaellt. Live getestet: #m-vix bleibt nach simuliertem loadMakro()-
+           Aufruf mit echten (veralteten) Cache-Daten unveraendert.
      v478: VIX-Diskrepanz im Morning Briefing behoben (25.08.2026, Axel-
            Bugreport: 16.01 oben vs. 15.13 im KI-Text). Root Cause: zwei
            komplett getrennte Datenpipelines fuer denselben Spot-VIX-Wert
@@ -9905,7 +9922,21 @@ function renderMakro(d){
     ' · Manuelle Daten: '+(d.date||'—');
   document.getElementById('m-sp').textContent=d.sp||'—';
   document.getElementById('m-nq').textContent=d.nq||'—';
-  document.getElementById('m-vix').textContent=d.vix||'—';
+  // NACHGERUESTET (25.08.2026, Axel-Bugreport VIX-Diskrepanz — eigentlicher
+  // Root Cause, nach den frueheren Fixes an fetchVix()/ko-indicators-loader.js
+  // noch gefunden): renderMakro() schrieb hier den manuell/KI-eingetragenen
+  // Cache-Wert (localStorage 'ko_makro', z.B. via "Makro heute"-Button) IN
+  // DASSELBE #m-vix-Element wie die Live-Quelle fetchVix(). runMorningBriefing()
+  // ruft loadMakro() als Schritt "0/9" auf (Zweck: DOM-Kontext fuer Intermarket/
+  // Bull-Indikator bereitstellen, NICHT um VIX zu setzen) -- direkt VOR Schritt
+  // "1/9", wo _getVixRobust() #m-vix als ersten Kaskaden-Schritt liest. Ergebnis:
+  // JEDE Briefing-Generierung ueberschrieb den frisch geholten Live-VIX-Wert
+  // deterministisch mit dem u.U. tagealten manuellen Cache-Eintrag, bevor er
+  // gelesen wurde -- unabhaengig davon, ob fetchVix() selbst schon korrekt lief.
+  // #m-vix ist die alleinige Zustaendigkeit von fetchVix() (v283-Prinzip: eine
+  // Quelle fuer VIX) -- der manuelle Makro-Cache-Wert wird hier bewusst NICHT
+  // mehr geschrieben. d.vix bleibt Teil des ko_makro-Objekts und der KI-Fliess-
+  // text-Analyse (verdictText), nur die DOM-Kollision mit #m-vix entfaellt.
   // BEKANNTE EINSCHRAENKUNG (15.07.2026, Dead-Code-Audit Backlog #19): 'm-oil'
   // Anzeige-Element existiert NICHT im HTML (anders als m-sp/m-nq/m-vix
   // daneben) -- dieser Write ist ein stiller No-Op. Gehoert zum manuellen
