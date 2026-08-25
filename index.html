@@ -3,8 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260823-v477">          
+<meta name="version" content="20260825-v478">          
      <!-- CHANGELOG (neueste zuerst):                
+     v478: VIX-Diskrepanz im Morning Briefing behoben (25.08.2026, Axel-
+           Bugreport: 16.01 oben vs. 15.13 im KI-Text). Root Cause: zwei
+           komplett getrennte Datenpipelines fuer denselben Spot-VIX-Wert
+           (factors.vix live via Yahoo/CORS-Proxy DOM-Pfad, factors.vix_term.vix
+           separat aus dem Aggregator-KV-Snapshot) — je nach Abrufzeitpunkt
+           unterschiedlich weit "nachgezogen" (Yahoo-5d-Chart hatte den
+           aktuellsten Handelstag teils noch nicht, KV-Snapshot war teils noch
+           der Vortageslauf), Faktoren daher potenziell unterschiedlich alt UND
+           ohne jede Kennzeichnung. Fix in ko-indicators-loader.js (CDN-Pin
+           dieser Datei s.u.): vix_term uebernimmt jetzt IMMER denselben Spot-
+           Wert wie factors.vix (Fallback auf Aggregator-Wert nur wenn
+           factors.vix fehlt), Spread wird bei Uebernahme konsistent neu
+           berechnet. Zusaetzlich (Axel-Wunsch): Datum des tatsaechlich
+           verwendeten VIX-Closes wird jetzt immer erfasst (data-asof-Attribut
+           auf #m-vix, gesetzt sowohl im Yahoo-Erfolgspfad als auch im
+           KV-Fallback-Pfad von fetchVix()/index.html) und als "(Stand: ...)"
+           an beide Faktor-Labels angehaengt — macht Alters-Unterschiede
+           zwischen den zwei Pipelines sichtbar statt sie zu verschleiern.
+           CDN-Hash-Pin ko-indicators-loader.js aktualisiert (313c739→1027955).
+           Getestet: isolierte Logikreproduktion des heutigen Bug-Falls (beide
+           Faktoren jetzt identisch + korrekt markiert), Normalfall, Edge Case
+           ohne DOM-Wert. Noch NICHT live verifiziert.
      v477: CDN-Hash-Pin ko-prompts.js aktualisiert (caa701f→9dcf33b, traegt
            ko-prompts.js v2.5.6 — 14 focus-Arrays fuer den EIC-/Expert-Modus-
            Teil des Deep-Dive-Fixes aus v476). Der Pin war seit dessen Commit
@@ -16638,6 +16660,7 @@ function fiboLevelCell(label, level, currentPrice) {
 // ═══════════════════════════════════════════════════════════════
 let _vixLevel = null;
 let _vixLastFetch = 0;
+let _vixLevelAsOf = null; // Datum des zuletzt verwendeten VIX-Closes (25.08.2026)
 const VIX_TTL = 30 * 60 * 1000; // 30 Minuten Cache
 
 async function fetchVix() {
@@ -16657,15 +16680,38 @@ async function fetchVix() {
     const j = await r.json();
     const result = j.chart && j.chart.result && j.chart.result[0];
     if (result && result.indicators && result.indicators.quote) {
-      const closes = result.indicators.quote[0].close.filter(function(v){ return v != null; });
-      if (closes.length > 0) {
-        _vixLevel = parseFloat(closes[closes.length - 1].toFixed(2));
+      const rawCloses = result.indicators.quote[0].close;
+      const timestamps = result.timestamp || [];
+      // NACHGERUESTET (25.08.2026, Axel-Bugreport: VIX-Diskrepanz im Morning
+      // Briefing, 16.01 oben vs. 15.13 im KI-Text). Root Cause: Yahoos 1d/5d-
+      // Chart-Endpunkt hat den aktuellsten Handelstag manchmal noch nicht
+      // aufgenommen (z.B. sehr frueh morgens abgerufen) -- der "letzte" Close
+      // war dann de facto 1-2 Handelstage aelter, ohne dass das irgendwo
+      // sichtbar war. Fix: Datum des tatsaechlich verwendeten Closes mit
+      // erfassen (rueckwaerts suchen, da rawCloses[i]===null fuer den noch
+      // nicht abgeschlossenen aktuellen Tag moeglich ist) und als
+      // data-asof-Attribut + Titel am DOM-Element hinterlegen, IMMER (nicht
+      // nur bei erkannter Staleness) -- vermeidet eine weitere fehleranfaellige
+      // "ist das jetzt alt genug um es zu markieren"-Heuristik.
+      let lastIdx = -1;
+      for (let i = rawCloses.length - 1; i >= 0; i--) {
+        if (rawCloses[i] != null) { lastIdx = i; break; }
+      }
+      if (lastIdx >= 0) {
+        _vixLevel = parseFloat(rawCloses[lastIdx].toFixed(2));
         _vixLastFetch = now;
+        _vixLevelAsOf = timestamps[lastIdx]
+          ? new Date(timestamps[lastIdx] * 1000).toISOString().slice(0, 10)
+          : null;
         // Einheitliche VIX-Quelle: #m-vix DOM mit echtem ^VIX-Wert befüllen
         const vixDomEl = document.getElementById('m-vix');
         if (vixDomEl) {
           vixDomEl.textContent = _vixLevel.toFixed(2);
           vixDomEl.style.color = _vixLevel < 16 ? 'var(--green)' : _vixLevel > 25 ? 'var(--red)' : 'var(--amber)';
+          if (_vixLevelAsOf) {
+            vixDomEl.setAttribute('data-asof', _vixLevelAsOf);
+            vixDomEl.title = 'Stand: ' + _vixLevelAsOf + ' (letzter verfügbarer Schlusskurs)';
+          }
         }
         return _vixLevel;
       }
@@ -16687,11 +16733,17 @@ function _vixFallbackFromKV() {
         vixDomEl.textContent = vixVal.toFixed(2) + (lastTD ? ' *' : '');
         vixDomEl.title = lastTD ? 'Stand: ' + lastTD + ' (letzter Handelstag)' : '';
         vixDomEl.style.color = vixVal < 16 ? 'var(--green)' : vixVal > 25 ? 'var(--red)' : 'var(--amber)';
+        // NACHGERUESTET (25.08.2026): data-asof konsistent mit fetchVix()-
+        // Erfolgspfad setzen, damit buildMarketContext() in ko-indicators-
+        // loader.js unabhängig vom gewählten Pfad denselben Zeitstempel-
+        // Mechanismus lesen kann.
+        if (lastTD) vixDomEl.setAttribute('data-asof', lastTD);
       }
       // Bugfix: _vixLevel global setzen, sonst bleibt es null und KI-Prompts
       // (openKiBriefing) lesen "unbekannt" obwohl der Wert hier vorlag.
       _vixLevel = vixVal;
       _vixLastFetch = Date.now();
+      _vixLevelAsOf = lastTD || null;
       console.log('[VIX] Fallback aus KV: ' + vixVal + ' (Stand: ' + lastTD + ')');
       return vixVal;
     }
@@ -26268,7 +26320,7 @@ async function generateDpKI(data, scoreObj, signal) {
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@9dcf33b/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@313c739/ko-indicators-loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1027955/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@e4f93297/ko-trackrecord.js"></script>
 
