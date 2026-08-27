@@ -3,8 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260825-v479">          
+<meta name="version" content="20260827-v480">          
      <!-- CHANGELOG (neueste zuerst):                
+     v480: Legal-Briefing-Audit Backlog №61 (27.08.2026) — die drei /public/*-
+           Endpunkte des ko-sync-Workers (master_market_data, options_watchlist,
+           daily_market_snapshot[_us]) verlangten bisher KEINEN Token — fuer
+           jeden im Internet abrufbar, nicht nur fuer Beta-Tester. Fix: alle
+           sechs Aufrufstellen dieser Endpunkte senden jetzt einen Bearer-Token
+           per neuer Helper-Funktion _publicKvAuthHeaders() (nutzt denselben
+           "KI-Zugangs-Token" wie ko-ai.js/getAiToken()) — Gegenstueck zu
+           ko-sync-worker.js v2.1, das serverseitig STATIC_TOKEN/OWNER_TOKEN
+           prueft und die konkreten KI-Trade-Parameter (trigger/stopLoss/
+           target/positionPct/leverageRec bzw. strikeSuggestion/dte/
+           deltaTarget/premiumEstimate) fuer Nicht-Owner aus der Antwort
+           entfernt. Kein UI-sichtbares Feature-Delta fuer normale Nutzung —
+           reiner Sicherheits-/Compliance-Fix, betrifft nur die Daten, die
+           bereits unveraendert angezeigt wurden.
      v479: VIX-Diskrepanz Morning Briefing — eigentlicher Root Cause gefunden
            (25.08.2026, nach v478). Der v478-Fix (Vereinheitlichung factors.vix/
            factors.vix_term + Zeitstempel) war korrekt, loeste aber nicht das
@@ -4570,6 +4584,17 @@ function getAiToken() {
   return localStorage.getItem('ko_ai_token') || '';
 }
 
+// NEU (27.08.2026, Legal-Briefing-Audit №61): die /public/*-Endpunkte des
+// ko-sync-Workers verlangen seit v2.1 denselben Bearer-Token wie ko-ai.js
+// (STATIC_TOKEN oder OWNER_TOKEN) — vorher waren sie unauthentifiziert.
+// Gleiche Token-Quelle wie getAiToken(), eigener Name fuer Klarheit an den
+// Call-Sites.
+function _publicKvAuthHeaders() {
+  var t = getAiToken();
+  return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+
+
 // ── Admin-Review: Pending-Liste laden + freigeben/verwerfen ─────────────────
 async function loadExtraTickerReview() {
   const el = document.getElementById('extra-ticker-pending-list');
@@ -7471,7 +7496,7 @@ async function loadKVMasterData(force) {
   try {
     var koSync   = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
     var url      = koSync + '/public/master_market_data';
-    var r        = await fetch(url, { cache: 'no-store' });
+    var r        = await fetch(url, { cache: 'no-store', headers: _publicKvAuthHeaders() });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var resp     = await r.json();
     var data     = resp.data || resp;   // Worker gibt {key, data, updated_at} zurück
@@ -22919,7 +22944,7 @@ async function runMorningBriefing(forceRefresh) {
     try {
       var _snapResp = !_eicForce ? await fetch(
         'https://ko-sync.ahildebrand.workers.dev/public/daily_market_snapshot',
-        { cache: 'no-store' }
+        { cache: 'no-store', headers: _publicKvAuthHeaders() }
       ) : null;
       if (_snapResp.ok) {
         var _snapData = await _snapResp.json();
@@ -23560,8 +23585,8 @@ async function renderIntradayComparison() {
   try {
     var todayUtc = new Date().toISOString().slice(0, 10);
     var [morningResp, usResp] = await Promise.all([
-      fetch('https://ko-sync.ahildebrand.workers.dev/public/daily_market_snapshot', { cache: 'no-store' }),
-      fetch('https://ko-sync.ahildebrand.workers.dev/public/daily_market_snapshot_us', { cache: 'no-store' }),
+      fetch('https://ko-sync.ahildebrand.workers.dev/public/daily_market_snapshot', { cache: 'no-store', headers: _publicKvAuthHeaders() }),
+      fetch('https://ko-sync.ahildebrand.workers.dev/public/daily_market_snapshot_us', { cache: 'no-store', headers: _publicKvAuthHeaders() }),
     ]);
     var morning = morningResp.ok ? await morningResp.json() : null;
     var us      = usResp.ok      ? await usResp.json()      : null;
@@ -24309,7 +24334,7 @@ async function loadOptionsDesk(force) {
   try {
     var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
     if (!window._alphaData) {
-      var rMaster = await fetch(koSync + '/public/master_market_data', { cache: 'no-store' });
+      var rMaster = await fetch(koSync + '/public/master_market_data', { cache: 'no-store', headers: _publicKvAuthHeaders() });
       if (rMaster.ok) {
         var respMaster = await rMaster.json();
         var dataMaster = respMaster.data || respMaster;
@@ -24340,7 +24365,7 @@ async function loadOptionsDesk(force) {
     }
     // Letzter Fallback: separater Legacy-KV-Key (kann leer sein, siehe oben)
     console.log('[OptionsDesk][Diag] Falle durch zu Legacy-Key — primaerer und Fallback-Pfad lieferten kein optionsWatchlist.');
-    var r = await fetch(koSync + '/public/options_watchlist', { cache: 'no-store' });
+    var r = await fetch(koSync + '/public/options_watchlist', { cache: 'no-store', headers: _publicKvAuthHeaders() });
     if (!r.ok) throw new Error('KV HTTP ' + r.status);
     _optionsWatchlist = await r.json();
     var _diagT = (_optionsWatchlist && _optionsWatchlist.tickers) || [];
@@ -24874,7 +24899,7 @@ async function loadAlphaDashboard(force) {
 
   try {
     var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
-    var r = await fetch(koSync + '/public/master_market_data', {cache:'no-store'});
+    var r = await fetch(koSync + '/public/master_market_data', {cache:'no-store', headers: _publicKvAuthHeaders()});
     if (!r.ok) throw new Error('KV HTTP ' + r.status);
     var resp = await r.json();
     var data = resp.data || resp;
