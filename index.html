@@ -24505,14 +24505,23 @@ function renderOptionsDeskCards(data) {
     // Aggregator-Lauf vorhanden war — sonst fehlt das Feld schlicht (fail-closed).
     var kiBadge = '';
     var kiDetail = '';
+    // v2.0 (28.08.2026, Options-Desk-Redesign): Setup-Fit-Struktur statt
+    // Trade-Generator-Ausgabe. t.ki ist fuer ALLE Nutzer sichtbar (Analyse,
+    // keine individuelle Handlungsanweisung). t.ki_eic existiert nur fuer
+    // Owner-Anfragen (ko-sync-worker.js v2.2 entfernt den Block serverseitig
+    // fuer Nicht-Owner) — daher hier immer defensiv mit "if (t.ki_eic)" prüfen.
     if (t.ki) {
-      var kiStratLabel = t.ki.strategy === 'csp' ? 'CSP' : t.ki.strategy === 'covered_call' ? 'Covered Call'
-                        : t.ki.strategy === 'credit_spread' ? 'Credit Spread' : t.ki.strategy;
-      kiBadge = '<span title="KI-angereichert — Setup-Parameter von der KI vorgeschlagen" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(129,140,248,0.12);border:0.5px solid #818cf8;color:#818cf8">✓ KI: ' + kiStratLabel + '</span>';
-      kiDetail = '<div style="margin-top:.3rem;padding:.4rem .5rem;background:rgba(129,140,248,0.06);border-radius:6px;font-size:10px;color:var(--text2)">'
-        + '<b style="color:#818cf8">KI-Vorschlag:</b> Strike ~$' + (t.ki.strikeSuggestion||'--') + ' · DTE ' + (t.ki.dte||'--')
-        + ' · Δ ' + (t.ki.deltaTarget||'--') + ' · Prämie ~' + (t.ki.premiumEstimate||'--') + '%'
-        + (t.ki.keyRisk ? '<div style="margin-top:2px;color:var(--text3)">⚠ ' + t.ki.keyRisk + '</div>' : '')
+      var stratLabels = {csp:'CSP', csp_atm_na:'CSP (ATM/NA)', covered_call:'Covered Call', credit_spread:'Credit Spread'};
+      var kiStratLabel = stratLabels[t.ki.strategy] || t.ki.strategy;
+      var fitColor = t.ki.conclusion === 'FAVOURABLE' ? '#4ade80' : t.ki.conclusion === 'MODERATE' ? '#fbbf24' : '#f87171';
+      kiBadge = '<span title="UIQ Setup-Fit-Analyse — keine individuelle Anlageempfehlung" style="font-size:9px;padding:1px 6px;border-radius:4px;background:rgba(129,140,248,0.12);border:0.5px solid #818cf8;color:#818cf8">'
+        + kiStratLabel + ' · ' + (t.ki.fitLabel || '') + '</span>';
+      kiDetail = '<div style="margin-top:.3rem;padding:.5rem;background:rgba(129,140,248,0.06);border-radius:6px;font-size:10px;color:var(--text2)">'
+        + '<b style="color:' + fitColor + '">UIQ Setup-Fit: ' + (t.ki.fitScore != null ? t.ki.fitScore : '--') + '/100 — ' + (t.ki.conclusion || '') + '</b>'
+        + (t.ki.positiveFactors && t.ki.positiveFactors.length ? '<div style="margin-top:4px"><b>Spricht dafür:</b> ' + t.ki.positiveFactors.join(' · ') + '</div>' : '')
+        + (t.ki.riskFactors && t.ki.riskFactors.length ? '<div style="margin-top:2px"><b>Risiken:</b> ' + t.ki.riskFactors.join(' · ') + '</div>' : '')
+        + (t.ki.modelParamRange ? '<div style="margin-top:2px;color:var(--text3)">Modellbereich: ' + (t.ki.modelParamRange.dte||'') + ', ' + (t.ki.modelParamRange.strikeGuideline||'') + '</div>' : '')
+        + (t.ki_eic ? '<div style="margin-top:4px;color:#818cf8">EIC: Strike ~$' + (t.ki_eic.strikeSuggestion||'--') + ' · DTE ' + (t.ki_eic.dte||'--') + ' · Δ ' + (t.ki_eic.deltaTarget||'--') + ' · Prämie ~' + (t.ki_eic.premiumEstimate||'--') + '%</div>' : '')
         + '</div>';
     }
     return '<div style="background:var(--bg2);border-radius:10px;padding:.6rem .8rem;border:0.5px solid var(--border2)">'
