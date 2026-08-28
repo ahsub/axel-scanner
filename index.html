@@ -3,8 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260827-v481">          
+<meta name="version" content="20260828-v482">          
      <!-- CHANGELOG (neueste zuerst):                
+     v482: Options-Desk-Redesign (28.08.2026, Legal-Briefing-Audit Backlog
+           №62-Vorarbeit) — Render-Block fuer t.ki umgestellt von direkter
+           Trade-Parameter-Anzeige (Strike/DTE/Delta/Praemie als KI-Vorschlag)
+           auf Setup-Fit-Struktur (fitScore/positiveFactors/riskFactors/
+           modelParamRange/conclusion), passend zur neuen Rueckgabe von
+           enrich_options_watchlist_with_ai() (market_aggregator.py v5.38.0).
+           Konkrete Zahlen (Strike/DTE/Delta/Praemie) werden jetzt nur noch
+           angezeigt, wenn t.ki_eic vorhanden ist (Owner-only, serverseitig
+           gefiltert seit ko-sync-worker.js v2.2) — kein clientseitiger
+           Public/Owner-Unterschied mehr im Rendering selbst noetig.
      v481: CDN-Hash-Pin ko-market-state.js aktualisiert (10f89b3→
            a834eb47fa34fb588b15b3cdef7f483e0d33f112, 27.08.2026) — traegt
            ko-market-state.js v2.5 (Legal-Briefing-Audit №61 Folgefix):
