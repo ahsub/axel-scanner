@@ -3,8 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260828-v482">          
+<meta name="version" content="20260828-v483">          
      <!-- CHANGELOG (neueste zuerst):                
+     v483: CDN-Hash-Pin ko-prompts.js aktualisiert (9dcf33b→13041af,
+           28.08.2026) — traegt ko-prompts.js v2.5.7 (Legal-Briefing-Audit
+           Folgefund zu №60/61): _getSystemPrompt()/_getMorningPrompt()
+           bauten clientseitig einen EIC-Instruktions-Block ("gib KONKRETE,
+           DIREKTE Handlungsempfehlungen") in den User-Prompt-Text ein,
+           gesteuert allein durch _expertModeActive/_eicUnlocked (Client-
+           Variablen) — lief am serverseitigen isOwner-Gate (№60) komplett
+           vorbei, da der Worker nur den Systemprompt waehlt, nicht den
+           eingebetteten User-Text prueft. Live beobachtet: Covered-Call-
+           Analyse im Public-Toggle-Zustand enthielt trotzdem Strike/Delta/
+           Praemien-Zahlen + Rangfolge. Fix liefert jetzt immer die
+           deskriptive Variante — Public/Expert-Unterscheidung liegt
+           ausschliesslich noch serverseitig. Fuer Axel als Owner keine
+           Aenderung der Ausgabequalitaet (Server-Systemprompt traegt die
+           Experten-Rahmung bereits zuverlaessig). getKiSystemPrompt()-
+           Fallback-Kopie in index.html entsprechend mitgezogen.
      v482: Options-Desk-Redesign (28.08.2026, Legal-Briefing-Audit Backlog
            №62-Vorarbeit) — Render-Block fuer t.ki umgestellt von direkter
            Trade-Parameter-Anzeige (Strike/DTE/Delta/Praemie als KI-Vorschlag)
@@ -22699,15 +22715,14 @@ function getKiSystemPrompt(context) {
   if (typeof KoPrompts !== 'undefined' && KoPrompts.getSystemPrompt) {
     return KoPrompts.getSystemPrompt(context, _expertModeActive && _eicUnlocked);
   }
-  // Fallback: Coaching-Prompt direkt (greift wenn ko-prompts.js CDN noch nicht verfügbar, v448)
-  var isEic = (typeof _expertModeActive !== 'undefined' && _expertModeActive &&
-               typeof _eicUnlocked !== 'undefined' && _eicUnlocked);
-  if (isEic) {
-    return 'Du bist ein erfahrener quantitativer Portfolio-Manager und Options-Trader. '
-      + 'Analysiere die gegebenen Messwerte und gib KONKRETE, DIREKTE Handlungsempfehlungen. '
-      + 'STRICT NO-HALLUCINATION: Alle Aussagen nur aus explizit gegebenen Messwerten. '
-      + (context ? '\nKONTEXT: ' + context : '');
-  }
+  // SICHERHEITS-FIX (28.08.2026, Legal-Briefing-Audit, Folgefund zu №60/61):
+  // Fallback-Kopie greift nur wenn ko-prompts.js CDN nicht verfügbar (v448).
+  // eic-Zweig entfernt — liefert jetzt immer die deskriptive Coaching-Variante,
+  // unabhängig von _expertModeActive/_eicUnlocked (beides Client-Variablen,
+  // koennen nicht als Sicherheitsgrenze dienen). Expert/Public-Unterscheidung
+  // liegt ausschliesslich noch serverseitig in ko-ai.js (isOwner-gehaertet,
+  // s. Backlog №60 in SUITE.md). Siehe ko-prompts.js::_getSystemPrompt() fuer
+  // die ausfuehrliche Begruendung.
   return 'Du bist ein Investment-Coach, der Investoren dabei hilft, bessere Entscheidungen zu treffen. '
     + 'Deine Aufgabe: erkläre klar und direkt, ob ein Setup heute handlungswürdig ist — '
     + 'oder warum es heute besser ist abzuwarten. '
@@ -26403,7 +26418,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@a834eb47fa34fb588b15b3cdef7f483e0d33f112/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@9dcf33b/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@13041af/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1027955/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
