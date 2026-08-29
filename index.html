@@ -3,8 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260828-v483">          
+<meta name="version" content="20260829-v484">          
      <!-- CHANGELOG (neueste zuerst):                
+     v484: Legal-Briefing-Audit Backlog №65 abgeschlossen (29.08.2026,
+           ko-prompts.js v2.5.7→v2.6.0, CDN-Pin nach Push zu aktualisieren —
+           s. Grundgesetz #10). (1) ctx.isEic wird jetzt einheitlich in
+           openKiBriefing() und runOptionsKiBriefing() gesetzt (vorher nur
+           bei 'value') — alle 14 Strategie-Templates in ko-prompts.js
+           liefern damit standardmaessig die neue deskriptive Public-
+           Variante (keine Kursziele/Stops/Strikes/Deltas/Praemien), EIC
+           weiterhin die volle Variante. (2) Zusatzfund: runOptionsKiBriefing()
+           sendete fuer 'atmna' unconditional expert_mode:true an ko-ai.js
+           (hart verdrahtetes "strat === 'atmna'") — jetzt der echte,
+           berechnete isEic-Flag. (3) Groesserer Zusatzfund: runValueKiBriefing()
+           rief die Action 'value_briefing' auf, die in ko-ai.js/ACTION_CONFIG
+           nicht existiert — der Call schlug dadurch IMMER fehl und die
+           Funktion lief PERMANENT ueber einen Direkt-Anthropic-API-Fallback
+           im Browser (eigener API-Key des Nutzers), komplett ausserhalb der
+           BaFin-Compliance-Architektur (kein System-Prompt, kein isOwner-
+           Gate, kein Rate-Limiting). Korrigiert auf 'ki_briefing'. (4) In
+           ko-prompts.js selbst: ctx.tickers wurde im value-Template nie
+           serialisiert (Dead-Code-Fund, Value bekam praktisch keine
+           Einzeltitel-Daten) sowie Feldnamen-Mismatch zwischen den zwei
+           Aufrufstellen (rs/rsRating, hvp/ivp) behoben. Details/Begruendung:
+           ko-prompts.js v2.6.0-Changelog, SUITE.md Backlog №65.
      v483: CDN-Hash-Pin ko-prompts.js aktualisiert (9dcf33b→13041af,
            28.08.2026) — traegt ko-prompts.js v2.5.7 (Legal-Briefing-Audit
            Folgefund zu №60/61): _getSystemPrompt()/_getMorningPrompt()
@@ -18717,7 +18739,16 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
   // Regelwerk-Daten ohne eigene .prompt()-Methode — Prompt-Text kommt aus dem
   // gemeinsamen Builder via KoPrompts.get(id, ctx) statt stratCfg.prompt(ctx).
   // Value-Strategie: ctx mit Fundamentaldaten aus valueScanner anreichern
-  var _kiCtx = { marktkontext: marktkontext, vixStr: vixForPrompt, optsCfg: optsCfg };
+  // FIX (29.08.2026, Legal-Briefing-Audit Backlog №65-Fortsetzung, ko-prompts.js
+  // v2.6.0): isEic wurde bisher NUR fuer 'value' gesetzt — alle anderen 13
+  // Strategien liefen dadurch mit ctx.isEic === undefined, was in den neuen
+  // .prompt(ctx)-Weichen als "kein EIC" gewertet wird (fail-safe, korrekt so),
+  // ABER vor v2.6.0 gab es dort noch keine Weiche, d.h. es war reiner Zufall,
+  // dass sie bislang trotzdem lief. Jetzt einheitlich fuer ALLE Strategien
+  // gesetzt, aus demselben clientseitigen Flag wie bisher bei 'value'.
+  var _isEicNowForBriefing = (typeof _expertModeActive !== 'undefined' && _expertModeActive)
+                           && (typeof _eicUnlocked !== 'undefined' && _eicUnlocked);
+  var _kiCtx = { marktkontext: marktkontext, vixStr: vixForPrompt, optsCfg: optsCfg, isEic: _isEicNowForBriefing };
   // BUGFIX (15.07.2026, Axel-Report): heutiges Datum + fuer Options-Strategien
   // das ECHTE, client-berechnete Ziel-Verfallsdatum ergaenzen — vorher fehlte
   // jeder Datums-Anker im Prompt, die KI hat dadurch teils falsche Datum/DTE-
@@ -18731,10 +18762,9 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       + _expInfo.dateStr + ' (Freitag, ' + _expInfo.actualDte + ' Tage ab heute) — dieses Datum in der Analyse verwenden.';
   }
   if (_kiStrat === 'value') {
-    var _isEicNow = (typeof _expertModeActive !== 'undefined' && _expertModeActive)
-                 && (typeof _eicUnlocked !== 'undefined' && _eicUnlocked);
+    // isEic wird jetzt oben einheitlich fuer alle Strategien gesetzt (s. FIX
+    // 29.08.2026) — hier nur noch mode/tickers ergaenzen.
     // topResults bereits mit Value-Feldern angereichert (PATCH 5 oben)
-    _kiCtx.isEic   = _isEicNow;
     _kiCtx.mode    = 'fundamental';
     _kiCtx.tickers = topResults.map(function(t) {
       return {
@@ -24755,9 +24785,23 @@ async function runValueKiBriefing(mode) {
     // koAiCall() nutzt den ko-ai Worker (BaFin-Compliance + Rate-Limiting)
     var text;
     try {
-      text = await koAiCall('value_briefing', userMsg, isEic);
+      // BUGFIX (29.08.2026, Zusatzfund beim №65-Fix): Action-Name war
+      // 'value_briefing' — das existiert in ko-ai.js/ACTION_CONFIG nicht
+      // (gueltige Actions: makro/ki_briefing/morning/oversold/meta_analysis/
+      // deep_dive/dark_pool/eic). koAiCall() bekam dadurch IMMER einen
+      // 400-Fehler vom Worker zurueck und landete IMMER im Direkt-API-
+      // Fallback unten — der komplett an ko-ai.js vorbeigeht: kein
+      // System-Prompt (also auch kein Public/EIC-Split auf System-Ebene,
+      // anders als bei allen anderen Strategien), kein isOwner-Gate, kein
+      // Rate-Limiting. Der Value-Desk-KI-Button lief dadurch strukturell
+      // ausserhalb der gesamten BaFin-Compliance-Architektur der Suite.
+      // Korrekte, bereits fuer diese Aufgabe konfigurierte Action: 'ki_briefing'.
+      text = await koAiCall('ki_briefing', userMsg, isEic);
     } catch(_kErr) {
-      // Direkter API-Fallback falls koAiCall nicht verfügbar
+      // Direkter API-Fallback falls koAiCall nicht verfügbar (z.B. Worker
+      // nicht erreichbar) — bewusst als Fallback belassen, sollte nach dem
+      // Fix oben aber nur noch bei echten Ausfaellen greifen, nicht mehr
+      // permanent.
       var resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': getAiToken(),
@@ -24886,7 +24930,15 @@ async function runOptionsKiBriefing(strat) {
   mkCtx = 'HEUTIGES DATUM: ' + _todayForPrompt2 + '\n\n' + mkCtx
     + '\n\nZIEL-VERFALLSDATUM (bereits berechnet, NICHT selbst berechnen): '
     + _expInfo2.dateStr + ' (Freitag, ' + _expInfo2.actualDte + ' Tage ab heute) — dieses Datum in der Analyse verwenden.';
-  var ctx = { marktkontext: mkCtx, optsCfg: { minPrice:15, maxPrice:(_optionsMaxPrice != null ? _optionsMaxPrice : 150), minHvp:_optionsDeskFilter, goodHvp:50, idealHvp:65, erDays:30, dte:_targetDte2 }, vixStr: String(_getVixRobust()||'--') };
+  // FIX (29.08.2026, Legal-Briefing-Audit Backlog №65-Fortsetzung, ko-prompts.js
+  // v2.6.0): ctx.isEic wurde hier bisher nie gesetzt — die 5 Options-Desk-
+  // Templates (csp_wheel/atmna/weekly_income/cc/collar) liefen dadurch
+  // faktisch immer im (jetzt neuen) Public-Zweig, AUSSER fuer 'atmna', wo
+  // weiter unten historisch "strat === 'atmna'" hart auf true verdrahtet war
+  // (Zusatzfund, kein Zusammenhang zu isEic hier — separat gefixt).
+  var _isEicNowForOptions = (typeof _expertModeActive !== 'undefined' && _expertModeActive)
+                          && (typeof _eicUnlocked !== 'undefined' && _eicUnlocked);
+  var ctx = { marktkontext: mkCtx, optsCfg: { minPrice:15, maxPrice:(_optionsMaxPrice != null ? _optionsMaxPrice : 150), minHvp:_optionsDeskFilter, goodHvp:50, idealHvp:65, erDays:30, dte:_targetDte2 }, vixStr: String(_getVixRobust()||'--'), isEic: _isEicNowForOptions };
   var prompt = KoPrompts.get(strat, ctx);
   // Open modal
   var existing = document.getElementById('ki-modal');
@@ -24909,7 +24961,13 @@ async function runOptionsKiBriefing(strat) {
     + '</div><div style="margin-top:.75rem;font-size:10px;color:var(--text3);text-align:center">Keine Anlageberatung &middot; Eigene Pruefung erforderlich</div></div>';
   document.body.appendChild(modal);
   try {
-    var text = await koAiCall('ki_briefing', prompt, strat === 'atmna');
+    // BUGFIX (29.08.2026, Zusatzfund beim №65-Fix): der expert_mode-Parameter
+    // hier war hart auf "strat === 'atmna'" verdrahtet — jeder Nutzer, der auf
+    // den CSP-ATM/NA-Button klickte, sendete unconditional expert_mode:true
+    // an ko-ai.js, unabhaengig vom eigenen EIC-Status. Serverseitig folgenlos
+    // fuer die Vertraulichkeit (isOwner-Gate seit №60 haelt das ab), aber
+    // fachlich falsch. Jetzt einheitlich der echte, oben berechnete Flag.
+    var text = await koAiCall('ki_briefing', prompt, _isEicNowForOptions);
     var contentEl = document.getElementById('ki-content');
     if (contentEl) contentEl.innerHTML = '<div style="white-space:pre-wrap;font-size:12px;line-height:1.6">' + text + '</div>';
     if (statusEl) statusEl.textContent = '';
