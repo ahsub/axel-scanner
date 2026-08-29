@@ -24856,10 +24856,17 @@ async function runBestOptionsOpportunityKI() {
 
   if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere ' + best.sym + '…';
 
+  // BUGFIX (29.08.2026, zweiter Fundort desselben Bugs aus
+  // runOptionsKiBriefing() — Label-Praefix 'IVR:' war auch hier fix
+  // verdrahtet, unabhaengig dupliziert statt aus einer Quelle. s. dortigen
+  // Kommentar fuer die volle Herleitung.
+  var _bestVolLabel = (best.ivRank != null) ? ('IVR:' + best.ivRank + '%')
+                     : (best.hvp != null)    ? ('HVP:' + best.hvp + '%')
+                     : 'Vol:--';
   var mkCtx = 'MARKTKONTEXT:\\nVIX: ' + (_getVixRobust() || '-') + '\\n' + _getMcmContextForPrompt()
     + '\n\nBESTER UNDERLYING ÜBER ALLE OPTIONS-STRATEGIEN (Gesamt-Score-Sieger):\n'
     + best.sym + ' Kurs:$' + (best.price||'--')
-    + ' IVR:' + (best.ivRank != null ? best.ivRank + '%' : (best.hvp ? 'HVP' + best.hvp + '%' : '--'))
+    + ' ' + _bestVolLabel
     + ' RSI:' + (best.rsi ? Math.round(best.rsi) : '--')
     + ' ATR:' + (best.atr||'--') + ' D200:' + (best.dist200!=null ? best.dist200+'%' : '--')
     + ' Grade:' + (best.grade||'--')
