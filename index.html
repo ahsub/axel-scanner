@@ -3,8 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260829-v484">          
+<meta name="version" content="20260829-v485">          
      <!-- CHANGELOG (neueste zuerst):                
+     v485: Spec §11 Punkte 1/2/7 (UIQ-REGULATORY-LANGUAGE-SPEC.md, Belastungstest
+           10.10/10.12 — Deep Dive hoechstes Risiko im System). (1) Groesserer
+           Fund in generateDeepDiveKI(): direktive Handlungshinweise ("keine
+           aggressiven CSPs", "Momentum-Strategien bevorzugen", "kein neuer CSP
+           empfohlen", "CSP-Strike bevorzugen") steckten in den Messwert-Zeilen
+           (ctx), die VOR der Public/Expert-Weiche gebaut werden — liefen dadurch
+           unabhaengig vom Modus in BEIDE Prompts. Neutrale Formulierungen fuer
+           beide Modi; direktive Fassung in neuen isExpert-gated EIC-Zusatzblock
+           verschoben (Axel-Entscheidung 29.08., EIC bleibt unveraendert, s.
+           SUITE.md №65/№66). (2) Universums-Bezugspflicht ergaenzt: Public-Modus
+           referenziert jetzt die Grösse des aktuellen Scan-Universums
+           (window._alphaData.tickers.length) bei jeder Strategy-Fit-Aussage,
+           plus explizite Anweisung, nicht auf die erkennbare Nutzer-Ticker-Wahl
+           einzugehen. (3) Leitunterscheidung (SUITE.md §0, "Strategy Fit ≠
+           Gewinnwahrscheinlichkeit ≠ Anlageempfehlung") jetzt im UI sichtbar an
+           drei Stellen: ki-briefing-modal-Footer, dynamisches ki-modal-Footer
+           (Options Desk), Deep-Dive-Status-Zeile — vorher nur im internen
+           Dokument.
      v484: Legal-Briefing-Audit Backlog №65 abgeschlossen (29.08.2026,
            ko-prompts.js v2.5.7→v2.6.0, CDN-Pin nach Push zu aktualisieren —
            s. Grundgesetz #10). (1) ctx.isEic wird jetzt einheitlich in
@@ -19277,7 +19295,8 @@ function csvSaveConfirm(tickers) {
       </div>
     </div>
     <div style="padding:.75rem 1.25rem;border-top:0.5px solid var(--border);font-size:10px;color:var(--text3)">
-      Daten-Synthese · Keine Anlageberatung gem. §1 WpHG · Eigene Prüfung erforderlich
+      Daten-Synthese · Keine Anlageberatung gem. §1 WpHG · Eigene Prüfung erforderlich<br>
+      Strategy Fit ≠ Gewinnwahrscheinlichkeit ≠ Anlageempfehlung
     </div>
   </div>
 </div>
@@ -21832,9 +21851,16 @@ async function generateDeepDiveKI(sym, name, raw, state) {
     if (state.confluenceScore != null) _tvaLine += ' · Confluence: ' + state.confluenceScore + '/100'
       + (state.confluenceScore >= 80 ? ' (hohe Signaldichte)' : state.confluenceScore >= 60 ? ' (OK)' : state.confluenceScore >= 40 ? ' (schwach)' : ' (keine Confluence)');
     if (state.diPlus != null) _tvaLine += ' · DI+/DI-: ' + state.diPlus.toFixed(1) + '/' + (state.diMinus||0).toFixed(1);
-    // Handlungshinweis
-    if (state.chopIndex >= 55) _tvaLine += ' → Choppiges Umfeld: Entry-Timing prüfen, keine aggressiven CSPs';
-    else if (state.adx >= 35 && state.diPlus > state.diMinus) _tvaLine += ' → Starker Aufwärtstrend: Momentum-Strategien bevorzugen';
+    // FIX (29.08.2026, Spec §11 Punkt 1): der bisherige "Handlungshinweis"
+    // hier ("Entry-Timing pruefen, keine aggressiven CSPs" / "Momentum-
+    // Strategien bevorzugen") lief UNABHAENGIG vom isExpert-Zweig weiter
+    // unten in BEIDE Prompts, weil er in den Messwert-Zeilen (ctx) steckt,
+    // die vor der Public/Expert-Weiche gebaut werden — Public bekam damit
+    // Handlungsanweisungen, die die Weiche eigentlich verhindern sollte.
+    // Neutrale Fassung hier fuer beide Modi; die direktive EIC-Fassung
+    // wandert weiter unten in einen isExpert-gated Zusatzblock.
+    if (state.chopIndex >= 55) _tvaLine += ' → choppiges Umfeld (niedrige Trendkonsistenz)';
+    else if (state.adx >= 35 && state.diPlus > state.diMinus) _tvaLine += ' → starker Aufwärtstrend (hohe Trendkonsistenz)';
     ctx.push(_tvaLine);
   }
 
@@ -21842,10 +21868,13 @@ async function generateDeepDiveKI(sym, name, raw, state) {
   if (state.earningsDTE != null && state.earningsDTE >= -2 && state.earningsDTE <= 45) {
     var _eLine = 'Earnings: in ' + state.earningsDTE + ' Tagen (' + (state.earningsDate||'?') + ')';
     if (state.earningsEPS  != null) _eLine += ' · EPS-Est: $' + state.earningsEPS;
-    if (state.earningsDTE <= 21)
-      _eLine += ' → WARNUNG: Position überspannt Earnings — CSP-Strike eng wählen oder warten';
-    else if (state.earningsDTE <= 7)
-      _eLine += ' → KRITISCH: Earnings in <7 Tagen — kein neuer CSP empfohlen';
+    // FIX (29.08.2026, Spec §11 Punkt 1): neutrale Zeitfenster-Beschreibung
+    // statt Handlungsanweisung ("CSP-Strike eng waehlen oder warten" /
+    // "kein neuer CSP empfohlen") — s. Kommentar bei TVA-Marktstruktur oben.
+    if (state.earningsDTE <= 7)
+      _eLine += ' → kurzfristiges Ereignisfenster (<7 Tage)';
+    else if (state.earningsDTE <= 21)
+      _eLine += ' → Earnings-Termin liegt im betrachteten Zeitfenster';
     ctx.push(_eLine);
   }
 
@@ -21859,22 +21888,52 @@ async function generateDeepDiveKI(sym, name, raw, state) {
       if (state.obBullVolPct != null)  _obLine += ' BullVol ' + state.obBullVolPct.toFixed(0) + '%';
       var price = raw.price || 0;
       if (price <= state.obBullHigh && price >= state.obBullLow)
-        _obLine += ' → PREIS IM BULL OB (institutionelle Unterstützung aktiv)';
+        _obLine += ' → Preis im Bull-Order-Block (institutionelle Unterstützungszone)';
     }
     if (state.obBearHigh != null) {
       _obLine += ' | Bear OB $' + state.obBearLow.toFixed(2) + '-$' + state.obBearHigh.toFixed(2);
       if (state.obBearDistPct != null) _obLine += ' (Dist ' + (state.obBearDistPct >= 0 ? '+' : '') + state.obBearDistPct.toFixed(1) + '%)';
     }
-    // Confluence
+    // FIX (29.08.2026, Spec §11 Punkt 1): "CSP-Strike bevorzugen" entfernt
+    // (Handlungsanweisung in gemeinsamer Messwert-Zeile) — reine
+    // Faktenbeschreibung der Zonen-Überschneidung bleibt.
     var avwdist = state.distToAvwapPct;
     var obdist  = state.obBullDistPct;
     if (avwdist != null && obdist != null && Math.abs(avwdist) <= 3 && Math.abs(obdist) <= 5)
-      _obLine += ' | CONFLUENCE: AVWAP-Zone + OB-Zone = maximale institutionelle Zone → CSP-Strike bevorzugen';
+      _obLine += ' | Confluence: AVWAP-Zone und Order-Block-Zone überschneiden sich (verstärktes technisches Signal)';
     ctx.push(_obLine);
   }
 
   var strat = KI_STRAT_CONFIG[_ddCurrentStrategy] || KI_STRAT_CONFIG.momentum || { label: _ddCurrentStrategy, focus: [] };
   var isExpert = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
+
+  // EIC-Zusatzblock (29.08.2026, Spec §11 Punkt 1): die oben entfernten
+  // direktiven Handlungshinweise bleiben fuer den EIC/Owner-Zugriff
+  // erhalten (Axel-Entscheidung 29.08., s. SUITE.md №65/№66 — EIC-Modus
+  // bewusst unveraendert, reiner Eigengebrauch) — hier aber sauber isExpert-
+  // gated statt unkontrolliert in der gemeinsamen Messwert-Zeile.
+  if (isExpert) {
+    if (state.chopIndex >= 55) ctx.push('EIC-Hinweis: choppiges Umfeld → Entry-Timing prüfen, keine aggressiven CSPs');
+    else if (state.adx >= 35 && state.diPlus > state.diMinus) ctx.push('EIC-Hinweis: starker Aufwärtstrend → Momentum-Strategien bevorzugen');
+    if (state.earningsDTE != null && state.earningsDTE <= 7 && state.earningsDTE >= -2)
+      ctx.push('EIC-Hinweis: Earnings in <7 Tagen → kein neuer CSP empfohlen');
+    else if (state.earningsDTE != null && state.earningsDTE <= 21 && state.earningsDTE > 7)
+      ctx.push('EIC-Hinweis: Position überspannt Earnings → CSP-Strike eng wählen oder warten');
+    var _avwdist2 = state.distToAvwapPct, _obdist2 = state.obBullDistPct;
+    if (_avwdist2 != null && _obdist2 != null && Math.abs(_avwdist2) <= 3 && Math.abs(_obdist2) <= 5)
+      ctx.push('EIC-Hinweis: AVWAP-Zone + OB-Zone = maximale institutionelle Zone → CSP-Strike bevorzugen');
+  }
+
+  // FIX (29.08.2026, Spec §11 Punkt 1 — Deep Dive eigene Sprachregeln):
+  // Universums-Bezugspflicht (Belastungstest 10.10/10.12, hoechstes Risiko
+  // im System — Nutzer waehlt den Titel selbst, isolierte Einzeltitel-
+  // Aussage ohne Vergleichsrahmen liest sich direktiver als ein Ranking).
+  // window._alphaData.tickers ist die aktuelle Scan-Universe-Quelle
+  // (dieselbe, aus der allTickers in renderAlphaLb() etc. gebaut wird).
+  var _universeSize = (window._alphaData && window._alphaData.tickers && window._alphaData.tickers.length) || null;
+  var _universeRef = _universeSize
+    ? (' (im Vergleich zu den ' + _universeSize + ' im aktuellen Scan erfassten Titeln)')
+    : '';
 
   var prompt = getKiSystemPrompt('Einzeltitel: ' + (name||sym) + ' · Perspektive: ' + strat.label)
     + '\n\nMESSWERTE:\n' + ctx.join('\n') + '\n\n'
@@ -21886,7 +21945,19 @@ async function generateDeepDiveKI(sym, name, raw, state) {
         + '3. ' + strat.focus[2] + '\n'
         + '4. Konkrete Handlungsempfehlung basierend auf den Messwerten (Richtung, Strike-Überlegung, Stop in ATR).\n'
         + '5. ' + strat.focus[3] + '\n'
-      : 'Strukturiere deine Antwort in exakt 3 Abschnitte (BaFin-konform, keine Kauf-/Verkaufsempfehlung):\n\n' + 'MARKTLAGE (1 Satz): Wie ist das aktuelle Marktumfeld? Nenne VIX-Level, Regime und DCE-Confidence mit kurzer Einordnung.\n\n' + 'SETUP-BEWERTUNG (2-3 Sätze): Was sagen die Indikatoren über diesen Titel? Erkläre trendScore, confluenceScore, ADX und RS-Rank in verständlichem Deutsch — nicht als Zahlenauflistung, sondern als zusammenhängende Einschätzung. Benenne auch was fehlt oder gegen das Setup spricht.\n\n' + 'EINSCHÄTZUNG (1-2 Sätze): Passt dieses Setup heute zum Marktumfeld? Wenn ja: welche Strategie wäre auf Basis der Datenlage denkbar. Wenn nein: was müsste sich ändern. Keine direkten Kauf-/Verkaufsempfehlungen.\n'
+      : 'Der Nutzer hat diesen Titel selbst zur Ansicht ausgewählt — reagiere NICHT auf diese Auswahl '
+        + 'oder eine damit vermutete Kaufabsicht (keine Formulierungen wie "da du diesen Titel ansiehst" '
+        + 'oder "für deine Position"). Strukturiere deine Antwort in exakt 3 Abschnitten '
+        + '(BaFin-konform, keine Kauf-/Verkaufsempfehlung):\n\n'
+        + 'MARKTLAGE (1 Satz): Wie ist das aktuelle Marktumfeld? Nenne VIX-Level, Regime und DCE-Confidence mit kurzer Einordnung.\n\n'
+        + 'SETUP-BEWERTUNG (2-3 Sätze): Was sagen die Indikatoren über diesen Titel aus'
+        + _universeRef + '? Erkläre trendScore, confluenceScore, ADX und RS-Rank in verständlichem '
+        + 'Deutsch — nicht als Zahlenauflistung, sondern als zusammenhängende Einschätzung im Verhältnis '
+        + 'zum untersuchten Universum. Benenne auch was fehlt oder gegen das Setup spricht.\n\n'
+        + 'EINORDNUNG (1-2 Sätze): Wie stark erfüllt dieser Titel die Kriterien der Strategie "' + strat.label + '"'
+        + _universeRef + '? Beschreibe ausschließlich den Erfüllungsgrad der Kriterien — keine Aussage darüber, '
+        + 'ob der Nutzer aktiv werden sollte. Diese Einordnung bezieht sich ausschließlich auf die '
+        + 'Modellkriterien und stellt keine individuelle Bewertung einer Kauf-/Verkaufsabsicht dar.\n'
     )
     + '\nNur Messwerte verwenden. Verständliche Sprache, kein Fachjargon ohne Erklärung. Kein Markdown.';
   try {
@@ -21901,7 +21972,7 @@ async function generateDeepDiveKI(sym, name, raw, state) {
       .replace(/\n\n/g, '<br><br>')
       .replace(/\n/g, '<br>');
     document.getElementById('dd-ki-text').innerHTML = '<div style="font-size:13px;line-height:1.8;color:var(--text)">' + html + '</div>';
-    document.getElementById('dd-ki-status').textContent = 'KI-basierte Markt-Einschätzung · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' · Keine Anlageberatung gem. §1 WpHG';
+    document.getElementById('dd-ki-status').textContent = 'KI-basierte Markt-Einschätzung · ' + new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) + ' · Keine Anlageberatung gem. §1 WpHG · Strategy Fit ≠ Anlageempfehlung';
     // Phase 0.5 Arbeitspaket I Punkt 3: Ergebnis fuer Cache-Fallback speichern
     _cacheKiResultForTicker(sym, html);
 
@@ -24978,7 +25049,7 @@ async function runOptionsKiBriefing(strat) {
     + '<button onclick="document.getElementById(\'ki-modal\').remove()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer">&times;</button>'
     + '</div><div id="ki-content" style="font-size:12px;color:var(--text2)">'
     + '<div style="text-align:center;padding:2rem;color:var(--text3)"><i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block;font-size:1.5rem"></i><div style="margin-top:.5rem">Analysiere...</div></div>'
-    + '</div><div style="margin-top:.75rem;font-size:10px;color:var(--text3);text-align:center">Keine Anlageberatung &middot; Eigene Pruefung erforderlich</div></div>';
+    + '</div><div style="margin-top:.75rem;font-size:10px;color:var(--text3);text-align:center">Keine Anlageberatung &middot; Eigene Pruefung erforderlich<br>Strategy Fit &ne; Gewinnwahrscheinlichkeit &ne; Anlageempfehlung</div></div>';
   document.body.appendChild(modal);
   try {
     // BUGFIX (29.08.2026, Zusatzfund beim №65-Fix): der expert_mode-Parameter
