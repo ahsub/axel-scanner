@@ -3,8 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260829-v485">          
+<meta name="version" content="20260830-v486">          
      <!-- CHANGELOG (neueste zuerst):                
+     v486: VIX-Doppelquellen-Fix im Morning-Briefing-Prompt (30.08.2026,
+           Axel-Fund — MB zitierte im selben Fliesstext "VIX laut
+           Aggregator-Snapshot 18,77" vs. "Makro-Snapshot vom 27. August
+           14,51" und dachte sich dafuer selbst Quellen-Labels aus, die im
+           Code nirgends vorkommen). Root Cause: 'vix' aus der Registry-
+           'volatility'-Kategorie liest #m-vix (client-seitige Live-Quelle,
+           fetchVix(), 30min-TTL) und landet im Prompt — die AGGREGATOR-
+           SNAPSHOT-Sektion (Kommentar "Single Source of Truth") liefert
+           parallel einen zweiten, unabhaengig vom nächtlichen Aggregator
+           aktualisierten VIX-Z-Score. Beide Werte gingen bisher gleichzeitig
+           in denselben Prompt. Fix (additiv, 1 Stelle): buildPromptSection()-
+           Aufruf fuer 'volatility' filtert die 'VIX:'-Zeile jetzt heraus,
+           da die Aggregator-Snapshot-Sektion bereits einen VIX-Wert liefert
+           — stellt die urspruengliche v283-Entscheidung ("keine zweite
+           VIX-Quelle") fuer den Prompt-Pfad wieder her. NICHT behoben (Axel-
+           Entscheidung: baldmoeglich nach Abschluss der heutigen Aufgaben,
+           separater groesserer Punkt): die UI selbst hat weiterhin zwei
+           VIX-Quellen (#m-vix live + Aggregator-KV) — ~40 DOM-Aufrufstellen
+           haengen an #m-vix, echte Vereinheitlichung braucht eigene Pruefung.
+           Syntaxgeprueft mit acorn (AST-Parser, wie ki-prompt-audit) — der
+           betroffene Script-Block parst fehlerfrei vor und nach der Aenderung.
      v485: Spec §11 Punkte 1/2/7 (UIQ-REGULATORY-LANGUAGE-SPEC.md, Belastungstest
            10.10/10.12 — Deep Dive hoechstes Risiko im System). (1) Groesserer
            Fund in generateDeepDiveKI(): direktive Handlungshinweise ("keine
@@ -23195,6 +23216,24 @@ async function runMorningBriefing(forceRefresh) {
         // Generisch: alle Kategorien in definierter Reihenfolge
         ['regime','volatility','sentiment','macro','commodity','fx','fred','calendar'].forEach(function(cat) {
           var lines = buildPromptSection(cat, _alphaCtx);
+          if (cat === 'volatility') {
+            // DEDUPE (30.08.2026, Axel-Fund — MB zitierte "Aggregator-Snapshot
+            // 18,77" vs. "Makro-Snapshot vom 27. August 14,51" im selben Text):
+            // Die 'vix'-Zeile hier kommt aus der client-seitigen Live-Quelle
+            // (#m-vix, fetchVix(), 30min-TTL, Registry source:'dom'). Die
+            // AGGREGATOR-SNAPSHOT-Sektion weiter unten liefert bereits einen
+            // zweiten, unabhaengig aktualisierten VIX-Wert (Aggregator-KV-
+            // Z-Score, _alphaCtx.market.zscores.vix). Beide Zeilen im selben
+            // Prompt fuehrten dazu, dass das Modell zwei widerspruechliche
+            // VIX-Werte zitierte und sich selbst Quellen-Labels dafuer ausdachte
+            // ("Aggregator-Snapshot"/"Makro-Snapshot" — beide Begriffe kommen
+            // im Code nirgends vor). Stellt die v283-Entscheidung ("keine
+            // zweite VIX-Quelle") fuer den Prompt-Pfad wieder her. Die UI
+            // selbst hat weiterhin zwei VIX-Quellen (#m-vix live + Aggregator-
+            // KV) — separater, groesserer Folgepunkt (Axel: baldmoeglich nach
+            // Abschluss der heutigen Aufgaben), s. UEBERGABE-2026-08-30.md.
+            lines = lines.filter(function(l) { return l.indexOf('VIX:') !== 0; });
+          }
           lines.forEach(function(l){ messwerteLines.push(l); });
           messwerteLines.push('');
         });
