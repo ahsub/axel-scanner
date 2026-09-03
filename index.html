@@ -3,8 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260830-v486">          
+<meta name="version" content="20260903-v487">          
      <!-- CHANGELOG (neueste zuerst):                
+     v487: Staleness-Heuristik-Fix (03.09.2026, Axel-Fund — GHA-Run zweimal
+           nachweislich fehlerfrei gelaufen, Banner zeigte trotzdem "Daten
+           veraltet"). Root Cause: _checkDataFreshnessDateHeuristic() ging
+           mit cutoffHour=15 davon aus, dass kurz nach dem ~13:30-UTC-Lauf
+           bereits der HEUTIGE Schlusskurs vorliegt. Tatsaechlich laufen laut
+           market-aggregator.yml BEIDE Cron-Laeufe VOR Marktoeffnung (03:37
+           UTC vor Xetra, 13:30 UTC vor NYSE) — nie danach. Der heutige NYSE-
+           Schluss (~20:00 UTC) kann folglich fruehestens vom NAECHSTEN
+           Kalendertag-Fruehlauf (03:37 UTC) erfasst werden. Fix: neue
+           Berechnung bestimmt den Kalendertag, dessen 03:37-UTC-Lauf bereits
+           stattgefunden hat, geht von dort einen weiteren Tag zurueck (der
+           Fruehlauf traegt den VORTag-Schlusskurs) und landet auf dem
+           naechsten echten Handelstag. Gegen 5 Szenarien verifiziert
+           (Screenshot-Zeitpunkt, vor/nach Fruehlauf, Wochenende ohne eigenen
+           Lauf, Feiertag-Montag) — Fehlalarm trat vermutlich taeglich ab
+           ca. 17:00 MESZ bis zum naechsten Morgen auf, seit Einfuehrung der
+           Heuristik unbemerkt. Nebenfund (nicht behoben, bereits im
+           02.09.2026-Uebergabeprotokoll bekannt): fetchDegradedStatus()
+           laeuft wegen fehlender /public/degraded_status-Route in
+           ko-sync-worker.js weiterhin ins Leere (401), faellt korrekt auf
+           die Datums-Heuristik zurueck.
      v486: VIX-Doppelquellen-Fix im Morning-Briefing-Prompt (30.08.2026,
            Axel-Fund — MB zitierte im selben Fliesstext "VIX laut
            Aggregator-Snapshot 18,77" vs. "Makro-Snapshot vom 27. August
@@ -19985,10 +20006,26 @@ async function fetchDegradedStatus() {
 }
 
 function _checkDataFreshnessDateHeuristic(meta, banner) {
-  // Erwarteter letzter Handelstag: rückwärts vom heutigen Tag zum letzten Trading Day
-  var d = new Date();
-  var cutoffHour = 15; // Aggregator-Lauf ~13:30 UTC, etwas Puffer
-  if (d.getUTCHours() < cutoffHour) d.setUTCDate(d.getUTCDate() - 1);
+  // KORRIGIERT (03.09.2026, Axel-Fund — GHA-Run zweimal nachweislich fehlerfrei
+  // gelaufen, Banner trotzdem faelschlich "veraltet"): die alte cutoffHour=15-
+  // Logik ging davon aus, dass kurz nach dem ~13:30-UTC-Lauf bereits der
+  // HEUTIGE Schlusskurs vorliegt. Tatsaechlich laufen laut market-aggregator.yml
+  // BEIDE Cron-Laeufe VOR Marktoeffnung (03:37 UTC vor Xetra, 13:30 UTC vor
+  // NYSE) — nie danach. Der heutige NYSE-Schluss (~20:00 UTC) kann folglich
+  // fruehestens vom NAECHSTEN Kalendertag-Fruehlauf (03:37 UTC) erfasst werden,
+  // nicht am selben Tag. Neue Logik: bestimmt zuerst den Kalendertag, dessen
+  // 03:37-UTC-Lauf bereits stattgefunden hat, geht von dort einen weiteren Tag
+  // zurueck (der Fruehlauf traegt den VORTag-Schlusskurs, da er selbst vor
+  // Marktoeffnung laeuft) und landet dann auf dem naechsten echten Handelstag.
+  // Gegen mehrere Szenarien verifiziert (Screenshot-Zeitpunkt, vor/nach
+  // Fruehlauf, Wochenende ohne eigenen Lauf, Feiertag-Montag).
+  var now = new Date();
+  var d = new Date(now);
+  var firstRunHour = 3, firstRunMin = 37; // 03:37 UTC, s. market-aggregator.yml Lauf 1
+  var afterFirstRunToday = (now.getUTCHours() > firstRunHour) ||
+    (now.getUTCHours() === firstRunHour && now.getUTCMinutes() >= firstRunMin);
+  if (!afterFirstRunToday) d.setUTCDate(d.getUTCDate() - 1);
+  d.setUTCDate(d.getUTCDate() - 1); // Fruehlauf traegt den VORTag-Schlusskurs
   while (!isTradingDay(d)) d.setUTCDate(d.getUTCDate() - 1);
   var expected = d.toISOString().slice(0, 10);
 
