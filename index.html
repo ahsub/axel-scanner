@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260903-v487">          
+<meta name="version" content="20260904-v488">          
      <!-- CHANGELOG (neueste zuerst):                
      v487: Staleness-Heuristik-Fix (03.09.2026, Axel-Fund — GHA-Run zweimal
            nachweislich fehlerfrei gelaufen, Banner zeigte trotzdem "Daten
@@ -18485,6 +18485,11 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       ma200: state.ma200 || null,
       sepa: state.sepaScore || 0,
       bullCount: state.bullCount || 0,
+      // Handelsboerse/-zeit, aus market_aggregator.py (04.09.2026, KO-5-Fix) —
+      // fuer Gap-/Overnight-Risiko-Guardrail bei KO-Zertifikaten (ko-prompts.js
+      // v2.22.5). Fallback 'US', falls raw.homeMarket (alte KV-Snapshots vor
+      // dem Aggregator-Fix) noch fehlt.
+      homeMarket: raw.homeMarket || 'US',
       // Value-Felder (nur wenn vorhanden)
       pe: _vd.pe || null,
       pb: _vd.pb || null,
@@ -18619,6 +18624,7 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       + ' S:' + r.score
       + ' ' + r.bullCount + '/3'
       + ' SEPA:' + r.sepa
+      + ' Markt:' + r.homeMarket
       + (r.markov ? (function(){
           var m = r.markov;
           var reg = m.regime === 1 ? 'BULL' : m.regime === -1 ? 'BEAR' : 'SIDE';
@@ -18723,6 +18729,7 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     + '  S:XX           = Composite Score 0-100\n'
     + '  X/3            = Bullish-Signale (MACD/OBV/MA50)\n'
     + '  SEPA:X         = Minervini SEPA-Score 0-8\n'
+    + '  Markt:XX       = Handelsboerse/-zeit des Titels: US (NYSE/NASDAQ/OTC — GILT AUCH für ADRs nicht-amerikanischer Unternehmen wie SAP/ASML/RIO, da diese selbst auf US-Boersen handeln!) oder DE/FR/NL/IT/CH/UK/DK/SE/AU (Heimatboerse). Massgeblich fuer Zeitzonen-/Gap-Risiko ist AUSSCHLIESSLICH dieses Feld — NIEMALS aus dem Tickersymbol selbst erraten (z.B. Ticker "DE" = Deere & Co., NYSE, NICHT das Laenderkuerzel Deutschland).\n'
     + '  Markov2:REG(X%) σ±Y = Markov 2.0 Regime (Stride-sampled, statistisch korrekt). REG=BULL/BEAR/SIDE, X%=Stickiness (Persistenz des Regimes), σ=Signal (-1 bis +1: positiv=bullisch, negativ=bärisch)\n'
     + '  Filter:LONG_OK/SHORT_OK/FLAT = Markov 2.0 Filter-Mode. LONG_OK: Signal stark genug für Longs. FLAT: kein klares Signal → keine neuen Positionen empfohlen\n'
     + '  ★CSP-Setup = Markov bullisch UND IV hoch → optimales Prämien-Verkauf Setup\n'
@@ -26643,7 +26650,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4e2b895/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@764d175/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@be66d53/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1027955/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
