@@ -3,8 +3,58 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260906-v493">          
+<meta name="version" content="20260906-v495">          
      <!-- CHANGELOG (neueste zuerst):                
+     v495: UI-Paritaet Scanner-Tab ↔ Alpha Desk hergestellt (06.09.2026,
+           Axel-Auftrag). (1) Namens-Vereinheitlichung: Alpha-Desk-Tab
+           "🚀 Minervini" (long_minervini) → "📈 Momentum" (identisch zum
+           Scanner-Tab-Label und zu STRATEGIES.momentum.label in ko-
+           prompts.js) — bewusste Entscheidung fuer "Momentum" statt
+           "Minervini", da VCP/Breakout ebenfalls Minervini-Methodik nutzen,
+           aber keinen Methodennamen tragen; Konsistenz-Argument gewinnt.
+           Sekundaere "Minervini SEPA"-Erklaertexte in Ticker-Detail-Karten
+           (Zeile ~8537/19568) BEWUSST NICHT angefasst — anderer Kontext
+           (Faktor-Erklaerung, nicht Strategie-Auswahl), ausserhalb des
+           heutigen Auftrags, bei Bedarf spaeter. (2) Scanner-Tab-Dropdown
+           um 4 fehlende, bereits 9P-migrierte Strategien ergaenzt: Covered
+           Call (cc), Value (value), Breakdown (breakdown), KO-Short
+           (fading_short) — alle vier voll funktionsfaehig (openKiBriefing()
+           braucht anders als Alpha Desk keine eigene Scoring-Funktion pro
+           Strategie, nur STRATEGIES-Eintrag in ko-prompts.js, den alle vier
+           bereits haben). (3) Deaktivierter Platzhalter fuer "Fading Short"
+           (short_fading, ohne _ko) ergaenzt — hat KEINEN STRATEGIES-
+           Eintrag (offene Design-Frage seit 06.09. morgens), daher rein
+           visuell, disabled, eigene CSS-Klasse "ki-strat-btn-placeholder"
+           (NICHT "ki-strat-btn"), damit setKiStrat()s Reset-Loop ihn nicht
+           erfasst. (4) BUGFIX nebenbei: setKiStrat() hatte toten Sonder-
+           fall-Code fuer data-strat==="value" (dauerhaft gedimmt) aus einer
+           Zeit, als noch gar kein "value"-Button existierte — entfernt,
+           value faellt jetzt korrekt in den generischen Button-Reset wie
+           alle anderen normalen Strategien. Isoliert mit Node-Stubs
+           getestet (value/breakdown-Klick-Simulation, Platzhalter bleibt
+           bei fremden Klicks unveraendert, atmna behaelt sein Lila).
+     v494: "Breakdown" (short_breakdown) in Alpha Desk aktiviert (06.09.2026,
+           Axel-Entscheidung nach Bestandsaufnahme der drei verbliebenen
+           deaktivierten Leaderboard-Tabs). score_short_breakdown() lieferte
+           in market_aggregator.py seit jeher echte Scoring-Logik (Death-
+           Cross-Bereich, Distribution, Volumen-Bestätigung) — es fehlte nur
+           der STRATEGIES-Eintrag in ko-prompts.js (jetzt ergänzt, v2.45.0,
+           `breakdown`). short_breakdown aus allen drei betroffenen Listen
+           entfernt: renderAlphaLB()s _lbNoMetrics (Ticker-Chips zeigen jetzt
+           echte Daten statt Platzhaltertext), switchAlphaLB()s _noMetrics
+           (KI-Button nicht mehr gedimmt), runAlphaLbKI()s _noMetricsLBs
+           (KI-Button funktionsfähig). KoPrompts.stratFromLb('short_breakdown')
+           löst jetzt korrekt zu 'breakdown' auf. Isoliert mit Node-Stubs
+           getestet (renderAlphaLB + runAlphaLbKI beide fehlerfrei durch-
+           gelaufen). "Fading Short" (short_fading) und "KO-Short" (short_
+           fading_ko) bleiben bewusst weiterhin deaktiviert — beide brauchen
+           andere Art Folgearbeit (offene Design-Frage bzw. neue Scoring-
+           Funktion in market_aggregator.py), kein Prompt-Thema, für später
+           vorgemerkt. WICHTIG: der jsDelivr-CDN-Hash-Pin für ko-prompts.js
+           (aktuell @f6fef1b) muss nach dem Commit von v2.45.0 erneut
+           aktualisiert werden, sonst bleibt `breakdown` trotz dieses Fixes
+           unerreichbar (identisches Muster zum dividend/value-Fund von
+           heute frueh).
      v493: "Dividend Growth" im Scanner-Tab-Dropdown ergänzt (06.09.2026,
            Axel-Fund — Vollständigkeit: dividend war zwar in ko-prompts.js
            voll migriert und im Alpha-Desk-Leaderboard erreichbar, fehlte
@@ -3502,7 +3552,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
          ZUSAETZLICH dazu, ersetzt/versteckt sie nicht. -->
     <div style="font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:.4rem">STRATEGIE LEADERBOARDS</div>
     <div style="display:flex;gap:5px;flex-wrap:wrap" id="alpha-lb-tabs">
-      <button class="alpha-lb-tab active-lb" data-lb="long_minervini" onclick="switchAlphaLB(this,'long_minervini')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.12);color:var(--green);cursor:pointer">🚀 Minervini</button>
+      <button class="alpha-lb-tab active-lb" data-lb="long_minervini" onclick="switchAlphaLB(this,'long_minervini')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.12);color:var(--green);cursor:pointer">📈 Momentum</button>
       <button class="alpha-lb-tab" data-lb="long_swing" onclick="switchAlphaLB(this,'long_swing')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #06b6d4;background:rgba(6,182,212,0.08);color:#06b6d4;cursor:pointer">🔄 Swing</button>
       <button class="alpha-lb-tab" data-lb="long_mr" onclick="switchAlphaLB(this,'long_mr')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">↩️ Mean Rev.</button>
       <button class="alpha-lb-tab" data-lb="short_breakdown" onclick="switchAlphaLB(this,'short_breakdown')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--red);background:rgba(239,68,68,0.08);color:var(--red);cursor:pointer">📉 Breakdown</button>
@@ -19147,7 +19197,12 @@ function _initUICache() {
 
 
 function setKiStrat(btn) {
-  // Alle Buttons zurücksetzen - Options-EIC behält lila, Value bleibt gedimmt
+  // Alle Buttons zurücksetzen - Options-EIC (atmna) behält lila
+  // ENTFERNT (06.09.2026): der data-strat==='value'-Sonderfall (dauerhaft
+  // gedimmt) war toter Code — bis heute existierte gar kein "value"-Button
+  // im DOM. Jetzt, wo "value" ein echter, funktionsfähiger Button ist
+  // (s. Scanner-Tab-Dropdown-Ergänzung), fällt er korrekt in den generischen
+  // else-Zweig, genau wie alle anderen normalen Strategie-Buttons.
   document.querySelectorAll('.ki-strat-btn').forEach(function(b) {
     b.classList.remove('active-strat');
     b.style.background = 'transparent';
@@ -19155,10 +19210,6 @@ function setKiStrat(btn) {
       b.style.color = '#a371f7';
       b.style.borderColor = '#a371f7';
       b.style.opacity = '1';
-    } else if (b.dataset.strat === 'value') {
-      b.style.color = 'var(--text3)';
-      b.style.borderColor = 'var(--border2)';
-      b.style.opacity = '0.6';
     } else {
       b.style.color = 'var(--text2)';
       b.style.borderColor = 'var(--border2)';
@@ -19478,6 +19529,35 @@ function csvSaveConfirm(tickers) {
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #f59e42;background:transparent;color:#f59e42;cursor:pointer"
           title="Dividend Growth: Qualitäts-Dividendentitel · Income + optionale CSP-Unterlegung">
           💰 Dividend Growth
+        </button>
+        <button class="ki-strat-btn" data-strat="cc"
+          onclick="setKiStrat(this)"
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #f59e0b;background:transparent;color:#f59e0b;cursor:pointer"
+          title="Covered Call: Call-Writing auf Bestandspositionen · Buy-Write · Prämieneinnahme">
+          📝 Covered Call
+        </button>
+        <button class="ki-strat-btn" data-strat="value"
+          onclick="setKiStrat(this)"
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #94a3b8;background:transparent;color:#94a3b8;cursor:pointer"
+          title="Value Investing: Günstig bewertete Qualitätstitel · peForward, P/B, FCF-Yield">
+          📊 Value
+        </button>
+        <button class="ki-strat-btn" data-strat="breakdown"
+          onclick="setKiStrat(this)"
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer"
+          title="Breakdown (Short): Death-Cross-Bereich · Distribution · technischer Abwärtstrend">
+          📉 Breakdown
+        </button>
+        <button class="ki-strat-btn" data-strat="fading_short"
+          onclick="setKiStrat(this)"
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer"
+          title="KO-Short (experimentell): KO-Zertifikat Short-Richtung · Gegentrend · BULL_FRAGILE/STRESS_UNSTABLE">
+          ⚠️ KO-Short 🧪
+        </button>
+        <button class="ki-strat-btn-placeholder" disabled
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:not-allowed;opacity:0.5"
+          title="Fading Short: noch keine STRATEGIES-Zuordnung — offene Design-Entscheidung (entfernen/mit KO-Short zusammenführen/eigenständig aufsetzen), s. Übergabeprotokoll 06.09.2026">
+          🔝 Fading Short (Platzhalter)
         </button>
       </div>
       <div id="ki-strat-hint" style="font-size:10px;color:var(--text3);margin-top:.4rem">
@@ -25473,8 +25553,11 @@ function renderAlphaLB(lb, key) {
 
   // Option 2 (17.07.2026): Leaderboards ohne definierte Bewertungsmetriken
   // zeigen Hinweistext statt Ticker-Chips — ehrlicher als Daten ohne Qualitätsbasis.
+  // ENTFERNT (06.09.2026): short_breakdown — score_short_breakdown() liefert
+  // seit jeher echte Scoring-Logik, es fehlte nur der STRATEGIES-Eintrag in
+  // ko-prompts.js fuer die KI-Analyse (jetzt ergaenzt, v2.45.0). Chips zeigen
+  // also ab sofort echte Daten statt Platzhaltertext.
   var _lbNoMetrics = {
-    short_breakdown: 'Breakdown',
     short_fading_ko: 'KO-Short',
   };
   if (_lbNoMetrics[key]) {
@@ -25574,7 +25657,10 @@ function switchAlphaLB(btn, key) {
   // ERGÄNZT (06.09.2026): short_fading (s. Kommentar in runAlphaLbKI()) —
   // nur der KI-Analyse-Button, NICHT die Ticker-Chip-Liste (die hat echte
   // sFading-Daten und bleibt unveraendert sichtbar, s. renderAlphaLB()).
-  var _noMetrics = ['short_breakdown','short_fading_ko','short_fading'];
+  // ENTFERNT (06.09.2026): short_breakdown — hat jetzt einen STRATEGIES-
+  // Eintrag (ko-prompts.js v2.45.0, `breakdown`), KI-Button wird nicht mehr
+  // gedimmt.
+  var _noMetrics = ['short_fading_ko','short_fading'];
   var kiBtn = document.querySelector('#alpha-lb-section button[onclick="runAlphaLbKI()"]');
   var kiStatus = document.getElementById('alpha-lb-ki-status');
   if (kiBtn) {
@@ -25702,13 +25788,15 @@ async function runAlphaLbKI() {
   // Modell bekam dadurch widersprüchliche Signale und erfand sich selbst
   // eine "SHORT_FADING-Strategie"-Beschreibung, die in keiner echten
   // Instruktion vorkam — live beobachtet, kein hypothetisches Risiko.
-  // Sofortmaßnahme: Button deaktivieren wie bei short_fading_ko/
-  // short_breakdown, bis geklärt ist, ob short_fading entfernt, mit
-  // short_fading_ko zusammengeführt oder als eigenständiges Konzept mit
-  // eigenem STRATEGIES-Eintrag neu aufgesetzt wird (Design-Entscheidung,
-  // noch offen).
+  // Sofortmaßnahme: Button deaktivieren wie bei short_fading_ko, bis
+  // geklärt ist, ob short_fading entfernt, mit short_fading_ko
+  // zusammengeführt oder als eigenständiges Konzept mit eigenem
+  // STRATEGIES-Eintrag neu aufgesetzt wird (Design-Entscheidung, noch offen).
+  // ENTFERNT (06.09.2026): short_breakdown — hat jetzt einen echten
+  // STRATEGIES-Eintrag (ko-prompts.js v2.45.0, `breakdown`,
+  // stratFromLb('short_breakdown') löst korrekt auf), KI-Button ist ab
+  // sofort funktionsfähig.
   var _noMetricsLBs = {
-    short_breakdown: 'Breakdown',
     short_fading_ko: 'KO-Short',
     short_fading: 'Fading Short',
   };
@@ -26866,7 +26954,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4e2b895/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6fef1b/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@277bcb9/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1027955/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
