@@ -3,8 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260906-v489">          
+<meta name="version" content="20260906-v490">          
      <!-- CHANGELOG (neueste zuerst):                
+     v490: "short_fading"-Mislabeling-Bug gefixt (06.09.2026, Axel-Fund, live
+           beobachtet in Alpha Desk). Root Cause: die Alt-Kachel "🔝 Fading
+           Short" (data-lb="short_fading", aus der Zeit vor "short_fading_ko")
+           hat KEINEN STRATEGIES[...]-Eintrag — nur "short_fading_ko" matcht
+           STRATEGIES.fading_short.lbKey. KoPrompts.stratFromLb('short_fading')
+           gab dadurch still null zurück, runAlphaLbKI() fiel unbemerkt auf
+           'momentum' zurück (Titel + Instruktionen = Momentum-Config, aber
+           Kandidaten-Kontext-Header blieb "SHORT_FADING") — das Modell bekam
+           widersprüchliche Signale und erfand sich selbst eine "SHORT_FADING-
+           Strategie"-Beschreibung, die in keiner echten Instruktion vorkam.
+           Sofortmaßnahme (Design-Entscheidung zu short_fadings Zukunft noch
+           offen — entfernen, mit short_fading_ko zusammenführen, oder
+           eigener STRATEGIES-Eintrag): KI-Analyse-Button für short_fading
+           deaktiviert, analog zu short_fading_ko/short_breakdown, in BEIDEN
+           dafür zuständigen Listen (runAlphaLbKI()s _noMetricsLBs, switch-
+           AlphaLB()s _noMetrics-Array). BEWUSST NICHT angefasst: render-
+           AlphaLB()s _lbNoMetrics-Liste — die Ticker-Chip-Anzeige für
+           short_fading nutzt echte sFading-Scoredaten und bleibt unverändert
+           sichtbar; nur die KI-Kommentierung war betroffen, nicht das
+           Leaderboard selbst.
      v489: Fehlende Kandidaten-Felder in KI-Briefing-Datenpfad nachgetragen
            (06.09.2026, Fund aus Mean-Reversion-/VCP-/Swing-Live-Tests — Claude-
            Diagnose). Root Cause ueber DREI Ebenen: (1) openKiBriefing()s
@@ -25483,7 +25503,10 @@ function switchAlphaLB(btn, key) {
   // KI-Analyse nur auf expliziten Nutzer-Wunsch.
 
   // U5/U7 (16.07.2026): KI-Button visuell dimmen wenn keine Metriken definiert
-  var _noMetrics = ['short_breakdown','short_fading_ko'];
+  // ERGÄNZT (06.09.2026): short_fading (s. Kommentar in runAlphaLbKI()) —
+  // nur der KI-Analyse-Button, NICHT die Ticker-Chip-Liste (die hat echte
+  // sFading-Daten und bleibt unveraendert sichtbar, s. renderAlphaLB()).
+  var _noMetrics = ['short_breakdown','short_fading_ko','short_fading'];
   var kiBtn = document.querySelector('#alpha-lb-section button[onclick="runAlphaLbKI()"]');
   var kiStatus = document.getElementById('alpha-lb-ki-status');
   if (kiBtn) {
@@ -25602,9 +25625,24 @@ async function runAlphaLbKI() {
   // U5/U7 (16.07.2026): Leaderboards ohne definierte Bewertungsmetriken
   // zeigen einen klaren Hinweis statt eine generische KI-Analyse zu starten,
   // die auf ungeeigneter Datengrundlage basieren würde.
+  // ERGÄNZT (06.09.2026, Axel-Fund): "short_fading" (Kachel "🔝 Fading Short",
+  // Alt-ID aus der Zeit vor "short_fading_ko") hat KEINEN STRATEGIES[...]-
+  // Eintrag (nur "short_fading_ko" matcht STRATEGIES.fading_short.lbKey) —
+  // KoPrompts.stratFromLb('short_fading') gab dadurch still null zurück,
+  // runAlphaLbKI() fiel unbemerkt auf 'momentum' zurück (Titel/Instruktionen
+  // = Momentum-Config, Kandidaten-Kontext-Header = "SHORT_FADING"). Das
+  // Modell bekam dadurch widersprüchliche Signale und erfand sich selbst
+  // eine "SHORT_FADING-Strategie"-Beschreibung, die in keiner echten
+  // Instruktion vorkam — live beobachtet, kein hypothetisches Risiko.
+  // Sofortmaßnahme: Button deaktivieren wie bei short_fading_ko/
+  // short_breakdown, bis geklärt ist, ob short_fading entfernt, mit
+  // short_fading_ko zusammengeführt oder als eigenständiges Konzept mit
+  // eigenem STRATEGIES-Eintrag neu aufgesetzt wird (Design-Entscheidung,
+  // noch offen).
   var _noMetricsLBs = {
     short_breakdown: 'Breakdown',
     short_fading_ko: 'KO-Short',
+    short_fading: 'Fading Short',
   };
   if (_noMetricsLBs[_alphaLB]) {
     if (statusEl) statusEl.innerHTML =
