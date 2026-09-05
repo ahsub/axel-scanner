@@ -3,8 +3,43 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260906-v490">          
+<meta name="version" content="20260906-v491">          
      <!-- CHANGELOG (neueste zuerst):                
+     v491: SINGLE-SOURCE-OF-TRUTH-UMBAU runAlphaLbKI() (06.09.2026, Axel-'
+           Entscheidung nach Architektur-Bestandsaufnahme). Root Cause: von '
+           VIER Entry-Points fuer KI-Strategieanalyse (Scanner-Tab openKi-'
+           Briefing(), Options-Desk runOptionsKiBriefing(), Alpha Desk '
+           Leaderboard-Reihe runAlphaLbKI(), sowie der separate runValueKi-'
+           Briefing()) lief NUR runAlphaLbKI() noch ueber die alte, deutlich '
+           schwaecher abgesicherte getKiSystemPrompt()-Familie (kein 9-'
+           Punkte-Schema, kein REASONING-GUARDRAILS-Block, keine Ticker-'
+           Scope-Sperre) — UND ZWAR FUER ALLE 13 LEADERBOARD-TABS, nicht nur '
+           die Equity-Strategien: options_csp/options_cc (obwohl fuer diese '
+           beiden Strategien im separaten Options-Desk-Tab bereits ein '
+           sauberer 9-Punkte-Pfad existiert) liefen HIER parallel weiterhin '
+           unge haertet. FIX: runAlphaLbKI() ruft jetzt KoPrompts.get(strat, '
+           ctx) statt getKiSystemPrompt() auf, ctx.marktkontext traegt '
+           dieselbe (bereits gut ausgebaute) tickerLines-Kandidatenliste wie '
+           zuvor, nur als Text eingebettet statt in eine zweite Prompt-'
+           Familie einzuspeisen. ZUSATZFIX (selbe Gelegenheit): der stille '
+           Fallback auf 'momentum', wenn stratFromLb() nichts findet — genau '
+           die Ursache des in v490 gefixten short_fading-Mislabeling-Bugs — '
+           komplett entfernt; ein unbekanntes Leaderboard zeigt jetzt einen '
+           klaren Fehler statt eine falsche Strategie-Config zu verwenden. '
+           Drei Testfaelle isoliert mit Node-Stubs verifiziert (normaler '
+           Fall inkl. vollstaendigem ctx.marktkontext, bekannte _noMetricsLBs-'
+           Blockade, neues Sicherheitsnetz bei unbekannter Zuordnung). '
+           BEKANNTE, BEWUSST ZURUECKGESTELLTE LUECKE: market_aggregator.pys '
+           build_leaderboards()/top20() liefert kein homeMarket-Feld in der '
+           _core-Liste — KO-Longs Gap-/Overnight-Risiko-Guardrail bekommt '
+           dadurch ueber DIESEN Pfad noch keine echten Daten (Fallback-'
+           Verhalten in ko-prompts.js greift, aber ungetestet ueber Alpha '
+           Desk). Separater Fix, noch offen. NAECHSTER SCHRITT: dividend/'
+           value muessen noch in ko-prompts.js auf `_publicNinePointPrompt()` '
+           migriert werden — sie werden durch diesen Fix jetzt zum ersten '
+           Mal ueberhaupt live erreichbar (vorher: kein funktionierender '
+           Pfad ueberhaupt), laufen aber inhaltlich noch auf dem alten '
+           `_publicEquityPrompt()`-Stand.
      v490: "short_fading"-Mislabeling-Bug gefixt (06.09.2026, Axel-Fund, live
            beobachtet in Alpha Desk). Root Cause: die Alt-Kachel "🔝 Fading
            Short" (data-lb="short_fading", aus der Zeit vor "short_fading_ko")
@@ -25651,7 +25686,18 @@ async function runAlphaLbKI() {
     return;
   }
 
-  var strat = (typeof KoPrompts !== 'undefined' && KoPrompts.stratFromLb) ? (KoPrompts.stratFromLb(_alphaLB) || 'momentum') : 'momentum';
+  var strat = (typeof KoPrompts !== 'undefined' && KoPrompts.stratFromLb) ? KoPrompts.stratFromLb(_alphaLB) : null;
+  // FIX (06.09.2026, Single-Source-of-Truth-Umbau — s. Kommentar oben):
+  // KEIN stiller Fallback auf 'momentum' mehr, falls stratFromLb() nichts
+  // findet. Genau dieser Fallback war die Ursache des short_fading-Mis-
+  // labeling-Bugs (v490) — auch wenn _noMetricsLBs jetzt alle bekannten
+  // Luecken abdeckt, soll ein kuenftiger neuer Leaderboard-Tab ohne
+  // STRATEGIES-Eintrag einen klaren Fehler zeigen statt still eine falsche
+  // Strategie-Config zu verwenden.
+  if (!strat) {
+    if (statusEl) statusEl.textContent = 'Keine Strategie-Zuordnung für "' + _alphaLB + '" gefunden.';
+    return;
+  }
   var stratCfg = (typeof KI_STRAT_CONFIG !== 'undefined') ? KI_STRAT_CONFIG[strat] : null;
   if (!stratCfg) { if (statusEl) statusEl.textContent = 'Strategie-Config fehlt'; return; }
   if (statusEl) statusEl.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;display:inline-block"></i> Analysiere…';
@@ -25681,6 +25727,10 @@ async function runAlphaLbKI() {
     if (t.bbPos  != null) line += ' BBPos:' + t.bbPos.toFixed(2);
     if (t.rsRating != null) line += ' RS:' + t.rsRating;
     if (t.overheat != null) line += ' Overheat:' + t.overheat;
+    // homeMarket NOCH NICHT im KV-Leaderboard-Payload enthalten (market_aggregator.py
+    // build_leaderboards()/top20()s _core-Liste hat es nicht — separater, bewusst
+    // zurückgestellter Fix, s. Kommentar in ko-prompts.js-Changelog 06.09.2026).
+    if (t.homeMarket != null) line += ' Markt:' + t.homeMarket;
     // VCP-spezifische Felder
     if (t.vcpContractions != null) line += ' VCP-C:' + t.vcpContractions;
     if (t.vcpLastPct != null) line += ' VCP-Last:' + t.vcpLastPct + '%';
@@ -25705,9 +25755,24 @@ async function runAlphaLbKI() {
     }
     return line;
   }).join('\n');
-  var ctx = 'MARKTKONTEXT:\nVIX: ' + vix + '\nRegime (MSE): ' + mseRegime + '\nMarkov: ' + regime + '\n\nKANDIDATEN ' + _alphaLB.toUpperCase() + ' (Top-' + tickers.length + '):\n' + tickerLines;
+  // FIX (06.09.2026, Single-Source-of-Truth-Umbau, Axel-Entscheidung): vorher
+  // wurde hier getKiSystemPrompt() aufgerufen — die separate, deutlich
+  // schwaecher abgesicherte _getSystemPrompt()-Familie (kein 9-Punkte-Schema,
+  // kein REASONING-GUARDRAILS-Block, keine Ticker-Scope-Sperre). Jetzt:
+  // KoPrompts.get(strat, ctx) wie bei openKiBriefing()/runOptionsKiBriefing()
+  // — dieselbe Kandidatenliste (tickerLines) wird nur noch als ctx.marktkontext
+  // eingebettet, STATT eine eigene, zweite Prompt-Familie zu bedienen.
   var isExpert = (typeof _expertModeActive !== 'undefined' && _expertModeActive && _eicUnlocked);
-  var prompt = getKiSystemPrompt('Strategie-Leaderboard: ' + stratCfg.label) + '\n\nMESSWERTE:\n' + ctx + '\n\nANALYSE-PERSPEKTIVE: ' + stratCfg.label + '\nFokus: ' + (stratCfg.focus ? stratCfg.focus.join(', ') : '') + '\n\nListe die Top-5 Kandidaten mit je 2 Saetzen: Warum passt dieser Titel heute zu ' + stratCfg.label + '? Welcher konkrete Trigger fehlt noch oder ist bereits aktiv?';
+  var ctx = {
+    marktkontext: 'MARKTKONTEXT:\nVIX: ' + vix + '\nRegime (MSE): ' + mseRegime + '\nMarkov: ' + regime
+      + '\n\nKANDIDATEN ' + _alphaLB.toUpperCase() + ' (Top-' + tickers.length + '):\n' + tickerLines,
+    isEic: isExpert
+  };
+  var prompt = (typeof KoPrompts !== 'undefined' && KoPrompts.get) ? KoPrompts.get(strat, ctx) : null;
+  if (!prompt) {
+    if (statusEl) statusEl.textContent = 'Fehler: Prompt für Strategie "' + strat + '" konnte nicht erstellt werden.';
+    return;
+  }
   try {
     var result = await koAiCall('ki_briefing', prompt, isExpert);
     // Ergebnis in Modal anzeigen (analog zu runOptionsKiBriefing)
