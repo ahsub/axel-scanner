@@ -3,8 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260906-v491">          
+<meta name="version" content="20260906-v493">          
      <!-- CHANGELOG (neueste zuerst):                
+     v493: "Dividend Growth" im Scanner-Tab-Dropdown ergänzt (06.09.2026,
+           Axel-Fund — Vollständigkeit: dividend war zwar in ko-prompts.js
+           voll migriert und im Alpha-Desk-Leaderboard erreichbar, fehlte
+           aber im Scanner-Tab "KI-Strategieempfehlung"-Menü, obwohl 10 der
+           inzwischen 14 Strategien dort bereits gelistet waren). Neuer
+           ki-strat-btn (data-strat="dividend", Farbe #f59e42 passend zu
+           STRATEGIES.dividend.color in ko-prompts.js) nach "Options Weekly"
+           ergänzt. Keine weiteren Änderungen nötig — KI_STRAT_CONFIG wird
+           dynamisch aus KoPrompts.STRATEGIES befüllt, Label/Hint kommen
+           automatisch aus ko-prompts.js. Beim Durchsehen entdeckt (nicht
+           behoben, nur notiert): setKiStrat() enthält bereits toten Code
+           für einen data-strat="value"-Sonderfall (gedimmte Darstellung),
+           obwohl kein solcher Button je im DOM existierte — vermutlich
+           Rest einer frueheren, nie fertiggestellten Planung. Value bleibt
+           bewusst nur ueber Alpha Desk erreichbar, nicht im Scanner-Tab
+           (nicht Teil des heutigen Auftrags).
+     v492: Fehlende Pflicht-Fusszeile im Alpha-Desk-KI-Modal ergaenzt (06.09.
+           2026, Axel-Fund im ersten dividend-Live-Test). Kein Prompt-Fehler:
+           runAlphaLbKI() baut sein Ergebnis-Modal komplett eigenstaendig auf
+           (separat von openKiBriefing()s Template) und hatte dabei nie die
+           Pflicht-Fusszeile ("Daten-Synthese · Keine Anlageberatung gem. §1
+           WpHG · Eigene Prüfung erforderlich" / "Strategy Fit ≠ Gewinnwahr-
+           scheinlichkeit ≠ Anlageempfehlung") uebernommen, die openKi-
+           Briefing()s Modal seit jeher fest im HTML hat. Die KI hat hier
+           nichts falsch gemacht — die Fusszeile war noch nie Teil des
+           generierten Texts, sondern immer ein statisches UI-Element, das
+           in diesem separaten Modal-Aufbau schlicht fehlte. Ergaenzt.
      v491: SINGLE-SOURCE-OF-TRUTH-UMBAU runAlphaLbKI() (06.09.2026, Axel-'
            Entscheidung nach Architektur-Bestandsaufnahme). Root Cause: von '
            VIER Entry-Points fuer KI-Strategieanalyse (Scanner-Tab openKi-'
@@ -19446,6 +19473,12 @@ function csvSaveConfirm(tickers) {
           title="Options Weekly: Diagonal Put-Spread · ATM-Short + Long-Versicherung · Weekly Income">
           📅 Options Weekly
         </button>
+        <button class="ki-strat-btn" data-strat="dividend"
+          onclick="setKiStrat(this)"
+          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid #f59e42;background:transparent;color:#f59e42;cursor:pointer"
+          title="Dividend Growth: Qualitäts-Dividendentitel · Income + optionale CSP-Unterlegung">
+          💰 Dividend Growth
+        </button>
       </div>
       <div id="ki-strat-hint" style="font-size:10px;color:var(--text3);margin-top:.4rem">
         ⚡ KO-Trading: Hebel 3–8x · KO-Abstand · Positionsgröße max. €2.000
@@ -25786,7 +25819,17 @@ async function runAlphaLbKI() {
       + '<div><div style="font-size:13px;font-weight:700">KI-basierte Markt-Einschätzung &mdash; ' + stratCfg.label + '</div>'
       + '<div style="font-size:11px;color:var(--text3)">' + _alphaLB + ' &middot; Top-' + tickers.length + ' Kandidaten</div></div>'
       + '<button onclick="document.getElementById(\'ki-modal\').remove()" style="background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer">&times;</button>'
-      + '</div><div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.6">' + result + '</div></div>';
+      + '</div><div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.6">' + result + '</div>'
+      // FIX (06.09.2026, Axel-Fund): dieser Modal-Aufbau ist komplett
+      // eigenstaendig (nicht das Template von openKiBriefing()) und hatte
+      // dadurch NIE die Pflicht-Fusszeile, die openKiBriefing()s Modal
+      // (Zeile ~19460) fest eingebaut hat. Kein Prompt-Fehler — die KI hat
+      // hier nichts falsch gemacht, die Fusszeile war noch nie Teil des
+      // generierten Texts, sondern immer ein statisches UI-Element.
+      + '<div style="padding:.75rem 0 0;margin-top:.75rem;border-top:0.5px solid var(--border);font-size:10px;color:var(--text3)">'
+      + 'Daten-Synthese · Keine Anlageberatung gem. §1 WpHG · Eigene Prüfung erforderlich<br>'
+      + 'Strategy Fit ≠ Gewinnwahrscheinlichkeit ≠ Anlageempfehlung'
+      + '</div></div>';
     document.body.appendChild(modal);
     modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
     if (statusEl) statusEl.textContent = '\u2713 ' + stratCfg.label;
@@ -26823,7 +26866,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4e2b895/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6fef1b/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1e58ae7/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1027955/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
