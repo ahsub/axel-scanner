@@ -3,8 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260904-v488">          
+<meta name="version" content="20260906-v489">          
      <!-- CHANGELOG (neueste zuerst):                
+     v489: Fehlende Kandidaten-Felder in KI-Briefing-Datenpfad nachgetragen
+           (06.09.2026, Fund aus Mean-Reversion-/VCP-/Swing-Live-Tests — Claude-
+           Diagnose). Root Cause ueber DREI Ebenen: (1) openKiBriefing()s
+           topResults.push() kopierte nur einen Teil der Felder aus state/raw
+           (score, grade, price, ma200, sepa, bullCount, homeMarket, markov,
+           er, rs, dist52wHigh, ivp, fibo) — RSI, ATR, rohes HVP, MACD, OBV,
+           volRatio, 52W-High/Low sowie ALLE VCP-spezifischen Felder
+           (vcpContractions/vcpLastPct/vcpVolContraction/vcpBreakoutVol) und
+           rsRating/tightnessPct gingen dabei verloren, obwohl buildParameter-
+           Pool() sie erwartet. (2) buildParameterPool() selbst hatte zusaetzlich
+           GAR KEINE Zuordnung fuer rsRating/tightnessPct/VCP-Felder — auch wenn
+           topResults sie geliefert haette, waeren sie hier verworfen worden.
+           (3) formatPoolForPrompt()s sections-Liste kannte diese Felder
+           ebenfalls nicht, haette sie also selbst bei korrekter Befuellung
+           nicht in den Prompt-Text aufgenommen. Alle drei Ebenen gefixt: neue
+           Felder in topResults.push() ergaenzt, buildParameterPool() um
+           rsRating/tightnessPct/vcp* erweitert, formatPoolForPrompt() um neue
+           Sektion "REL.STAERKE/VCP" ergaenzt. Betraf ALLE Equity-Strategien
+           gleichermassen (nicht nur VCP) — erklaert u.a. warum RSI in mehreren
+           9-Punkte-Live-Tests (breakout/vcp/swing/meanrev) komplett fehlte und
+           HVP nur zufaellig ueber den ivp-Fallback auftauchte. Separater, NOCH
+           OFFENER Befund (nicht Teil dieses Fixes): die Kandidaten-AUSWAHL
+           selbst bleibt fuer alle Equity-Strategien generisch nach
+           compositeScore sortiert (nur options/atmna/weekly_income haben eine
+           eigene Vorfilterung) — obwohl bereits strategie-eigene Scores
+           (sMinervini/sSwing/sMrLong/sBreakdown/sFading) serverseitig
+           existieren und in buildParameterPool() gelesen, aber nirgends zur
+           Sortierung/Auswahl genutzt werden. Erklaert, warum praktisch
+           identische Top-3-Kandidaten (VOD/GLEN.L/VLO) bei mehreren,
+           strukturell unterschiedlichen Strategien auftauchten. Bewusst
+           zurueckgestellt als eigene Design-Entscheidung (welcher Score fuer
+           welche Strategie, Filter vs. Neusortierung, Strategien ohne eigenen
+           Score wie breakout/vcp/ko/dividend/value).
      v487: Staleness-Heuristik-Fix (03.09.2026, Axel-Fund — GHA-Run zweimal
            nachweislich fehlerfrei gelaufen, Banner zeigte trotzdem "Daten
            veraltet"). Root Cause: _checkDataFreshnessDateHeuristic() ging
@@ -18490,6 +18523,32 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       // v2.22.5). Fallback 'US', falls raw.homeMarket (alte KV-Snapshots vor
       // dem Aggregator-Fix) noch fehlt.
       homeMarket: raw.homeMarket || 'US',
+      // NACHGETRAGEN (06.09.2026, Backlog-Fund aus Mean-Reversion-/VCP-/Swing-
+      // Live-Tests): buildParameterPool() erwartet diese Felder (r.rsi, r.atr,
+      // r.hvp, r.macdHist/r.histVal, r.obvSlope/r.obvTrend, r.volRatio,
+      // r.high52w/r.low52w, r.vcp*, r.rsRating, r.tightnessPct), sie wurden
+      // bisher aber NIE aus state/raw hierher kopiert — RSI/HVP/VCP-spezifische
+      // Kennzahlen erreichten den KI-Prompt dadurch nie, unabhaengig von der
+      // gewaehlten Strategie. Root Cause identifiziert, hier geschlossen.
+      rsi:          state.rsi   != null ? state.rsi   : (raw.rsi != null ? raw.rsi : null),
+      atr:          state.atr   != null ? state.atr   : (raw.atr != null ? raw.atr : null),
+      hvp:          raw.hvp != null ? raw.hvp : null,
+      macdHist:     state.histVal != null ? state.histVal : (raw.macd_hist != null ? raw.macd_hist : null),
+      macdBull:     state.macdBull != null ? state.macdBull : null,
+      obvTrend:     state.obvSlope != null ? state.obvSlope : (raw.obv_slope_5d != null ? raw.obv_slope_5d : null),
+      obvBull:      state.obvBull != null ? state.obvBull : null,
+      volRatio:     state.volRatio != null ? state.volRatio : (raw.volume_ratio != null ? raw.volume_ratio : null),
+      high52w:      state.high52w != null ? state.high52w : null,
+      low52w:       state.low52w  != null ? state.low52w  : null,
+      above50:      state.above50 != null ? state.above50 : null,
+      rsRating:     raw.rsRating != null ? raw.rsRating : null,
+      tightnessPct: raw.tightnessPct != null ? raw.tightnessPct : null,
+      vcpDetected:      raw.vcpDetected      || false,
+      vcpContractions:  raw.vcpContractions  || 0,
+      vcpLastPct:       raw.vcpLastPct       != null ? raw.vcpLastPct       : null,
+      vcpAvgPrevPct:    raw.vcpAvgPrevPct    != null ? raw.vcpAvgPrevPct    : null,
+      vcpVolContraction: raw.vcpVolContraction != null ? raw.vcpVolContraction : null,
+      vcpBreakoutVol:   raw.vcpBreakoutVol   != null ? raw.vcpBreakoutVol   : null,
       // Value-Felder (nur wenn vorhanden)
       pe: _vd.pe || null,
       pb: _vd.pb || null,
@@ -23664,6 +23723,16 @@ function buildParameterPool(r) {
     low52:        r.low52w  || r.low52,
     dist52wHigh:  r.dist52wHigh || r.dist52h || r.pctFromHigh52,
 
+    // ── RELATIVE STÄRKE / VCP (nachgetragen 06.09.2026, s. topResults-Fix) ────
+    rsRating:     r.rsRating != null ? r.rsRating : null,
+    tightnessPct: r.tightnessPct != null ? r.tightnessPct : null,
+    vcpDetected:      r.vcpDetected || false,
+    vcpContractions:  r.vcpContractions || 0,
+    vcpLastPct:       r.vcpLastPct != null ? r.vcpLastPct : null,
+    vcpAvgPrevPct:    r.vcpAvgPrevPct != null ? r.vcpAvgPrevPct : null,
+    vcpVolContraction:r.vcpVolContraction != null ? r.vcpVolContraction : null,
+    vcpBreakoutVol:   r.vcpBreakoutVol != null ? r.vcpBreakoutVol : null,
+
     // ── MARKOV REGIME ─────────────────────────────────────────────────────────
     regime:       r._markov ? (r._markov.regime===1?'BULL':r._markov.regime===-1?'BEAR':'SIDE') : r.regime,
     pBull2Bear:   r._markov ? r._markov.pBull2Bear : r.pBull2Bear,
@@ -23718,6 +23787,7 @@ function formatPoolForPrompt(pool, strategy) {
     'OPTIONS-STRIKES':['strikeCSP','strikeCC','strikeMR'],
     'VOLUMEN/FLOW':  ['volRatio','bullSignals'],
     '52W-RANGE':     ['high52','low52','dist52wHigh'],
+    'REL.STÄRKE/VCP':['rsRating','tightnessPct','vcpDetected','vcpContractions','vcpLastPct','vcpAvgPrevPct','vcpVolContraction','vcpBreakoutVol'],
     'MARKOV-REGIME': ['regime','pBull2Bear','regimeWarn'],
     'STRAT-SCORES':  ['sMinervini','sSwing','sMrLong','sBreakdown','sFading'],
     'IOS-FOUNDATION':['iosScore','iosRating','iosDecision','iosQuality','iosEntry','iosIsLeader','iosSummary'],
