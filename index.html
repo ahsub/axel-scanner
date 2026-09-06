@@ -19094,8 +19094,17 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       var ema200flag = d200 < -15 ? '🔴' : d200 < -5 ? '🟡' : d200 <= 5 ? '🟢' : d200 < 20 ? '🟡' : '🔴';
       line += ' EMA200-Kurs:$' + r.ma200.toFixed(0) + '(' + (d200>=0?'+':'') + d200 + '%' + ema200flag + ')';
     }
-    // RS-Rating vs S&P500 (nur wenn vorhanden)
-    if(r.rs != null) line += ' RS:' + r.rs;
+    // RS-Rating vs S&P500 (Feld-Audit-Fund): rsRating (server-seitig, IBD-Stil
+    // 0-99-Perzentil-Rating, aus market_aggregator.py/KV-Pfad) und rs (client-
+    // seitig live berechnete rohe relative Performance in %, calcRS()) sind
+    // ZWEI unterschiedliche Felder aus zwei sich nie ueberschneidenden Pfaden
+    // (KV/Aggregator setzt nie raw.rs, Live-Scan setzt nie raw.rsRating) — vorher
+    // wurde hier ausschliesslich r.rs geprueft, wodurch im KV-Regelfall (Scanner-
+    // Tab-Hauptpfad) NIE ein RS-Wert im Prompt ankam, obwohl rsRating laengst
+    // korrekt vorlag. rsRating hat Vorrang (passt zur DATA_LEGENDE-Beschreibung
+    // "0-100"), rs bleibt Live-Scan-Fallback wenn rsRating fehlt.
+    if(r.rsRating != null) line += ' RS-Rating:' + r.rsRating;
+    else if(r.rs != null) line += ' RS:' + r.rs;
     // ATR + Strike-Berechnung (für EIC Options-Empfehlung)
     if(r.atr && r.price) {
       var strikeCSP = r.ma200 ? (r.ma200 - 1.5 * r.atr).toFixed(2) : null;
@@ -19217,7 +19226,8 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     + '  ⚡LabelWarn = Markov Label-Verifikation fehlgeschlagen → Regime-Signal mit Vorsicht interpretieren\n'
     + '  ER:Xd          = Earnings in X Tagen\n'
     + '  EMA200-Kurs:$XX= 200-Tage-EMA Kurswert (≠ Handelskurs!)\n'
-    + '  RS:XX          = Relative Stärke vs S&P500 (0-100)\n'
+    + '  RS-Rating:XX   = Relative Staerke-Rating vs Gesamtmarkt, IBD-Stil-Perzentil-Rating (0-99, hoeher=staerker)\n'
+    + '  RS:XX          = Relative Performance vs S&P500 in % (Live-Scan-Modus, ROH-Prozentwert, kann negativ sein — NICHT mit RS-Rating verwechseln)\n'
     + '  52W-H:X%       = Abstand vom 52-Wochen-Hoch\n'
     + '  HVP:XX%        = Historical Volatility Percentile (NÄHERUNG — kein echter IV-Rank!). >50%: erhöhte Vola → CSP-Prämien tendenziell höher. <30%: niedrige Vola → CSP meiden. Wenn HVP fehlt: NIEMALS IV-Wert erfinden.\n'
     + '  Fibo:zone(X%)  = Fibonacci-Zone\n'
