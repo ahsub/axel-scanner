@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260907-v502">          
+<meta name="version" content="20260907-v503">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -25,6 +25,31 @@
      7. runAlphaLbKI()s tickerLines-Bauschleife — Alpha-Desk-eigener Pfad.
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
+     <!-- CHANGELOG (neueste zuerst):                
+     v503: kvToScannerState()-Inline-Fallback (CDN-Ausfallpfad, aktiv nur wenn
+           ko-kv-state.js nicht laedt) nachgeruestet — Feld-Audit-Vollcheck
+           ergab, dass die urspruengliche Annahme "alle 26 Felder fehlen hier
+           komplett" FALSCH war (eigener Fehler: Fenster der ersten Pruefung zu
+           klein). Tatsaechlich fehlten nur: homeMarket (KO-5-Gap-Risiko-
+           relevant!), die sechs neuen IVP-Felder (ivpPercentile/ivpDays/
+           ivpCurIv/ivpHv20/50/100 — externe Quelle, s. v501/v502), sowie
+           breakout/vcp/ko im strategyScores-Objekt (existierten dort noch nie,
+           auch nicht in den anderen beiden Stellen mit demselben Objektliteral
+           — anders als long_dividend/long_value, die seit Backlog #13b,
+           29.07.2026, da sind). WICHTIGER Zusatzfund: tickerLists Objekt-Zweig
+           (if(r.strategyScores){...}) fragte bisher NUR die urspruenglichen 5
+           Strategien ab — long_dividend/long_value waren im CDN-Fallback zwar
+           laengst vorhanden, kamen aber trotzdem nie im Prompt an, weil dieser
+           Zweig sie nie prüfte. Ohne diesen zweiten Fix haette der
+           kvToScannerState()-Fix nur kosmetisch gewirkt. Beide Betroffenen
+           Stellen sind als bewusste, byte-identische Doppel-Definition im File
+           vorhanden (Kommentar: "hier kopiert für Scope-Isolation") — Fix an
+           beiden Kopien identisch angewendet und verifiziert. Feld-Audit-
+           Vollcheck (uiq_field_audit.py) zeigt danach ausschliesslich noch
+           buildParameterPool()-Luecken, die weiterhin folgenlos bleiben
+           (poolData nachweislich toter Code, s. v501/v502) — damit sind alle
+           bekannten Feld-Propagations-Luecken aus der 07.09.-Debugging-Session
+           geschlossen. -->
      <!-- CHANGELOG (neueste zuerst):                
      v502: Feld-Audit-Vollcheck (uiq_field_audit.py, Diagnose-Skript aus dem
            07.09.-Debugging destilliert) deckte fünf weitere Luecken auf, alle
@@ -8793,6 +8818,14 @@ function kvToScannerState(r) {
     short_fading:   { score: r.sFading    || 0, label: 'Short Fading'   },
     long_dividend:  { score: r.sDividend  || 0, label: 'Dividend Growth' },  // Backlog #13b (29.07.2026)
     long_value:     { score: r.sValue     || 0, label: 'Value Investing'  },  // Backlog #13b (29.07.2026)
+    // NEU (Feld-Audit-Vollcheck, echter Fund): breakout/vcp/ko hatten HIER NIE
+    // einen strategyScores-Eintrag (auch nicht in den anderen beiden Stellen,
+    // die dasselbe Objektliteral bauen) — anders als long_dividend/long_value
+    // oben, die seit Backlog #13b existieren. tickerLists Objekt-Zweig wird
+    // im selben Batch ergaenzt, sonst wirkt dieser Fix nur kosmetisch.
+    breakout:       { score: r.sBreakout  || 0, label: 'Breakout' },
+    vcp:            { score: r.sVcp       || 0, label: 'VCP-Setup' },
+    ko:             { score: r.sKoLong    || 0, label: 'KO-Zertifikat Long' },
   };
 
   // SEPA-Proxy aus Minervini-Score (renderCard erwartet 0-8)
@@ -8880,6 +8913,11 @@ function kvToScannerState(r) {
     rs:           null,
     // RS-Rating (Aggregator v5.0, SUITE.md #14) — Universum-Perzentil 0-99
     rsRating:     r.rsRating != null ? r.rsRating : null,
+    // homeMarket (Feld-Audit-Vollcheck, echter Fund): fehlte im CDN-Fallback
+    // komplett, obwohl kritisch fuer KO-5-Gap-/Overnight-Risiko-Guardrail
+    // (s. market_aggregator.py-Fix 04.09.2026). Fallback 'US' analog zu
+    // topResults.push().
+    homeMarket:   r.homeMarket || 'US',
     perf3m:       r.perf3m  != null ? r.perf3m  : null,
     perf12m:      r.perf12m != null ? r.perf12m : null,
     // Pattern/Entry-Engine (ios_pattern_entry_engine.py, Backlog #13c/f, 25.07.2026)
@@ -8890,6 +8928,18 @@ function kvToScannerState(r) {
     ivRank:         r.ivRank        != null ? r.ivRank        : null,
     ivPercentile:   r.ivPercentile  != null ? r.ivPercentile  : null,
     ivArchiveDays:  r.ivArchiveDays != null ? r.ivArchiveDays : null,
+    // NEU (Feld-Audit-Vollcheck, echter Fund): echte IV-Perzentil-Daten aus
+    // market_aggregator.py fetch_iv_percentile_data() (externe Quelle,
+    // github.com/ahsub/options-vol-data) — ANDERE, neuere Quelle als das
+    // aeltere ivRank/ivAtm-Paar oben (Aggregator v5.1). Fehlte im CDN-Fallback
+    // komplett, obwohl in tickerList/topResults.push() laengst als primaeres
+    // IV-Kriterium vor HVP-Fallback genutzt (s. index.html v501/v502).
+    ivpPercentile:  r.ivpPercentile != null ? r.ivpPercentile : null,
+    ivpDays:        r.ivpDays       != null ? r.ivpDays       : null,
+    ivpCurIv:       r.ivpCurIv      != null ? r.ivpCurIv      : null,
+    ivpHv20:        r.ivpHv20       != null ? r.ivpHv20       : null,
+    ivpHv50:        r.ivpHv50       != null ? r.ivpHv50       : null,
+    ivpHv100:       r.ivpHv100      != null ? r.ivpHv100      : null,
     // _ivp-Objekt: echte Aggregator-Werte wenn vorhanden, sonst HVP-Fallback (calcHV20 bleibt aktiv)
     _ivp: (r.ivAtm != null) ? {
       ivp:    r.ivRank,        // ivRank als ivp (0-100, wie HVP)
@@ -19176,6 +19226,17 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       if(ss.long_mr        && ss.long_mr.score > 30)        stratParts.push('MR:'+ss.long_mr.score);
       if(ss.short_breakdown && ss.short_breakdown.score > 30) stratParts.push('Short⬇:'+ss.short_breakdown.score);
       if(ss.short_fading   && ss.short_fading.score > 30)   stratParts.push('Fade:'+ss.short_fading.score);
+      // ERGAENZT (Feld-Audit-Vollcheck, echter Fund): dieser Zweig fragte nur
+      // die urspruenglichen 5 Strategien ab, obwohl kvToScannerState() (CDN-
+      // Fallback) laengst auch long_dividend/long_value (Backlog #13b,
+      // 29.07.2026) und jetzt neu breakout/vcp/ko liefert — waren im
+      // strategyScores-Pfad (CDN-Fallback aktiv) bisher NIE sichtbar, obwohl
+      // im KV-Regelfall (else-Zweig unten) laengst vorhanden.
+      if(ss.long_dividend  && ss.long_dividend.score > 30)  stratParts.push('Div:'+ss.long_dividend.score);
+      if(ss.long_value     && ss.long_value.score > 30)     stratParts.push('Value:'+ss.long_value.score);
+      if(ss.breakout       && ss.breakout.score > 30)       stratParts.push('Breakout:'+ss.breakout.score);
+      if(ss.vcp            && ss.vcp.score > 30)            stratParts.push('VCP:'+ss.vcp.score);
+      if(ss.ko             && ss.ko.score > 30)             stratParts.push('KO:'+ss.ko.score);
     } else {
       // KV-Modus: direkte Score-Felder
       if(r.sMinervini > 30) stratParts.push('SEPA:'+r.sMinervini);
@@ -19994,6 +20055,14 @@ function kvToScannerState(r) {
     short_fading:   { score: r.sFading    || 0, label: 'Short Fading'   },
     long_dividend:  { score: r.sDividend  || 0, label: 'Dividend Growth' },  // Backlog #13b (29.07.2026)
     long_value:     { score: r.sValue     || 0, label: 'Value Investing'  },  // Backlog #13b (29.07.2026)
+    // NEU (Feld-Audit-Vollcheck, echter Fund): breakout/vcp/ko hatten HIER NIE
+    // einen strategyScores-Eintrag (auch nicht in den anderen beiden Stellen,
+    // die dasselbe Objektliteral bauen) — anders als long_dividend/long_value
+    // oben, die seit Backlog #13b existieren. tickerLists Objekt-Zweig wird
+    // im selben Batch ergaenzt, sonst wirkt dieser Fix nur kosmetisch.
+    breakout:       { score: r.sBreakout  || 0, label: 'Breakout' },
+    vcp:            { score: r.sVcp       || 0, label: 'VCP-Setup' },
+    ko:             { score: r.sKoLong    || 0, label: 'KO-Zertifikat Long' },
   };
 
   // SEPA-Proxy aus Minervini-Score (renderCard erwartet 0-8)
@@ -20081,6 +20150,11 @@ function kvToScannerState(r) {
     rs:           null,
     // RS-Rating (Aggregator v5.0, SUITE.md #14) — Universum-Perzentil 0-99
     rsRating:     r.rsRating != null ? r.rsRating : null,
+    // homeMarket (Feld-Audit-Vollcheck, echter Fund): fehlte im CDN-Fallback
+    // komplett, obwohl kritisch fuer KO-5-Gap-/Overnight-Risiko-Guardrail
+    // (s. market_aggregator.py-Fix 04.09.2026). Fallback 'US' analog zu
+    // topResults.push().
+    homeMarket:   r.homeMarket || 'US',
     perf3m:       r.perf3m  != null ? r.perf3m  : null,
     perf12m:      r.perf12m != null ? r.perf12m : null,
     // Pattern/Entry-Engine (ios_pattern_entry_engine.py, Backlog #13c/f, 25.07.2026)
@@ -20091,6 +20165,18 @@ function kvToScannerState(r) {
     ivRank:         r.ivRank        != null ? r.ivRank        : null,
     ivPercentile:   r.ivPercentile  != null ? r.ivPercentile  : null,
     ivArchiveDays:  r.ivArchiveDays != null ? r.ivArchiveDays : null,
+    // NEU (Feld-Audit-Vollcheck, echter Fund): echte IV-Perzentil-Daten aus
+    // market_aggregator.py fetch_iv_percentile_data() (externe Quelle,
+    // github.com/ahsub/options-vol-data) — ANDERE, neuere Quelle als das
+    // aeltere ivRank/ivAtm-Paar oben (Aggregator v5.1). Fehlte im CDN-Fallback
+    // komplett, obwohl in tickerList/topResults.push() laengst als primaeres
+    // IV-Kriterium vor HVP-Fallback genutzt (s. index.html v501/v502).
+    ivpPercentile:  r.ivpPercentile != null ? r.ivpPercentile : null,
+    ivpDays:        r.ivpDays       != null ? r.ivpDays       : null,
+    ivpCurIv:       r.ivpCurIv      != null ? r.ivpCurIv      : null,
+    ivpHv20:        r.ivpHv20       != null ? r.ivpHv20       : null,
+    ivpHv50:        r.ivpHv50       != null ? r.ivpHv50       : null,
+    ivpHv100:       r.ivpHv100      != null ? r.ivpHv100      : null,
     // _ivp-Objekt: echte Aggregator-Werte wenn vorhanden, sonst HVP-Fallback (calcHV20 bleibt aktiv)
     _ivp: (r.ivAtm != null) ? {
       ivp:    r.ivRank,        // ivRank als ivp (0-100, wie HVP)
