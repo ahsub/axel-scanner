@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260907-v504">          
+<meta name="version" content="20260907-v505">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -25,6 +25,24 @@
      7. runAlphaLbKI()s tickerLines-Bauschleife — Alpha-Desk-eigener Pfad.
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
+     <!-- CHANGELOG (neueste zuerst):                
+     v505: Strike-Gültigkeitsprüfung (Live-Test-Fund, erster EIC-csp_wheel-
+           Lauf über Options-Desk). Die in v504 eingeführte Strike-
+           Vorberechnung (EMA200-1,5×ATR) an allen drei Stellen (tickerList,
+           runOptionsKiBriefing(), runAlphaLbKI()) lieferte bei Titeln mit
+           grossem Abstand zur EMA200 (Live-Belege: MCD -9,9%, LHX -13,4%
+           unter EMA200) einen Strike ÜBER dem aktuellen Kurs — für einen
+           CSP-Put-Strike unbrauchbar (waere bereits bei Eroeffnung im
+           Geld). Das Modell zitierte diese unbrauchbaren Werte im Live-Test
+           unkommentiert als Strike-Vorschlag. Fix: an allen drei Stellen
+           wird der berechnete Wert nur noch ausgegeben, wenn er tatsaechlich
+           unter dem aktuellen Kurs liegt — sonst explizit "n/a (Wert über
+           Kurs)" statt eines stillschweigend falschen Zahlenwerts. Isoliert
+           mit MCD-/HUBB-artigen Testwerten verifiziert (ungueltiger bzw.
+           gueltiger Fall korrekt unterschieden). Serverseitiges Gegenstueck:
+           ko-ai-worker.js v1.18→v1.19, max_tokens fuer ki_briefing im EIC-
+           Modus erhoeht (Live-Test-Fund: Antwort brach bei mehreren
+           detailliert behandelten Kandidaten sichtbar mitten im Satz ab). -->
      <!-- CHANGELOG (neueste zuerst):                
      v504: EIC Master Prompt §23 ("Handlungsempfehlung", Strike-Berechnung)
            Datenvorbereitung — vor dem eigentlichen csp_wheel-Prompt-Umbau
@@ -19215,7 +19233,19 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     if(r.atr && r.price) {
       var strikeCSP = r.ma200 ? (r.ma200 - 1.5 * r.atr).toFixed(2) : null;
       line += ' ATR:$' + r.atr.toFixed(2);
-      if(strikeCSP) line += ' Strike(EMA200-1.5×ATR):$' + strikeCSP;
+      // GÜLTIGKEITSPRÜFUNG (Live-Test-Fund, EIC-csp_wheel-Erstlauf): bei
+      // Titeln, deren Abstand Kurs↔EMA200 groesser als 1,5×ATR ist (z.B.
+      // MCD -9,9%, LHX -13,4% unter EMA200), liefert die Formel einen
+      // Strike ÜBER dem aktuellen Kurs — fuer einen Put-Strike (CSP) waere
+      // das bereits bei Eroeffnung im Geld, kein sinnvolles Setup. Statt
+      // einen unbrauchbaren Wert stillschweigend auszugeben: explizit als
+      // "kein sinnvoller Wert" kennzeichnen, damit das Modell nicht
+      // versehentlich einen Strike ueber dem Kurs als CSP-Strike zitiert.
+      if(strikeCSP && parseFloat(strikeCSP) < r.price) {
+        line += ' Strike(EMA200-1.5×ATR):$' + strikeCSP;
+      } else if(strikeCSP) {
+        line += ' Strike(EMA200-1.5×ATR):n/a (Formel liefert Wert über Kurs — Titel zu weit unter EMA200 fuer sinnvollen CSP-Strike)';
+      }
     }
     // 52W Range
     if(r.dist52wHigh != null) line += ' 52W-H:' + (r.dist52wHigh >= 0 ? '+' : '') + r.dist52wHigh + '%';
@@ -25823,9 +25853,17 @@ async function runOptionsKiBriefing(strat) {
         // ergaenzt (market_aggregator.py). Strike hier bereits vorberechnet
         // (EMA200-1,5xATR, analog zu tickerList/openKiBriefing()) statt dem
         // Modell die Arithmetik zu ueberlassen — Numeric-Integrity-Prinzip.
-        var _strikeTxt = (t.ema200 != null && t.atr != null)
-          ? (' Strike(EMA200-1.5xATR):$' + (t.ema200 - 1.5 * t.atr).toFixed(2))
-          : '';
+        // GÜLTIGKEITSPRÜFUNG (Live-Test-Fund, EIC-csp_wheel-Erstlauf, s.
+        // tickerList): Formel kann einen Strike ÜBER dem aktuellen Kurs
+        // liefern, wenn der Titel weit unter der EMA200 notiert — fuer CSP
+        // unbrauchbar (waere bereits im Geld). Explizit als n/a kennzeichnen
+        // statt einen unbrauchbaren Wert stillschweigend auszugeben.
+        var _rawStrike = (t.ema200 != null && t.atr != null) ? (t.ema200 - 1.5 * t.atr) : null;
+        var _strikeTxt = (_rawStrike != null && _rawStrike < t.price)
+          ? (' Strike(EMA200-1.5xATR):$' + _rawStrike.toFixed(2))
+          : (_rawStrike != null)
+            ? ' Strike(EMA200-1.5xATR):n/a(Wert über Kurs)'
+            : '';
         return (i+1) + '. ' + t.sym
           + ' Kurs:$' + (t.price||'--')
           + ' ' + _volLabel
@@ -26346,8 +26384,17 @@ async function runAlphaLbKI() {
     // und atr waren beide schon da, aber nie zu einem Strike-Vorschlag
     // verrechnet — das Modell haette das selbst tun muessen (Numeric-
     // Integrity-Risiko). Jetzt vorberechnet, analog zu tickerList/
-    // runOptionsKiBriefing().
-    if (t.ema200 != null && t.atr != null) line += ' Strike(EMA200-1.5xATR):$' + (t.ema200 - 1.5 * t.atr).toFixed(2);
+    // runOptionsKiBriefing(). GÜLTIGKEITSPRÜFUNG (Live-Test-Fund): Formel
+    // kann einen Strike ÜBER dem aktuellen Kurs liefern, wenn der Titel
+    // weit unter der EMA200 notiert — fuer CSP unbrauchbar.
+    if (t.ema200 != null && t.atr != null) {
+      var _rawStrikeAlpha = t.ema200 - 1.5 * t.atr;
+      if (t.price != null && _rawStrikeAlpha < t.price) {
+        line += ' Strike(EMA200-1.5xATR):$' + _rawStrikeAlpha.toFixed(2);
+      } else {
+        line += ' Strike(EMA200-1.5xATR):n/a(Wert über Kurs)';
+      }
+    }
     if (t.dist200 != null) line += ' Dist200:' + t.dist200.toFixed(1) + '%';
     if (t.pctFromHigh52 != null) line += ' 52W-H:' + t.pctFromHigh52.toFixed(1) + '%';
     if (t.bbPos  != null) line += ' BBPos:' + t.bbPos.toFixed(2);
