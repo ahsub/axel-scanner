@@ -3,8 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260906-v495">          
+<meta name="version" content="20260907-v496">          
      <!-- CHANGELOG (neueste zuerst):                
+     v496: Echte IV-Perzentil-Daten client-seitig durchgereicht (07.09.2026,
+           Fortsetzung des market_aggregator.py-Fixes vom selben Tag).
+           Dieselbe Drei-Ebenen-Kette wie beim homeMarket/tightnessPct-Fund
+           vom 06.09.: (1) topResults.push() in openKiBriefing() um sechs
+           neue Felder ergänzt (ivpPercentile, ivpDays, ivpCurIv, ivpHv20,
+           ivpHv50, ivpHv100) — bisher gingen diese Felder aus raw
+           verloren, obwohl market_aggregator.py sie seit heute liefert.
+           (2) buildParameterPool() liest die neuen Felder jetzt ebenfalls
+           aus r. (3) formatPoolForPrompt()s VOLATILITÄT-Sektion um die
+           neuen Felder ergänzt — bewusst in dieselbe Sektion wie "hvp"
+           einsortiert (nicht als eigene Sektion), damit das Modell beide
+           Kennzahlen im Prompt-Text direkt nebeneinander sieht und die
+           Unterscheidung (hvp = historische, ivpPercentile = implizite
+           Volatilität) leichter nachvollziehen kann. Alle drei Stellen
+           isoliert mit node --check validiert. NOCH OFFEN: ko-prompts.js-
+           Guardrail-Texte, die HVP bisher als reine Notlösung für
+           implizite Volatilität rahmen — separater nächster Schritt.
      v495: UI-Paritaet Scanner-Tab ↔ Alpha Desk hergestellt (06.09.2026,
            Axel-Auftrag). (1) Namens-Vereinheitlichung: Alpha-Desk-Tab
            "🚀 Minervini" (long_minervini) → "📈 Momentum" (identisch zum
@@ -18681,6 +18698,16 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       vcpAvgPrevPct:    raw.vcpAvgPrevPct    != null ? raw.vcpAvgPrevPct    : null,
       vcpVolContraction: raw.vcpVolContraction != null ? raw.vcpVolContraction : null,
       vcpBreakoutVol:   raw.vcpBreakoutVol   != null ? raw.vcpBreakoutVol   : null,
+      // NEU (07.09.2026): echte IV-Perzentil-Daten aus market_aggregator.py
+      // (fetch_iv_percentile_data(), externe Quelle github.com/ahsub/options-vol-data).
+      // Ergaenzung zu hvp (historische statt implizite Volatilitaet) — None fuer
+      // Ticker, die die externe Quelle nicht abdeckt (kein 1:1-identisches Universum).
+      ivpPercentile: raw.ivpPercentile != null ? raw.ivpPercentile : null,
+      ivpDays:       raw.ivpDays       != null ? raw.ivpDays       : null,
+      ivpCurIv:      raw.ivpCurIv      != null ? raw.ivpCurIv      : null,
+      ivpHv20:       raw.ivpHv20       != null ? raw.ivpHv20       : null,
+      ivpHv50:       raw.ivpHv50       != null ? raw.ivpHv50       : null,
+      ivpHv100:      raw.ivpHv100      != null ? raw.ivpHv100      : null,
       // Value-Felder (nur wenn vorhanden)
       pe: _vd.pe || null,
       pb: _vd.pb || null,
@@ -23901,6 +23928,17 @@ function buildParameterPool(r) {
     vcpVolContraction:r.vcpVolContraction != null ? r.vcpVolContraction : null,
     vcpBreakoutVol:   r.vcpBreakoutVol != null ? r.vcpBreakoutVol : null,
 
+    // ── ECHTE IV-PERZENTIL-DATEN (07.09.2026, s. market_aggregator.py '
+    // fetch_iv_percentile_data(), externe Quelle github.com/ahsub/options-vol-data) ─
+    // Ergaenzung zu hvp (historische statt implizite Volatilitaet), None wenn die
+    // externe Quelle den Ticker nicht abdeckt (hvp bleibt dort als Fallback aktiv).
+    ivpPercentile: r.ivpPercentile != null ? r.ivpPercentile : null,
+    ivpDays:       r.ivpDays       != null ? r.ivpDays       : null,
+    ivpCurIv:      r.ivpCurIv      != null ? r.ivpCurIv      : null,
+    ivpHv20:       r.ivpHv20       != null ? r.ivpHv20       : null,
+    ivpHv50:       r.ivpHv50       != null ? r.ivpHv50       : null,
+    ivpHv100:      r.ivpHv100      != null ? r.ivpHv100      : null,
+
     // ── MARKOV REGIME ─────────────────────────────────────────────────────────
     regime:       r._markov ? (r._markov.regime===1?'BULL':r._markov.regime===-1?'BEAR':'SIDE') : r.regime,
     pBull2Bear:   r._markov ? r._markov.pBull2Bear : r.pBull2Bear,
@@ -23951,7 +23989,7 @@ function formatPoolForPrompt(pool, strategy) {
     'KERN':          ['sym','price','grade','compositeScore'],
     'TREND/MAs':     ['ema50','ema200','dist50pct','dist200pct','above50','above200'],
     'MOMENTUM':      ['rsi','macdHist','macdBull','obvTrend','obvBull'],
-    'VOLATILITÄT':   ['atr','atrPct','hvp','hv10','bbPos','overheat'],
+    'VOLATILITÄT':   ['atr','atrPct','hvp','hv10','bbPos','overheat','ivpPercentile','ivpDays','ivpCurIv','ivpHv20','ivpHv50','ivpHv100'],
     'OPTIONS-STRIKES':['strikeCSP','strikeCC','strikeMR'],
     'VOLUMEN/FLOW':  ['volRatio','bullSignals'],
     '52W-RANGE':     ['high52','low52','dist52wHigh'],
