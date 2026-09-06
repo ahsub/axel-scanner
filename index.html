@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260907-v501">          
+<meta name="version" content="20260907-v502">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -25,6 +25,34 @@
      7. runAlphaLbKI()s tickerLines-Bauschleife — Alpha-Desk-eigener Pfad.
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
+     <!-- CHANGELOG (neueste zuerst):                
+     v502: Feld-Audit-Vollcheck (uiq_field_audit.py, Diagnose-Skript aus dem
+           07.09.-Debugging destilliert) deckte fünf weitere Luecken auf, alle
+           gefixt: (1) top20()s/_rebuild_fundamental_lb()s _core-Liste (market_
+           aggregator.py) führte weder VCP-Detailfelder noch die zehn Strategie-
+           Scores — betraf v.a. das vcp_setups-Leaderboard, per GHA-Log (VOD:4,
+           GLEN.L:5 Kontraktionen) UND Live-Modell-Output nach Deploy bestätigt
+           behoben. (2) tickerList (der tatsächlich live genutzte Prompt-Pfad,
+           s. v501) fehlten trotz v501-Fix noch: vcpAvgPrevPct, ivpHv20/50/100,
+           tightnessPct, sma150, sowie 5 Strategie-Scores (Breakout/VCP/KO/Div/
+           Value) — alle ergänzt, DATA_LEGENDE entsprechend erweitert (vorher
+           erklärte die Legende weder VCP✓/VCP-Ansatz noch IVP/HV/SMA150, obwohl
+           tickerList sie längst ausgab). (3) Feldnamens-Mismatch gefunden und
+           gefixt: die RS-Zeile prüfte ausschließlich r.rs (Live-Scan-only,
+           client-seitig via calcRS() berechnet), NIE r.rsRating (KV/Aggregator-
+           Pfad, server-seitig, IBD-Stil 0-99) — zwei komplett unabhängige
+           Pipelines, die sich nie überschneiden. Im KV-Regelfall (Scanner-Tab-
+           Hauptpfad) kam dadurch NIE ein RS-Wert im Prompt an, obwohl rsRating
+           längst korrekt vorlag. rsRating hat jetzt Vorrang (Label "RS-Rating:
+           XX"), rs bleibt Live-Scan-Fallback (Label "RS:XX", Legende für beide
+           präzisiert). (4) topResults.push() fehlte trotz der 06./07.09.-Nach-
+           rüstrunde (s. v501-Kommentar an dieser Stelle) sma150 komplett, obwohl
+           raw.sma150 identisch zu raw.rsRating/raw.tightnessPct verfügbar ist —
+           ma200 war seit jeher da, sma150 wurde schlicht übersehen. NICHT in
+           diesem Batch: kvToScannerState()-Inline-Fallback (CDN-Ausfallpfad,
+           alle 26 hier gefundenen Felder fehlen dort ebenfalls) — bewusst
+           zurückgestellt, separater Fix folgt. buildParameterPool()-Lücken
+           bleiben unangetastet (poolData nachweislich toter Code, s. v501). -->
      <!-- CHANGELOG (neueste zuerst):                
      v501: DRITTE, bisher unbekannte Feldliste im Scanner-Tab-Pfad gefunden
            und gefixt (07.09.2026, Axel-Fund — VCP-Live-Test zeigte trotz
@@ -18871,6 +18899,10 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       above50:      state.above50 != null ? state.above50 : null,
       rsRating:     raw.rsRating != null ? raw.rsRating : null,
       tightnessPct: raw.tightnessPct != null ? raw.tightnessPct : null,
+      // ERGAENZT (uiq_field_audit.py-Vollcheck): sma150 wurde bei der 06./07.09.-
+      // Nachruestrunde dieses Objekts (s. Kommentar oben) uebersehen — ma200 ist
+      // seit jeher da, sma150 fehlte trotz identischer raw-Quelle komplett.
+      sma150:       raw.sma150 != null ? raw.sma150 : null,
       vcpDetected:      raw.vcpDetected      || false,
       vcpContractions:  raw.vcpContractions  || 0,
       vcpLastPct:       raw.vcpLastPct       != null ? raw.vcpLastPct       : null,
@@ -19126,6 +19158,10 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     if(r.histVal != null)   line += ' MACD:' + (r.histVal > 0 ? '+' : '') + r.histVal.toFixed(3);
     if(r.bbPos != null)     line += ' BB:' + Math.round(r.bbPos*100) + '%';
     if(r.ma50 && r.price)   { var d50 = ((r.price-r.ma50)/r.ma50*100).toFixed(1); line += ' EMA50:$'+r.ma50.toFixed(0)+'('+d50+'%)'; }
+    // sma150 (Feld-Audit-Fund): analog zu EMA50/EMA200-Kurs-Ausgabe oben —
+    // Minervini-Stage-2-Kriterium nutzt explizit die 150-Tage-Linie, die bisher
+    // trotz vorhandener Daten nie im Prompt-Text ankam.
+    if(r.sma150 && r.price) { var d150 = ((r.price-r.sma150)/r.sma150*100).toFixed(1); line += ' SMA150:$'+r.sma150.toFixed(0)+'('+d150+'%)'; }
     if(r.volRatio != null)  line += ' VolR:' + (r.volRatio/100).toFixed(2) + 'x';
     if(r.overheat != null && r.overheat > 0) line += ' 🔥Overheat:' + r.overheat;
     if(r.obvSlope != null)  line += ' OBV:' + (r.obvSlope > 0 ? '▲' : '▼') + Math.abs(r.obvSlope).toFixed(2);
@@ -19147,6 +19183,14 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       if(r.sMrLong    > 30) stratParts.push('MR:'+r.sMrLong);
       if(r.sBreakdown > 30) stratParts.push('Short⬇:'+r.sBreakdown);
       if(r.sFading    > 30) stratParts.push('Fade:'+r.sFading);
+      // Feld-Audit-Fund: diese fuenf Scores existieren NUR als flache KV-Felder
+      // (kein strategyScores-Objekt-Aequivalent, s. Architektur-Check vor diesem
+      // Fix) und fehlten bisher komplett in tickerList, obwohl laengst berechnet.
+      if(r.sBreakout  > 30) stratParts.push('Breakout:'+r.sBreakout);
+      if(r.sVcp       > 30) stratParts.push('VCP:'+r.sVcp);
+      if(r.sKoLong    > 30) stratParts.push('KO:'+r.sKoLong);
+      if(r.sDividend  > 30) stratParts.push('Div:'+r.sDividend);
+      if(r.sValue     > 30) stratParts.push('Value:'+r.sValue);
     }
     if(stratParts.length) line += ' [Strat:' + stratParts.join('|') + ']';
     // IOS Foundation v1.2
@@ -19170,6 +19214,7 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     // topResults laengst korrekt vorlagen (bestaetigt per GHA-Log-Diagnose).
     if(r.vcpDetected) {
       line += ' VCP✓(' + (r.vcpContractions||0) + 'x,letzte:' + r.vcpLastPct + '%';
+      if(r.vcpAvgPrevPct    != null) line += ',⌀vorherige:' + r.vcpAvgPrevPct.toFixed(1) + '%';
       if(r.vcpVolContraction != null) line += ',VolKontr:' + r.vcpVolContraction.toFixed(2);
       if(r.vcpBreakoutVol    != null) line += ',BrkVol:'   + r.vcpBreakoutVol.toFixed(2) + 'x';
       line += ')';
@@ -19179,6 +19224,10 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       // NIEMALS als "VCP bestaetigt" darstellen (s. ko-prompts.js risikenText).
       line += ' VCP-Ansatz(' + r.vcpContractions + 'x, kein vollst. VCP)';
     }
+    // tightnessPct (Feld-Audit-Fund): allgemeine Kurs-Tightness-Kennzahl,
+    // unabhaengig vom VCP-Status verfuegbar — deshalb als eigene Zeile, nicht
+    // in den vcpDetected-Zweig eingehaengt.
+    if(r.tightnessPct != null) line += ' Tightness:' + r.tightnessPct.toFixed(1) + '%';
     // NEU (07.09.2026): echte IV-Perzentil-Daten (fetch_iv_percentile_data(),
     // externe Quelle) — als PRIMAERES Kriterium vor dem alten HVP-Fallback
     // (r._ivp/isHV weiter unten), konsistent mit ko-prompts.js v2.46.0
@@ -19187,6 +19236,16 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       line += ' IVP:' + r.ivpPercentile + '%ile';
       if(r.ivpDays  != null) line += '(' + r.ivpDays + 'T)';
       if(r.ivpCurIv != null) line += ' IV:' + r.ivpCurIv + '%';
+      // HV20/50/100 (Feld-Audit-Fund): Referenzwerte hinter der IVP-Berechnung,
+      // helfen einzuordnen ob die aktuelle Vola kurzfristig oder strukturell
+      // erhoeht/erniedrigt ist — bisher trotz vorhandener Daten nie ausgegeben.
+      if(r.ivpHv20 != null || r.ivpHv50 != null || r.ivpHv100 != null) {
+        var hvParts = [];
+        if(r.ivpHv20  != null) hvParts.push('20:'+r.ivpHv20);
+        if(r.ivpHv50  != null) hvParts.push('50:'+r.ivpHv50);
+        if(r.ivpHv100 != null) hvParts.push('100:'+r.ivpHv100);
+        line += ' HV(' + hvParts.join('/') + ')';
+      }
     }
     // IV-Percentile mit Markov-Kombination (ALTER HVP-Proxy-Fallback — nur
     // wenn die NEUE, echte IVP-Kennzahl oben nicht verfuegbar war, sonst
@@ -19231,6 +19290,12 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     + '  52W-H:X%       = Abstand vom 52-Wochen-Hoch\n'
     + '  HVP:XX%        = Historical Volatility Percentile (NÄHERUNG — kein echter IV-Rank!). >50%: erhöhte Vola → CSP-Prämien tendenziell höher. <30%: niedrige Vola → CSP meiden. Wenn HVP fehlt: NIEMALS IV-Wert erfinden.\n'
     + '  Fibo:zone(X%)  = Fibonacci-Zone\n'
+    + '  VCP✓(Nx,letzte:X%,⌀vorherige:Y%,VolKontr:Z,BrkVol:W) = Volatility-Contraction-Pattern bestaetigt: N Kontraktionen, letzte Kontraktion X% Kursspanne (Y%=Durchschnitt der vorherigen Kontraktionen, zum Vergleich ob die Kontraktion enger wird), VolKontr=Volumen-Kontraktionsfaktor, BrkVol=Volumen-Multiplikator am (potenziellen) Ausbruchstag\n'
+    + '  VCP-Ansatz(Nx, kein vollst. VCP) = Kontraktionsmuster erkannt, aber Tightening-Kriterium NICHT erfuellt — NIEMALS als bestaetigtes VCP werten\n'
+    + '  Tightness:X%   = Kurs-Tightness-Kennzahl (je niedriger, desto enger die juengste Konsolidierung)\n'
+    + '  IVP:XX%ile(YT) IV:Z% HV(20:A/50:B/100:C) = echtes IV-Perzentil (Y=Tage Historie), aktuelle IV, dahinterliegende historische Volatilitaeten ueber 20/50/100 Tage (Referenz zur Einordnung, ob Vola kurzfristig oder strukturell erhoeht/erniedrigt ist)\n'
+    + '  SMA150:$XX(Y%) = 150-Tage-Linie (Minervini Stage-2-Kriterium), Y%=Abstand Kurs zur Linie\n'
+    + '  [Strat:...]    = Strategie-Fit-Scores (>30) fuer: SEPA=Minervini, Swing=Swing-Pullback, MR=Mean-Reversion, Short⬇=Breakdown, Fade=Fading-Short, Breakout=Breakout, VCP=VCP-Setup-Score (numerischer Fit, ergaenzt die VCP✓-Detailmetriken oben), KO=KO-Zertifikat-Long, Div=Dividend-Growth, Value=Value\n'
     + 'NICHT VERFÜGBAR (niemals erfinden): KGV, EPS, Umsatz, Dividende, Analystenziele\n\n';
 
   // Markov 2.0 Zusammenfassung für QQQ
