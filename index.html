@@ -3,8 +3,43 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260907-v496">          
+<meta name="version" content="20260907-v498">          
      <!-- CHANGELOG (neueste zuerst):                
+     v498: FÜNFTE unabhängige Instanz desselben "neue Felder werden
+           vergessen"-Musters gefunden und gefixt (07.09.2026, direkt im
+           Zuge der v497-Diagnose entdeckt): runAlphaLbKI()s eigenständige
+           tickerLines-Bauschleife (komplett getrennt von buildParameter-
+           Pool()/formatPoolForPrompt()) hatte ivpPercentile/ivpDays/
+           ivpCurIv nie erhalten. Ergänzt (IVP:X%ile(YT), IV:Z%). Nebenbei:
+           veralteten Kommentar bei homeMarket korrigiert (behauptete
+           fälschlich "noch nicht im KV-Payload enthalten", obwohl das
+           bereits am 06.09.2026 gefixt wurde). Damit sind jetzt ALLE
+           bekannten Feld-Weiterleitungsstellen (7 insgesamt, s. Antwort an
+           Axel zur Single-Source-of-Truth-Frage) für die aktuellen Felder
+           konsistent — die strukturelle Fragilität (7 unabhängige
+           handgepflegte Feldlisten statt einer zentralen Quelle) bleibt
+           als offener Architektur-Punkt bestehen, s. Übergabeprotokoll.
+     v497: VIERTE, unabhängige Instanz des "handverlesene Feldliste vergisst
+           neue Felder"-Musters gefunden und gefixt (07.09.2026, Axel-Fund
+           via csp_wheel-Live-Test — kein ivpPercentile trotz korrekt
+           funktionierendem Aggregator UND Alpha-Desk-Pfad). Root Cause:
+           kvDataToTickerData() — konvertiert KV-Rohdaten für den Scanner-
+           Tab-Live-Scan-Pfad (runScan() → tickerData[sym] → openKiBriefing()
+           liest direkt aus tickerData) — hatte NIE homeMarket/tightnessPct/
+           VCP-Felder/sma150/rsRating übernommen, trotz der Fixes vom
+           04./06.09.2026. Diese Lücke betraf AUSSCHLIESSLICH den Scanner-
+           Tab-Pfad: Alpha Desk (runAlphaLbKI()) liest direkt aus
+           _alphaData.leaderboards (serverseitig von build_leaderboards()
+           gebaut) und durchläuft kvDataToTickerData() nie — weshalb der
+           frühere KO-5-homeMarket-Test (über Alpha Desk) fälschlich als
+           vollständiger Beweis der Behebung galt, obwohl der Scanner-Tab-
+           Pfad die ganze Zeit über weiterhin betroffen war. Jetzt alle
+           bisher fehlenden Felder ergänzt (homeMarket, tightnessPct, sma150,
+           rsRating, vcpDetected/Contractions/LastPct/AvgPrevPct/
+           VolContraction/BreakoutVol) PLUS die sechs neuen ivpPercentile/
+           ivpDays/ivpCurIv/ivpHv20/ivpHv50/ivpHv100-Felder. Isoliert
+           getestet: echte Werte kommen korrekt durch, fehlende Felder
+           liefern sauber Fallback/null statt Crash.
      v496: Echte IV-Perzentil-Daten client-seitig durchgereicht (07.09.2026,
            Fortsetzung des market_aggregator.py-Fixes vom selben Tag).
            Dieselbe Drei-Ebenen-Kette wie beim homeMarket/tightnessPct-Fund
@@ -7867,6 +7902,35 @@ function kvDataToTickerData(kvTicker) {
     distToAvwapPct: kvTicker.distToAvwapPct != null ? kvTicker.distToAvwapPct : null,
     avwapAbove:    kvTicker.avwapAbove     != null ? kvTicker.avwapAbove     : null,
     obBullDistPct: kvTicker.obBullDistPct  != null ? kvTicker.obBullDistPct  : null,
+    // NACHGETRAGEN (07.09.2026, Axel-Fund — csp_wheel-Live-Test zeigte kein
+    // ivpPercentile trotz korrekt funktionierendem Aggregator+Alpha-Desk-Pfad):
+    // diese Konvertierungsfunktion ist eine VIERTE, unabhaengige handverlesene
+    // Feldliste (nach scored.append()/top20()/_rebuild_fundamental_lb() in
+    // market_aggregator.py) — sie hatte NIE homeMarket/tightnessPct/VCP-Felder/
+    // sma150/rsRating uebernommen, trotz der Fixes vom 04./06.09.2026. Betraf
+    // ausschliesslich den Scanner-Tab-Pfad (openKiBriefing() liest aus
+    // tickerData, das ueber runScan() -> kvDataToTickerData() befuellt wird) —
+    // Alpha Desk (runAlphaLbKI()) liest direkt aus _alphaData.leaderboards und
+    // war von dieser Luecke nie betroffen, weshalb der KO-5-homeMarket-Test
+    // (ueber Alpha Desk) faelschlich als vollstaendiger Beweis galt.
+    homeMarket:    kvTicker.homeMarket    != null ? kvTicker.homeMarket    : 'US',
+    tightnessPct:  kvTicker.tightnessPct  != null ? kvTicker.tightnessPct  : null,
+    sma150:        kvTicker.sma150        != null ? kvTicker.sma150        : null,
+    rsRating:      kvTicker.rsRating      != null ? kvTicker.rsRating      : null,
+    vcpDetected:       kvTicker.vcpDetected       || false,
+    vcpContractions:   kvTicker.vcpContractions   || 0,
+    vcpLastPct:        kvTicker.vcpLastPct        != null ? kvTicker.vcpLastPct        : null,
+    vcpAvgPrevPct:     kvTicker.vcpAvgPrevPct     != null ? kvTicker.vcpAvgPrevPct     : null,
+    vcpVolContraction: kvTicker.vcpVolContraction != null ? kvTicker.vcpVolContraction : null,
+    vcpBreakoutVol:    kvTicker.vcpBreakoutVol    != null ? kvTicker.vcpBreakoutVol    : null,
+    // NEU (07.09.2026): echte IV-Perzentil-Daten (fetch_iv_percentile_data()
+    // in market_aggregator.py, externe Quelle github.com/ahsub/options-vol-data)
+    ivpPercentile: kvTicker.ivpPercentile != null ? kvTicker.ivpPercentile : null,
+    ivpDays:       kvTicker.ivpDays       != null ? kvTicker.ivpDays       : null,
+    ivpCurIv:      kvTicker.ivpCurIv      != null ? kvTicker.ivpCurIv      : null,
+    ivpHv20:       kvTicker.ivpHv20       != null ? kvTicker.ivpHv20       : null,
+    ivpHv50:       kvTicker.ivpHv50       != null ? kvTicker.ivpHv50       : null,
+    ivpHv100:      kvTicker.ivpHv100      != null ? kvTicker.ivpHv100      : null,
   };
 }
 
@@ -25886,10 +25950,19 @@ async function runAlphaLbKI() {
     if (t.bbPos  != null) line += ' BBPos:' + t.bbPos.toFixed(2);
     if (t.rsRating != null) line += ' RS:' + t.rsRating;
     if (t.overheat != null) line += ' Overheat:' + t.overheat;
-    // homeMarket NOCH NICHT im KV-Leaderboard-Payload enthalten (market_aggregator.py
-    // build_leaderboards()/top20()s _core-Liste hat es nicht — separater, bewusst
-    // zurückgestellter Fix, s. Kommentar in ko-prompts.js-Changelog 06.09.2026).
+    // homeMarket seit 06.09.2026 in market_aggregator.py build_leaderboards()/
+    // top20()s _core-Liste enthalten (Kommentar hier war veraltet, korrigiert
+    // 07.09.2026).
     if (t.homeMarket != null) line += ' Markt:' + t.homeMarket;
+    // NEU (07.09.2026): echte IV-Perzentil-Daten (fetch_iv_percentile_data() in
+    // market_aggregator.py, externe Quelle github.com/ahsub/options-vol-data).
+    // FUENFTE unabhaengige Fundstelle desselben "neue Felder werden vergessen"-
+    // Musters — diese eigenstaendige tickerLines-Bauschleife hier ist von
+    // buildParameterPool()/formatPoolForPrompt() komplett getrennt und wurde
+    // beim urspruenglichen IVP-Rollout uebersehen.
+    if (t.ivpPercentile != null) line += ' IVP:' + t.ivpPercentile + '%ile';
+    if (t.ivpDays       != null) line += '(' + t.ivpDays + 'T)';
+    if (t.ivpCurIv      != null) line += ' IV:' + t.ivpCurIv + '%';
     // VCP-spezifische Felder
     if (t.vcpContractions != null) line += ' VCP-C:' + t.vcpContractions;
     if (t.vcpLastPct != null) line += ' VCP-Last:' + t.vcpLastPct + '%';
