@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260907-v503">          
+<meta name="version" content="20260907-v504">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -25,6 +25,30 @@
      7. runAlphaLbKI()s tickerLines-Bauschleife — Alpha-Desk-eigener Pfad.
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
+     <!-- CHANGELOG (neueste zuerst):                
+     v504: EIC Master Prompt §23 ("Handlungsempfehlung", Strike-Berechnung)
+           Datenvorbereitung — vor dem eigentlichen csp_wheel-Prompt-Umbau
+           auf Wunsch geprueft, ob alle drei KI-Entry-Points (Scanner-Tab/
+           Options-Desk/Alpha Desk) dieselbe Datenbasis liefern. Ergebnis:
+           NEIN, zwei echte Luecken gefunden und gefixt. (1) runOptionsKi-
+           Briefing() (Options-Desk) hatte kein rohes ema200 — nur den
+           Prozentabstand (dist200) —, obwohl market_aggregator.pys
+           options_candidates-Konstruktion ema200 direkt im Diagnose-Log
+           daneben ausgab, aber NIE ins Dict selbst uebernahm (neunte
+           unabhaengige Fundstelle desselben "Feld vergessen"-Musters —
+           die achte, ivpPercentile/ivpDays/ivpCurIv an derselben Stelle,
+           wurde bereits 07.09. gefixt, ema200 dabei uebersehen). Jetzt in
+           market_aggregator.py ergaenzt UND hier in ema200 + vorberechneten
+           Strike (EMA200-1,5xATR) umgewandelt, analog zu tickerList. (2)
+           runAlphaLbKI() (Alpha Desk) hatte ema200 UND atr bereits, aber
+           KEINEN vorberechneten Strike — das Modell haette die Subtraktion/
+           Multiplikation selbst durchfuehren muessen (Numeric-Integrity-
+           Risiko, LLMs rechnen gelegentlich falsch). Jetzt ebenfalls
+           vorberechnet. Rechnerische Korrektheit der Formel isoliert
+           verifiziert (Node-Test: 150 - 1,5x4,2 = 143,70 ✓). Damit liefern
+           alle drei Entry-Points identisch verlaessliche Strike-Textwerte
+           fuer den geplanten §23-Prompt-Text (noch nicht Teil dieses
+           Batches — folgt als naechster Schritt in ko-prompts.js). -->
      <!-- CHANGELOG (neueste zuerst):                
      v503: kvToScannerState()-Inline-Fallback (CDN-Ausfallpfad, aktiv nur wenn
            ko-kv-state.js nicht laedt) nachgeruestet — Feld-Audit-Vollcheck
@@ -25794,12 +25818,21 @@ async function runOptionsKiBriefing(strat) {
                        : (t.ivRank != null) ? ('IVR:' + t.ivRank + '%')
                        : (t.hvp != null)    ? ('HVP:' + t.hvp + '%')
                        : 'Vol:--';
+        // ERGAENZT (Feld-Audit-Vollcheck, echter Fund, EIC-§23-Vorarbeit):
+        // ema200 stand serverseitig nie im Dict (nur im Diagnose-Log), jetzt
+        // ergaenzt (market_aggregator.py). Strike hier bereits vorberechnet
+        // (EMA200-1,5xATR, analog zu tickerList/openKiBriefing()) statt dem
+        // Modell die Arithmetik zu ueberlassen — Numeric-Integrity-Prinzip.
+        var _strikeTxt = (t.ema200 != null && t.atr != null)
+          ? (' Strike(EMA200-1.5xATR):$' + (t.ema200 - 1.5 * t.atr).toFixed(2))
+          : '';
         return (i+1) + '. ' + t.sym
           + ' Kurs:$' + (t.price||'--')
           + ' ' + _volLabel
           + ' RSI:' + (t.rsi ? Math.round(t.rsi) : '--')
           + ' ATR:' + (t.atr||'--')
           + ' D200:' + (t.dist200!=null ? t.dist200+'%' : '--')
+          + _strikeTxt
           + ' Grade:' + (t.grade||'--');
       }).join('\n');
   var _todayForPrompt2 = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', weekday:'long' });
@@ -26309,6 +26342,12 @@ async function runAlphaLbKI() {
     if (t.avgVol20 != null) line += ' AvgVol:' + Math.round(t.avgVol20/1000) + 'k';
     if (t.ema50  != null && t.price) line += ' EMA50:$' + t.ema50.toFixed(2);
     if (t.ema200 != null && t.price) line += ' EMA200:$' + t.ema200.toFixed(2);
+    // ERGAENZT (Feld-Audit-Vollcheck, echter Fund, EIC-§23-Vorarbeit): ema200
+    // und atr waren beide schon da, aber nie zu einem Strike-Vorschlag
+    // verrechnet — das Modell haette das selbst tun muessen (Numeric-
+    // Integrity-Risiko). Jetzt vorberechnet, analog zu tickerList/
+    // runOptionsKiBriefing().
+    if (t.ema200 != null && t.atr != null) line += ' Strike(EMA200-1.5xATR):$' + (t.ema200 - 1.5 * t.atr).toFixed(2);
     if (t.dist200 != null) line += ' Dist200:' + t.dist200.toFixed(1) + '%';
     if (t.pctFromHigh52 != null) line += ' 52W-H:' + t.pctFromHigh52.toFixed(1) + '%';
     if (t.bbPos  != null) line += ' BBPos:' + t.bbPos.toFixed(2);
