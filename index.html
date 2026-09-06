@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260907-v499">          
+<meta name="version" content="20260907-v500">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,33 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):                
+     v500: FUND B behoben (07.09.2026, Axel-Entscheidung nach dem VCP-/
+           Mean-Reversion-Live-Test-Muster von vor zwei Tagen — dieselben
+           "Immer-Kandidaten" VOD/GLEN.L/VLO tauchten unabhängig von der
+           gewählten Equity-Strategie als "Top-Fit" auf). Root Cause:
+           openKiBriefing() sortierte für ALLE Equity-Strategien nach
+           demselben generischen compositeScore, obwohl market_aggregator.py
+           bereits zehn strategie-eigene Scores (sMinervini/sSwing/sMrLong/
+           sBreakout/sBreakdown/sFading/sVcp/sKoLong/sDividend/sValue) direkt
+           auf jedem results[]-Item berechnet UND unverändert (master["tickers"]
+           = results, keine Rekonstruktion) an die KV weiterreicht — die
+           Daten lagen die ganze Zeit vor, wurden nur nie genutzt. Fix: (1)
+           topResults.push() und kvDataToTickerData() um alle zehn sXxx-Felder
+           ergänzt (reiner Durchreichungs-Fix, kein Rekonstruktionsrisiko
+           serverseitig, aber die übliche Lücke auf dem Weg zum Client). (2)
+           Neue STRAT_SCORE_FIELD-Mapping-Tabelle + Sortierung nutzt jetzt den
+           strategie-eigenen Score, wo vorhanden, mit Fallback auf composite-
+           Score. Bewusst NUR für die 10 Equity-/Short-Strategien mit eigenem
+           Score — Options-Strategien (csp_wheel/atmna/weekly_income/cc/
+           collar) behalten compositeScore, da sie über den dedizierten
+           Options-Desk-Pfad ohnehin bereits korrekt score-basiert bedient
+           werden; dieser Scanner-Tab-Pfad ist für sie nur sekundär. fading_
+           short nutzt sFading (nicht ein eigenes Short-KO-Score-Feld, das es
+           serverseitig nicht gibt) — konsistent mit der bereits bestehenden
+           calc_ko_short_leverage()-Kopplung an sFading. Isoliert mit
+           synthetischen Testdaten verifiziert: meanrev bringt jetzt korrekt
+           einen Titel mit niedrigerem compositeScore aber hohem sMrLong nach
+           vorne; csp_wheel faellt korrekt auf compositeScore zurueck.
      v499: ZWEI WEITERE Fundstellen desselben Musters, direkt aus Axels
            Dreifach-Vergleichstest (CSP/Wheel über Options-Desk/Alpha-Desk/
            Scanner-Tab) diagnostiziert (07.09.2026):
@@ -7975,6 +8002,20 @@ function kvDataToTickerData(kvTicker) {
     ivpHv20:       kvTicker.ivpHv20       != null ? kvTicker.ivpHv20       : null,
     ivpHv50:       kvTicker.ivpHv50       != null ? kvTicker.ivpHv50       : null,
     ivpHv100:      kvTicker.ivpHv100      != null ? kvTicker.ivpHv100      : null,
+    // NEU (07.09.2026, Fund B): strategie-eigene Scores, direkt 1:1 aus
+    // market_aggregator.py durchgereicht (master["tickers"] = results, kein
+    // Rekonstruktions-Risiko fuer diese zehn Felder — s. Kommentar in
+    // topResults.push() in openKiBriefing()).
+    sMinervini:    kvTicker.sMinervini != null ? kvTicker.sMinervini : null,
+    sSwing:        kvTicker.sSwing     != null ? kvTicker.sSwing     : null,
+    sMrLong:       kvTicker.sMrLong    != null ? kvTicker.sMrLong    : null,
+    sBreakout:     kvTicker.sBreakout  != null ? kvTicker.sBreakout  : null,
+    sBreakdown:    kvTicker.sBreakdown != null ? kvTicker.sBreakdown : null,
+    sFading:       kvTicker.sFading    != null ? kvTicker.sFading    : null,
+    sVcp:          kvTicker.sVcp       != null ? kvTicker.sVcp       : null,
+    sKoLong:       kvTicker.sKoLong    != null ? kvTicker.sKoLong    : null,
+    sDividend:     kvTicker.sDividend  != null ? kvTicker.sDividend  : null,
+    sValue:        kvTicker.sValue     != null ? kvTicker.sValue     : null,
   };
 }
 
@@ -18816,6 +18857,26 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       ivpHv20:       raw.ivpHv20       != null ? raw.ivpHv20       : null,
       ivpHv50:       raw.ivpHv50       != null ? raw.ivpHv50       : null,
       ivpHv100:      raw.ivpHv100      != null ? raw.ivpHv100      : null,
+      // NEU (07.09.2026, Fund B — Axel-Entscheidung): strategie-eigene Scores
+      // fuer die Kandidatenauswahl (s. STRAT_SCORE_FIELD weiter unten). Bisher
+      // sortierte openKiBriefing() fuer ALLE Equity-Strategien nach demselben
+      // generischen compositeScore ("score" oben) — dieselben "Immer-
+      // Kandidaten" (z.B. VOD/GLEN.L/VLO) tauchten dadurch unabhaengig von der
+      // gewaehlten Strategie als Top-Kandidaten auf. Diese zehn Felder liegen
+      // laut market_aggregator.py direkt auf jedem results[]-Item (kein
+      // Rekonstruktions-Risiko wie bei anderen Feldern), muessen hier aber
+      // trotzdem einzeln durchgereicht werden, da topResults.push() ein
+      // eigenes, handverlesenes Objekt baut.
+      sMinervini:    raw.sMinervini != null ? raw.sMinervini : null,
+      sSwing:        raw.sSwing     != null ? raw.sSwing     : null,
+      sMrLong:       raw.sMrLong    != null ? raw.sMrLong    : null,
+      sBreakout:     raw.sBreakout  != null ? raw.sBreakout  : null,
+      sBreakdown:    raw.sBreakdown != null ? raw.sBreakdown : null,
+      sFading:       raw.sFading    != null ? raw.sFading    : null,
+      sVcp:          raw.sVcp       != null ? raw.sVcp       : null,
+      sKoLong:       raw.sKoLong    != null ? raw.sKoLong    : null,
+      sDividend:     raw.sDividend  != null ? raw.sDividend  : null,
+      sValue:        raw.sValue     != null ? raw.sValue     : null,
       // Value-Felder (nur wenn vorhanden)
       pe: _vd.pe || null,
       pb: _vd.pb || null,
@@ -18854,8 +18915,40 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     });
   });
 
-  // Sortierung: Score absteigend
-  topResults.sort(function(a, b) { return b.score - a.score; });
+  // Sortierung: strategie-eigener Score, wo vorhanden — sonst Composite-Score
+  // als Fallback (Fund B, 07.09.2026, Axel-Entscheidung). VORHER: immer
+  // compositeScore, unabhaengig von der gewaehlten Strategie — dieselben
+  // "Immer-Kandidaten" (VOD/GLEN.L/VLO) tauchten dadurch bei praktisch jeder
+  // Equity-Strategie als "Top-Fit" auf, obwohl sie fachlich oft nicht die
+  // besten Kandidaten fuer die jeweils gewaehlte Strategie waren (z.B. bei
+  // Mean-Reversion, wo genau das Gegenteil — extremer RSI statt hoher SEPA/
+  // EMA200-Abstand — das eigentliche Auswahlkriterium ist). Nur fuer die 10
+  // Equity-/Short-Strategien mit einem eigenen serverseitigen Score
+  // (STRAT_SCORE_FIELD) — Options-Strategien (csp_wheel/atmna/weekly_income/
+  // cc/collar) behalten bewusst compositeScore, da sie ueber den dedizierten
+  // Options-Desk-Pfad (runOptionsKiBriefing()) ohnehin bereits eine eigene,
+  // korrekt score-basierte Kandidatenliste bekommen — dieser Scanner-Tab-Pfad
+  // ist fuer sie nur ein sekundaerer Zugang.
+  var STRAT_SCORE_FIELD = {
+    ko:           'sKoLong',
+    momentum:     'sMinervini',
+    breakout:     'sBreakout',
+    vcp:          'sVcp',
+    swing:        'sSwing',
+    meanrev:      'sMrLong',
+    breakdown:    'sBreakdown',
+    fading_short: 'sFading',   // s. Memo-Notiz 07.09.2026: calc_ko_short_leverage()
+                                // ist bereits an sFading gekoppelt, nicht sBreakdown —
+                                // dieselbe Kandidatenbasis hier wiederverwendet.
+    dividend:     'sDividend',
+    value:        'sValue',
+  };
+  var _stratScoreField = STRAT_SCORE_FIELD[_kiStrat];
+  function _sortScore(r) {
+    if (_stratScoreField && r[_stratScoreField] != null) return r[_stratScoreField];
+    return r.score;
+  }
+  topResults.sort(function(a, b) { return _sortScore(b) - _sortScore(a); });
 
   // ── Pre-Filter für Options-Wheel/EIC: Kursrahmen + ER-Schutz im JS anwenden ──
   // So kommt kein ungeeigneter Titel in den Prompt — KI muss nichts ausschließen
