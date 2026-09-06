@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260907-v500">          
+<meta name="version" content="20260907-v501">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,36 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):                
+     v501: DRITTE, bisher unbekannte Feldliste im Scanner-Tab-Pfad gefunden
+           und gefixt (07.09.2026, Axel-Fund — VCP-Live-Test zeigte trotz
+           v497-Fix und per GHA-Log bestätigtem vcpDetected=True weiterhin
+           "Contraction-Metriken nicht verfügbar"). Root Cause: openKi-
+           Briefing() baut NEBEN topResults.push() UND buildParameterPool()/
+           formatPoolForPrompt() noch eine DRITTE, komplett unabhängige
+           Text-Zusammenfassung ("tickerList") — und NUR diese landet
+           tatsächlich in ctx.marktkontext. Die über buildParameterPool()
+           gebaute "poolData"-Variable (inkl. aller VCP- und IVP-Felder,
+           korrekt seit v497/v496) wird zwar berechnet, aber NIRGENDS
+           anschließend verwendet — praktisch toter Code, seit wann genau
+           ungeklärt. tickerList selbst hatte weder die sechs VCP-Felder
+           noch die neuen echten IVP-Felder (ivpPercentile/ivpDays/ivpCurIv)
+           — nur ein ALTES, separates "_ivp"/isHV-Konzept (HVP-als-Proxy-
+           Fallback), das schon vor der IVP-Integration existierte. Fix:
+           beide Feldgruppen direkt in tickerList ergänzt — VCP mit
+           Unterscheidung "vollständig bestätigt" vs. "Muster erkannt, aber
+           nicht vollständig" (niemals unvollständige Kontraktionen als
+           bestätigtes VCP darstellen); IVP als neues primäres Kriterium,
+           der alte _ivp/isHV-Fallback nur noch aktiv, wenn KEINE echte IVP
+           vorliegt (vermeidet widersprüchliche Doppel-Nennung). Isoliert
+           mit drei realistischen Testfällen verifiziert. WICHTIGE KONSEQUENZ:
+           der fruehere CSP/Wheel-Dreifach-Test (Scanner-Tab-Teilergebnis)
+           zeigte vermutlich aus demselben Grund kein IVP — nicht wegen
+           "duenner Daten bei generischen Kandidaten" wie urspruenglich
+           vermutet, sondern weil tickerList die ganze Zeit ueber die neuen
+           IVP-Felder gar nicht kannte. NOCH OFFEN: warum "poolData" gebaut,
+           aber nie verwendet wird — vermutlich historischer Rest eines
+           frueheren Refactors; Bereinigung oder Reaktivierung als eigener,
+           spaeterer Schritt.
      v500: FUND B behoben (07.09.2026, Axel-Entscheidung nach dem VCP-/
            Mean-Reversion-Live-Test-Muster von vor zwei Tagen — dieselben
            "Immer-Kandidaten" VOD/GLEN.L/VLO tauchten unabhängig von der
@@ -19120,8 +19150,39 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     if(r.scoreLabel) line += ' Grade:' + r.scoreLabel;
     // Fibo-Zone (nur wenn vorhanden)
     if(r.fibo) line += ' Fibo:' + r.fibo.zone + '(' + r.fibo.retrace + '%)';
-    // IV-Percentile mit Markov-Kombination
-    if(r._ivp != null) {
+    // NEU (07.09.2026, Axel-Fund — VCP-Live-Test zeigte trotz v497-Fix weiterhin
+    // "Contraction-Metriken nicht verfuegbar"): tickerList ist eine DRITTE,
+    // unabhaengige Feldliste, komplett getrennt von topResults.push() UND von
+    // buildParameterPool()/formatPoolForPrompt() (deren Ergebnis "poolData"
+    // weiter oben gebaut, aber NIE tatsaechlich in den Prompt-Text uebernommen
+    // wird — poolData ist toter Code, s. Zeile ~19037). NUR tickerList landet
+    // tatsaechlich in ctx.marktkontext (s. "+ tickerList +" weiter unten). Die
+    // sechs VCP-Felder waren hier nie ergaenzt worden, obwohl sie in raw/
+    // topResults laengst korrekt vorlagen (bestaetigt per GHA-Log-Diagnose).
+    if(r.vcpDetected) {
+      line += ' VCP✓(' + (r.vcpContractions||0) + 'x,letzte:' + r.vcpLastPct + '%';
+      if(r.vcpVolContraction != null) line += ',VolKontr:' + r.vcpVolContraction.toFixed(2);
+      if(r.vcpBreakoutVol    != null) line += ',BrkVol:'   + r.vcpBreakoutVol.toFixed(2) + 'x';
+      line += ')';
+    } else if (r.vcpContractions != null) {
+      // Muster erkannt, aber (noch) nicht als vollstaendiges VCP qualifiziert
+      // (z.B. Tightening-Kriterium nicht erfuellt) — trotzdem als Kontext nennen,
+      // NIEMALS als "VCP bestaetigt" darstellen (s. ko-prompts.js risikenText).
+      line += ' VCP-Ansatz(' + r.vcpContractions + 'x, kein vollst. VCP)';
+    }
+    // NEU (07.09.2026): echte IV-Perzentil-Daten (fetch_iv_percentile_data(),
+    // externe Quelle) — als PRIMAERES Kriterium vor dem alten HVP-Fallback
+    // (r._ivp/isHV weiter unten), konsistent mit ko-prompts.js v2.46.0
+    // ("IVP wo verfuegbar primaer, HVP nur als dokumentierter Fallback").
+    if(r.ivpPercentile != null) {
+      line += ' IVP:' + r.ivpPercentile + '%ile';
+      if(r.ivpDays  != null) line += '(' + r.ivpDays + 'T)';
+      if(r.ivpCurIv != null) line += ' IV:' + r.ivpCurIv + '%';
+    }
+    // IV-Percentile mit Markov-Kombination (ALTER HVP-Proxy-Fallback — nur
+    // wenn die NEUE, echte IVP-Kennzahl oben nicht verfuegbar war, sonst
+    // widerspruechliche Doppel-Nennung derselben Grundfrage).
+    if(r._ivp != null && r.ivpPercentile == null) {
       var ivpVal = r._ivp.ivp;
       var ivpLabel = r._ivp.isHV ? 'HVP' : 'IVP';
       var ivpAtm = r._ivp.atmIV;
