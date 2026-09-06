@@ -3,8 +3,45 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260907-v498">          
+<meta name="version" content="20260907-v499">          
+     <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
+     WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
+     NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
+     unabhängige, handgepflegte Feldlisten über zwei Dateien/Sprachen hinweg —
+     jede muss beim Hinzufügen eines neuen Feldes einzeln ergänzt werden, sonst
+     geht das Feld irgendwo auf dem Weg zum Modell verloren (genau DAS ist
+     fünfmal in Folge passiert: homeMarket, tightnessPct, sma150, rsRating,
+     VCP-Felder, zuletzt ivpPercentile — jedes Mal an einer anderen der sieben
+     Stellen). Bis ein struktureller Fix (Option B, zurückgestellt bis das
+     System sich stabil bewährt hat — s. /areas/uiq.md) diese sieben Listen
+     durch eine einzige gemeinsame Quelle ersetzt, gilt diese Checkliste:
+     market_aggregator.py: 1. scored.append({...}) — die eigentliche Quelle;
+     2. top20()s _core-Liste — generische Leaderboards; 3. _rebuild_fundamental_
+     lb()s _core — dividend/value-Leaderboard.
+     Diese Datei (axel-scanner/index.html):
+     4. kvDataToTickerData() — Scanner-Tab-Live-Scan-Pfad;
+     5. topResults.push() in openKiBriefing() — Scanner-Tab-KI-Briefing;
+     6. buildParameterPool() — gemeinsamer Pool-Builder;
+     7. runAlphaLbKI()s tickerLines-Bauschleife — Alpha-Desk-eigener Pfad.
+     Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
+     gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):                
+     v499: ZWEI WEITERE Fundstellen desselben Musters, direkt aus Axels
+           Dreifach-Vergleichstest (CSP/Wheel über Options-Desk/Alpha-Desk/
+           Scanner-Tab) diagnostiziert (07.09.2026):
+           (1) kvDataToTickerData() — "hvp" selbst fehlte, unabhängig von
+           allen bisherigen Fixes (vermutlich seit Erstanlage der Funktion,
+           lange vor dieser Woche) — erklärt, warum der Scanner-Tab-Test
+           WEDER HVP noch IVP zeigte, obwohl v497/v498 bereits deployed
+           waren. Ergänzt.
+           (2) runOptionsKiBriefing() (Options-Desk-Tab) — SECHSTER
+           unabhängiger Datenpfad, komplett getrennt von den anderen fünf:
+           liest aus _optionsWatchlist (direkt aus market_aggregator.py
+           options_candidates, kein Zwischenschritt clientseitig). _volLabel-
+           Logik um ivpPercentile als höchste Priorität ergänzt (vor dem
+           alten, seit Monaten leeren ivRank-Feld und dem HVP-Fallback).
+           Isoliert getestet: Prioritätsreihenfolge IVP→IVR→HVP→Fallback
+           bestätigt korrekt.
      v498: FÜNFTE unabhängige Instanz desselben "neue Felder werden
            vergessen"-Musters gefunden und gefixt (07.09.2026, direkt im
            Zuge der v497-Diagnose entdeckt): runAlphaLbKI()s eigenständige
@@ -7896,6 +7933,13 @@ function kvDataToTickerData(kvTicker) {
     pBull2Bear:    kvTicker.pBull2Bear,
     fromKV:        true,
     updated:       kvTicker.updated,
+    // NACHGETRAGEN (07.09.2026, Axel-Fund — csp_wheel-Scanner-Tab-Live-Test
+    // zeigte WEDER HVP noch IVP, obwohl homeMarket/ivp*/etc. bereits gefixt
+    // waren): hvp selbst fehlte in dieser Funktion — unabhaengig von allen
+    // bisherigen Fixes, vermutlich seit Erstanlage der Funktion nie gemappt.
+    // Reiner Zufall, dass das erst jetzt auffiel (bisherige Tests liefen
+    // ueberwiegend ueber Alpha Desk, das diese Funktion nie durchlaeuft).
+    hvp:           kvTicker.hvp != null ? kvTicker.hvp : null,
     // TVA Sprint A (August 2026)
     trendScore:    kvTicker.trendScore    != null ? kvTicker.trendScore    : null,
     confluenceScore: kvTicker.confluenceScore != null ? kvTicker.confluenceScore : null,
@@ -25427,7 +25471,12 @@ async function runOptionsKiBriefing(strat) {
         // anderen Stellen (index.html ~9587/13456/18641) existiert bereits
         // das korrekte Muster (label = isHV ? 'HVP' : 'IVP') — hier jetzt
         // uebernommen statt neu erfunden (Grundgesetz #1, Regelwerk-Einheit).
-        var _volLabel = (t.ivRank != null) ? ('IVR:' + t.ivRank + '%')
+        // FIX (07.09.2026, Axel-Fund — Options-Desk-Live-Test zeigte gar
+        // keinen IVP-Bezug): ivpPercentile als hoechste Prioritaet ergaenzt,
+        // vor dem alten ivRank-Feld (das laut Aggregator-Kommentar seit
+        // Monaten bewusst leer bleibt) und dem HVP-Fallback.
+        var _volLabel = (t.ivpPercentile != null) ? ('IVP:' + t.ivpPercentile + '%ile')
+                       : (t.ivRank != null) ? ('IVR:' + t.ivRank + '%')
                        : (t.hvp != null)    ? ('HVP:' + t.hvp + '%')
                        : 'Vol:--';
         return (i+1) + '. ' + t.sym
