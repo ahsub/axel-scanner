@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260909-v507">          
+<meta name="version" content="20260909-v508">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,27 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):                
+     v508: Drei neue Options-Strategie-Tabs im Alpha-Desk-Leaderboard
+           (09.09.2026, "Weg 1"-Entscheidung nach Axel-Frage "verschwinden
+           CSP/Wheel und CC dann aus dem Options-Desk?"). atmna/weekly_
+           income/collar hatten bisher lbKey:null (nur im Options-Desk
+           vertreten, nicht im Alpha-Desk-Leaderboard) — inkonsistent zu
+           csp_wheel/cc, die bereits an beiden Stellen erschienen. Statt
+           eines Frontend-Workarounds (mehrere Strategien teilen sich einen
+           lbKey — haette stratFromLb()s 1:1-Aufloesung gebrochen UND jede
+           der mehreren Aufrufstellen haette eine Sonderbehandlung gebraucht,
+           dasselbe Bug-Muster wie der Fading-Short-Fund in v506/v507, nur
+           absichtlich eingebaut) wurden im Aggregator (market_aggregator.py)
+           drei ECHTE, neue Leaderboard-Eintraege ergaenzt (options_atmna/
+           options_weekly/options_collar — identische sCsp-Kandidatenmenge
+           wie options_csp, da alle vier CSP-Varianten dieselbe Titelauswahl
+           teilen, sich nur in der Strukturierung unterscheiden). Neue Tabs
+           hier entsprechend ergaenzt (data-lb="options_atmna"/"options_
+           weekly"/"options_collar"), lbKey-Zuordnung in ko-prompts.js
+           v2.53.14 gesetzt. Dient als Vorbild fuer die geplanten Spread-
+           Strategien (Bull Put Spread, Iron Condor, Calendar Spread), die
+           wegen eigener Scoring-Logik ohnehin echte Leaderboard-Eintraege
+           brauchen werden.
      v507: Fading-Short-Fix vervollständigt (09.09.2026, Axel-Fund nach v506).
            v506 hatte nur das Label-Symptom behoben, aber den falschen der
            zwei Tabs behalten: "short_fading_ko" existiert NIRGENDS im Python-
@@ -3850,6 +3871,15 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <!-- NEU (13.07.2026): KO-Long, CSP, CC Leaderboards -->
       <button class="alpha-lb-tab" data-lb="ko_long" onclick="switchAlphaLB(this,'ko_long')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #818cf8;background:rgba(129,140,248,0.12);color:#818cf8;cursor:pointer">⚡ KO-Long</button>
       <button class="alpha-lb-tab" data-lb="options_csp" onclick="switchAlphaLB(this,'options_csp')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">🎯 CSP/Wheel</button>
+      <!-- ERGÄNZT (09.09.2026, "Weg 1"-Entscheidung — s. Kommentar bei
+           ko-prompts.js STRATEGIES.atmna.lbKey): drei neue Tabs, teilen sich
+           dieselbe options_atmna/options_weekly/options_collar-Kandidaten-
+           menge (identisch zu options_csp im Aggregator), jeder mit
+           eigenem, echt aufloesbarem lbKey — kein Frontend-Alias/Override,
+           volle Konsistenz mit dem bestehenden csp_wheel/cc-Muster. -->
+      <button class="alpha-lb-tab" data-lb="options_atmna" onclick="switchAlphaLB(this,'options_atmna')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #a371f7;background:rgba(163,113,247,0.08);color:#a371f7;cursor:pointer">⚙️ CSP ATM/NA</button>
+      <button class="alpha-lb-tab" data-lb="options_weekly" onclick="switchAlphaLB(this,'options_weekly')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #34d399;background:rgba(52,211,153,0.08);color:#34d399;cursor:pointer">📅 CSP Weekly</button>
+      <button class="alpha-lb-tab" data-lb="options_collar" onclick="switchAlphaLB(this,'options_collar')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #64748b;background:rgba(100,116,139,0.08);color:#64748b;cursor:pointer">🛡️ Collar/PP</button>
       <button class="alpha-lb-tab" data-lb="options_cc" onclick="switchAlphaLB(this,'options_cc')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--green);background:rgba(34,197,94,0.08);color:var(--green);cursor:pointer">📋 Cov. Call</button>
       <!-- NEU (14.07.2026): VCP Detection Leaderboard (Backlog #18, Sprint 1) -->
       <button class="alpha-lb-tab" data-lb="vcp_setups" onclick="switchAlphaLB(this,'vcp_setups')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #a855f7;background:rgba(168,85,247,0.1);color:#a855f7;cursor:pointer">📐 VCP</button>
@@ -27576,7 +27606,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4e2b895/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@9dd18b1/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@7016eda/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1027955/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
