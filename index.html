@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260909-v508">          
+<meta name="version" content="20260909-v509">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,19 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):                
+     v509: ownerEarningsYield in runAlphaLbKI()s tickerLines fuer
+           long_dividend/long_value ergaenzt (09.09.2026, Owner-Earnings-
+           Feature, s. ko-prompts.js v2.53.25 und market_aggregator.py
+           enrich_with_fundamentals()-Erweiterung). WICHTIGER EIGENER
+           FUND: diese Aenderung wurde urspruenglich im selben Zug wie
+           v508 vorgenommen, aber die Versionsnummer/dieser Changelog-
+           Eintrag wurden dabei vergessen — die zuvor als "v508 deployed"
+           bereitgestellte Datei trug dadurch weiterhin die alte
+           Versionskennung, obwohl sich der Inhalt bereits geaendert
+           hatte. Beim naechsten Deploy-Check fiel auf, dass die live
+           Datei die ownerEarningsYield-Ergaenzung tatsaechlich nicht
+           enthielt — hier nachgeholt, mit korrektem Versionsbump, damit
+           Inhalt und Versionsnummer wieder synchron sind.
      v508: Drei neue Options-Strategie-Tabs im Alpha-Desk-Leaderboard
            (09.09.2026, "Weg 1"-Entscheidung nach Axel-Frage "verschwinden
            CSP/Wheel und CC dann aus dem Options-Desk?"). atmna/weekly_
@@ -26515,6 +26528,10 @@ async function runAlphaLbKI() {
       if (t.payoutRatio != null) line += ' Payout:' + t.payoutRatio + '%';
       if (t.fcfYield    != null) line += ' FCF:' + t.fcfYield + '%';
       if (t.roe         != null) line += ' ROE:' + t.roe + '%';
+      // ERGAENZT (09.09.2026): echtes ownerEarningsYield-Feld, falls fuer
+      // diesen Titel verfuegbar (Cashflow-/Financials-Fetch kann fuer
+      // einzelne Titel fehlschlagen, dann bleibt das Feld null).
+      if (t.ownerEarningsYield != null) line += ' OE-Yield:' + t.ownerEarningsYield + '%';
       if (t.sDividend   != null) line += ' sDividend:' + t.sDividend;
     }
     // Value-spezifische Felder (Backlog #13b, 29.07.2026)
@@ -26524,6 +26541,7 @@ async function runAlphaLbKI() {
       if (t.fcfYield      != null) line += ' FCF:' + t.fcfYield + '%';
       if (t.analystUpside != null) line += ' Upside:+' + t.analystUpside + '%';
       if (t.roe           != null) line += ' ROE:' + t.roe + '%';
+      if (t.ownerEarningsYield != null) line += ' OE-Yield:' + t.ownerEarningsYield + '%';
       if (t.sValue        != null) line += ' sValue:' + t.sValue;
     }
     return line;
