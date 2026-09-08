@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260909-v506">          
+<meta name="version" content="20260909-v507">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,25 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):                
+     v507: Fading-Short-Fix vervollständigt (09.09.2026, Axel-Fund nach v506).
+           v506 hatte nur das Label-Symptom behoben, aber den falschen der
+           zwei Tabs behalten: "short_fading_ko" existiert NIRGENDS im Python-
+           Aggregator (verifiziert, 0 Treffer) — der echte, datentragende
+           Schluessel ist "short_fading" (top20("sFading",35)). Root Cause
+           war eine falsche lbKey-Zuordnung in ko-prompts.js (jetzt v2.53.13
+           korrigiert: STRATEGIES.fading_short.lbKey = 'short_fading_ko' →
+           'short_fading'). Aenderungen hier: (1) Alpha-Desk-Tab nutzt jetzt
+           data-lb="short_fading" statt des erfundenen "short_fading_ko".
+           (2) Alle drei Sperrlisten (_lbNoMetrics, _noMetricsLBs, _noMetrics)
+           komplett geleert — short_fading braucht keine "keine Metriken"-
+           Behandlung mehr, KI-Button UND Kandidaten-Chips funktionieren
+           jetzt gleichzeitig. (3) Separates, bisher unentdecktes drittes
+           Strategie-Dropdown (toggleKiDropdown(), Scanner-Tab "KI-Strategie-
+           empfehlung"-Button) um die vier fehlenden Eintraege ergaenzt:
+           dividend, value, breakdown, fading_short — dieses Array ist
+           unabhaengig vom ki-briefing-modal-Button-Set (v506) und muss bei
+           kuenftigen Strategie-Ergaenzungen separat gepflegt werden, es gibt
+           noch keine gemeinsame Quelle fuer beide Stellen.
      v506: "KO-Short"-Umbenennung zu "Fading Short" (09.09.2026, Axel-
            Entscheidung nach Nutzerverwirrung). Root Cause: der Button/Tab
            mit data-strat/data-lb="fading_short"/"short_fading_ko" (korrekter
@@ -3819,13 +3838,15 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <button class="alpha-lb-tab" data-lb="long_swing" onclick="switchAlphaLB(this,'long_swing')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #06b6d4;background:rgba(6,182,212,0.08);color:#06b6d4;cursor:pointer">🔄 Swing</button>
       <button class="alpha-lb-tab" data-lb="long_mr" onclick="switchAlphaLB(this,'long_mr')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">↩️ Mean Rev.</button>
       <button class="alpha-lb-tab" data-lb="short_breakdown" onclick="switchAlphaLB(this,'short_breakdown')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--red);background:rgba(239,68,68,0.08);color:var(--red);cursor:pointer">📉 Breakdown</button>
-      <!-- ENTFERNT (09.09.2026, Axel-Entscheidung): alter, funktionsloser "short_fading"-Tab
-           (ohne _ko) hier entfernt — hatte keinen STRATEGIES-Eintrag, war reiner Deadweight.
-           Die Scoredaten (r.sFading) leben unveraendert in den Ticker-Badges weiter, nur
-           dieser eigenstaendige Leaderboard-Tab faellt weg. KO-Short als Konzept (allgemeine
-           Short-KO-Wette auf fallende Kurse, Spiegel zu KO-Long) komplett zurueckgestellt,
-           s. Backlog. -->
-      <button class="alpha-lb-tab" data-lb="short_fading_ko" onclick="switchAlphaLB(this,'short_fading_ko')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.15);color:#f97316;cursor:pointer;font-weight:700" title="Experimentell — Edge-These noch nicht verifiziert">⚠️ Fading Short 🧪</button>
+      <!-- KORRIGIERT (09.09.2026, Axel-Fund): data-lb war "short_fading_ko" —
+           ein reiner UI-Workaround-Schluessel ohne Entsprechung im Python-
+           Aggregator. Der echte, datentragende Schluessel ist "short_fading"
+           (top20("sFading", 35) in market_aggregator.py) — jetzt korrekt
+           verwendet, zusammen mit dem korrigierten lbKey in ko-prompts.js
+           v2.53.13 loest die KI-Analyse jetzt tatsaechlich auf 'fading_short'
+           auf, UND der Tab zeigt echte Kandidatendaten statt der bisherigen
+           "keine Metriken"-Meldung. -->
+      <button class="alpha-lb-tab" data-lb="short_fading" onclick="switchAlphaLB(this,'short_fading')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.15);color:#f97316;cursor:pointer;font-weight:700" title="Experimentell — Edge-These noch nicht verifiziert">⚠️ Fading Short 🧪</button>
       <!-- NEU (13.07.2026): KO-Long, CSP, CC Leaderboards -->
       <button class="alpha-lb-tab" data-lb="ko_long" onclick="switchAlphaLB(this,'ko_long')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #818cf8;background:rgba(129,140,248,0.12);color:#818cf8;cursor:pointer">⚡ KO-Long</button>
       <button class="alpha-lb-tab" data-lb="options_csp" onclick="switchAlphaLB(this,'options_csp')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">🎯 CSP/Wheel</button>
@@ -18836,12 +18857,21 @@ function toggleKiDropdown(anchorEl) {
     { strat:'vcp',          label:'📐 VCP-Setup' },
     { strat:'swing',        label:'🔄 Swing-Trading' },
     { strat:'meanrev',      label:'↩️ Mean Reversion' },
+    { strat:'dividend',     label:'💰 Dividend Growth' },
+    { strat:'value',        label:'📊 Value' },
+    { strat:'breakdown',    label:'📉 Breakdown' },
+    { strat:'fading_short', label:'⚠️ Fading Short 🧪' },
     { strat:'csp_wheel',    label:'⚙️ CSP/Wheel' },
     { strat:'atmna',        label:'🎯 CSP (ATM/NA)' },
     { strat:'weekly_income',label:'💰 CSP (Weekly)' },
     { strat:'cc',           label:'📝 Covered Call' },
     { strat:'collar',       label:'🛡️ Collar/Protective Put' },
   ];
+  // ERGÄNZT (09.09.2026, Axel-Fund): dividend/value/breakdown/fading_short
+  // fehlten in diesem Dropdown komplett (separates, hartcodiertes Array,
+  // unabhängig vom ki-briefing-modal-Button-Set weiter unten in der Datei —
+  // beide Stellen muessen bei kuenftigen Strategie-Ergaenzungen einzeln
+  // aktualisiert werden, es gibt noch keine gemeinsame Quelle).
 
   var html = '<div style="font-size:10px;color:var(--text3);padding:2px 8px 5px;border-bottom:0.5px solid var(--border);margin-bottom:3px">KI-ANALYSE STARTEN:</div>';
   // BUGFIX (15.07.2026, Phase 0.5 Arbeitspaket G Punkt 6): kurzer Hinweis auf
@@ -26120,9 +26150,11 @@ function renderAlphaLB(lb, key) {
   // seit jeher echte Scoring-Logik, es fehlte nur der STRATEGIES-Eintrag in
   // ko-prompts.js fuer die KI-Analyse (jetzt ergaenzt, v2.45.0). Chips zeigen
   // also ab sofort echte Daten statt Platzhaltertext.
-  var _lbNoMetrics = {
-    short_fading_ko: 'Fading Short',
-  };
+  // KORRIGIERT (09.09.2026): short_fading_ko entfernt (existierte nie im
+  // Aggregator, s. lbKey-Fix ko-prompts.js v2.53.13). Der jetzt verwendete
+  // Schluessel "short_fading" hat ECHTE Kandidatendaten (top20("sFading",35))
+  // und gehoert NICHT in diese Sperrliste.
+  var _lbNoMetrics = {};
   if (_lbNoMetrics[key]) {
     el.innerHTML = '<div style="padding:8px 0;font-size:11px;color:var(--amber)">'
       + '⚠ <strong>' + _lbNoMetrics[key] + '</strong>: '
@@ -26223,7 +26255,10 @@ function switchAlphaLB(btn, key) {
   // ENTFERNT (06.09.2026): short_breakdown — hat jetzt einen STRATEGIES-
   // Eintrag (ko-prompts.js v2.45.0, `breakdown`), KI-Button wird nicht mehr
   // gedimmt.
-  var _noMetrics = ['short_fading_ko'];
+  // KORRIGIERT (09.09.2026): short_fading_ko entfernt (existierte nie im
+  // Aggregator, s. lbKey-Fix ko-prompts.js v2.53.13). short_fading loest
+  // jetzt korrekt auf 'fading_short' auf und hat echte Kandidatendaten.
+  var _noMetrics = [];
   var kiBtn = document.querySelector('#alpha-lb-section button[onclick="runAlphaLbKI()"]');
   var kiStatus = document.getElementById('alpha-lb-ki-status');
   if (kiBtn) {
@@ -26359,9 +26394,10 @@ async function runAlphaLbKI() {
   // STRATEGIES-Eintrag (ko-prompts.js v2.45.0, `breakdown`,
   // stratFromLb('short_breakdown') löst korrekt auf), KI-Button ist ab
   // sofort funktionsfähig.
-  var _noMetricsLBs = {
-    short_fading_ko: 'Fading Short',
-  };
+  // KORRIGIERT (09.09.2026): short_fading_ko entfernt (existierte nie im
+  // Aggregator). short_fading hat echte sFading-Kandidatendaten, gehoert
+  // NICHT in diese Sperrliste.
+  var _noMetricsLBs = {};
   if (_noMetricsLBs[_alphaLB]) {
     if (statusEl) statusEl.innerHTML =
       '<span style="color:var(--amber)">⚠ ' + _noMetricsLBs[_alphaLB] +
@@ -27540,7 +27576,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4e2b895/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@8390bf1/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@9dd18b1/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1027955/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
