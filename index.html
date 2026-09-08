@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260907-v505">          
+<meta name="version" content="20260909-v506">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,28 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):                
+     v506: "KO-Short"-Umbenennung zu "Fading Short" (09.09.2026, Axel-
+           Entscheidung nach Nutzerverwirrung). Root Cause: der Button/Tab
+           mit data-strat/data-lb="fading_short"/"short_fading_ko" (korrekter
+           Inhalt: Überdehnung/Erschöpfung, Gegentrend, s. ko-prompts.js
+           STRATEGIES.fading_short) trug in der UI faelschlich das Label
+           "KO-Short" — waehrend ein SEPARATER, komplett leerer Platzhalter-
+           Button den korrekten Namen "Fading Short" trug, aber keinerlei
+           STRATEGIES-Zuordnung hatte. Axel-Entscheidung: "KO-Short" als
+           eigenstaendiges Konzept (allgemeine Short-KO-Wette auf fallende
+           Kurse, Spiegel zu KO-Long) komplett zurueckgestellt (Backlog fuer
+           spaeter zu ergaenzende Strategien) — der bereits inhaltlich fertige
+           "fading_short"-Button wird stattdessen "namensgleich" zu "Fading
+           Short". Aenderungen: (1) Scanner-Modal-Button umbenannt (Label +
+           Tooltip), leerer Platzhalter-Button entfernt. (2) Alpha-Desk-
+           Leaderboard: alter, funktionsloser "short_fading"-Tab (ohne _ko)
+           komplett entfernt, "short_fading_ko"-Tab umbenannt. (3) Beide
+           Label-Mapping-Objekte (_lbNoMetrics, _noMetricsLBs) sowie die
+           _noMetrics-Pruefliste bereinigt (verwaisten short_fading-Eintrag
+           entfernt, short_fading_ko-Label korrigiert). Die echten sFading-
+           Scoredaten (Ticker-Badges, Composite-Score-Anzeige) sind von
+           dieser Umbenennung NICHT betroffen und bleiben unveraendert —
+           trugen bereits korrekt den Namen "Fading Short"/"Short Fading".
      v505: Strike-Gültigkeitsprüfung (Live-Test-Fund, erster EIC-csp_wheel-
            Lauf über Options-Desk). Die in v504 eingeführte Strike-
            Vorberechnung (EMA200-1,5×ATR) an allen drei Stellen (tickerList,
@@ -3797,9 +3819,13 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
       <button class="alpha-lb-tab" data-lb="long_swing" onclick="switchAlphaLB(this,'long_swing')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #06b6d4;background:rgba(6,182,212,0.08);color:#06b6d4;cursor:pointer">🔄 Swing</button>
       <button class="alpha-lb-tab" data-lb="long_mr" onclick="switchAlphaLB(this,'long_mr')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">↩️ Mean Rev.</button>
       <button class="alpha-lb-tab" data-lb="short_breakdown" onclick="switchAlphaLB(this,'short_breakdown')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--red);background:rgba(239,68,68,0.08);color:var(--red);cursor:pointer">📉 Breakdown</button>
-      <button class="alpha-lb-tab" data-lb="short_fading" onclick="switchAlphaLB(this,'short_fading')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.08);color:#f97316;cursor:pointer">🔝 Fading Short</button>
-      <!-- NEU (01.07.2026): Fading Short via KO — separater Tab für Short-Strategie-Workflow -->
-      <button class="alpha-lb-tab" data-lb="short_fading_ko" onclick="switchAlphaLB(this,'short_fading_ko')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.15);color:#f97316;cursor:pointer;font-weight:700" title="Experimentell — Edge-These noch nicht verifiziert">⚠️ KO-Short 🧪</button>
+      <!-- ENTFERNT (09.09.2026, Axel-Entscheidung): alter, funktionsloser "short_fading"-Tab
+           (ohne _ko) hier entfernt — hatte keinen STRATEGIES-Eintrag, war reiner Deadweight.
+           Die Scoredaten (r.sFading) leben unveraendert in den Ticker-Badges weiter, nur
+           dieser eigenstaendige Leaderboard-Tab faellt weg. KO-Short als Konzept (allgemeine
+           Short-KO-Wette auf fallende Kurse, Spiegel zu KO-Long) komplett zurueckgestellt,
+           s. Backlog. -->
+      <button class="alpha-lb-tab" data-lb="short_fading_ko" onclick="switchAlphaLB(this,'short_fading_ko')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #f97316;background:rgba(249,115,22,0.15);color:#f97316;cursor:pointer;font-weight:700" title="Experimentell — Edge-These noch nicht verifiziert">⚠️ Fading Short 🧪</button>
       <!-- NEU (13.07.2026): KO-Long, CSP, CC Leaderboards -->
       <button class="alpha-lb-tab" data-lb="ko_long" onclick="switchAlphaLB(this,'ko_long')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid #818cf8;background:rgba(129,140,248,0.12);color:#818cf8;cursor:pointer">⚡ KO-Long</button>
       <button class="alpha-lb-tab" data-lb="options_csp" onclick="switchAlphaLB(this,'options_csp')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:0.5px solid var(--amber);background:rgba(245,158,11,0.08);color:var(--amber);cursor:pointer">🎯 CSP/Wheel</button>
@@ -3964,7 +3990,7 @@ background:var(--bg3);color:var(--text2)">↓ Bear</button>
         <!-- Dividend/Value entfernt (17.07.2026, Regime-Coverage-Analyse) — keine Timing-Strategien -->
         <button onclick="setDdStrategy('atmna')" id="dd-strat-top-atmna" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:#a371f7">⚙️ ATM/NA</button>
         <!-- NEU (01.07.2026): Short-Strategien -->
-        <button onclick="setDdStrategy('fading_short')" id="dd-strat-top-fading_short" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:#f97316;border-color:#f97316;font-weight:700" title="Experimentell — Edge-These noch nicht verifiziert">⚠️ KO-Short 🧪</button>
+        <button onclick="setDdStrategy('fading_short')" id="dd-strat-top-fading_short" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:#f97316;border-color:#f97316;font-weight:700" title="Experimentell — Edge-These noch nicht verifiziert">⚠️ Fading Short 🧪</button>
       </div>
     </div>
 
@@ -20030,14 +20056,14 @@ function csvSaveConfirm(tickers) {
         <button class="ki-strat-btn" data-strat="fading_short"
           onclick="setKiStrat(this)"
           style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer"
-          title="KO-Short (experimentell): KO-Zertifikat Short-Richtung · Gegentrend · BULL_FRAGILE/STRESS_UNSTABLE">
-          ⚠️ KO-Short 🧪
+          title="Fading Short (experimentell): KO-Zertifikat Short-Richtung · Gegentrend · BULL_FRAGILE/STRESS_UNSTABLE">
+          🔻 Fading Short 🧪
         </button>
-        <button class="ki-strat-btn-placeholder" disabled
-          style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:not-allowed;opacity:0.5"
-          title="Fading Short: noch keine STRATEGIES-Zuordnung — offene Design-Entscheidung (entfernen/mit KO-Short zusammenführen/eigenständig aufsetzen), s. Übergabeprotokoll 06.09.2026">
-          🔝 Fading Short (Platzhalter)
-        </button>
+        <!-- ENTFERNT (09.09.2026, Axel-Entscheidung): leerer "Fading Short (Platzhalter)"-
+             Button hier entfernt — der obige "fading_short"-Button traegt jetzt den
+             korrekten Namen und deckt das Konzept vollstaendig ab. "KO-Short" (allgemeine
+             Short-KO-Wette auf fallende Kurse, Spiegel zu KO-Long) komplett zurueckgestellt,
+             s. Backlog. -->
       </div>
       <div id="ki-strat-hint" style="font-size:10px;color:var(--text3);margin-top:.4rem">
         ⚡ KO-Trading: Hebel 3–8x · KO-Abstand · Positionsgröße max. €2.000
@@ -26095,7 +26121,7 @@ function renderAlphaLB(lb, key) {
   // ko-prompts.js fuer die KI-Analyse (jetzt ergaenzt, v2.45.0). Chips zeigen
   // also ab sofort echte Daten statt Platzhaltertext.
   var _lbNoMetrics = {
-    short_fading_ko: 'KO-Short',
+    short_fading_ko: 'Fading Short',
   };
   if (_lbNoMetrics[key]) {
     el.innerHTML = '<div style="padding:8px 0;font-size:11px;color:var(--amber)">'
@@ -26197,7 +26223,7 @@ function switchAlphaLB(btn, key) {
   // ENTFERNT (06.09.2026): short_breakdown — hat jetzt einen STRATEGIES-
   // Eintrag (ko-prompts.js v2.45.0, `breakdown`), KI-Button wird nicht mehr
   // gedimmt.
-  var _noMetrics = ['short_fading_ko','short_fading'];
+  var _noMetrics = ['short_fading_ko'];
   var kiBtn = document.querySelector('#alpha-lb-section button[onclick="runAlphaLbKI()"]');
   var kiStatus = document.getElementById('alpha-lb-ki-status');
   if (kiBtn) {
@@ -26334,8 +26360,7 @@ async function runAlphaLbKI() {
   // stratFromLb('short_breakdown') löst korrekt auf), KI-Button ist ab
   // sofort funktionsfähig.
   var _noMetricsLBs = {
-    short_fading_ko: 'KO-Short',
-    short_fading: 'Fading Short',
+    short_fading_ko: 'Fading Short',
   };
   if (_noMetricsLBs[_alphaLB]) {
     if (statusEl) statusEl.innerHTML =
