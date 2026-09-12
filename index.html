@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260909-v509">          
+<meta name="version" content="20260911-v510">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -25,7 +25,21 @@
      7. runAlphaLbKI()s tickerLines-Bauschleife — Alpha-Desk-eigener Pfad.
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
-     <!-- CHANGELOG (neueste zuerst):                
+     <!-- CHANGELOG (neueste zuerst):
+     v510: renderIntradayComparison() entfernt (11.09.2026, Nachbörsen-
+           Lauf-Umstellung). Aggregator laeuft seit market-aggregator.yml
+           v1.2 nur noch einmal taeglich nach US-Boersenschluss (22:00 UTC)
+           statt zuvor zweimal (Xetra-Vormarkt 03:37 UTC + NYSE-Oeffnung
+           13:30 UTC) — Root Cause: get_last_trading_day() liest die
+           letzte SPY-Tageskerze, die erst nach Boersenschluss existiert,
+           beide alten Laeufe lagen strukturell davor. Mit nur noch einem
+           Lauf/Tag haetten daily_market_snapshot und daily_market_
+           snapshot_us zwangslaeufig immer identischen Inhalt gezeigt —
+           die Funktion (Backlog #1, 13.07.2026, v327) haette also nie
+           wieder einen echten Unterschied anzeigen koennen. Funktion,
+           zugehoeriger HTML-Block (Tearsheet "INTRADAY-VERGLEICH") und
+           Aufruf in showMorningTearsheet() vollstaendig entfernt statt
+           als totes Feature stehen zu lassen.
      v509: ownerEarningsYield in runAlphaLbKI()s tickerLines fuer
            long_dividend/long_value ergaenzt (09.09.2026, Owner-Earnings-
            Feature, s. ko-prompts.js v2.53.25 und market_aggregator.py
