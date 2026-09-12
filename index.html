@@ -24640,94 +24640,6 @@ async function generateSimpleTearsheet() {
   btn.innerHTML = '<i class="ti ti-text-size"></i> Neu laden';
 }
 
-// ── MORNING BRIEFING TEARSHEET ────────────────────────────────────────────────
-/**
- * Intraday-Vergleich: Morgen-Lauf (daily_market_snapshot) vs. NYSE-Lauf
- * (daily_market_snapshot_us) — Backlog-Punkt #1 (Übergabeprotokoll 13.07.2026).
- * Laedt beide KV-Snapshots parallel, vergleicht Regime + Kernwerte aus
- * marketContext.factors (Single Source of Truth, MCM). Faellt sauber zurueck
- * wenn der NYSE-Lauf am aktuellen Tag noch nicht stattgefunden hat (normal
- * vor 13:30 UTC) oder wenn beide Snapshots identisch sind (kein neuer Lauf
- * seit dem Morgen).
- */
-async function renderIntradayComparison() {
-  var el = document.getElementById('ts-intraday-content');
-  if (!el) return;
-  try {
-    var todayUtc = new Date().toISOString().slice(0, 10);
-    var [morningResp, usResp] = await Promise.all([
-      fetch('https://ko-sync.ahildebrand.workers.dev/public/daily_market_snapshot', { cache: 'no-store', headers: _publicKvAuthHeaders() }),
-      fetch('https://ko-sync.ahildebrand.workers.dev/public/daily_market_snapshot_us', { cache: 'no-store', headers: _publicKvAuthHeaders() }),
-    ]);
-    var morning = morningResp.ok ? await morningResp.json() : null;
-    var us      = usResp.ok      ? await usResp.json()      : null;
-
-    var morningValid = morning && morning.ok && morning.generated && morning.generated.slice(0, 10) === todayUtc;
-    var usValid       = us      && us.ok      && us.generated      && us.generated.slice(0, 10) === todayUtc;
-
-    if (!morningValid) {
-      el.innerHTML = '<span style="color:var(--text3)">Kein Morgen-Snapshot für heute verfügbar.</span>';
-      return;
-    }
-    if (!usValid) {
-      el.innerHTML = '<span style="color:var(--text3)">NYSE-Lauf noch nicht verfügbar — erwartet ab ~13:30 UTC (15:30 MESZ). Zeige nur Morgen-Werte.</span>';
-      return;
-    }
-    if (morning.generated === us.generated) {
-      el.innerHTML = '<span style="color:var(--text3)">Morgen- und NYSE-Snapshot sind identisch (' + _fmtDeTime(morning.generated) + ') — noch kein separater NYSE-Lauf seit dem Morgen-Briefing.</span>';
-      return;
-    }
-
-    // Vergleichswerte aus marketContext.factors ziehen (Single Source of Truth, MCM)
-    function _f(snap, id) {
-      var f = snap && snap.marketContext && snap.marketContext.factors && snap.marketContext.factors[id];
-      return f ? f.value : null;
-    }
-    var rows = [
-      { label: 'Regime',          m: morning.regime, u: us.regime, isText: true },
-      { label: 'VIX',             m: _f(morning, 'vix'), u: _f(us, 'vix') },
-      { label: 'Fear & Greed',    m: _f(morning, 'fear_greed'), u: _f(us, 'fear_greed') },
-      { label: 'Put/Call-Ratio',  m: _f(morning, 'pcr'), u: _f(us, 'pcr') },
-      { label: 'Risk-Level',      m: morning.marketContext && morning.marketContext.summary && morning.marketContext.summary.risk_level,
-                                    u: us.marketContext && us.marketContext.summary && us.marketContext.summary.risk_level, isText: true },
-    ];
-
-    var html = '<div style="font-size:10px;color:var(--text3);margin-bottom:.5rem">Morgen: ' + _fmtDeTime(morning.generated)
-      + ' &nbsp;→&nbsp; NYSE: ' + _fmtDeTime(us.generated) + '</div>'
-      + '<table style="width:100%;border-collapse:collapse;font-size:11px">'
-      + '<tr style="color:var(--text3);font-size:9px;letter-spacing:0.5px"><td style="padding:2px 6px">METRIK</td><td style="padding:2px 6px;text-align:right">MORGEN</td><td style="padding:2px 6px;text-align:right">NYSE</td><td style="padding:2px 6px;text-align:right">Δ</td></tr>';
-
-    rows.forEach(function(r) {
-      if (r.m == null && r.u == null) return;
-      var deltaHtml = '—';
-      if (!r.isText && r.m != null && r.u != null) {
-        var d = r.u - r.m;
-        var col = Math.abs(d) < 0.01 ? 'var(--text3)' : (d > 0 ? 'var(--red)' : 'var(--green)');
-        deltaHtml = '<span style="color:' + col + '">' + (d >= 0 ? '+' : '') + d.toFixed(2) + '</span>';
-      } else if (r.isText && r.m !== r.u) {
-        deltaHtml = '<span style="color:var(--amber)">geändert</span>';
-      }
-      html += '<tr style="border-top:0.5px solid var(--border)">'
-        + '<td style="padding:3px 6px;color:var(--text2)">' + r.label + '</td>'
-        + '<td style="padding:3px 6px;text-align:right;font-weight:600">' + (r.m != null ? r.m : '—') + '</td>'
-        + '<td style="padding:3px 6px;text-align:right;font-weight:600">' + (r.u != null ? r.u : '—') + '</td>'
-        + '<td style="padding:3px 6px;text-align:right">' + deltaHtml + '</td>'
-        + '</tr>';
-    });
-    html += '</table>';
-    el.innerHTML = html;
-  } catch (e) {
-    console.warn('[Intraday-Vergleich] Fehler:', e.message);
-    el.innerHTML = '<span style="color:var(--text3)">Vergleich nicht verfügbar (' + e.message + ').</span>';
-  }
-}
-
-function _fmtDeTime(iso) {
-  try {
-    return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
-  } catch (e) { return iso || '—'; }
-}
-
 function showMorningTearsheet(results) {
   var existing = document.getElementById('tearsheet-modal');
   if (existing) existing.remove();
@@ -24943,12 +24855,6 @@ function showMorningTearsheet(results) {
       '</div>' +
     '</div>' +
 
-    // Intraday-Vergleich: Morgen-Lauf vs. NYSE-Lauf (Backlog #1, 14.07.2026)
-    '<div id="ts-intraday-compare" style="padding:1rem 1.5rem;border-bottom:1px solid var(--border)">' +
-      '<div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;margin-bottom:.4rem">INTRADAY-VERGLEICH · MORGEN VS. NYSE</div>' +
-      '<div id="ts-intraday-content" style="font-size:11px;color:var(--text2)"><i class="ti ti-loader"></i> Lädt Vergleichsdaten…</div>' +
-    '</div>' +
-
     // Distribution Days Warnblock (IOS Konzept-Integration, August 2026)
     (function(){
       var dd = window._kvMasterData && window._kvMasterData.market && window._kvMasterData.market.distributionDays
@@ -25012,7 +24918,6 @@ function showMorningTearsheet(results) {
 
   document.body.insertAdjacentHTML('beforeend', html);
   document.body.style.overflow = 'hidden';
-  renderIntradayComparison();
 
   // Tearsheet-Daten für Speicherung merken
   window._lastTearsheetData = results;
