@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260911-v510">          
+<meta name="version" content="20260913-v511">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,23 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):
+     v511: Digest-Cache-First fuer openKiBriefing()/runAlphaLbKI() (13.09.2026)
+           — neue Route ko-sync-worker.js v2.3 GET /public/ai_output/:strategy
+           liefert die volle, nachts bereits generierte KI-Narrative
+           (generate_public_recommendations.js v1.3, neuer Pointer-Key
+           public/ai_output/latest/{strategy}). Beide Aufrufstellen prüfen
+           vor dem bisherigen koAiCall() zuerst diesen Cache — nur im Public-
+           Modus (nie bei EIC/Owner) und nur für die 10 Equity-/KO-Strategien
+           (DIGEST_CACHE_STRATEGIES, neue Konstante bei _publicKvAuthHeaders())
+           — Options-Strategien bleiben unverändert live. Freshness-Pflicht:
+           Cache-Eintrag zählt nur bei date === _kvMasterData.meta.
+           last_trading_day, sonst Fail-Open auf normalen Live-Call. Grund:
+           der bestehende Public Digest (/public/digest) enthält nur eine
+           kurze, statisch-templatete Rationale, nicht die volle Narrative —
+           erster von zwei geplanten Schritten (zweiter, separater Schritt:
+           API-Kosten-Reduktion durch Auslagerung der Boilerplate-Abschnitte
+           7/8 "Was UIQ (nicht) ableiten kann" aus dem LLM-Prompt in
+           App-seitige Templates, noch nicht umgesetzt).
      v510: renderIntradayComparison() entfernt (11.09.2026, Nachbörsen-
            Lauf-Umstellung). Aggregator laeuft seit market-aggregator.yml
            v1.2 nur noch einmal taeglich nach US-Boersenschluss (22:00 UTC)
@@ -5220,6 +5237,54 @@ function getAiToken() {
 function _publicKvAuthHeaders() {
   var t = getAiToken();
   return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+
+// ── Digest-Cache-First fuer openKiBriefing()/runAlphaLbKI() (NEU, 13.09.2026) ──
+// Die 10 Equity-/KO-Strategien, die der naechtliche AI_delivery_public-Lauf
+// (generate_public_recommendations.js) abdeckt und unter public/ai_output/
+// latest/{strategy} (ko-sync-worker.js v2.3) ablegt. MUSS identisch bleiben
+// zu EQUITY_STRATEGIES dort UND zu STRAT_SCORE_FIELD weiter unten in
+// openKiBriefing() (bekanntes Single-Source-of-Truth-Risiko bei neuen
+// Strategien/Feldern, s. Uebergabeprotokolle 07.09.2026) — bei kuenftiger
+// Erweiterung auf die 5 Options-Strategien alle drei Stellen mitpflegen.
+var DIGEST_CACHE_STRATEGIES = [
+  'ko', 'momentum', 'breakout', 'vcp', 'swing',
+  'meanrev', 'breakdown', 'fading_short', 'dividend', 'value'
+];
+
+// Session-lokaler Cache: verhindert wiederholte KV-Reads fuer dieselbe
+// Strategie innerhalb einer Sitzung. Unabhaengig vom bestehenden _kiCache/
+// _KI_CACHE_TTL (das den fertig ANGEZEIGTEN Text cached) — dieser Cache hier
+// wirkt VOR der ersten Anzeige, auf Ebene des KV-Reads selbst.
+var _digestAiOutputCache = {};
+
+// Liefert den vollen recommendation_text aus dem naechtlichen Public-Digest-
+// Lauf fuer `strategy`, oder null (Cache-Miss/veraltet/Fehler — dann macht
+// der Aufrufer wie bisher einen normalen Live-Call, Fail-Open). Freshness-
+// Pflicht: date-Feld des Cache-Eintrags muss exakt dem aktuellen
+// _kvMasterData.meta.last_trading_day entsprechen (dieselbe Handelstag-
+// Logik wie market_aggregator.py get_last_trading_day(), s. dortiger Fix
+// 13.09.2026) — ohne diesen Abgleich koennte ein veralteter Eintrag
+// faelschlich als aktuell angezeigt werden.
+async function fetchDigestAiOutput(strategy) {
+  if (_digestAiOutputCache[strategy] !== undefined) return _digestAiOutputCache[strategy];
+  try {
+    var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
+    var r = await fetch(koSync + '/public/ai_output/' + strategy,
+      { cache: 'no-store', headers: _publicKvAuthHeaders() });
+    if (!r.ok) { _digestAiOutputCache[strategy] = null; return null; }
+    var data = await r.json();
+    var expectedDate = (_kvMasterData && _kvMasterData.meta) ? _kvMasterData.meta.last_trading_day : null;
+    if (!data || !data.recommendation_text || !expectedDate || data.date !== expectedDate) {
+      _digestAiOutputCache[strategy] = null;
+      return null;
+    }
+    _digestAiOutputCache[strategy] = data.recommendation_text;
+    return data.recommendation_text;
+  } catch (e) {
+    _digestAiOutputCache[strategy] = null;
+    return null;
+  }
 }
 
 
@@ -19643,7 +19708,13 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
     const _expertMode = typeof _expertModeActive !== 'undefined' && _expertModeActive && typeof _eicUnlocked !== 'undefined' && _eicUnlocked;
     let _kiText;
     try {
-      _kiText = await koAiCall('ki_briefing', prompt, _expertMode);
+      // Digest-Cache-First (NEU, 13.09.2026): nur Public-Modus, nur die 10
+      // Equity-/KO-Strategien — Fail-Open auf normalen Live-Call bei jedem
+      // Cache-Miss/Fehler (s. fetchDigestAiOutput()).
+      const _digestCached = (!_expertMode && DIGEST_CACHE_STRATEGIES.indexOf(_kiStrat) !== -1)
+        ? await fetchDigestAiOutput(_kiStrat)
+        : null;
+      _kiText = _digestCached || await koAiCall('ki_briefing', prompt, _expertMode);
     } catch(fetchErr) {
       showKiError(content, fetchErr);
       return;
@@ -26484,7 +26555,11 @@ async function runAlphaLbKI() {
     return;
   }
   try {
-    var result = await koAiCall('ki_briefing', prompt, isExpert);
+    // Digest-Cache-First (NEU, 13.09.2026): s. openKiBriefing() fuer Details.
+    var _digestCachedLb = (!isExpert && DIGEST_CACHE_STRATEGIES.indexOf(strat) !== -1)
+      ? await fetchDigestAiOutput(strat)
+      : null;
+    var result = _digestCachedLb || await koAiCall('ki_briefing', prompt, isExpert);
     // Ergebnis in Modal anzeigen (analog zu runOptionsKiBriefing)
     var _existingModal = document.getElementById('ki-modal');
     if (_existingModal) _existingModal.remove();
