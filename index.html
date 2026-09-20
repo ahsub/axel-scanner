@@ -5391,7 +5391,16 @@ async function rejectExtraTicker(sym) {
 window.rejectExtraTicker = rejectExtraTicker;
 
 // Zentraler KI-Call — ersetzt alle direkten Anthropic-Proxy-Aufrufe
-async function koAiCall(action, payload, expertMode) {
+// ERWEITERT (20.09.2026, ATMNA-Explainability-Gap-Fix, "Baustelle B" —
+// ko-ai.js v1.24+ REPAIR-Loop): neuer optionaler 5. Parameter `strategy`
+// (z.B. 'atmna'). Wird NUR gesendet, wenn gesetzt — bestehende Aufrufer,
+// die diesen Parameter nicht mitgeben, senden weiterhin exakt denselben
+// Body wie vorher (kein Verhaltensunterschied). ko-ai.js wertet dieses
+// Feld ausschliesslich fuer die fuenf Options-Strategien beim
+// action==='ki_briefing'-Pfad im Public-Modus aus (REPAIR-Loop); alle
+// anderen Aufrufe (morning/deep_dive/dark_pool/makro/eic sowie ki_briefing
+// fuer Equity-/KO-Strategien) ignorieren das Feld serverseitig fail-open.
+async function koAiCall(action, payload, expertMode, strategy) {
   const token = getAiToken();
   if (!token) throw new Error('KI-Token nicht gesetzt — bitte im Admin-Tab eintragen');
 
@@ -5410,6 +5419,7 @@ async function koAiCall(action, payload, expertMode) {
         action,
         payload,
         expert_mode: expertMode || false,
+        ...(strategy ? { strategy } : {}),
       }),
       signal: _abort.signal,
     });
@@ -26055,7 +26065,7 @@ async function runOptionsKiBriefing(strat) {
     // an ko-ai.js, unabhaengig vom eigenen EIC-Status. Serverseitig folgenlos
     // fuer die Vertraulichkeit (isOwner-Gate seit №60 haelt das ab), aber
     // fachlich falsch. Jetzt einheitlich der echte, oben berechnete Flag.
-    var text = _digestCachedOptions || await koAiCall('ki_briefing', prompt, _isEicNowForOptions);
+    var text = _digestCachedOptions || await koAiCall('ki_briefing', prompt, _isEicNowForOptions, strat);
     var contentEl = document.getElementById('ki-content');
     if (contentEl) contentEl.innerHTML = '<div style="white-space:pre-wrap;font-size:12px;line-height:1.6">' + text + '</div>';
     if (statusEl) statusEl.textContent = '';
@@ -26609,7 +26619,7 @@ async function runAlphaLbKI() {
     var _digestCachedLb = (!isExpert && DIGEST_CACHE_STRATEGIES.indexOf(strat) !== -1)
       ? await fetchDigestAiOutput(strat)
       : null;
-    var result = _digestCachedLb || await koAiCall('ki_briefing', prompt, isExpert);
+    var result = _digestCachedLb || await koAiCall('ki_briefing', prompt, isExpert, strat);
     // Ergebnis in Modal anzeigen (analog zu runOptionsKiBriefing)
     var _existingModal = document.getElementById('ki-modal');
     if (_existingModal) _existingModal.remove();
