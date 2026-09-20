@@ -1,6 +1,30 @@
 /**
  * ko-ai.ahildebrand.workers.dev
  * ══════════════════════════════════════════════════════════════════
+ * UnderlyingIQ — KI-Proxy Worker v1.25
+ *
+ * NEU in v1.25 (20.09.2026, Live-Test-Fund direkt nach dem v1.24-Deploy,
+ *   verifiziert via `wrangler tail` gegen einen echten atmna-Aufruf):
+ *   Der REPAIR-Loop (v1.24) funktionierte nachweislich — von drei fehlenden
+ *   Pflichtangaben wurden zwei (bollinger-position, tightness) durch den
+ *   Repair-Call zuverlässig nachgezogen. Eine blieb hängen:
+ *   "optionsmarkt-validierungsstatus". Ursache: validateBriefingCompliance()
+ *   verlangt wörtlich die Zeichenkette "nicht verifiziert" — das Modell
+ *   schrieb im Repair-Versuch stattdessen "Daten nicht verfügbar"
+ *   (semantisch identisch, aber kein Regex-Treffer), weil buildRepairPrompt()
+ *   bisher nur NANNTE, welcher Punkt fehlt, nicht MIT WELCHEM WORTLAUT er zu
+ *   ergänzen ist. Fix: buildRepairPrompt() hängt jetzt pro fehlendem Punkt
+ *   einen expliziten Formulierungshinweis an (analog zur "gib die exakte
+ *   Formulierung vor"-Strategie, die ko-prompts.js' eigener
+ *   _deterministicOptionsFactBlock() im Regelbetrieb bereits nutzt).
+ *   validateBriefingCompliance() selbst bleibt bewusst UNVERÄNDERT — "nicht
+ *   verifiziert" bleibt die kanonische Compliance-Formulierung, keine
+ *   Aufweichung auf Synonyme wie "nicht verfügbar"/"nicht geprüft" (das ist
+ *   eine bewusst etablierte Formulierung, kein frei interpretierbarer
+ *   Fachinhalt). Repair-Limit bleibt unverändert bei genau einem Versuch
+ *   (kein Repair-of-Repair-Loop) — bestätigt bereits korrekt implementiert,
+ *   keine Änderung nötig.
+ *
  * UnderlyingIQ — KI-Proxy Worker v1.24
  *
  * NEU in v1.24 (20.09.2026, Axel-Entscheidung — "Baustelle B" des ATMNA-
@@ -1047,17 +1071,60 @@ function validateBriefingCompliance(stratId, outputText) {
 // nicht neu generieren, sondern gezielt nachbessern (analog zum
 // REPAIR-Loop-Konzept, das ko-prompts.js selbst im Kommentar bei
 // validateBriefingCompliance() vorschlägt).
+// GESCHÄRFT (v1.25, 20.09.2026, Live-Test-Fund direkt nach v1.24-Deploy):
+// Bollinger-Position/Tightness wurden vom Repair zuverlässig nachgezogen,
+// "optionsmarkt-validierungsstatus" blieb hängen — das Modell schrieb "Daten
+// nicht verfügbar" statt der von validateBriefingCompliance() wörtlich
+// verlangten Zeichenkette "nicht verifiziert" (semantisch identisch, aber
+// kein Regex-Treffer). Root Cause: der Prompt nannte bisher nur, WELCHER
+// Punkt fehlt, nicht MIT WELCHEM WORTLAUT er zu ergänzen ist. Fix: pro
+// fehlendem Punkt einen expliziten Formulierungshinweis anhängen. Der
+// Validator selbst bleibt bewusst UNVERÄNDERT an "nicht verifiziert" als
+// kanonische Formulierung gebunden (nicht auf Synonyme wie "nicht
+// verfügbar"/"nicht geprüft" aufgeweicht) — das ist eine bewusst etablierte
+// Compliance-Sprache, kein fachlicher Inhalt, den das Modell frei
+// interpretieren soll.
 function buildRepairPrompt(strategy, missing, originalText) {
   const missingDesc = missing.join(', ');
-  return 'Deine vorherige Antwort zur Strategie "' + strategy + '" ließ folgende ' +
-    'Pflichtangabe(n) aus: ' + missingDesc + '. Hier ist deine vorherige Antwort:\n\n' +
+  const hints = [];
+
+  if (missing.includes('optionsmarkt-validierungsstatus')) {
+    hints.push(
+      '- Für "optionsmarkt-validierungsstatus": Verwende im Text ' +
+      'WÖRTLICH die Formulierung "nicht verifiziert". ' +
+      'Nicht durch "nicht verfügbar", "nicht geprüft" oder andere ' +
+      'Umschreibungen ersetzen.'
+    );
+  }
+
+  if (
+    missing.includes('bollinger-position') ||
+    missing.includes('tightness')
+  ) {
+    hints.push(
+      '- Für "bollinger-position"/"tightness": Verwende die Begriffe ' +
+      '"Bollinger-Position" und "Tightness" WÖRTLICH.'
+    );
+  }
+
+  const hintText = hints.length
+    ? '\n\nWICHTIG — exakter Wortlaut:\n' + hints.join('\n')
+    : '';
+
+  return (
+    'Deine vorherige Antwort zur Strategie "' + strategy +
+    '" ließ folgende Pflichtangabe(n) aus: ' + missingDesc +
+    '. Hier ist deine vorherige Antwort:\n\n' +
     '---\n' + originalText + '\n---\n\n' +
-    'Ergänze GENAU die fehlende(n) Pflichtangabe(n) an der dafür vorgesehenen ' +
-    'Stelle (Abschnitt 3 für den Optionsmarkt-Validierungsstatus, Abschnitt 4 ' +
-    'für Bollinger-Position/Tightness bei atmna) — ändere sonst NICHTS an der ' +
-    'Antwort, auch nicht Formulierungen, Reihenfolge oder Länge anderer ' +
-    'Abschnitte. Gib die VOLLSTÄNDIGE, korrigierte Antwort zurück, nicht nur ' +
-    'den Zusatz und nicht nur den betroffenen Abschnitt.';
+    'Ergänze GENAU die fehlende(n) Pflichtangabe(n) an der dafür ' +
+    'vorgesehenen Stelle (Abschnitt 3 für den Optionsmarkt-' +
+    'Validierungsstatus, Abschnitt 4 für Bollinger-Position/Tightness ' +
+    'bei atmna). Ändere sonst NICHTS an der Antwort, auch nicht ' +
+    'Formulierungen, Reihenfolge oder Länge anderer Abschnitte.' +
+    hintText +
+    '\nGib die VOLLSTÄNDIGE, korrigierte Antwort zurück, nicht nur ' +
+    'den Zusatz und nicht nur den betroffenen Abschnitt.'
+  );
 }
 
 // ── §23 NUMERIC-FABRICATION-SCAN (v1.20, 08.09.2026) ────────────────────────
