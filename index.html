@@ -19760,7 +19760,7 @@ async function openKiBriefing(defaultStrat, forceRefresh) {
       const _digestCached = (!_expertMode && DIGEST_CACHE_STRATEGIES.indexOf(_kiStrat) !== -1)
         ? await fetchDigestAiOutput(_kiStrat)
         : null;
-      _kiText = _digestCached || await koAiCall('ki_briefing', prompt, _expertMode);
+        _kiText = _digestCached || await koAiCall('ki_briefing', prompt, _expertMode, _kiStrat);
     } catch(fetchErr) {
       showKiError(content, fetchErr);
       return;
