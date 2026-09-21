@@ -1,6 +1,27 @@
 /**
  * ko-ai.ahildebrand.workers.dev
  * ══════════════════════════════════════════════════════════════════
+ * UnderlyingIQ — KI-Proxy Worker v1.29
+ *
+ * NEU in v1.29 (21.09.2026, Backlog #21 — Compliance-Scanner-Fehlalarm bei
+ *   Verneinung, Live-Fund 30.08.2026): "Top-Kandidat" wurde bislang auch bei
+ *   verneinenden Saetzen ("kein Top-Kandidat"/"nicht Top-Kandidat") faelschlich
+ *   geflaggt, obwohl der Public-Output korrekt KEINEN Top-Kandidaten nannte
+ *   -- reiner Substring-Match ohne jede Verneinungserkennung. Fix bewusst
+ *   klein gehalten (Axel-Vorgabe): KEINE allgemeine NLP-/semantische
+ *   Verneinungserkennung, nur eine gezielte, klausel-lokale Pruefung fuer
+ *   dieses EINE Pattern (neues optionales `negationAware`-Flag am
+ *   COMPLIANCE_PATTERNS-Eintrag, alle anderen Patterns unveraendert reine
+ *   Substring-Tests). _isNegatedMatch() prueft den Text unmittelbar VOR
+ *   einem Fund, begrenzt auf das aktuelle Satzglied (bricht am naechsten
+ *   Satzzeichen/Komma ab) -- verhindert insbesondere, dass ein frueheres
+ *   "Nicht" in einem GANZ ANDEREN Teilsatz einen spaeteren, echten Treffer
+ *   unterdrueckt (z.B. "Nicht X, sondern Y ist Top-Kandidat" bleibt
+ *   korrekt ein Treffer). Getestet: alle von Axel geforderten 6 Faelle plus
+ *   5 weitere Robustheits-/Regressionstests (11/11 bestanden) -- inkl. dem
+ *   expliziten "Nicht X, sondern Y"-Edge-Case und der Bestaetigung, dass
+ *   alle uebrigen COMPLIANCE_PATTERNS unveraendert funktionieren.
+ *
  * UnderlyingIQ — KI-Proxy Worker v1.28
  *
  * NEU in v1.28 (21.09.2026, Backlog #1 — API-Kosten-Auswertung): Preise
@@ -1011,7 +1032,11 @@ const COMPLIANCE_PATTERNS = [
   { label: 'solltest du',          re: /solltest\s+du/i },
   { label: 'jetzt handeln',        re: /jetzt\s+handeln/i },
   { label: 'Trade eröffnen',       re: /Trade\s+eröffnen/i },
-  { label: 'Top-Kandidat',         re: /Top-Kandidat/i },
+  // negationAware (v1.29, 21.09.2026, Backlog #21): s. Kommentar bei
+  // _isNegatedMatch()/scanForComplianceViolations() weiter unten fuer den
+  // vollstaendigen Kontext -- NUR dieses eine Pattern bekommt eine gezielte
+  // Negationspruefung, alle anderen Patterns bleiben unveraendert.
+  { label: 'Top-Kandidat',         re: /Top-Kandidat/i, negationAware: true },
   { label: 'Exit-Schwelle/-Fenster', re: /Exit-(Schwelle|Fenster)/i },
   { label: 'Stop unterhalb/oberhalb', re: /Stop\s+(unterhalb|oberhalb)/i },
   { label: 'ist für dich nicht geeignet', re: /ist\s+für\s+dich\s+nicht\s+geeignet/i },
@@ -1047,11 +1072,57 @@ const COMPLIANCE_PATTERNS = [
   // manuell im Einzelfall prüfen, nicht automatisiert scannen.
 ];
 
+// NEU (v1.29, 21.09.2026, Backlog #21 — Live-Fund 30.08.2026, s. Memo-
+// Notiz: ein verneinender Satz ("kein Top-Kandidat"/"nicht Top-Kandidat")
+// wurde faelschlich als Compliance-Verstoss geflaggt, obwohl der Public-
+// Output korrekt KEINEN Top-Kandidaten nannte). Axel-Vorgabe: bewusst
+// KEINE allgemeine NLP-/semantische Verneinungserkennung — nur eine kleine,
+// deterministische Klausel-lokale Pruefung fuer die drei belegten Faelle
+// ("X ist kein Top-Kandidat", "X ist nicht Top-Kandidat", "X wird nicht
+// als Top-Kandidat gefuehrt"). Betrifft AUSSCHLIESSLICH das eine mit
+// negationAware:true markierte Pattern — alle anderen COMPLIANCE_PATTERNS
+// bleiben unveraendert reine Substring-Tests.
+//
+// Klausel-lokal begrenzt (bricht am naechsten Satzzeichen . ! ? oder Komma
+// VOR dem Fund ab), damit ein fruehes "Nicht" in einem GANZ ANDEREN
+// Teilsatz nicht faelschlich einen spaeteren, tatsaechlichen Treffer
+// unterdrueckt — z.B. MUSS "Nicht X, sondern Y ist Top-Kandidat" weiterhin
+// als echter Treffer erkannt werden: das "Nicht" davor negiert dort nicht
+// "Top-Kandidat", sondern X; das Komma trennt die beiden Teilaussagen.
+// Bewusst NUR rueckwaerts geprueft (Negation VOR dem Fund) — eine
+// nachgestellte Verneinung ("...ist Top-Kandidat nicht") ist in den bisher
+// belegten Live-Faellen nicht aufgetreten und wuerde den Scope wieder
+// unnoetig erweitern; falls das je live auftritt, dann gezielt nachziehen.
+function _isNegatedMatch(text, matchIndex, windowSize) {
+  const start = Math.max(0, matchIndex - windowSize);
+  let preceding = text.slice(start, matchIndex);
+  const boundaryMatch = preceding.match(/[.!?,][^.!?,]*$/);
+  if (boundaryMatch) preceding = boundaryMatch[0].slice(1);
+  return /\b(kein|keine|nicht)\b[^.!?,]*$/i.test(preceding);
+}
+
+const NEGATION_CHECK_WINDOW = 40;
+
 function scanForComplianceViolations(text) {
   if (!text) return [];
   const hits = [];
   for (const p of COMPLIANCE_PATTERNS) {
-    if (p.re.test(text)) hits.push(p.label);
+    if (p.negationAware) {
+      const flags = p.re.flags.includes('g') ? p.re.flags : p.re.flags + 'g';
+      const re = new RegExp(p.re.source, flags);
+      let m;
+      let found = false;
+      while ((m = re.exec(text)) !== null) {
+        if (!_isNegatedMatch(text, m.index, NEGATION_CHECK_WINDOW)) {
+          found = true;
+          break;
+        }
+        if (m.index === re.lastIndex) re.lastIndex++;
+      }
+      if (found) hits.push(p.label);
+    } else if (p.re.test(text)) {
+      hits.push(p.label);
+    }
   }
   return hits;
 }
