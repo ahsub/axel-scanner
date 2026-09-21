@@ -1,6 +1,25 @@
 /**
  * ko-ai.ahildebrand.workers.dev
  * ══════════════════════════════════════════════════════════════════
+ * UnderlyingIQ — KI-Proxy Worker v1.28
+ *
+ * NEU in v1.28 (21.09.2026, Backlog #1 — API-Kosten-Auswertung): Preise
+ *   verifiziert gegen https://docs.claude.com/en/docs/about-claude/pricing
+ *   und estimateCostUsd() modellabhaengig gemacht — vorher EIN globales
+ *   Preispaar (beide Konstanten ohnehin noch `null`, nie kalibriert) fuer
+ *   ALLE Actions, obwohl ACTION_CONFIG bereits seit laengerem Haiku 4.5
+ *   (makro/ki_briefing/oversold/meta_analysis) und Sonnet 4.6 (morning/
+ *   deep_dive/dark_pool/eic) gemeinsam nutzt — ein einziger globaler Wert
+ *   haette je nach Wahl entweder Sonnet-Calls systematisch unterschaetzt
+ *   oder Haiku-Calls systematisch ueberschaetzt, sobald kalibriert worden
+ *   waere. Neue MODEL_PRICING-Lookup-Tabelle (Haiku 4.5: $1/$5 pro MTok
+ *   Input/Output; Sonnet 4.6: $3/$15 pro MTok) — estimateCostUsd() bekommt
+ *   jetzt `model` als ersten Parameter, unbekanntes Modell liefert weiterhin
+ *   bewusst `null` statt eines geratenen Werts. recordAiBudgetEntry() gibt
+ *   `model` (aus dem bereits vorhandenen Funktionsparameter) jetzt durch.
+ *   Alte, nie kalibrierte globale Konstanten entfernt statt als irrefuehrender
+ *   toter Code stehen gelassen.
+ *
  * UnderlyingIQ — KI-Proxy Worker v1.27
  *
  * NEU in v1.27 (21.09.2026, Backlog #7 — Live-Fund waehrend der ATMNA-
@@ -921,15 +940,29 @@ async function logRequest(env, token, action, origin, cfRay, success, compliance
 // PREISE UNVERIFIZIERT (wie im JS-Pendant) — token_input/token_output sind
 // verlaesslich, estimated_cost_usd bleibt null bis die Konstanten unten
 // gegen https://docs.claude.com/en/docs/about-claude/pricing geprueft sind.
-const ANTHROPIC_PRICE_PER_INPUT_TOKEN_USD  = null;  // TODO(Axel): verifizieren
-const ANTHROPIC_PRICE_PER_OUTPUT_TOKEN_USD = null;  // TODO(Axel): verifizieren
 
-function estimateCostUsd(inputTokens, outputTokens) {
-  if (ANTHROPIC_PRICE_PER_INPUT_TOKEN_USD == null || ANTHROPIC_PRICE_PER_OUTPUT_TOKEN_USD == null) {
-    return null;
-  }
-  return +(inputTokens * ANTHROPIC_PRICE_PER_INPUT_TOKEN_USD
-    + outputTokens * ANTHROPIC_PRICE_PER_OUTPUT_TOKEN_USD).toFixed(6);
+// GEAENDERT (v1.28, 21.09.2026, Backlog #1 — API-Kosten-Auswertung): war
+// zuvor EIN globales Preispaar fuer alle Modelle — falsch, da ACTION_CONFIG
+// oben Haiku 4.5 (makro/ki_briefing/oversold/meta_analysis) UND Sonnet 4.6
+// (morning/deep_dive/dark_pool/eic) gemeinsam nutzt; ein einziger globaler
+// Satz haette je nach gewaehltem Wert entweder Sonnet-Calls systematisch
+// unterschaetzt oder Haiku-Calls systematisch ueberschaetzt. Jetzt
+// modellabhaengig ueber MODEL_PRICING nachgeschlagen. Preise verifiziert
+// gegen https://docs.claude.com/en/docs/about-claude/pricing (21.09.2026):
+// Claude Haiku 4.5: $1/MTok Input, $5/MTok Output.
+// Claude Sonnet 4.6: $3/MTok Input, $15/MTok Output.
+// Unbekanntes/nicht gelistetes Modell liefert bewusst weiterhin `null`
+// (kein Raten) statt eines falschen Werts.
+const MODEL_PRICING = {
+  'claude-haiku-4-5-20251001': { inputPerMTok: 1, outputPerMTok: 5 },
+  'claude-sonnet-4-6':          { inputPerMTok: 3, outputPerMTok: 15 },
+};
+
+function estimateCostUsd(model, inputTokens, outputTokens) {
+  const pricing = MODEL_PRICING[model];
+  if (!pricing) return null;
+  return +(inputTokens * pricing.inputPerMTok / 1e6
+    + outputTokens * pricing.outputPerMTok / 1e6).toFixed(6);
 }
 
 async function recordAiBudgetEntry(env, { action, model, usage, expertMode }) {
@@ -946,7 +979,7 @@ async function recordAiBudgetEntry(env, { action, model, usage, expertMode }) {
       expertMode: !!expertMode,
       tokenInput:  inputTokens,
       tokenOutput: outputTokens,
-      estimatedCostUsd: estimateCostUsd(inputTokens ?? 0, outputTokens ?? 0),
+      estimatedCostUsd: estimateCostUsd(model, inputTokens ?? 0, outputTokens ?? 0),
       timestamp: new Date().toISOString(),
     });
     await env.AUTH_KV.put(key, entry, { expirationTtl: 60 * 60 * 24 * 90 });
