@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260916-v513">          
+<meta name="version" content="20260928-v514">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,27 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):
+     v514: Public-UI-Bereinigung Batch 1 (28.09.2026, Umbauplan
+           PUBLIC-UI-BEREINIGUNG-PLAN.md Punkte 2.1/2.2/2.4/2.7/4.3 + CDN-
+           Pin ko-prompts.js v2.55.0 [2.9/2.10] → @e82508a). Nur Texte, keine Logik-
+           oder Scoring-Aenderung: (1) Scanner-Signallabels "Kaufsignal /
+           Vorsicht / Kein Einstieg" → "Signallage stark / gemischt /
+           schwach" (sortAndRenderCards, Scanner-Summary, Detailansicht,
+           useInRechner); (2) generateRuleBasedSummary() (Makro-Tagesfazit)
+           rein deskriptiv — entfernt: Positionsgroessen-Vorgaben, KO-
+           Abstaende, "max. €2.000 pro Position", "Keine neuen Long-
+           Positionen", "bevorzugen/handeln"; (3) Regime-Tooltip "Selektiv"
+           deskriptiv; (4) KI-Strategie-Hint ohne Positionsgroessen-Limit;
+           (5) verifyUserToken() fail-closed ('free' statt 'admin' bei
+           nicht erreichbarem ko-auth; derzeit ohne Funktionswirkung, da
+           _userTier/_userFeatures nirgends ausgewertet werden — Vorbereitung
+           fuer die Beta-Nutzerverwaltung); (6) Nachfunde der Restsuche:
+           Scanner-Hinweiszeile, Intermarket-Score-Verdict ("Longs
+           bevorzugen", "Position klein halten", "Defensiv positionieren")
+           und QQQ-Markov-Regime-Untertitel deskriptiv. Bewusst NICHT in
+           diesem Batch (folgen mit Batch 2/3): KO-Rechner-Hinweis
+           (useInRechner/cr), Deep-Dive-Kontextbox, EIC-Hinweise.
+           Noch KEIN Live-Test.
      v513: Thema 3 — die fünf Options-Strategien (csp_wheel/atmna/weekly_
            income/cc/collar) in DIGEST_CACHE_STRATEGIES aufgenommen und
            runOptionsKiBriefing() um einen Digest-Cache-First-Check
@@ -5092,7 +5113,7 @@ const TIER_FEATURES_DEFAULT = {
 };
 
 // [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: getUserTier() war unbenutzt]  // Fallback admin solange Phase 1
-function getUserFeatures() { return _userFeatures || TIER_FEATURES_DEFAULT['admin']; }
+function getUserFeatures() { return _userFeatures || TIER_FEATURES_DEFAULT['free']; }  // v514: fail-closed
 // [entfernt 15.07.2026, Dead-Code-Audit Backlog #19: hasFeature() war unbenutzt]
 
 async function verifyUserToken() {
@@ -5109,16 +5130,17 @@ async function verifyUserToken() {
       _userFeatures = data.features || TIER_FEATURES_DEFAULT[_userTier] || TIER_FEATURES_DEFAULT.free;
       console.log('[Auth] Tier:', _userTier);
     } else {
-      // Worker noch nicht deployed → fallback admin (Phase 1)
-      _userTier = 'admin';
-      _userFeatures = TIER_FEATURES_DEFAULT.admin;
-      console.warn('[Auth] ko-auth nicht erreichbar — Fallback admin (Phase 1)');
+      // v514 (28.09.2026): fail-closed — bei nicht erreichbarem ko-auth
+      // niedrigste Stufe statt 'admin' (vorher "Fallback admin (Phase 1)").
+      _userTier = 'free';
+      _userFeatures = TIER_FEATURES_DEFAULT.free;
+      console.warn('[Auth] ko-auth nicht erreichbar — Fallback free (fail-closed)');
     }
   } catch(e) {
-    // ko-auth noch nicht deployed → kein Crash, Fallback admin
-    _userTier = 'admin';
-    _userFeatures = TIER_FEATURES_DEFAULT.admin;
-    console.warn('[Auth] ko-auth Fehler:', e.message, '— Fallback admin');
+    // ko-auth nicht erreichbar → kein Crash, fail-closed (v514, 28.09.2026)
+    _userTier = 'free';
+    _userFeatures = TIER_FEATURES_DEFAULT.free;
+    console.warn('[Auth] ko-auth Fehler:', e.message, '— Fallback free (fail-closed)');
   }
 }
 
@@ -8048,7 +8070,7 @@ function setMarket(mkt){
   }
   document.getElementById('scan-container').innerHTML='';
   const hint = document.getElementById('scanner-market-hint');
-  if(hint) hint.innerHTML='<i class="ti ti-info-circle"></i> '+(mkt==='us'?'🔔 US-Markt · 50 Titel':'🇩🇪 DE-Markt · 50 Titel · <button onclick="openDEListSelector()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;text-decoration:underline;padding:0">DAX/MDAX/TecDAX auswählen</button>')+' · Kaufsignal = alle 3 bullisch';
+  if(hint) hint.innerHTML='<i class="ti ti-info-circle"></i> '+(mkt==='us'?'🔔 US-Markt · 50 Titel':'🇩🇪 DE-Markt · 50 Titel · <button onclick="openDEListSelector()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;text-decoration:underline;padding:0">DAX/MDAX/TecDAX auswählen</button>')+' · Signallage stark = alle 3 Indikatoren bullisch';
 }
 
 // ── Globale EU_TICKER_MAP (auch für Rescan verfügbar) ──
@@ -9647,9 +9669,9 @@ function sortAndRenderCards(tickers){
   let html = '';
   let lastGroup = -1;
   const groupLabels = {
-    3: '<div style="font-size:11px;font-weight:500;padding:6px 0 4px;color:var(--green)"><i class="ti ti-trending-up"></i> Kaufsignal — 3/3 bullisch</div>',
-    2: '<div style="font-size:11px;font-weight:500;padding:6px 0 4px;color:var(--amber)"><i class="ti ti-minus"></i> Vorsicht — 2/3 bullisch</div>',
-    1: '<div style="font-size:11px;font-weight:500;padding:6px 0 4px;color:var(--red)"><i class="ti ti-trending-down"></i> Schwach — 1/3 bullisch</div>',
+    3: '<div style="font-size:11px;font-weight:500;padding:6px 0 4px;color:var(--green)"><i class="ti ti-trending-up"></i> Signallage stark — 3/3 bullisch</div>',
+    2: '<div style="font-size:11px;font-weight:500;padding:6px 0 4px;color:var(--amber)"><i class="ti ti-minus"></i> Signallage gemischt — 2/3 bullisch</div>',
+    1: '<div style="font-size:11px;font-weight:500;padding:6px 0 4px;color:var(--red)"><i class="ti ti-trending-down"></i> Signallage schwach — 1/3 bullisch</div>',
     0: '<div style="font-size:11px;font-weight:500;padding:6px 0 4px;color:var(--text3)"><i class="ti ti-x"></i> Bärisch — 0/3</div>',
   };
 
@@ -9686,8 +9708,8 @@ function sortAndRenderCards(tickers){
     summary.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">'+
       '<span><i class="ti ti-sort-descending"></i> '+filteredResults.length+' Titel'+hiddenNote+' · '+
-      '<span style="color:var(--green)">'+bull3+' Kaufsignal</span> · '+
-      '<span style="color:var(--amber)">'+bull2+' Vorsicht</span> · '+
+      '<span style="color:var(--green)">'+bull3+' stark (3/3)</span> · '+
+      '<span style="color:var(--amber)">'+bull2+' gemischt (2/3)</span> · '+
       '<span style="color:var(--text3)">'+(filteredResults.length-bull3-bull2)+' Bärisch</span></span>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
       '<button onclick="saveFromScan(3)" class="btn btn-sm" style="font-size:10px;padding:2px 7px;background:rgba(52,194,110,0.12);border-color:var(--green);color:var(--green)">'+
@@ -10109,9 +10131,9 @@ function renderCard(t,state){
   var obvSlope=state.obvSlope,volRatio=state.volRatio,bullCount=state.bullCount;
   var closes=state.closes,hist=state.hist,obvNorm=state.obvNorm,dates=state.dates;
   var vC,vT,vI;
-  if(bullCount===3){vC='v-bull';vT='Kaufsignal — alle 3 bullisch';vI='ti-trending-up';}
-  else if(bullCount===2){vC='v-neu';vT='Vorsicht — 2 von 3 bullisch';vI='ti-minus';}
-  else{vC='v-bear';vT=bullCount===1?'Kein Einstieg — 1/3':'Kein Einstieg';vI='ti-trending-down';}
+  if(bullCount===3){vC='v-bull';vT='Signallage stark — alle 3 bullisch';vI='ti-trending-up';}
+  else if(bullCount===2){vC='v-neu';vT='Signallage gemischt — 2 von 3 bullisch';vI='ti-minus';}
+  else{vC='v-bear';vT=bullCount===1?'Signallage schwach — 1/3':'Signallage schwach — 0/3';vI='ti-trending-down';}
   var vRatioTxt=volRatio?(Math.round(volRatio)+'% Ø'):'n/a';
   var vRatioCls=volRatio>120?'pill-green':volRatio<80?'pill-red':'pill-amber';
   var m50cls=above50?'pill-green':'pill-red';
@@ -10503,7 +10525,7 @@ function useInRechner(sym){
   document.getElementById('r-isin').value='';
   document.getElementById('r-emittent').value='';
   const info=document.getElementById('rechner-info');
-  const sig=d.bullCount===3?'Kaufsignal':d.bullCount===2?'Vorsicht':'Kein Einstieg';
+  const sig=d.bullCount===3?'Signallage stark':d.bullCount===2?'Signallage gemischt':'Signallage schwach';
   info.innerHTML=`<i class="ti ti-transfer"></i> <strong>${sym}</strong> — $${d.price.toFixed(2)} · ${sig} (${d.bullCount}/3) · KO −20%, Stop −10% vorausgefüllt`;
   info.style.display='block';
   cr();showPanel('rechner');
@@ -12745,10 +12767,10 @@ async function loadIntermarket() {
     const warnCount    = signals.filter(s => s.signal === 'warning').length;
     const bgColor = scorePct >= 60 ? 'rgba(52,194,110,0.1)' : scorePct >= 45 ? 'rgba(240,169,58,0.1)' : 'rgba(255,59,48,0.1)';
     const txColor = scorePct >= 60 ? 'var(--green)' : scorePct >= 45 ? 'var(--amber)' : 'var(--red)';
-    const verdictTxt = scorePct >= 65 ? '📈 Intermarket signalisiert Risk-On — Longs bevorzugen'
-      : scorePct >= 50 ? '😐 Gemischte Signale — Selektiv und mit engem Stop'
-      : scorePct >= 35 ? '⚠ Intermarket tendiert Risk-Off — Position klein halten'
-      : '🚨 Starke Risk-Off Signale — Defensiv positionieren';
+    const verdictTxt = scorePct >= 65 ? '📈 Intermarket signalisiert Risk-On'
+      : scorePct >= 50 ? '😐 Gemischte Intermarket-Signale'
+      : scorePct >= 35 ? '⚠ Intermarket tendiert Risk-Off'
+      : '🚨 Starke Risk-Off-Signale';
     verdict.style.background = bgColor;
     verdict.style.borderLeft = '3px solid ' + txColor;
     verdict.style.color = txColor;
@@ -13094,17 +13116,17 @@ function generateRuleBasedSummary(){
           (stapRS>2?'Staples (XLP +'+stapRS.toFixed(1)+'%) ':'') +
           (healthRS>2?'Health (XLV +'+healthRS.toFixed(1)+'%) ':'') +
           (reitRS>2?'REIT (XLRE +'+reitRS.toFixed(1)+'%) ':'') +
-          '. Tech/Semis schwach (' + (xlk?'XLK '+xlk.rs5d.toFixed(1)+'%':'') + '). Keine neuen Long-Positionen in Tech/Semis.'
+          '. Tech/Semis schwach (' + (xlk?'XLK '+xlk.rs5d.toFixed(1)+'%':'') + ').'
       });
     } else if (isTechStrong && stapRS < 0) {
       rotationVerdict = 'bull';
       factors.push({icon:'bull', title:'Risk-ON Rotation — Tech führt',
-        desc:'Technologie (XLK +'+techRS.toFixed(1)+'%) und Halbleiter (SMH +'+semRS.toFixed(1)+'%) outperformen. Günstig für Momentum-Setups in AI/Tech.'
+        desc:'Technologie (XLK +'+techRS.toFixed(1)+'%) und Halbleiter (SMH +'+semRS.toFixed(1)+'%) outperformen. Die Rotation ist konsistent mit einem Risk-on-Umfeld.'
       });
     } else if (isTechWeak) {
       rotationVerdict = 'neu';
-      factors.push({icon:'neu', title:'Tech-Schwäche — selektiv vorgehen',
-        desc:'Tech/Semis underperformen SPY. Sektorwechsel beobachten, nur stärkste Setups handeln.'
+      factors.push({icon:'neu', title:'Tech-Schwäche — Sektorwechsel',
+        desc:'Tech/Semis underperformen SPY. Die Sektorführung ist derzeit nicht eindeutig.'
       });
     }
   }
@@ -13113,19 +13135,19 @@ function generateRuleBasedSummary(){
   if (vix < 16) {
     if (rotationVerdict !== 'bear') verdict = 'bull';
     factors.push({icon:'bull', title:'VIX '+vix.toFixed(1)+' — Niedriges Risiko',
-      desc:'VIX unter 16 signalisiert entspannte Marktlage. Gutes Umfeld für Momentum-Trades.'});
+      desc:'VIX unter 16 signalisiert eine entspannte Marktlage mit niedriger impliziter Volatilität.'});
   } else if (vix > 25) {
     verdict = 'bear'; // VIX > 25 überstimmt alles
     factors.push({icon:'bear', title:'VIX '+vix.toFixed(1)+' — Erhöhte Volatilität',
-      desc:'VIX über 25 — Positionsgrößen auf max. 50% reduzieren, KO-Abstand ≥25%, keine neuen Einstiege ohne klares Signal.'});
+      desc:'VIX über 25 — deutlich erhöhte implizite Volatilität; Kursschwankungen und Gap-Risiken sind in diesem Umfeld historisch größer.'});
   } else if (vix > 20) {
     if (rotationVerdict === 'bear') verdict = 'bear';
     else if (verdict !== 'bear') verdict = 'neu';
     factors.push({icon:'neu', title:'VIX '+vix.toFixed(1)+' — Erhöhte Unsicherheit',
-      desc:'VIX über 20 — Vorsicht, Positionsgrößen reduzieren, KO-Abstand ≥22%.'});
+      desc:'VIX über 20 — erhöhte implizite Volatilität gegenüber einem ruhigen Marktumfeld.'});
   } else {
     factors.push({icon:'neu', title:'VIX '+vix.toFixed(1)+' — Neutrale Volatilität',
-      desc:'Normales Marktumfeld. Standard-Positionsgrößen anwenden.'});
+      desc:'Volatilität im mittleren Bereich, kein ausgeprägtes Stresssignal.'});
   }
 
   // Rotations-Verdict übernehmen wenn VIX nicht überstimmt
@@ -13134,28 +13156,28 @@ function generateRuleBasedSummary(){
   // ── Bitcoin ──
   if (btcChg > 2) {
     factors.push({icon:'bull', title:'Bitcoin +'+btcChg.toFixed(1)+'% — Risk-on',
-      desc:'Krypto-Stärke bestätigt Risk-on. Günstig für Tech/AI Turbos sofern Rotation stimmt.'});
+      desc:'Krypto-Stärke ist konsistent mit einer Risk-on-Stimmung.'});
     if (verdict === 'neu' && rotationVerdict !== 'bear') verdict = 'bull';
   } else if (btcChg < -2) {
     factors.push({icon:'bear', title:'Bitcoin '+btcChg.toFixed(1)+'% — Risk-off',
-      desc:'Krypto-Schwäche bestätigt Risk-off Stimmung. Neue Positionen mit erhöhter Vorsicht.'});
+      desc:'Krypto-Schwäche ist konsistent mit einer Risk-off-Stimmung.'});
     if (verdict === 'bull') verdict = 'neu';
   }
 
   // ── Gold ──
   if (goldPrice > 3000) {
     factors.push({icon:'neu', title:'Gold $'+goldPrice.toFixed(0)+' — Sicherheitsnachfrage',
-      desc:'Hoher Goldpreis zeigt geopolitische Unsicherheit und Risk-off. Overnight-Risiko beachten.'});
+      desc:'Hoher Goldpreis ist konsistent mit erhöhter Sicherheitsnachfrage bzw. geopolitischer Unsicherheit.'});
   }
 
   // ── verdictText mit konkreten Handlungsempfehlungen ──
   if (verdict === 'bull') {
-    verdictText = 'Risk-ON Umfeld — Tech/AI führt die Rotation an. Momentum-Setups mit 3/3 Scanner-Signal bevorzugen. KO-Abstand Standard ≥20%, max. €2.000 pro Position.';
+    verdictText = 'Risk-ON-Umfeld — Tech/AI führt die Sektorrotation an, die Volatilität ist nicht erhöht.';
   } else if (verdict === 'bear') {
     verdictText = 'Risk-OFF — ' + (vix > 20 ? 'VIX ' + vix.toFixed(0) + ' erhöht, ' : '') +
-      'defensive Sektorrotation aktiv. Keine neuen Long-Positionen in Tech/Semis. Bestehende Positionen absichern, KO-Abstand ≥25%, Positionsgrößen auf 50% reduzieren.';
+      'defensive Sektorrotation aktiv, Tech/Semis relativ schwach.';
   } else {
-    verdictText = 'Neutrales bis vorsichtiges Umfeld — Sektorwechsel beobachten. Nur 3/3 Scanner-Signale in nicht-defensiven Sektoren handeln. KO-Abstand ≥22%.';
+    verdictText = 'Gemischtes Umfeld — Sektorwechsel ohne klare Führung.';
   }
 
   const stored = JSON.parse(localStorage.getItem('ko_makro') || '{}');
@@ -18072,15 +18094,15 @@ function renderQqqBanner(markov) {
   if (regime === 1) {
     color='var(--green)'; bg='rgba(52,199,89,0.10)'; icon='ti-trending-up';
     label = 'QQQ: BULL-Regime';
-    sub   = 'Trend intakt · Longs bevorzugen · Markov 2.0';
+    sub   = 'Trend intakt · Markov 2.0';
   } else if (regime === -1) {
     color='var(--red)'; bg='rgba(255,59,48,0.10)'; icon='ti-trending-down';
     label = 'QQQ: BEAR-Regime';
-    sub   = 'Abwärtsdruck · Defensiv bleiben · Markov 2.0';
+    sub   = 'Abwärtsdruck · Markov 2.0';
   } else {
     color='var(--amber)'; bg='rgba(240,169,58,0.10)'; icon='ti-minus';
     label = 'QQQ: SIDEWAYS-Regime';
-    sub   = 'Kein klarer Trend – Selektiv vorgehen · Markov 2.0';
+    sub   = 'Kein klarer Trend · Markov 2.0';
   }
   if (wl === 3) { color='var(--red)'; bg='rgba(255,59,48,0.15)'; }
   else if (wl >= 1) { color='var(--amber)'; bg='rgba(240,169,58,0.12)'; }
@@ -20270,7 +20292,7 @@ function csvSaveConfirm(tickers) {
              s. Backlog. -->
       </div>
       <div id="ki-strat-hint" style="font-size:10px;color:var(--text3);margin-top:.4rem">
-        ⚡ KO-Trading: Hebel 3–8x · KO-Abstand · Positionsgröße max. €2.000
+        ⚡ KO-Trading: Hebel 3–8x · KO-Abstand · Totalverlustrisiko
       </div>
     </div>
     <div id="ki-briefing-content" style="padding:1.25rem;font-size:13px;line-height:1.7;color:var(--text2)">
@@ -23355,8 +23377,8 @@ async function updateMarketWeatherWidget(dpData, vix, tsiScore) {
   if (actionEl && result) {
     var actionText = result.action || '';
     if (actionText.includes('Selektiv')) {
-      actionEl.title = 'Selektiv = Nur Setups mit Score ≥75, klarem Trend und engem Stop handeln. '
-        + 'Positionsgröße reduzieren, keine neuen Strategien aufbauen.';
+      actionEl.title = 'Selektiv = Das Regime-Modell zeigt ein gemischtes Umfeld, in dem nur wenige Titel '
+        + 'die Strategiekriterien vollständig erfüllen (z.B. Score ≥75 und intakter Trend).';
       actionEl.style.cursor = 'help';
     }
   }
@@ -27678,7 +27700,7 @@ async function generateDpKI(data, scoreObj, signal) {
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@4e2b895/ko-market-state.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@99277ac/ko-darkpool.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@f6e398e/ko-scanner.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@475cf2a/ko-prompts.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@e82508a/ko-prompts.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@749e790/ko-home.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/ahsub/ko-modules@1027955/ko-indicators-loader.js"></script>
 <!-- ko-trackrecord.js — Track-Record Phase C (31.07.2026, EIC-only, Spec §9.3) -->
