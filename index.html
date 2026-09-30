@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260928-v514">          
+<meta name="version" content="20260930-v515">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,22 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):
+     v515: DCE-Trennung Frontend (30.09.2026, SUITE №72 / Runmap 2 Nacht A, ADR-1;
+           Voraussetzung: Aggregator v5.46.0, ko-sync-worker v2.5). (1) Neu:
+           loadDceInternalOwner() liest das interne DCE-Objekt NUR ueber GET
+           /owner/dce (Owner-Token); Nicht-Owner erhalten 401/403 -> kein DCE.
+           Uebergangsweise (Frontend vor Aggregator): data.dce aus dem Rohpayload,
+           das der Worker Nicht-Ownern ohnehin entfernt. (2) Alpha Desk: Ampel-
+           Pill und Warnbanner nur aus dem internen Objekt (Owner); KEIN stiller
+           Default 'YELLOW' mehr; ein Fallback-Objekt (fallback:true) wird als
+           "DCE-Fallback" gekennzeichnet, nie als Ampel. (3) Fuer alle: Pills
+           "Signalbreite x % (n=...)" bzw. "n/v" sowie "CUSUM n/v" / "VaR n/v"
+           mit Ursache im Tooltip, gelesen aus data.dce_public. (4) KI-Prompts:
+           der DCE-Block (Confidence, Ampel, Position-Sizing, Richtung,
+           Warnungen) entfaellt fuer ALLE Nutzer inkl. Owner; stattdessen nur
+           die Signalbreite aus dce_public (reine Messgroesse); die
+           Marktlage-Anweisung nennt keine "DCE-Confidence" mehr. Keine
+           Aenderung an Scores, Filtern oder Rankings.
      v514: Public-UI-Bereinigung Batch 1 (28.09.2026, Umbauplan
            PUBLIC-UI-BEREINIGUNG-PLAN.md Punkte 2.1/2.2/2.4/2.7/4.3 + CDN-
            Pin ko-prompts.js v2.55.0 [2.9/2.10] → @e82508a). Nur Texte, keine Logik-
@@ -5288,6 +5304,48 @@ function getAiToken() {
 function _publicKvAuthHeaders() {
   var t = getAiToken();
   return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+
+// ── DCE-Trennung (v515, 30.09.2026, ADR-1) ──────────────────────────────────
+// Internes DCE-Objekt (Confidence, Ampel, Richtung, Positionsgroesse, Warnungen):
+// ausschliesslich ueber GET /owner/dce mit Owner-Token. Nicht-Owner: 401/403 -> null.
+// Oeffentlich ist nur dce_public (Signalbreite; CUSUM/VaR n/v) aus master_market_data.
+var _dceInternal = null;
+async function loadDceInternalOwner() {
+  _dceInternal = null;
+  try {
+    var koSync = (typeof KoConfig !== 'undefined') ? KoConfig.api.koSync : 'https://ko-sync.ahildebrand.workers.dev';
+    var hdr = _publicKvAuthHeaders();
+    if (!hdr.Authorization) return null;
+    var r = await fetch(koSync + '/owner/dce', { cache: 'no-store', headers: hdr });
+    if (!r.ok) return null;                       // 401/403/404: kein Owner bzw. noch nicht im KV
+    var j = await r.json();
+    _dceInternal = (j && typeof j === 'object') ? j : null;
+  } catch (e) { _dceInternal = null; }
+  return _dceInternal;
+}
+// Owner-Sicht: interner Key, uebergangsweise das (nur fuer Owner noch gelieferte) Feld data.dce
+function getDceInternal(data) {
+  return _dceInternal || ((data && data.dce && typeof data.dce === 'object') ? data.dce : null);
+}
+function dcePublicPill(pubObj) {
+  function esc(x) { return String(x == null ? '' : x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+  function chip(label, val, tip, col) {
+    return '<span title="' + esc(tip) + '" style="font-size:10px;padding:3px 8px;border-radius:8px;background:var(--bg3);'
+      + 'border:0.5px solid var(--border2);margin-right:4px"><span style="color:var(--text3)">' + esc(label) + '</span> '
+      + '<b style="color:' + (col || 'var(--text2)') + '">' + esc(val) + '</b></span>';
+  }
+  var sb = pubObj && pubObj.signal_breadth, cu = pubObj && pubObj.cusum, va = pubObj && pubObj.var;
+  var asOf = pubObj && pubObj.as_of ? ' · Stand ' + pubObj.as_of : '';
+  var out = '';
+  if (sb && sb.status === 'ok') {
+    out += chip('Signalbreite', sb.share_pct + ' % (n=' + sb.n + ')', (sb.definition || '') + asOf);
+  } else {
+    out += chip('Signalbreite', 'n/v', 'nicht verfügbar: ' + ((sb && sb.reason) || 'nicht im Datenstand'));
+  }
+  out += chip('CUSUM', 'n/v', 'nicht verfügbar: ' + ((cu && cu.reason) || 'nicht im Datenstand'));
+  out += chip('VaR', 'n/v', 'nicht verfügbar: ' + ((va && va.reason) || 'nicht im Datenstand'));
+  return out;
 }
 
 // ── Digest-Cache-First fuer openKiBriefing()/runAlphaLbKI() (NEU, 13.09.2026) ──
@@ -22997,7 +23055,7 @@ async function generateDeepDiveKI(sym, name, raw, state) {
         + 'oder eine damit vermutete Kaufabsicht (keine Formulierungen wie "da du diesen Titel ansiehst" '
         + 'oder "für deine Position"). Strukturiere deine Antwort in exakt 3 Abschnitten '
         + '(BaFin-konform, keine Kauf-/Verkaufsempfehlung):\n\n'
-        + 'MARKTLAGE (1 Satz): Wie ist das aktuelle Marktumfeld? Nenne VIX-Level, Regime und DCE-Confidence mit kurzer Einordnung.\n\n'
+        + 'MARKTLAGE (1 Satz): Wie ist das aktuelle Marktumfeld? Nenne VIX-Level und Regime mit kurzer Einordnung; die Signalbreite nur, wenn sie in den Messwerten angegeben ist.\n\n'
         + 'SETUP-BEWERTUNG (2-3 Sätze): Was sagen die Indikatoren über diesen Titel aus'
         + _universeRef + '? Erkläre trendScore, confluenceScore, ADX und RS-Rank in verständlichem '
         + 'Deutsch — nicht als Zahlenauflistung, sondern als zusammenhängende Einschätzung im Verhältnis '
@@ -24224,15 +24282,15 @@ async function runMorningBriefing(forceRefresh) {
         }
 
         // ── DCE: Decision Confidence Engine (August 2026) ─────────────────
-        var _dce = (_alphaData && _alphaData.dce) || {};
-        if (_dce && _dce.confidence != null) {
-          messwerteLines.push('--- DECISION CONFIDENCE ENGINE (DCE) ---');
-          messwerteLines.push('DCE-Confidence: ' + _dce.confidence + '/100 · Ampel: ' + (_dce.mode || '—'));
-          messwerteLines.push('Position-Sizing: ' + ((_dce.position_size || 0) * 100).toFixed(0) + '% · Richtung: ' + (_dce.direction || '—'));
-          if (_dce.warnings && _dce.warnings.length) {
-            messwerteLines.push('DCE-Warnungen: ' + _dce.warnings.join(' | '));
-          }
-          messwerteLines.push('HINWEIS: Die DCE fusioniert MCM-Makro, Ticker-Konsens, CUSUM und EVT-VaR zu einem kalibrierten Vertrauensmaß. Beziehe dich bei niedrigem Confidence-Wert (<50) auf erhöhte Unsicherheit.');
+        // v515 (ADR-1): kein DCE-Block mehr (Confidence/Ampel/Position-Sizing/Richtung/Warnungen) fuer
+        // irgendeinen Nutzer; nur die berechnete Signalbreite aus dce_public (reine Messgroesse).
+        var _dcp = (_alphaData && _alphaData.dce_public) || null;
+        if (_dcp && _dcp.signal_breadth && _dcp.signal_breadth.status === 'ok') {
+          messwerteLines.push('--- SIGNALBREITE (berechnet) ---');
+          messwerteLines.push('Signalbreite: ' + _dcp.signal_breadth.share_pct + ' % von ' + _dcp.signal_breadth.n
+            + ' Titeln (Mittelwert der verfügbaren Scores > ' + _dcp.signal_breadth.threshold + ')'
+            + (_dcp.as_of ? ' · Stand ' + _dcp.as_of : ''));
+          messwerteLines.push('HINWEIS: Reine Messgröße zur Breite der Signale; keine Kauf- oder Erfolgswahrscheinlichkeit, keine Empfehlung.');
           messwerteLines.push('');
         }
       }
@@ -26126,6 +26184,7 @@ async function loadAlphaDashboard(force) {
     var resp = await r.json();
     var data = resp.data || resp;
     _alphaData = data;
+    await loadDceInternalOwner();   // v515: nur Owner erhaelt das interne DCE-Objekt
     // Breadth-Oszillator-Widget befüllen (kein API-Call nötig)
     if (typeof loadBreadthOsc === 'function') loadBreadthOsc();
     renderAlphaDashboard(data);
@@ -26206,11 +26265,13 @@ function renderAlphaDashboard(data) {
         + '<b style="color:' + (col||'var(--text2)') + '">' + val + '</b></div>';
     }
     // ── DCE-Ampel (August 2026) ─────────────────────────────────────────────
-    var dce = data.dce || {};
-    var dceConf = dce.confidence;
-    var dceMode = dce.mode || 'YELLOW';
-    var dceModeCol = dceMode === 'GREEN' ? 'var(--green)' : dceMode === 'RED' ? 'var(--red)' : 'var(--amber)';
-    var dceModeIco = dceMode === 'GREEN' ? '🟢' : dceMode === 'RED' ? '🔴' : '🟡';
+    // v515: internes Objekt nur fuer Owner (Worker /owner/dce); kein stiller Default 'YELLOW'
+    var dce = getDceInternal(data) || {};
+    var dceIsFallback = dce.fallback === true;
+    var dceConf = dceIsFallback ? null : dce.confidence;
+    var dceMode = dceIsFallback ? null : (dce.mode || null);
+    var dceModeCol = dceMode === 'GREEN' ? 'var(--green)' : dceMode === 'RED' ? 'var(--red)' : dceMode === 'YELLOW' ? 'var(--amber)' : 'var(--text3)';
+    var dceModeIco = dceMode === 'GREEN' ? '🟢' : dceMode === 'RED' ? '🔴' : dceMode === 'YELLOW' ? '🟡' : '⚪';
     var dceLabel   = dceConf != null ? (dceModeIco + ' ' + dceConf + '%') : (dceModeIco + ' DCE');
     var dceTip = 'Decision Confidence Engine · ' + dceMode
                + (dceConf != null ? ' · ' + dceConf + '/100' : '')
@@ -26219,11 +26280,13 @@ function renderAlphaDashboard(data) {
 
     weatherEl.innerHTML =
       // DCE-Ampel als erste, prominente Pill
-      (dceConf != null ? (function(){
+      (dceConf != null && dceMode ? (function(){
         var bgMap = {'GREEN':'rgba(52,194,110,0.12)','RED':'rgba(240,86,86,0.12)','YELLOW':'rgba(245,158,11,0.12)'};
         var bg = bgMap[dceMode] || 'rgba(255,255,255,0.06)';
         return '<span title="' + dceTip + '" style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:' + bg + ';color:' + dceModeCol + ';border:0.5px solid ' + dceModeCol + ';margin-right:4px">' + dceLabel + '</span>';
-      })() : '') +
+      })() : (dceIsFallback ? '<span title="Internes DCE: Berechnung fehlgeschlagen (Fallback), kein Signal" style="font-size:10px;padding:3px 8px;border-radius:8px;background:var(--bg3);color:var(--text3);border:0.5px solid var(--border2);margin-right:4px">⚪ DCE-Fallback</span>' : '')) +
+      // v515: oeffentliche Messwerte (Signalbreite; CUSUM/VaR n/v) fuer alle
+      dcePublicPill(data.dce_public) +
       pill('VIX', vt.vix || '—', vt.vix && vt.vix < 20 ? 'var(--green)' : 'var(--red)') +
       pill('Term', vt.signal || '—', vt.signal === 'CONTANGO' ? 'var(--green)' : 'var(--red)') +
       pill('Ratio', vt.ratio || '—') +
@@ -26232,7 +26295,7 @@ function renderAlphaDashboard(data) {
 
     // DCE-Warnungen im Warning-Banner anzeigen (falls vorhanden)
     var dceWarnEl = document.getElementById('dce-warnings');
-    if (dceWarnEl && dce.warnings && dce.warnings.length > 0) {
+    if (dceWarnEl && !dceIsFallback && dce.warnings && dce.warnings.length > 0) {
       dceWarnEl.innerHTML = dce.warnings.map(function(w) {
         return '<div style="font-size:11px;padding:4px 8px;color:' + dceModeCol + '">' + w + '</div>';
       }).join('');
