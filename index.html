@@ -37,11 +37,12 @@
            "DCE-Fallback" gekennzeichnet, nie als Ampel. (3) Fuer alle: Pills
            "Signalbreite x % (n=...)" bzw. "n/v" sowie "CUSUM n/v" / "VaR n/v"
            mit Ursache im Tooltip, gelesen aus data.dce_public. (4) KI-Prompts:
-           der DCE-Block (Confidence, Ampel, Position-Sizing, Richtung,
-           Warnungen) entfaellt fuer ALLE Nutzer inkl. Owner; stattdessen nur
-           die Signalbreite aus dce_public (reine Messgroesse); die
-           Marktlage-Anweisung nennt keine "DCE-Confidence" mehr. Keine
-           Aenderung an Scores, Filtern oder Rankings.
+           der interne DCE-Block (Confidence, Ampel, Position-Sizing,
+           Richtung, Warnungen) bleibt NUR als Owner-Kontext (nur aus
+           /owner/dce, nie aus dem oeffentlichen Payload, nie ein Fallback);
+           fuer alle zusaetzlich die Signalbreite aus dce_public (reine
+           Messgroesse); die Marktlage-Anweisung nennt keine "DCE-Confidence"
+           mehr. Keine Aenderung an Scores, Filtern oder Rankings.
      v514: Public-UI-Bereinigung Batch 1 (28.09.2026, Umbauplan
            PUBLIC-UI-BEREINIGUNG-PLAN.md Punkte 2.1/2.2/2.4/2.7/4.3 + CDN-
            Pin ko-prompts.js v2.55.0 [2.9/2.10] → @e82508a). Nur Texte, keine Logik-
@@ -24282,8 +24283,22 @@ async function runMorningBriefing(forceRefresh) {
         }
 
         // ── DCE: Decision Confidence Engine (August 2026) ─────────────────
-        // v515 (ADR-1): kein DCE-Block mehr (Confidence/Ampel/Position-Sizing/Richtung/Warnungen) fuer
-        // irgendeinen Nutzer; nur die berechnete Signalbreite aus dce_public (reine Messgroesse).
+        // v515 (ADR-1, Entscheidung Axel 30.09.2026): interner DCE-Block (Confidence/Ampel/Position-Sizing/
+        // Richtung/Warnungen) NUR als interner Owner-Kontext: ausschliesslich aus dem ueber GET /owner/dce
+        // geladenen Objekt (_dceInternal; Nicht-Owner erhalten dort 401/403 -> nie ein Block). Ein Fallback-
+        // Objekt (fallback:true) wird nie als Signal in den Prompt uebernommen.
+        var _dce = _dceInternal || {};
+        if (_dce && _dce.fallback !== true && _dce.confidence != null) {
+          messwerteLines.push('--- DECISION CONFIDENCE ENGINE (DCE, intern) ---');
+          messwerteLines.push('DCE-Confidence: ' + _dce.confidence + '/100 · Ampel: ' + (_dce.mode || '—'));
+          messwerteLines.push('Position-Sizing: ' + ((_dce.position_size || 0) * 100).toFixed(0) + '% · Richtung: ' + (_dce.direction || '—'));
+          if (_dce.warnings && _dce.warnings.length) {
+            messwerteLines.push('DCE-Warnungen: ' + _dce.warnings.join(' | '));
+          }
+          messwerteLines.push('HINWEIS: Die DCE fusioniert MCM-Makro, Ticker-Konsens, CUSUM und EVT-VaR zu einem kalibrierten Vertrauensmaß. Beziehe dich bei niedrigem Confidence-Wert (<50) auf erhöhte Unsicherheit.');
+          messwerteLines.push('');
+        }
+        // Fuer alle Nutzer: nur die berechnete Signalbreite aus dce_public (reine Messgroesse).
         var _dcp = (_alphaData && _alphaData.dce_public) || null;
         if (_dcp && _dcp.signal_breadth && _dcp.signal_breadth.status === 'ok') {
           messwerteLines.push('--- SIGNALBREITE (berechnet) ---');
