@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="version" content="20260930-v515">          
+<meta name="version" content="20261003-v516">          
      <!-- CHECKLISTE: NEUES TICKER-FELD HINZUFÜGEN (07.09.2026)
      WICHTIG: ein neues Feld in market_aggregator.pys process_ticker() erreicht
      NICHT automatisch den KI-Prompt. Es gibt (Stand 07.09.2026) SIEBEN
@@ -26,6 +26,11 @@
      Bei jedem neuen Feld: alle sieben Stellen durchgehen, nicht nur die, die
      gerade im Fokus steht. -->
      <!-- CHANGELOG (neueste zuerst):
+     v516: Options-Desk: Herkunftshinweis an der EIC-Zeile (03.10.2026, SUITE №72 /
+           P1 #5, Befund 03.10.2026 im Befundregister). Unter "EIC: Strike ~$ ... Praemie ~ ...%"
+           steht jetzt "Modellschätzung ohne Optionsdaten (Eingabe: Kurs, HVP, Strategie).".
+           Gilt nur im selben if (t.ki_eic)-Zweig, erscheint also nur fuer Owner (der Worker
+           entfernt ki_eic fuer Nicht-Owner). Keine Aenderung an Daten, Worker, Aggregator.
      v515: DCE-Trennung Frontend (30.09.2026, SUITE №72 / Runmap 2 Nacht A, ADR-1;
            Voraussetzung: Aggregator v5.46.0, ko-sync-worker v2.5). (1) Neu:
            loadDceInternalOwner() liest das interne DCE-Objekt NUR ueber GET
@@ -25713,7 +25718,8 @@ function renderOptionsDeskCards(data) {
         + (t.ki.positiveFactors && t.ki.positiveFactors.length ? '<div style="margin-top:4px"><b>Spricht dafür:</b> ' + t.ki.positiveFactors.join(' · ') + '</div>' : '')
         + (t.ki.riskFactors && t.ki.riskFactors.length ? '<div style="margin-top:2px"><b>Risiken:</b> ' + t.ki.riskFactors.join(' · ') + '</div>' : '')
         + (t.ki.modelParamRange ? '<div style="margin-top:2px;color:var(--text3)">Modellbereich: ' + (t.ki.modelParamRange.dte||'') + ', ' + (t.ki.modelParamRange.strikeGuideline||'') + '</div>' : '')
-        + (t.ki_eic ? '<div style="margin-top:4px;color:#818cf8">EIC: Strike ~$' + (t.ki_eic.strikeSuggestion||'--') + ' · DTE ' + (t.ki_eic.dte||'--') + ' · Δ ' + (t.ki_eic.deltaTarget||'--') + ' · Prämie ~' + (t.ki_eic.premiumEstimate||'--') + '%</div>' : '')
+        + (t.ki_eic ? '<div style="margin-top:4px;color:#818cf8">EIC: Strike ~$' + (t.ki_eic.strikeSuggestion||'--') + ' · DTE ' + (t.ki_eic.dte||'--') + ' · Δ ' + (t.ki_eic.deltaTarget||'--') + ' · Prämie ~' + (t.ki_eic.premiumEstimate||'--') + '%</div>'
+          + '<div style="margin-top:2px;color:var(--text3)">Modellschätzung ohne Optionsdaten (Eingabe: Kurs, HVP, Strategie).</div>' : '')
         + '</div>';
     }
     return '<div style="background:var(--bg2);border-radius:10px;padding:.6rem .8rem;border:0.5px solid var(--border2)">'
